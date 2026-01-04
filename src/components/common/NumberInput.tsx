@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { formatNumber, parseNumber } from '../../utils/formatters';
 
 interface NumberInputProps {
@@ -11,13 +11,8 @@ interface NumberInputProps {
 export function NumberInput({ value, onChange, placeholder = '0', className = '' }: NumberInputProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [localValue, setLocalValue] = useState('');
-  const prevValueRef = useRef(value);
 
-  // 외부 value가 변경되면 localValue 초기화 (focusing 중이 아닐 때만)
-  if (!isFocused && prevValueRef.current !== value) {
-    prevValueRef.current = value;
-  }
-
+  // 표시할 값 결정: 포커스 중이면 로컬 값, 아니면 외부 값
   const displayValue = isFocused
     ? localValue
     : value === 0

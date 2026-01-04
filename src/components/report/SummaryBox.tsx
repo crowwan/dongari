@@ -6,6 +6,25 @@ interface SummaryBoxProps {
   data: AccountingData;
 }
 
+const styles = {
+  container: {
+    fontSize: '12px',
+  },
+  yearLabel: {
+    fontWeight: 'bold',
+  },
+  item: {
+    paddingLeft: '8px',
+  },
+  balance: {
+    paddingLeft: '8px',
+    fontWeight: 'bold',
+  },
+  spacer: {
+    marginTop: '8px',
+  },
+};
+
 export function SummaryBox({ data }: SummaryBoxProps) {
   const { basicInfo } = data;
   const totalIncome = sumYearlyIncome(data.monthlyData);
@@ -13,13 +32,13 @@ export function SummaryBox({ data }: SummaryBoxProps) {
   const balance = calculateBalance(data);
 
   return (
-    <div className="text-sm space-y-1">
-      <div className="font-bold">{basicInfo.year - 1}년</div>
-      <div className="pl-2">이월금 ₩ {formatNumber(basicInfo.carryover)}</div>
-      <div className="font-bold mt-2">{basicInfo.year}년</div>
-      <div className="pl-2">수 입 ₩ {formatNumber(totalIncome)}</div>
-      <div className="pl-2">지 출 ₩ {formatNumber(totalExpense)}</div>
-      <div className="pl-2 font-bold">잔 액 ₩ {formatNumber(balance)}</div>
+    <div style={styles.container}>
+      <div style={styles.yearLabel}>{basicInfo.year - 1}년</div>
+      <div style={styles.item}>이월금 ₩ {formatNumber(basicInfo.carryover)}</div>
+      <div style={{ ...styles.yearLabel, ...styles.spacer }}>{basicInfo.year}년</div>
+      <div style={styles.item}>수 입 ₩ {formatNumber(totalIncome)}</div>
+      <div style={styles.item}>지 출 ₩ {formatNumber(totalExpense)}</div>
+      <div style={styles.balance}>잔 액 ₩ {formatNumber(balance)}</div>
     </div>
   );
 }

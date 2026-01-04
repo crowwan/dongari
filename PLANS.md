@@ -319,45 +319,63 @@ src/
 
 ## 8. 개발 단계
 
-### Phase 1: 프로젝트 세팅
+### Phase 1: 프로젝트 세팅 ✅
 
-- [ ] Vite + React + TypeScript 프로젝트 생성
-- [ ] Tailwind CSS 설정
-- [ ] 기본 폴더 구조 생성
+- [x] Vite + React + TypeScript 프로젝트 생성
+- [x] Tailwind CSS v4 설정 (@tailwindcss/vite 플러그인)
+- [x] 기본 폴더 구조 생성
 
-### Phase 2: 타입 및 유틸리티
+### Phase 2: 타입 및 유틸리티 ✅
 
-- [ ] TypeScript 타입 정의
-- [ ] localStorage 유틸리티 함수
-- [ ] 숫자 포맷팅 함수 (콤마, 원화)
-- [ ] 계산 함수 (합계, 잔액)
+- [x] TypeScript 타입 정의 (src/types/accounting.ts)
+- [x] localStorage 유틸리티 함수 (src/utils/storage.ts)
+- [x] 숫자 포맷팅 함수 (src/utils/formatters.ts)
+- [x] 계산 함수 (src/utils/calculations.ts)
 
-### Phase 3: 데이터 관리
+### Phase 3: 데이터 관리 ✅
 
-- [ ] useAccountingData 훅 구현
-- [ ] 자동 저장 기능
-- [ ] 데이터 불러오기 기능
+- [x] useAccountingData 훅 구현
+- [x] 자동 저장 기능 (useEffect로 data 변경 시 저장)
+- [x] 데이터 불러오기 기능
 
-### Phase 4: 입력 UI
+### Phase 4: 입력 UI ✅
 
-- [ ] 탭 네비게이션 컴포넌트
-- [ ] 기본정보 탭 UI
-- [ ] 월별입력 탭 UI (아코디언)
-- [ ] 수입내역 탭 UI
-- [ ] 숫자 입력 컴포넌트 (콤마 자동 포맷)
-- [ ] 항목 추가/삭제 컴포넌트
+- [x] 탭 네비게이션 컴포넌트
+- [x] 기본정보 탭 UI
+- [x] 월별입력 탭 UI (아코디언)
+- [x] 수입내역 탭 UI
+- [x] 숫자 입력 컴포넌트 (콤마 자동 포맷)
+- [x] 항목 추가/삭제 컴포넌트
 
-### Phase 5: 미리보기 및 이미지 저장
+### Phase 5: 미리보기 및 이미지 저장 ✅
 
-- [ ] 보고서 미리보기 컴포넌트
-- [ ] 수입지출 표 컴포넌트
-- [ ] 지출내역 표 컴포넌트 (월별 행 맞춤 로직)
-- [ ] html2canvas로 이미지 저장 기능 구현
+- [x] 보고서 미리보기 컴포넌트
+- [x] 수입지출 표 컴포넌트
+- [x] 지출내역 표 컴포넌트 (좌우 분할, rowSpan 처리)
+- [x] html2canvas로 이미지 저장 기능 구현
+- [x] oklch 색상 호환성 문제 해결 (인라인 스타일 사용)
 
-### Phase 6: 마무리
+### Phase 6: 마무리 ✅
 
-- [ ] 모바일 UI 최적화 및 데스크탑 대응
-- [ ] 테스트 및 버그 수정
+- [x] 모바일 우선 레이아웃 (max-w-md, 중앙 정렬)
+- [x] ESLint 에러 수정 (React hooks 규칙 준수)
+- [x] 빌드 테스트 완료
+
+---
+
+## 11. 기술적 이슈 및 해결
+
+### html2canvas oklch 색상 미지원
+
+**문제**: Tailwind CSS v4가 oklch 색상 함수를 사용하는데, html2canvas가 이를 파싱하지 못함
+
+**해결**: 보고서 컴포넌트들에서 Tailwind 클래스 대신 인라인 스타일로 hex 색상 직접 지정
+
+### React hooks 규칙
+
+**문제**: useEffect 내 setState 호출, 렌더 중 ref 접근
+
+**해결**: 상태 기반 로직으로 전환, useCallback으로 이벤트 핸들러 최적화
 
 ---
 
