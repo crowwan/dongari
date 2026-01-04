@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { formatNumber, parseNumber } from '../../utils/formatters';
 
 interface NumberInputProps {
@@ -9,23 +9,39 @@ interface NumberInputProps {
 }
 
 export function NumberInput({ value, onChange, placeholder = '0', className = '' }: NumberInputProps) {
-  const [displayValue, setDisplayValue] = useState(value === 0 ? '' : formatNumber(value));
+  const [isFocused, setIsFocused] = useState(false);
+  const [localValue, setLocalValue] = useState('');
+  const prevValueRef = useRef(value);
 
-  useEffect(() => {
-    setDisplayValue(value === 0 ? '' : formatNumber(value));
-  }, [value]);
+  // 외부 value가 변경되면 localValue 초기화 (focusing 중이 아닐 때만)
+  if (!isFocused && prevValueRef.current !== value) {
+    prevValueRef.current = value;
+  }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const displayValue = isFocused
+    ? localValue
+    : value === 0
+      ? ''
+      : formatNumber(value);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     const numericValue = parseNumber(inputValue);
+    const formatted = numericValue === 0 ? '' : formatNumber(numericValue);
 
-    setDisplayValue(numericValue === 0 ? '' : formatNumber(numericValue));
+    setLocalValue(formatted);
     onChange(numericValue);
-  };
+  }, [onChange]);
 
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    setIsFocused(true);
+    setLocalValue(value === 0 ? '' : formatNumber(value));
     e.target.select();
-  };
+  }, [value]);
+
+  const handleBlur = useCallback(() => {
+    setIsFocused(false);
+  }, []);
 
   return (
     <input
@@ -34,6 +50,7 @@ export function NumberInput({ value, onChange, placeholder = '0', className = ''
       value={displayValue}
       onChange={handleChange}
       onFocus={handleFocus}
+      onBlur={handleBlur}
       placeholder={placeholder}
       className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`}
     />

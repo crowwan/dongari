@@ -5,6 +5,7 @@ import { TabNavigation } from './components/common/TabNavigation';
 import { BasicInfoTab } from './components/tabs/BasicInfoTab';
 import { MonthlyInputTab } from './components/tabs/MonthlyInputTab';
 import { IncomeDetailTab } from './components/tabs/IncomeDetailTab';
+import { PreviewTab } from './components/tabs/PreviewTab';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('basic');
@@ -50,11 +51,7 @@ function App() {
           />
         );
       case 'preview':
-        return (
-          <div className="p-4 text-center text-gray-500">
-            미리보기 (구현 예정)
-          </div>
-        );
+        return <PreviewTab data={data} />;
     }
   };
 
