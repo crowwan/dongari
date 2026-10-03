@@ -23,11 +23,11 @@ describe('SPEC-002 저장 (메모리)', () => {
     const data = sampleData()
 
     expect(repository.save(data)).toEqual({ ok: true })
-    expect(repository.load()).toEqual(data)
+    expect(repository.load()).toEqual({ status: 'ok', data })
   })
 
   it('처음에는 빈 초기값을 돌려준다', () => {
-    expect(new MemoryRepository().load()).toEqual({ schemaVersion: 2, ledgers: {}, settings: {} })
+    expect(new MemoryRepository().load()).toEqual({ status: 'ok', data: { schemaVersion: 2, ledgers: {}, settings: {} } })
   })
 
   it('저장한 뒤 원본 객체를 바꿔도 저장된 값은 바뀌지 않는다', () => {
@@ -37,6 +37,6 @@ describe('SPEC-002 저장 (메모리)', () => {
 
     data.ledgers['2026'].entries.push({ ...data.ledgers['2026'].entries[0], id: 'e2' })
 
-    expect(repository.load().ledgers['2026'].entries).toHaveLength(1)
+    expect(repository.load().data.ledgers['2026'].entries).toHaveLength(1)
   })
 })

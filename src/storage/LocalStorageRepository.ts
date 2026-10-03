@@ -1,5 +1,5 @@
 import type { StoredData } from '../domain/types'
-import type { LedgerRepository, SaveFailureReason, SaveResult } from './LedgerRepository'
+import type { LedgerRepository, LoadResult, ReadOnlyReason, SaveResult } from './LedgerRepository'
 import { migrate, NewerSchemaError } from './migrate'
 import { createEmptyData } from './schema'
 
@@ -7,11 +7,8 @@ export const STORAGE_KEY = 'dongari:v2'
 // 읽을 수 없는 원본을 보존하는 키 접두사. 뒤에 보존 시각이 붙는다
 export const BROKEN_KEY_PREFIX = 'dongari:v2:broken:'
 
-// 원본을 덮어쓰면 안 되는 상황. 이때 save 는 쓰지 않고 실패를 돌려준다
 // 이 저장소가 쓰는 Storage 기능만 (테스트에서 바꿔 끼울 수 있게)
 type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
-
-type SaveBlock = Extract<SaveFailureReason, 'newer-version' | 'unreadable-original'>
 
 function isQuotaExceeded(error: unknown): boolean {
   return (
@@ -22,29 +19,28 @@ function isQuotaExceeded(error: unknown): boolean {
 
 export class LocalStorageRepository implements LedgerRepository {
   private readonly storage: KeyValueStorage
-  private saveBlock: SaveBlock | undefined
+  // 원본을 덮어쓰면 안 되는 상황. 이때 save 는 쓰지 않고 실패를 돌려준다
+  private saveBlock: ReadOnlyReason | undefined
 
   constructor(storage: KeyValueStorage = localStorage) {
     this.storage = storage
   }
 
   // 데이터가 없거나 읽을 수 없으면 빈 초기값으로 시작한다. 원본은 조용히 버리지 않는다
-  // - 깨진/형식이 다른 데이터: 별도 키에 보존하고 원래 키를 비운 뒤 이후 저장을 허용
-  // - 상위 버전 데이터: 새 앱이 다시 읽을 수 있게 이후 저장을 막는다
-  load(): StoredData {
+  // - 깨진/형식이 다른 데이터: 별도 키에 보존하고 원래 키를 비운 뒤 이후 저장을 허용 (recovered)
+  //   보존하지 못하면 원본을 덮어쓰지 않게 저장을 막는다 (read-only: unreadable-original)
+  // - 상위 버전 데이터: 새 앱이 다시 읽을 수 있게 이후 저장을 막는다 (read-only: newer-version)
+  load(): LoadResult {
     this.saveBlock = undefined
     const raw = this.storage.getItem(STORAGE_KEY)
-    if (raw === null) return createEmptyData()
+    if (raw === null) return { status: 'ok', data: createEmptyData() }
 
     try {
-      return migrate(JSON.parse(raw))
+      return { status: 'ok', data: migrate(JSON.parse(raw)) }
     } catch (error) {
-      if (error instanceof NewerSchemaError) {
-        this.saveBlock = 'newer-version'
-      } else if (!this.preserveBroken(raw)) {
-        this.saveBlock = 'unreadable-original'
-      }
-      return createEmptyData()
+      if (error instanceof NewerSchemaError) return this.readOnly('newer-version')
+      if (!this.preserveBroken(raw)) return this.readOnly('unreadable-original')
+      return { status: 'recovered', data: createEmptyData() }
     }
   }
 
@@ -58,6 +54,11 @@ export class LocalStorageRepository implements LedgerRepository {
       if (isQuotaExceeded(error)) return { ok: false, reason: 'quota-exceeded' }
       return { ok: false, reason: 'unknown', error }
     }
+  }
+
+  private readOnly(reason: ReadOnlyReason): LoadResult {
+    this.saveBlock = reason
+    return { status: 'read-only', reason, data: createEmptyData() }
   }
 
   // 원본을 보존 키로 옮긴다. 원래 키를 비워야 다음 load 때 같은 원본을 또 보존하지 않는다

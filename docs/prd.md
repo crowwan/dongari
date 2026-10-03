@@ -62,10 +62,11 @@ Ledger (연도별 장부 1개)
 └─ entries: Entry[]
      Entry { id, month(1~12), type('income'|'expense'), name, amount, createdAt, batchId? }  // batchId: 사진으로 함께 넣은 묶음 (되돌리기용)
 
-Settings { frequentNames: { income: string[], expense: string[] } }  // 자주 쓰는 항목
+Settings { lastBackupAt?, lastChangedAt? }
 ```
 
 - 월별 수입·지출, 지출 상세표, 수입내역(항목별 합)은 전부 `entries` 에서 **계산**한다. 저장하지 않는다.
+- 자주 쓰는 항목도 저장하지 않고 전체 연도 `entries` 에서 최근 사용 순으로 계산한다 (SPEC-001 결정, #11).
 - 저장 형식에 `schemaVersion` 을 둔다. 상세는 [ADR 001](decisions/001-storage.md).
 
 ## 기술 스택
