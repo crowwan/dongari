@@ -93,6 +93,28 @@ describe('SPEC-002 저장 (localStorage)', () => {
       expect(localStorage.getItem(brokenKeys()[0])).toBe('not json')
     })
 
+    it('저장 없이 앱을 다시 열어도 같은 원본을 또 보존하지 않는다', () => {
+      localStorage.setItem(STORAGE_KEY, 'not json')
+
+      new LocalStorageRepository().load()
+      new LocalStorageRepository().load()
+
+      expect(brokenKeys()).toHaveLength(1)
+      expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+    })
+
+    it('보존 후 원래 키를 비우지 못해도 빈 장부로 시작하고 저장할 수 있다', () => {
+      localStorage.setItem(STORAGE_KEY, 'not json')
+      vi.spyOn(Storage.prototype, 'removeItem').mockImplementationOnce(() => {
+        throw new Error('삭제 실패')
+      })
+      const repository = new LocalStorageRepository()
+
+      expect(repository.load()).toEqual({ schemaVersion: 2, ledgers: {}, settings: {} })
+      expect(localStorage.getItem(brokenKeys()[0])).toBe('not json')
+      expect(repository.save(sampleData())).toEqual({ ok: true })
+    })
+
     it('원본을 보존하지 못하면 저장을 막아 원본을 덮어쓰지 않는다', () => {
       localStorage.setItem(STORAGE_KEY, 'not json')
       vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {

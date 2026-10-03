@@ -1,6 +1,7 @@
 // 저장 데이터 런타임 검증. 외부에서 들어온 값(localStorage, 백업 파일)은 이 가드를 통과해야 타입을 얻는다
 import {
   CURRENT_SCHEMA_VERSION,
+  ENTRY_AMOUNT_MAX,
   type Entry,
   type Ledger,
   type Settings,
@@ -32,7 +33,9 @@ export function isEntry(value: unknown): value is Entry {
     (type === 'income' || type === 'expense') &&
     typeof name === 'string' &&
     typeof amount === 'number' &&
-    Number.isFinite(amount) &&
+    Number.isInteger(amount) &&
+    amount > 0 &&
+    amount <= ENTRY_AMOUNT_MAX &&
     typeof createdAt === 'string' &&
     isOptionalString(batchId)
   )

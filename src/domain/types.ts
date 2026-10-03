@@ -2,13 +2,17 @@
 
 export type EntryType = 'income' | 'expense'
 
+// 기록 한 줄 금액 상한 (원). 금액은 1 ~ 이 값 사이의 정수
+// TODO(#21): 머지 후 src/ui/money.ts 의 MONEY_MAX 와 한 곳으로 통합
+export const ENTRY_AMOUNT_MAX = 999_999_999
+
 // 장부 한 줄. 월별 합계·지출 상세·수입내역은 entries 에서 계산하고 저장하지 않는다
 export interface Entry {
   id: string
   month: number // 1~12
   type: EntryType
   name: string
-  amount: number
+  amount: number // 1 ~ ENTRY_AMOUNT_MAX 정수
   createdAt: string // ISO 8601
   batchId?: string // 사진으로 함께 넣은 묶음 (되돌리기용)
 }
@@ -17,7 +21,7 @@ export interface Entry {
 export interface Ledger {
   year: number
   clubName: string
-  carryover: number // 전년도 이월금
+  carryover: number // 전년도 이월금 (적자면 음수)
   entries: Entry[]
 }
 

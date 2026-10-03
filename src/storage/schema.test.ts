@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ENTRY_AMOUNT_MAX } from '../domain/types'
 import { createEmptyData, isStoredData } from './schema'
 
 function validData(): unknown {
@@ -61,6 +62,14 @@ describe('SPEC-002 저장 스키마 검증', () => {
   })
 
   it.each([
+    ['금액 1원', withEntryPatch({ amount: 1 })],
+    ['금액 상한', withEntryPatch({ amount: ENTRY_AMOUNT_MAX })],
+    ['이월금 음수 (전년도 적자)', withLedgerPatch({ carryover: -50_000 })],
+  ])('경계 안의 값은 인정한다: %s', (_label, raw) => {
+    expect(isStoredData(raw)).toBe(true)
+  })
+
+  it.each([
     ['null', null],
     ['배열', []],
     ['문자열', 'hello'],
@@ -90,6 +99,10 @@ describe('SPEC-002 저장 스키마 검증', () => {
     ['월이 소수', withEntryPatch({ month: 1.5 })],
     ['종류가 income/expense 가 아님', withEntryPatch({ type: 'refund' })],
     ['이름이 문자열이 아님', withEntryPatch({ name: 3 })],
+    ['금액이 0', withEntryPatch({ amount: 0 })],
+    ['금액이 음수', withEntryPatch({ amount: -1000 })],
+    ['금액이 소수', withEntryPatch({ amount: 1000.5 })],
+    ['금액이 상한 + 1', withEntryPatch({ amount: ENTRY_AMOUNT_MAX + 1 })],
     ['금액이 NaN', withEntryPatch({ amount: Number.NaN })],
     ['금액이 문자열', withEntryPatch({ amount: '1000' })],
     ['createdAt 없음', withEntryPatch({ createdAt: undefined })],
