@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>공유 검증 (#6)</title>
+<!--
+  이슈 #6 기술 검증: 삼성 인터넷·크롬(갤럭시)에서 navigator.share({ files }) 와
+  사용자 누름 직후(일시적 활성화) 제한을 확인하는 독립 페이지.
+  앱 빌드에 포함되지 않는다. html2canvas 는 레포와 같은 1.4.1 을 CDN 에서 고정 로드.
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+  integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H"
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; font-family: system-ui, -apple-system, "Noto Sans KR", sans-serif; background: #f5f5f4; color: #1c1917; font-size: 16px; line-height: 1.5; }
+  h1 { font-size: 22px; margin: 0 0 12px; }
+  h2 { font-size: 19px; margin: 24px 0 8px; }
+  .card { background: #ffffff; border: 1px solid #e7e5e4; border-radius: 12px; padding: 12px; }
+  .env { font-size: 14px; word-break: break-all; }
+  .env dt { font-weight: 700; margin-top: 6px; }
+  .env dd { margin: 0; font-family: ui-monospace, monospace; }
+  .buttons { display: flex; flex-direction: column; gap: 10px; }
+  button, .btn { display: block; width: 100%; min-height: 56px; padding: 12px 16px; font-size: 19px; font-weight: 700; text-align: left; border: 0; border-radius: 12px; background: #1d4ed8; color: #ffffff; cursor: pointer; }
+  button:active { background: #1e3a8a; }
+  button.secondary { background: #44403c; }
+  button .sub { display: block; font-size: 14px; font-weight: 400; opacity: 0.85; }
+  #log { font-family: ui-monospace, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; min-height: 120px; max-height: 60vh; overflow: auto; margin: 0; }
+  .ok { color: #15803d; }
+  .err { color: #b91c1c; }
+  .info { color: #57534e; }
+  #logText { width: 100%; height: 160px; font-size: 12px; display: none; margin-top: 8px; }
+  .notice { margin: 24px 0 40px; padding: 16px; border-radius: 12px; background: #fef3c7; font-size: 18px; font-weight: 700; }
+  .report-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>보고서 공유 검증 (#6)</h1>
+
+<h2>환경</h2>
+<div class="card">
+  <dl class="env">
+    <dt>userAgent</dt><dd id="ua"></dd>
+    <dt>navigator.share</dt><dd id="hasShare"></dd>
+    <dt>navigator.canShare</dt><dd id="hasCanShare"></dd>
+    <dt>canShare({ files: [작은 png] })</dt><dd id="canShareFiles"></dd>
+    <dt>미리 생성한 보고서 PNG</dt><dd id="pregenStatus">생성 중...</dd>
+  </dl>
+</div>
+
+<h2>테스트</h2>
+<div class="buttons">
+  <button type="button" id="t1">1. 작은 PNG 바로 공유<span class="sub">누르는 즉시 만든 작은 그림</span></button>
+  <button type="button" id="t2">2. 보고서 만들고 바로 공유<span class="sub">누른 뒤 html2canvas(scale 2)로 생성</span></button>
+  <button type="button" id="t3">3. 1초 기다린 뒤 공유<span class="sub">작은 PNG, 인위적 지연 1초</span></button>
+  <button type="button" id="t4">4. 3초 기다린 뒤 공유<span class="sub">작은 PNG, 인위적 지연 3초</span></button>
+  <button type="button" id="t5">5. 미리 만든 보고서 공유<span class="sub">페이지 열 때 만들어 둔 PNG</span></button>
+  <button type="button" id="t6" class="secondary">6. 사진으로 저장 (대체 방법)<span class="sub">공유가 안 될 때 a download</span></button>
+</div>
+
+<h2>결과 기록</h2>
+<div class="card">
+  <pre id="log"></pre>
+</div>
+<div class="buttons" style="margin-top: 10px;">
+  <button type="button" id="copyLog" class="secondary">기록 전체 복사</button>
+</div>
+<textarea id="logText" readonly></textarea>
+
+<h2>샘플 보고서</h2>
+<div class="report-wrap">
+  <!-- 실제 v1 보고서와 비슷한 크기. html2canvas 가 oklch 를 못 읽으므로 인라인 hex 색만 사용 -->
+  <div id="report" style="width: 720px; background: #ffffff; color: #1c1917; padding: 32px; font-family: system-ui, sans-serif;">
+    <div style="text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 4px;">2026년 동아리 회계 보고서</div>
+    <div style="text-align: center; font-size: 16px; color: #57534e; margin-bottom: 24px;">기간: 2026.01 ~ 2026.12</div>
+    <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+      <div style="flex: 1; background: #eff6ff; border-radius: 10px; padding: 14px;">
+        <div style="font-size: 14px; color: #1e40af;">총 수입</div>
+        <div id="sumIncome" style="font-size: 22px; font-weight: 700; color: #1e40af;"></div>
+      </div>
+      <div style="flex: 1; background: #fef2f2; border-radius: 10px; padding: 14px;">
+        <div style="font-size: 14px; color: #b91c1c;">총 지출</div>
+        <div id="sumExpense" style="font-size: 22px; font-weight: 700; color: #b91c1c;"></div>
+      </div>
+      <div style="flex: 1; background: #f0fdf4; border-radius: 10px; padding: 14px;">
+        <div style="font-size: 14px; color: #15803d;">잔액</div>
+        <div id="sumBalance" style="font-size: 22px; font-weight: 700; color: #15803d;"></div>
+      </div>
+    </div>
+    <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">월별 수입·지출</div>
+    <table style="width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 24px;">
+      <thead>
+        <tr style="background: #f5f5f4;">
+          <th style="border: 1px solid #d6d3d1; padding: 8px; text-align: left;">월</th>
+          <th style="border: 1px solid #d6d3d1; padding: 8px; text-align: right;">수입</th>
+          <th style="border: 1px solid #d6d3d1; padding: 8px; text-align: right;">지출</th>
+          <th style="border: 1px solid #d6d3d1; padding: 8px; text-align: right;">잔액</th>
+        </tr>
+      </thead>
+      <tbody id="monthRows"></tbody>
+    </table>
+    <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">지출 상세</div>
+    <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
+      <thead>
+        <tr style="background: #f5f5f4;">
+          <th style="border: 1px solid #d6d3d1; padding: 8px; text-align: left;">날짜</th>
+          <th style="border: 1px solid #d6d3d1; padding: 8px; text-align: left;">내용</th>
+          <th style="border: 1px solid #d6d3d1; padding: 8px; text-align: right;">금액</th>
+        </tr>
+      </thead>
+      <tbody id="detailRows"></tbody>
+    </table>
+    <div style="margin-top: 24px; text-align: right; font-size: 14px; color: #57534e;">총무 김○○ (확인용 샘플 데이터)</div>
+  </div>
+</div>
+
+<div class="notice">테스트가 끝나면 이 화면(특히 "환경"과 "결과 기록")을 캡처하거나 "기록 전체 복사"로 복사해서 보내주세요. 어느 브라우저(삼성 인터넷/크롬)인지도 같이 알려주세요.</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- 샘플 보고서 채우기 ----------
+  var won = function (n) { return n.toLocaleString('ko-KR') + '원'; };
+  var cell = 'border: 1px solid #d6d3d1; padding: 8px;';
+  var months = [];
+  var totalIncome = 0;
+  var totalExpense = 0;
+  for (var m = 1; m <= 12; m++) {
+    var income = 300000 + (m % 3) * 50000;
+    var expense = 180000 + ((m * 37) % 7) * 20000;
+    totalIncome += income;
+    totalExpense += expense;
+    months.push('<tr><td style="' + cell + '">' + m + '월</td>' +
+      '<td style="' + cell + ' text-align: right; color: #1e40af;">' + won(income) + '</td>' +
+      '<td style="' + cell + ' text-align: right; color: #b91c1c;">' + won(expense) + '</td>' +
+      '<td style="' + cell + ' text-align: right;">' + won(totalIncome - totalExpense) + '</td></tr>');
+  }
+  document.getElementById('monthRows').innerHTML = months.join('');
+  document.getElementById('sumIncome').textContent = won(totalIncome);
+  document.getElementById('sumExpense').textContent = won(totalExpense);
+  document.getElementById('sumBalance').textContent = won(totalIncome - totalExpense);
+
+  var items = ['정기모임 다과', '회의실 대관', '현수막 제작', '꽃다발', '경조사비', '문구류', '야유회 버스', '점심 식사',
+    '음료', '기념품', '사진 인화', '우편 발송', '연말 행사 케이크', '회원 선물', '교통비', '간식', '복사비', '강사 사례비',
+    '장소 청소비', '송년회 식사'];
+  var details = items.map(function (name, i) {
+    var month = (i % 12) + 1;
+    var day = ((i * 7) % 27) + 1;
+    var amount = 15000 + ((i * 53) % 17) * 5000;
+    return '<tr><td style="' + cell + '">' + month + '/' + day + '</td>' +
+      '<td style="' + cell + '">' + name + '</td>' +
+      '<td style="' + cell + ' text-align: right;">' + won(amount) + '</td></tr>';
+  });
+  document.getElementById('detailRows').innerHTML = details.join('');
+
+  // ---------- 기록 ----------
+  var logEl = document.getElementById('log');
+  var lines = [];
+  function stamp() {
+    var d = new Date();
+    var p = function (n, w) { return String(n).padStart(w || 2, '0'); };
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) + '.' + p(d.getMilliseconds(), 3);
+  }
+  function log(kind, text) {
+    var line = '[' + stamp() + '] ' + text;
+    lines.push(line);
+    var div = document.createElement('div');
+    div.className = kind;
+    div.textContent = line;
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function errText(e) {
+    if (e && typeof e === 'object' && 'name' in e) return e.name + ': ' + e.message;
+    return String(e);
+  }
+  // 일시적 활성화 상태 (지원 브라우저만)
+  function activation() {
+    var ua = navigator.userActivation;
+    if (!ua) return 'userActivation 미지원';
+    return 'isActive=' + ua.isActive + ', hasBeenActive=' + ua.hasBeenActive;
+  }
+
+  // ---------- PNG 만들기 ----------
+  // 작은 PNG 를 동기로 만든다 (toDataURL → Blob). 누름 직후 지연 없이 공유하기 위함.
+  function makeSmallPngSync() {
+    var c = document.createElement('canvas');
+    c.width = 200; c.height = 120;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#1d4ed8'; ctx.fillRect(0, 0, 200, 120);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 22px sans-serif';
+    ctx.fillText('공유 테스트', 20, 55);
+    ctx.font = '16px sans-serif';
+    ctx.fillText(stamp(), 20, 90);
+    var b64 = c.toDataURL('image/png').split(',')[1];
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new File([bytes], 'share-test-small.png', { type: 'image/png' });
+  }
+
+  function canvasToFile(canvas, name) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (!blob) { reject(new Error('toBlob 결과가 비어 있음')); return; }
+        resolve(new File([blob], name, { type: 'image/png' }));
+      }, 'image/png');
+    });
+  }
+
+  function renderReport() {
+    if (typeof window.html2canvas !== 'function') {
+      return Promise.reject(new Error('html2canvas 로드 실패'));
+    }
+    return window.html2canvas(document.getElementById('report'), { scale: 2, backgroundColor: '#ffffff' })
+      .then(function (canvas) { return canvasToFile(canvas, 'dongari-report.png'); });
+  }
+
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  // ---------- 공유 공통 ----------
+  // t0: 버튼 누른 시각(performance.now). share 호출 직전까지 걸린 시간과 전체 시간을 남긴다.
+  function share(label, file, t0) {
+    var before = Math.round(performance.now() - t0);
+    if (!navigator.share) {
+      log('err', label + ' | 누름→공유호출 ' + before + 'ms | 실패: navigator.share 없음');
+      return Promise.resolve();
+    }
+    var data = { files: [file], title: '동아리 회계 보고서' };
+    var can = navigator.canShare ? navigator.canShare(data) : '(canShare 없음)';
+    log('info', label + ' | 누름→공유호출 ' + before + 'ms | 파일 ' + Math.round(file.size / 1024) + 'KB | canShare=' + can + ' | ' + activation());
+    var p;
+    try {
+      p = navigator.share(data);
+    } catch (e) {
+      log('err', label + ' | 동기 예외 ' + errText(e));
+      return Promise.resolve();
+    }
+    return p.then(function () {
+      log('ok', label + ' | 성공 (공유 완료) | 총 ' + Math.round(performance.now() - t0) + 'ms');
+    }, function (e) {
+      // AbortError = 공유창은 떴지만 취소, NotAllowedError = 누름 효력 만료 등으로 거부
+      log('err', label + ' | 실패 ' + errText(e) + ' | 총 ' + Math.round(performance.now() - t0) + 'ms');
+    });
+  }
+
+  // ---------- 환경 표시 ----------
+  document.getElementById('ua').textContent = navigator.userAgent;
+  document.getElementById('hasShare').textContent = typeof navigator.share === 'function' ? '있음' : '없음';
+  document.getElementById('hasCanShare').textContent = typeof navigator.canShare === 'function' ? '있음' : '없음';
+  var canFilesText;
+  try {
+    canFilesText = typeof navigator.canShare === 'function'
+      ? String(navigator.canShare({ files: [makeSmallPngSync()] }))
+      : '판단 불가 (canShare 없음)';
+  } catch (e) {
+    canFilesText = '예외 ' + errText(e);
+  }
+  document.getElementById('canShareFiles').textContent = canFilesText;
+  log('info', '페이지 로드 | share=' + (typeof navigator.share) + ' canShare=' + (typeof navigator.canShare) + ' canShare(files)=' + canFilesText);
+  log('info', 'UA ' + navigator.userAgent);
+
+  // ---------- 미리 생성 ----------
+  var pregenFile = null;
+  var pregenStatus = document.getElementById('pregenStatus');
+  var pg0 = performance.now();
+  // 폰트 적용 후 생성해야 실제와 비슷하다
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+    .then(renderReport)
+    .then(function (file) {
+      pregenFile = file;
+      var ms = Math.round(performance.now() - pg0);
+      pregenStatus.textContent = '완료 ' + ms + 'ms, ' + Math.round(file.size / 1024) + 'KB';
+      log('ok', '미리 생성 완료 | ' + ms + 'ms | ' + Math.round(file.size / 1024) + 'KB');
+    }, function (e) {
+      pregenStatus.textContent = '실패 ' + errText(e);
+      log('err', '미리 생성 실패 | ' + errText(e));
+    });
+
+  // ---------- 버튼 ----------
+  function on(id, fn) { document.getElementById(id).addEventListener('click', fn); }
+
+  on('t1', function () {
+    var t0 = performance.now();
+    log('info', '1 작은PNG 누름');
+    share('1 작은PNG', makeSmallPngSync(), t0);
+  });
+
+  on('t2', function () {
+    var t0 = performance.now();
+    log('info', '2 생성후공유 누름 | ' + activation());
+    renderReport().then(function (file) {
+      log('info', '2 생성후공유 | html2canvas 생성 ' + Math.round(performance.now() - t0) + 'ms');
+      return share('2 생성후공유', file, t0);
+    }, function (e) {
+      log('err', '2 생성후공유 | 생성 실패 ' + errText(e));
+    });
+  });
+
+  function delayed(label, ms) {
+    return function () {
+      var t0 = performance.now();
+      var file = makeSmallPngSync();
+      log('info', label + ' 누름 | ' + ms + 'ms 대기 시작');
+      wait(ms).then(function () { return share(label, file, t0); });
+    };
+  }
+  on('t3', delayed('3 지연1초', 1000));
+  on('t4', delayed('4 지연3초', 3000));
+
+  on('t5', function () {
+    var t0 = performance.now();
+    log('info', '5 미리생성 누름');
+    if (!pregenFile) {
+      log('err', '5 미리생성 | 아직 생성 전 (환경 칸의 "미리 생성" 완료 후 다시 누르기)');
+      return;
+    }
+    // await 없이 바로 공유 호출
+    share('5 미리생성', pregenFile, t0);
+  });
+
+  on('t6', function () {
+    var t0 = performance.now();
+    log('info', '6 사진저장 누름');
+    var ready = pregenFile ? Promise.resolve(pregenFile) : renderReport();
+    ready.then(function (file) {
+      var url = URL.createObjectURL(file);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'dongari-report.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      log('ok', '6 사진저장 | 다운로드 시작 요청 ' + Math.round(performance.now() - t0) + 'ms (갤러리/내 파일 > 다운로드에서 확인)');
+    }, function (e) {
+      log('err', '6 사진저장 | 실패 ' + errText(e));
+    });
+  });
+
+  // ---------- 기록 복사 ----------
+  on('copyLog', function () {
+    var text = lines.join('\n');
+    var fallback = function (reason) {
+      var ta = document.getElementById('logText');
+      ta.value = text;
+      ta.style.display = 'block';
+      ta.focus();
+      ta.select();
+      log('err', '복사 실패(' + reason + ') | 아래 글상자가 선택됐어요. 길게 눌러 복사하세요');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        log('ok', '기록 복사 완료 (' + lines.length + '줄)');
+      }, function (e) { fallback(errText(e)); });
+    } else {
+      fallback('clipboard API 없음');
+    }
+  });
+})();
+</script>
+</body>
+</html>
