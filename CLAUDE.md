@@ -46,6 +46,8 @@ npm run deploy               # GitHub Pages
 docs/          기획(prd, specs, decisions, design, qa-checklist)
 dev/active/    이슈별 작업 메모 (머지 후 dev/archive/)
 src/
+├── domain/      v2 데이터 타입 (Entry, Ledger, StoredData)
+├── storage/     v2 저장 계층 (LedgerRepository, 스키마 가드, 마이그레이션)
 ├── components/  tabs, report, common (v1)
 ├── hooks/       useAccountingData (v1)
 ├── types/
