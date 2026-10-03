@@ -1,0 +1,362 @@
+/*
+ * 기본 컴포넌트 모양. 값은 tokens.css 변수만 쓴다.
+ * 레이아웃: 버튼·입력칸은 부모 폭을 채우고(위험 글자형 제외), 누르는 곳은 최소 --touch-min.
+ */
+@import '../styles/tokens.css';
+
+.ui-button,
+.ui-big-action,
+.ui-chip,
+.ui-tab,
+.ui-money__field {
+  font-family: var(--typeface);
+  letter-spacing: var(--letter-body);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ui-button:focus-visible,
+.ui-big-action:focus-visible,
+.ui-chip:focus-visible,
+.ui-tab:focus-visible {
+  outline: var(--focus-ring) solid var(--primary);
+  outline-offset: var(--stroke);
+}
+
+/* 버튼: 주(채움) / 보조(테두리) / 위험(빨강 채움) / 위험 글자형(밑줄 글자) */
+.ui-button {
+  width: 100%;
+  min-height: var(--touch-primary);
+  padding: 0 var(--space-4);
+  border: var(--stroke) solid transparent;
+  border-radius: var(--corner-md);
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+  cursor: pointer;
+}
+
+.ui-button[data-variant='primary'] {
+  background: var(--primary);
+  color: var(--on-accent);
+}
+
+.ui-button[data-variant='secondary'] {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+  font-weight: var(--weight-strong);
+}
+
+.ui-button[data-variant='danger'] {
+  background: var(--expense);
+  color: var(--on-accent);
+}
+
+.ui-button[data-variant='danger-text'] {
+  width: auto;
+  min-height: var(--touch-min);
+  align-self: center;
+  background: none;
+  color: var(--expense);
+  font-size: var(--size-body);
+  font-weight: var(--weight-strong);
+  text-decoration: underline;
+  text-underline-offset: var(--space-1);
+}
+
+.ui-button:disabled {
+  background: var(--line);
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.ui-button[data-variant='danger-text']:disabled {
+  background: none;
+  border-color: transparent;
+  text-decoration: none;
+}
+
+/* 큰 행동 버튼: 돈 들어옴(파랑) / 돈 나감(빨강) + 보조 설명 줄 */
+.ui-big-action {
+  width: 100%;
+  min-height: var(--touch-big);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--corner-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+.ui-big-action[data-kind='income'] {
+  background: var(--income);
+}
+
+.ui-big-action[data-kind='expense'] {
+  background: var(--expense);
+}
+
+.ui-big-action__label {
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+.ui-big-action__description {
+  font-size: var(--size-small);
+  font-weight: var(--weight-regular);
+  line-height: var(--line-tight);
+}
+
+.ui-big-action:disabled {
+  background: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* 선택 버튼: 월·항목 고르기. 선택되면 주색 채움 + 굵게 (색만으로 구분하지 않음) */
+.ui-chip {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--corner-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--size-body);
+  font-weight: var(--weight-regular);
+  line-height: var(--line-tight);
+  cursor: pointer;
+}
+
+.ui-chip[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--on-accent);
+  font-weight: var(--weight-bold);
+}
+
+.ui-chip:disabled {
+  border-style: dashed;
+  background: var(--bg);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* 금액 입력칸: 오른쪽 정렬 큰 숫자 + "원" */
+.ui-money {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-family: var(--typeface);
+  color: var(--ink);
+}
+
+.ui-money__label {
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+.ui-money__box {
+  position: relative;
+}
+
+.ui-money__field {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--touch-primary);
+  padding: 0 calc(var(--space-4) + var(--space-8)) 0 var(--space-4);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--corner-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--size-amount);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ui-money__field::placeholder {
+  color: var(--muted);
+  font-weight: var(--weight-regular);
+}
+
+.ui-money__field:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 var(--hairline) var(--primary);
+}
+
+.ui-money__field[aria-invalid='true'] {
+  border-color: var(--expense);
+}
+
+.ui-money__field:disabled {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.ui-money__unit {
+  position: absolute;
+  top: 50%;
+  right: var(--space-4);
+  transform: translateY(-50%);
+  font-size: var(--size-large);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.ui-money__error {
+  margin: 0;
+  font-size: var(--size-small);
+  font-weight: var(--weight-strong);
+  color: var(--expense);
+}
+
+/* 확인 창: 화면 가운데 카드, 아니요/확인 두 버튼 */
+.ui-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gutter);
+  background: var(--scrim);
+}
+
+.ui-dialog {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--dialog-max);
+  padding: var(--space-6) var(--space-5) var(--space-4);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--typeface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.ui-dialog__title {
+  margin: 0;
+  font-size: var(--size-large);
+  font-weight: var(--weight-strong);
+  line-height: var(--line-body);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.ui-dialog__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+/* 알림: 아래 탭 위에 잠깐 뜨는 둥근 띠 */
+.ui-toast-region {
+  position: fixed;
+  left: var(--gutter);
+  right: var(--gutter);
+  bottom: calc(var(--touch-primary) + var(--space-6) + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.ui-toast {
+  max-width: 100%;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--corner-pill);
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--typeface);
+  font-size: var(--size-body);
+  font-weight: var(--weight-strong);
+  line-height: var(--line-body);
+  text-align: center;
+}
+
+/* 하단 탭: 아이콘 + 글자, 화면 아래 고정, 홈 표시줄(safe-area) 만큼 띄움 */
+.ui-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-top: var(--hairline) solid var(--line);
+  background: var(--surface);
+}
+
+.ui-tabbar__list {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.ui-tab {
+  min-height: var(--touch-primary);
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  color: var(--muted);
+  font-size: var(--size-small);
+  font-weight: var(--weight-regular);
+  line-height: var(--line-tight);
+  cursor: pointer;
+}
+
+.ui-tab[aria-selected='true'] {
+  color: var(--primary);
+  font-weight: var(--weight-bold);
+}
+
+.ui-tab__icon {
+  width: var(--space-6);
+  height: var(--space-6);
+}
+
+/* 동작 줄이기를 켜지 않은 사람에게만 나타남 효과 */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-dialog {
+    animation: ui-rise var(--motion-base) var(--motion-curve);
+  }
+
+  .ui-toast {
+    animation: ui-rise var(--motion-fast) var(--motion-curve);
+  }
+
+  .ui-button,
+  .ui-chip,
+  .ui-tab {
+    transition:
+      background-color var(--motion-fast),
+      border-color var(--motion-fast),
+      color var(--motion-fast);
+  }
+}
+
+@keyframes ui-rise {
+  from {
+    transform: translateY(var(--space-3));
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
