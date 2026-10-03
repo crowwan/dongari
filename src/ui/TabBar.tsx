@@ -38,17 +38,17 @@ type TabBarProps = {
 }
 
 // 화면 아래 고정 탭: 장부 / 보고서 / 설정
+// 화면 이동 버튼 묶음이라 tab 역할 대신 지금 화면에 aria-current="page" 를 단다
 export function TabBar({ current, onChange }: TabBarProps) {
   return (
     <nav className="ui-tabbar" aria-label="화면 바꾸기" data-testid="tab-bar">
-      <div className="ui-tabbar__list" role="tablist">
+      <div className="ui-tabbar__list">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            role="tab"
             className="ui-tab"
-            aria-selected={tab.id === current}
+            aria-current={tab.id === current ? 'page' : undefined}
             data-testid={`tab-${tab.id}`}
             onClick={() => onChange(tab.id)}
           >

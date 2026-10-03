@@ -23,6 +23,11 @@
   --expense: #b42318;
   --warn-bg: #fff4d6;
   --scrim: rgb(10 16 15 / 62%);
+  /* 눌림: 손가락이 닿은 동안의 바탕 (폰엔 hover 가 없어 유일한 눌림 신호) */
+  --pressed: #dfe6e4;
+  --primary-pressed: #174844;
+  --income-pressed: #193f99;
+  --expense-pressed: #8f1c13;
   color-scheme: light;
 }
 
@@ -39,6 +44,10 @@
     --expense: #ff8e84;
     --warn-bg: #3a3216;
     --scrim: rgb(0 0 0 / 70%);
+    --pressed: #2a3533;
+    --primary-pressed: #8fd3cb;
+    --income-pressed: #afc7ff;
+    --expense-pressed: #ffada5;
     color-scheme: dark;
   }
 }
@@ -55,6 +64,10 @@
   --expense: #ff8e84;
   --warn-bg: #3a3216;
   --scrim: rgb(0 0 0 / 70%);
+  --pressed: #2a3533;
+  --primary-pressed: #8fd3cb;
+  --income-pressed: #afc7ff;
+  --expense-pressed: #ffada5;
   color-scheme: dark;
 }
 

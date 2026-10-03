@@ -320,7 +320,7 @@
   cursor: pointer;
 }
 
-.ui-tab[aria-selected='true'] {
+.ui-tab[aria-current='page'] {
   color: var(--primary);
   font-weight: var(--weight-bold);
 }
@@ -330,7 +330,54 @@
   height: var(--space-6);
 }
 
-/* 동작 줄이기를 켜지 않은 사람에게만 나타남 효과 */
+/*
+ * 눌림: 손가락이 닿은 동안 바탕이 한 단계 진해진다. 폰엔 hover 가 없어 "눌렸다"는 유일한 신호.
+ * [data-preview-pressed] 안에서는 늘 눌린 모양 — 디자인 카탈로그 미리보기용.
+ */
+.ui-button[data-variant='primary']:active:not(:disabled),
+[data-preview-pressed] .ui-button[data-variant='primary']:not(:disabled) {
+  background: var(--primary-pressed);
+}
+
+.ui-button[data-variant='secondary']:active:not(:disabled),
+[data-preview-pressed] .ui-button[data-variant='secondary']:not(:disabled),
+.ui-button[data-variant='danger-text']:active:not(:disabled),
+[data-preview-pressed] .ui-button[data-variant='danger-text']:not(:disabled) {
+  background: var(--pressed);
+}
+
+.ui-button[data-variant='danger']:active:not(:disabled),
+[data-preview-pressed] .ui-button[data-variant='danger']:not(:disabled) {
+  background: var(--expense-pressed);
+}
+
+.ui-big-action[data-kind='income']:active:not(:disabled),
+[data-preview-pressed] .ui-big-action[data-kind='income']:not(:disabled) {
+  background: var(--income-pressed);
+}
+
+.ui-big-action[data-kind='expense']:active:not(:disabled),
+[data-preview-pressed] .ui-big-action[data-kind='expense']:not(:disabled) {
+  background: var(--expense-pressed);
+}
+
+.ui-chip:active:not(:disabled),
+[data-preview-pressed] .ui-chip:not(:disabled) {
+  background: var(--pressed);
+}
+
+.ui-chip[aria-pressed='true']:active:not(:disabled),
+[data-preview-pressed] .ui-chip[aria-pressed='true']:not(:disabled) {
+  border-color: var(--primary-pressed);
+  background: var(--primary-pressed);
+}
+
+.ui-tab:active,
+[data-preview-pressed] .ui-tab {
+  background: var(--pressed);
+}
+
+/* 동작 줄이기를 켜지 않은 사람에게만 나타남 효과와 눌림 색 전환(--motion-fast) */
 @media (prefers-reduced-motion: no-preference) {
   .ui-dialog {
     animation: ui-rise var(--motion-base) var(--motion-curve);
@@ -341,6 +388,7 @@
   }
 
   .ui-button,
+  .ui-big-action,
   .ui-chip,
   .ui-tab {
     transition:

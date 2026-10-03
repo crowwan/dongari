@@ -28,6 +28,10 @@ const COLOR_TOKENS = [
   '--expense',
   '--warn-bg',
   '--scrim',
+  '--pressed',
+  '--primary-pressed',
+  '--income-pressed',
+  '--expense-pressed',
 ]
 
 const SIZE_TOKENS = ['--size-small', '--size-body', '--size-large', '--size-title', '--size-amount', '--size-balance']
@@ -167,6 +171,31 @@ export function Catalog() {
           <State label="비활성">
             <MoneyInput label="얼마인가요?" value={140000} onChange={noop} disabled />
           </State>
+        </Section>
+
+        <Section title="눌림">
+          <p className="catalog__state">손가락이 닿은 동안의 모양을 고정해서 보여준다 (실제로는 :active)</p>
+          <div className="catalog__stack" data-preview-pressed="">
+            <div className="catalog__pair">
+              <Button>저장</Button>
+              <Button variant="secondary">백업 파일 보내기</Button>
+            </div>
+            <div className="catalog__pair">
+              <Button variant="danger">지우기</Button>
+              <Button variant="danger-text">이 기록 지우기</Button>
+            </div>
+            <div className="catalog__pair">
+              <BigActionButton kind="income" description="회비, 지원금" />
+              <BigActionButton kind="expense" description="대관료, 간식비" />
+            </div>
+            <div className="catalog__row">
+              <ChoiceChip selected>간식비</ChoiceChip>
+              <ChoiceChip selected={false}>대관료</ChoiceChip>
+            </div>
+            <div className="catalog__frame catalog__frame--short">
+              <TabBar current="ledger" onChange={noop} />
+            </div>
+          </div>
         </Section>
 
         <Section title="ConfirmDialog">
