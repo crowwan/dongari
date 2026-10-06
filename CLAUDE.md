@@ -47,10 +47,10 @@ docs/          기획(prd, specs, decisions, design, qa-checklist)
 dev/active/    이슈별 작업 메모 (머지 후 dev/archive/)
 src/
 ├── main.tsx     진입점: 저장소를 한 번 읽어(LoadResult) App 에 넘김, 개발 모드 카탈로그 분기
-├── App.tsx      앱 뼈대: 첫 실행 화면 / 장부(첫 화면)·설정·월 정리·올해 결산 화면 전환(탭 없음, features/useScreenHistory) + 저장 상태 안내
+├── App.tsx      앱 뼈대: 첫 실행 화면 / 장부(첫 화면)·내역 적기·설정·월 정리·올해 결산 화면 전환(탭 없음, features/useScreenHistory) + 저장 상태 안내
 ├── domain/      v2 데이터 타입과 계산 순수 함수 (Entry, Ledger, StoredData, ledger.ts 장부, report.ts 월 정리·올해 결산)
 ├── storage/     v2 저장 계층 (LedgerRepository, LocalStorage·Memory 구현, 스키마 가드, 마이그레이션)
-├── features/    화면 단위 (ledger: 장부·시작·useLedger, settings, report: 월 정리·올해 결산, storage: 저장 안내 문구, useScreenHistory·BackToLedger)
+├── features/    화면 단위 (ledger: 장부·시작·내역 적기·useLedger, settings, report: 월 정리·올해 결산, storage: 저장 안내 문구, useScreenHistory·BackToLedger)
 ├── ui/          기본 컴포넌트 (Button, ChoiceChip, MoneyInput, TextField, NoticeBar, BalanceCard, MonthStepper, …)
 ├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준)
 ├── catalog/     디자인 카탈로그 `/#/dev/catalog` (개발 모드 전용, 프로덕션 번들 제외)

@@ -6,11 +6,12 @@ import {
   createLedger,
   deleteEntry as deleteEntryFrom,
   firstVisibleMonth,
-  frequentNames as pickFrequentNames,
+  frequentChoices as pickFrequentChoices,
   newLedgerDefaults as defaultsFor,
   updateEntry as updateEntryIn,
   updateLedgerInfo,
   type EntryInput,
+  type FrequentChoice,
   type LedgerInfo,
   type LedgerTotals,
 } from '../../domain/ledger'
@@ -36,9 +37,10 @@ export interface LedgerState {
   newLedgerDefaults: LedgerInfo // 이 연도 장부를 새로 만들 때 기본값 (AC-8)
   startup: StartupStatus
   saveFailure: SaveFailureReason | undefined // 마지막 저장이 실패했으면 그 이유
-  frequentNames: (type: EntryType) => string[]
+  // 자주 쓴 항목 버튼: 종류를 고르기 전(type 없음)엔 두 종류를 섞어서
+  frequentChoices: (type?: EntryType) => FrequentChoice[]
   startLedger: (info: LedgerInfo) => void
-  addEntry: (input: EntryInput) => void
+  addEntry: (input: EntryInput) => boolean // 저장에 성공했는지 (성공일 때만 "저장했어요" 를 띄운다)
   updateEntry: (id: string, input: EntryInput) => void
   deleteEntry: (id: string) => void
   updateClubInfo: (info: LedgerInfo) => boolean // 저장에 성공했는지 (성공일 때만 알림을 띄운다)
@@ -102,7 +104,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     newLedgerDefaults: defaultsFor(data.ledgers, year),
     startup: toStartupStatus(loaded),
     saveFailure,
-    frequentNames: (type) => pickFrequentNames(allEntriesOldestFirst(data), type),
+    frequentChoices: (type) => pickFrequentChoices(allEntriesOldestFirst(data), type),
     startLedger: (info) =>
       commit((current) => {
         if (current.ledgers[String(year)]) throw new Error(`${year}년 장부가 이미 있다`)

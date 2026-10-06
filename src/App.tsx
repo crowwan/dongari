@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+import { EntryForm } from './features/ledger/EntryForm'
+import { emptyDraft } from './features/ledger/entryDraft'
 import { LedgerScreen } from './features/ledger/LedgerScreen'
 import { StartLedgerScreen } from './features/ledger/StartLedgerScreen'
 import { useLedger, type UseLedgerOptions } from './features/ledger/useLedger'
@@ -20,7 +22,7 @@ type AppProps = {
   options?: UseLedgerOptions
 }
 
-// 앱 뼈대 (SPEC-001 화면 구성, 탭 없음): 장부(첫 화면) / 설정 / 월 정리 / 올해 결산. 장부가 하나도 없으면 시작 화면만
+// 앱 뼈대 (SPEC-001 화면 구성, 탭 없음): 장부(첫 화면) / 내역 적기 / 설정 / 월 정리 / 올해 결산. 장부가 하나도 없으면 시작 화면만
 export default function App({ repository, loaded, options }: AppProps) {
   const ledger = useLedger(repository, loaded, options)
   const navigation = useScreenHistory()
@@ -64,6 +66,22 @@ export default function App({ repository, loaded, options }: AppProps) {
         return <MonthSummaryScreen year={ledger.year} month={screen.month} onBack={navigation.backToLedger} />
       case 'year-summary':
         return <YearSummaryScreen year={ledger.year} onBack={navigation.backToLedger} />
+      case 'add-entry':
+        return (
+          <EntryForm
+            title="내역 적기"
+            initial={emptyDraft(screen.month)}
+            frequentChoices={ledger.frequentChoices}
+            onSave={(input) => {
+              // 저장에 실패하면 위쪽 안내 띠만 보이고 "저장했어요" 는 띄우지 않는다. 어느 쪽이든 장부로 돌아가 그 기록의 달을 보여 준다
+              if (ledger.addEntry(input)) setToast('저장했어요')
+              setViewedMonth(input.month)
+              navigation.backToLedger()
+            }}
+            // 적던 내용을 버릴지 묻는 확인은 #14 에서 붙인다
+            onBack={navigation.backToLedger}
+          />
+        )
       case 'ledger':
         return ledgerScreen()
     }
@@ -89,7 +107,7 @@ export default function App({ repository, loaded, options }: AppProps) {
       )
     }
     return (
-      // 입력 화면(#13)은 onAddEntry, 고치기 화면(#14)은 onEditEntry 로 여기에 연결한다
+      // 고치기 화면(#14)은 onEditEntry 로 여기에 연결한다
       <LedgerScreen
         year={year}
         ledger={ledger.ledger}
@@ -99,6 +117,7 @@ export default function App({ repository, loaded, options }: AppProps) {
         onOpenMonthSummary={(summaryMonth) => navigation.open({ name: 'month-summary', month: summaryMonth })}
         onOpenYearSummary={() => navigation.open({ name: 'year-summary' })}
         onOpenSettings={() => navigation.open({ name: 'settings' })}
+        onAddEntry={(entryMonth) => navigation.open({ name: 'add-entry', month: entryMonth })}
       />
     )
   }

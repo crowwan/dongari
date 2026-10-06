@@ -110,8 +110,9 @@ updated: 2026-10-06
 | `AmountText` | 수입 `+` 초록 / 지출 `−` 본문색. 글자 크기는 놓인 자리를 따른다 |
 | `MonthStepper` | [‹] 달 [›], 화살표 56px, 끝 달에서 비활성(`previousDisabled`/`nextDisabled`), 이름 "이전 달"/"다음 달", 달 글자는 `aria-live` |
 | `TopTextButton` | 위쪽 알약 글자 버튼 ([올해 결산] [설정]) × 기본·눌림, 높이 56px |
-| `BottomActionBar` | 화면 아래 고정 흰 면 + 주 버튼 하나 × 기본·비활성, 홈 표시줄(safe-area) 만큼 띄움 |
+| `BottomActionBar` | 화면 아래 고정 흰 면 + 주 버튼 하나 × 기본·비활성·비활성 + 안내(버튼 바로 위 한 줄, 버튼 설명으로 읽힘 — 내역 적기 [저장] 을 누를 수 없는 이유), 홈 표시줄(safe-area) 만큼 띄움 |
 | `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 [남았어요]/[적자였어요] 로 부호를 고른다. 적자면 음수 저장 |
+| `EntryForm` (`features/ledger`) | 내역 적기: 질문 제목(`--size-large` 굵게, 입력칸 이름과 같은 급) → 월 `ChoiceChip` 4×3 / [수입][지출] 반씩 / 자주 쓴 항목 칩(글자 폭, 줄바꿈) + "직접 적기" `TextField` / `MoneyInput`, 아래 고정 [저장] + 빠진 것 안내. 처음 값을 받아 고치기 화면(#14)도 같은 모양 |
 
 `BalanceCard`·`AmountText`·`MonthStepper`·`TopTextButton`·`BottomActionBar` 는 #25 에서 카탈로그에 먼저 올리고 #26 에서 장부 화면에 붙였다. `TopTextButton` 은 장부 외 화면 맨 위 [← 장부로] 에도 쓴다(화살표는 화면 읽기에서 숨김). `TabBar`·`BigActionButton` 은 ADR 003 에 따라 #25 에서 지웠다.
 

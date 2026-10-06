@@ -177,8 +177,13 @@ describe('SPEC-001 useLedger', () => {
       }
       const { result } = renderLedger(new MemoryRepository(storedWith(lastYear, ledger2026())))
 
-      expect(result.current.frequentNames('expense')).toEqual(['대관료', '꽃값', '간식비'])
-      expect(result.current.frequentNames('income')).toEqual(['회비'])
+      expect(result.current.frequentChoices('expense').map((choice) => choice.name)).toEqual(['대관료', '꽃값', '간식비'])
+      expect(result.current.frequentChoices()).toEqual([
+        { name: '대관료', type: 'expense' },
+        { name: '회비', type: 'income' },
+        { name: '꽃값', type: 'expense' },
+        { name: '간식비', type: 'expense' },
+      ])
     })
   })
 
@@ -293,7 +298,21 @@ describe('SPEC-001 useLedger', () => {
         saved = result.current.updateClubInfo({ clubName: '한랑드림', carryover: 0 })
       })
       expect(saved).toBe(true)
+
+      // 기록 추가도 같은 방식으로 저장 결과를 돌려준다 (실패면 "저장했어요" 를 띄우지 않게)
+      next = { ok: false, reason: 'quota-exceeded' }
+      act(() => {
+        saved = result.current.addEntry({ month: 10, type: 'expense', name: '간식비', amount: 5_000 })
+      })
+      expect(saved).toBe(false)
+      next = { ok: true }
+      act(() => {
+        saved = result.current.addEntry({ month: 10, type: 'expense', name: '꽃값', amount: 3_000 })
+      })
+      expect(saved).toBe(true)
       act(() => result.current.deleteEntry('a'))
+      act(() => result.current.deleteEntry('id-1'))
+      act(() => result.current.deleteEntry('id-2'))
 
       expect(result.current.saveFailure).toBeUndefined()
       expect(memory.load().data.ledgers['2026']?.entries).toEqual([])

@@ -26,14 +26,21 @@ export interface MonthGroup {
   entries: Entry[] // 입력 순
 }
 
-// 자주 쓴 항목 버튼 최대 개수 (SPEC-001 결정)
-export const FREQUENT_NAMES_LIMIT = 6
-
-// 기록이 적을 때 채워 넣는 기본 항목
-const DEFAULT_NAMES: Readonly<Record<EntryType, readonly string[]>> = {
-  expense: ['대관료', '간식비'],
-  income: ['회비'],
+// 자주 쓴 항목 버튼 하나: 이름과, 누르면 함께 고를 종류
+export interface FrequentChoice {
+  name: string
+  type: EntryType
 }
+
+// 자주 쓴 항목 버튼 최대 개수 (SPEC-001 결정)
+export const FREQUENT_CHOICES_LIMIT = 6
+
+// 기록이 적을 때 채워 넣는 기본 항목 (대관료·간식비 = 지출, 회비 = 수입)
+const DEFAULT_CHOICES: readonly FrequentChoice[] = [
+  { name: '대관료', type: 'expense' },
+  { name: '간식비', type: 'expense' },
+  { name: '회비', type: 'income' },
+]
 
 // 저장 데이터 형식(schema.ts)에 맞지 않는 입력. 화면은 이런 값으로 저장 버튼을 누를 수 없어야 한다
 export class InvalidLedgerInputError extends Error {
@@ -102,13 +109,22 @@ export function deleteEntry(ledger: Ledger, id: string): Ledger {
   return { ...ledger, entries: ledger.entries.filter((entry) => entry.id !== id) }
 }
 
-// 최근에 쓴 이름부터 중복 없이, 모자라면 기본 항목으로 채운다. entries 는 오래된 것부터 입력 순
-export function frequentNames(entries: readonly Entry[], type: EntryType, limit: number = FREQUENT_NAMES_LIMIT): string[] {
-  const recentFirst = entries
-    .filter((entry) => entry.type === type)
-    .map((entry) => entry.name)
-    .reverse()
-  return [...new Set([...recentFirst, ...DEFAULT_NAMES[type]])].slice(0, limit)
+// 자주 쓴 항목 버튼 (AC-4). entries 는 오래된 것부터 입력 순
+// - type 을 주면(종류를 고른 뒤) 그 종류로 쓴 이름만, 없으면(고르기 전) 두 종류를 섞는다
+// - 최근에 쓴 이름부터 중복 없이, 각 이름의 종류는 그 이름을 마지막으로 쓴 기록의 종류
+// - 모자라면 기본 항목으로 채운다
+export function frequentChoices(
+  entries: readonly Entry[],
+  type?: EntryType,
+  limit: number = FREQUENT_CHOICES_LIMIT,
+): FrequentChoice[] {
+  const ofType = (choice: FrequentChoice) => type === undefined || choice.type === type
+  const recentFirst = [...entries].reverse().map((entry) => ({ name: entry.name, type: entry.type }))
+  const byName = new Map<string, FrequentChoice>()
+  for (const choice of [...recentFirst.filter(ofType), ...DEFAULT_CHOICES.filter(ofType)]) {
+    if (!byName.has(choice.name)) byName.set(choice.name, choice)
+  }
+  return [...byName.values()].slice(0, limit)
 }
 
 function normalizeLedgerInfo(info: LedgerInfo): LedgerInfo {
