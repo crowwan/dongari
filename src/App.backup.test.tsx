@@ -205,7 +205,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
     it.each([
       ['깨진 JSON', '{"schemaVersion": 2,', '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
       ['다른 형식', JSON.stringify({ name: '가계부' }), '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
-      ['상위 버전', JSON.stringify({ schemaVersion: 3, ledgers: {}, settings: {} }), '앱을 새로고침한 뒤 다시 시도해 주세요'],
+      ['상위 버전', JSON.stringify({ schemaVersion: 3, ledgers: {}, settings: {} }), '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
     ])('AC-4 %s 파일은 불러오지 않고 "이 파일은 열 수 없어요" 를 알리며 기존 데이터를 유지한다', async (_label, text, description) => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openSettings()

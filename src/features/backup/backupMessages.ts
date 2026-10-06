@@ -20,7 +20,7 @@ export function importFailureMessage(reason: BackupReadFailure): DialogMessage {
   return {
     title: '이 파일은 열 수 없어요',
     description:
-      reason === 'newer-version' ? '앱을 새로고침한 뒤 다시 시도해 주세요' : '동아리 회계에서 보낸 백업 파일인지 확인해 주세요',
+      reason === 'newer-version' ? '앱을 닫았다가 다시 연 뒤 불러와 주세요' : '동아리 회계에서 보낸 백업 파일인지 확인해 주세요',
   }
 }
 
@@ -29,7 +29,7 @@ export function restoreFailureMessage(reason: SaveFailureReason): DialogMessage 
     title: '불러오지 못했어요',
     description:
       reason === 'newer-version'
-        ? '새 버전 앱에서 쓴 기록이 있어요. 앱을 새로고침한 뒤 다시 시도해 주세요'
+        ? '새 버전 앱에서 쓴 기록이 있어요. 앱을 닫았다가 다시 열어 주세요'
         : '기기에 저장하지 못했어요. 지금 기록은 그대로예요',
   }
 }

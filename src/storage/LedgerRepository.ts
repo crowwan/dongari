@@ -2,7 +2,7 @@ import type { StoredData } from '../domain/types'
 
 // 저장 실패 이유
 // - quota-exceeded: 저장 공간 부족
-// - newer-version: 저장소에 더 새 버전 데이터가 있어 덮어쓰지 않음 (앱 새로고침 필요)
+// - newer-version: 저장소에 더 새 버전 데이터가 있어 덮어쓰지 않음 (앱을 다시 열어 새 버전으로 바꿔야 함)
 // - unreadable-original: 읽을 수 없는 원본을 따로 보존하지 못해 덮어쓰지 않음
 // - unknown: 그 밖의 오류 (error 에 원인)
 export type SaveFailureReason = 'quota-exceeded' | 'newer-version' | 'unreadable-original' | 'unknown'

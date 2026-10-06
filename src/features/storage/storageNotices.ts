@@ -4,7 +4,7 @@ import type { StartupStatus } from '../ledger/useLedger'
 
 export const STORAGE_NOTICE = {
   recovered: '저장된 기록을 읽지 못해 새 장부로 시작해요. 예전 기록은 따로 보관해 두었어요',
-  newerVersion: '새 버전 앱에서 쓴 기록이 있어요. 앱을 새로고침해 주세요',
+  newerVersion: '새 버전 앱에서 쓴 기록이 있어요. 앱을 닫았다가 다시 열어 주세요',
   unreadableOriginal: '저장된 기록을 읽지 못했어요. 지금 적는 내용은 저장되지 않아요',
   saveFailed: '저장하지 못했어요. 백업 파일을 보내 두세요',
 }
@@ -20,7 +20,7 @@ export interface StorageNotice {
 function startupNotice(startup: StartupStatus): StorageNotice | undefined {
   if (startup.status === 'recovered') return { message: STORAGE_NOTICE.recovered }
   if (startup.status === 'read-only') {
-    // 상위 버전 원본은 새로고침한 새 앱이 다시 읽어야 하므로 불러오기를 권하지 않는다
+    // 상위 버전 원본은 다시 연 새 버전 앱이 다시 읽어야 하므로 불러오기를 권하지 않는다
     return startup.reason === 'newer-version'
       ? { message: STORAGE_NOTICE.newerVersion }
       : { message: STORAGE_NOTICE.unreadableOriginal, action: 'import-backup' }

@@ -20,15 +20,15 @@ describe('SPEC-002 백업 불러오기 문구', () => {
   it.each<[BackupReadFailure, string]>([
     ['broken', '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
     ['not-backup', '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
-    ['newer-version', '앱을 새로고침한 뒤 다시 시도해 주세요'],
+    ['newer-version', '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
   ])('AC-4 %s 파일은 "이 파일은 열 수 없어요" 와 할 일을 알린다', (reason, description) => {
     expect(importFailureMessage(reason)).toEqual({ title: '이 파일은 열 수 없어요', description })
   })
 
-  it('새 버전 기록이 있어 저장을 막았으면 새로고침하라고 알린다', () => {
+  it('새 버전 기록이 있어 저장을 막았으면 앱을 닫았다가 다시 열라고 알린다', () => {
     expect(restoreFailureMessage('newer-version')).toEqual({
       title: '불러오지 못했어요',
-      description: '새 버전 앱에서 쓴 기록이 있어요. 앱을 새로고침한 뒤 다시 시도해 주세요',
+      description: '새 버전 앱에서 쓴 기록이 있어요. 앱을 닫았다가 다시 열어 주세요',
     })
   })
 

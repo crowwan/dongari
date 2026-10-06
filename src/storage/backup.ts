@@ -16,7 +16,7 @@ export interface BackupSummary {
 // 읽지 못한 이유
 // - broken: JSON 이 아니다 (깨졌거나 빈 파일)
 // - not-backup: JSON 이지만 이 앱의 백업 형식이 아니다
-// - newer-version: 이 앱보다 새 버전 앱이 만든 파일 (새로고침 필요)
+// - newer-version: 이 앱보다 새 버전 앱이 만든 파일 (앱을 다시 열어 새 버전으로 바꿔야 함)
 export type BackupReadFailure = 'broken' | 'not-backup' | 'newer-version'
 
 export type BackupReadResult =
