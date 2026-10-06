@@ -1,0 +1,124 @@
+/*
+ * 동아리 회계 디자인 토큰 — 색, 글꼴, 간격, 반경, 터치 크기, 모션 값의 유일한 기준.
+ * 컴포넌트는 여기 변수만 쓰고 값을 직접 쓰지 않는다. 각 토큰의 역할과 이유는 docs/design.md.
+ *
+ * 이름 규칙: Tailwind v4 테마 변수(--color-*, --text-*, --font-*, --radius-*, --spacing, --ease-* 등)와
+ * 겹치지 않는 이름을 쓴다. 겹치면 레이어 밖에 있는 이 값이 v1 화면의 Tailwind 유틸리티 값을 덮어쓴다.
+ *
+ * 테마: 기본은 시스템 설정을 따르고, data-theme="light" | "dark" 를 단 요소 안에서는 그 테마로 고정한다.
+ * (카탈로그가 라이트/다크를 나란히 보여줄 때도 같은 규칙을 쓴다)
+ */
+
+:root,
+[data-theme='light'] {
+  /* 색 */
+  --bg: #eef2f1;
+  --surface: #ffffff;
+  --ink: #18201f;
+  --muted: #4a5654;
+  --line: #d3dbd9;
+  --primary: #1f5c57;
+  --on-accent: #ffffff;
+  --income: #1f4fbf;
+  --expense: #b42318;
+  --warn-bg: #fff4d6;
+  --scrim: rgb(10 16 15 / 62%);
+  /* 눌림: 손가락이 닿은 동안의 바탕 (폰엔 hover 가 없어 유일한 눌림 신호) */
+  --pressed: #dfe6e4;
+  --primary-pressed: #174844;
+  --income-pressed: #193f99;
+  --expense-pressed: #8f1c13;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #111716;
+    --surface: #1b2321;
+    --ink: #eef3f2;
+    --muted: #aebbb8;
+    --line: #34403e;
+    --primary: #6fc3ba;
+    --on-accent: #0e1715;
+    --income: #8db0ff;
+    --expense: #ff8e84;
+    --warn-bg: #3a3216;
+    --scrim: rgb(0 0 0 / 70%);
+    --pressed: #2a3533;
+    --primary-pressed: #8fd3cb;
+    --income-pressed: #afc7ff;
+    --expense-pressed: #ffada5;
+    color-scheme: dark;
+  }
+}
+
+[data-theme='dark'] {
+  --bg: #111716;
+  --surface: #1b2321;
+  --ink: #eef3f2;
+  --muted: #aebbb8;
+  --line: #34403e;
+  --primary: #6fc3ba;
+  --on-accent: #0e1715;
+  --income: #8db0ff;
+  --expense: #ff8e84;
+  --warn-bg: #3a3216;
+  --scrim: rgb(0 0 0 / 70%);
+  --pressed: #2a3533;
+  --primary-pressed: #8fd3cb;
+  --income-pressed: #afc7ff;
+  --expense-pressed: #ffada5;
+  color-scheme: dark;
+}
+
+:root {
+  /* 글꼴 — 갤럭시 기본 글꼴(사용자가 고른 글꼴 포함)을 그대로 쓴다 */
+  --typeface: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --size-small: 16px;
+  --size-body: 18px;
+  --size-large: 20px;
+  --size-title: 24px;
+  --size-amount: 24px;
+  --size-balance: 36px;
+  --weight-regular: 400;
+  --weight-strong: 600;
+  --weight-bold: 700;
+  --line-body: 1.5;
+  --line-tight: 1.25;
+  --letter-body: -0.01em;
+
+  /* 간격 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --gutter: 16px;
+
+  /* 반경 */
+  --corner-sm: 12px;
+  --corner-md: 16px;
+  --corner-lg: 20px;
+  --corner-pill: 999px;
+
+  /* 선 굵기, 포커스 링 */
+  --hairline: 1px;
+  --stroke: 2px;
+  --focus-ring: 3px;
+
+  /* 폭 — 큰 폰·태블릿에서도 한 손 화면 폭을 넘지 않게 */
+  --content-max: 480px;
+  --dialog-max: 400px;
+
+  /* 누르는 곳 크기 */
+  --touch-min: 56px;
+  --touch-primary: 64px;
+  --touch-big: 72px;
+
+  /* 모션 */
+  --motion-fast: 120ms;
+  --motion-base: 220ms;
+  --motion-curve: cubic-bezier(0.2, 0.8, 0.2, 1);
+}

@@ -1,0 +1,117 @@
+/*
+ * 디자인 카탈로그 (개발 모드 전용) 레이아웃.
+ * 위에서 아래로 컴포넌트 묶음이 이어지고, 화면 고정 요소(확인 창·알림·하단 탭)는 틀(frame) 안에 가둬 보여준다.
+ */
+@import '../styles/tokens.css';
+
+.catalog {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--typeface);
+  font-size: var(--size-body);
+  line-height: var(--line-body);
+  letter-spacing: var(--letter-body);
+}
+
+.catalog__inner {
+  box-sizing: border-box;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-6) var(--gutter) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.catalog__title {
+  margin: 0;
+  font-size: var(--size-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+.catalog__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.catalog__heading {
+  margin: 0;
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+.catalog__state {
+  margin: 0;
+  font-size: var(--size-small);
+  color: var(--muted);
+}
+
+.catalog__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.catalog__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.catalog__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.catalog__months {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.catalog__swatches {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.catalog__swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--size-small);
+}
+
+.catalog__chip-color {
+  flex: none;
+  width: var(--space-6);
+  height: var(--space-6);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--corner-sm);
+}
+
+.catalog__sizes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* 화면 고정 요소를 가두는 틀: transform 이 있으면 position: fixed 자식의 기준이 이 틀이 된다 */
+.catalog__frame {
+  position: relative;
+  height: 240px;
+  overflow: hidden;
+  transform: translateZ(0);
+  border: var(--hairline) solid var(--line);
+  border-radius: var(--corner-md);
+  background: var(--bg);
+}
+
+.catalog__frame--short {
+  height: 120px;
+}
