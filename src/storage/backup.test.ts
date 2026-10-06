@@ -27,8 +27,8 @@ function storedWith(...ledgers: Ledger[]): StoredData {
   }
 }
 
-// 한국 시각 2026-10-06 오전 (UTC 로는 10월 5일 밤)
-const NOW = new Date('2026-10-06T08:30:00.000+09:00')
+// 폰의 현지 시각 2026-10-06 오전 (실행 환경 시간대와 상관없이 현지 날짜로 만든다)
+const NOW = new Date(2026, 9, 6, 8, 30)
 
 describe('SPEC-002 백업 파일 만들기', () => {
   it('파일 이름은 오늘 날짜가 붙은 동아리회계-백업-YYYY-MM-DD.txt 이다', () => {
