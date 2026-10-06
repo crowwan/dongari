@@ -10,7 +10,7 @@ type BottomActionBarProps = {
   note?: string
 }
 
-// 화면 아래 고정 영역 + 주 버튼 하나 ([+ 내역 적기], [저장], [사진으로 보내기]).
+// 화면 아래 고정 영역 + 주 버튼 하나 ([+ 내역 적기], [저장], [사진으로 저장]).
 // 목록을 내려도 사라지지 않고 엄지가 닿는 자리 (ADR 003). 홈 표시줄(safe-area) 만큼 띄운다
 export function BottomActionBar({ label, onClick, disabled, note }: BottomActionBarProps) {
   const noteId = useId()

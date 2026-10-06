@@ -461,6 +461,9 @@
   font-weight: var(--weight-strong);
   line-height: var(--line-body);
   text-align: center;
+  /* 긴 알림이 두 줄이 될 때 낱말 중간("앨/범")에서 꺾이지 않게 */
+  word-break: keep-all;
+  text-wrap: balance;
 }
 
 /*
