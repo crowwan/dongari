@@ -1,9 +1,5 @@
-import type { AccountingData, MonthlyData, ExpenseItem, IncomeItem } from '../types/accounting';
-
-// 지출 상세 항목 합계
-export function sumExpenseItems(items: ExpenseItem[]): number {
-  return items.reduce((sum, item) => sum + item.amount, 0);
-}
+// v1 보고서(src/components/report) 전용 계산. #16 에서 보고서를 v2 모델로 옮기면 지운다
+import type { AccountingData, MonthlyData, IncomeItem } from '../types/accounting';
 
 // 수입 내역 합계
 export function sumIncomeItems(items: IncomeItem[]): number {
@@ -27,15 +23,3 @@ export function calculateBalance(data: AccountingData): number {
   return data.basicInfo.carryover + yearlyIncome - yearlyExpense;
 }
 
-// 월별 지출 상세 합계와 지출 총액 일치 여부
-export function isExpenseMatched(monthData: MonthlyData): boolean {
-  const itemsSum = sumExpenseItems(monthData.expenseItems);
-  return itemsSum === monthData.expense;
-}
-
-// 수입 내역 합계와 월별 수입 합계 일치 여부
-export function isIncomeMatched(data: AccountingData): boolean {
-  const incomeItemsSum = sumIncomeItems(data.incomeItems);
-  const monthlyIncomeSum = sumYearlyIncome(data.monthlyData);
-  return incomeItemsSum === monthlyIncomeSum;
-}

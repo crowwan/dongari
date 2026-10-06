@@ -28,3 +28,7 @@ dist/
 .vercel/
 coverage/
 .env*.local
+
+# Claude Code 로컬 작업 흔적
+.claude/worktrees/
+.claude/settings.local.json

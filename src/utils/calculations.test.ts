@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AccountingData, MonthlyData } from '../types/accounting'
-import { calculateBalance, isExpenseMatched } from './calculations'
+import { calculateBalance } from './calculations'
 
 function month(month: number, income: number, expense: number): MonthlyData {
   return { month, income, expense, expenseItems: [] }
@@ -16,19 +16,5 @@ describe('calculations', () => {
     }
 
     expect(calculateBalance(data)).toBe(130_000)
-  })
-
-  it('지출 상세 합계가 월 지출 총액과 같으면 일치로 본다', () => {
-    const data: MonthlyData = {
-      month: 3,
-      income: 0,
-      expense: 15_000,
-      expenseItems: [
-        { id: 'a', name: '간식', amount: 10_000 },
-        { id: 'b', name: '음료', amount: 5_000 },
-      ],
-    }
-
-    expect(isExpenseMatched(data)).toBe(true)
   })
 })

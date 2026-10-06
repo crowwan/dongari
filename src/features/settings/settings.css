@@ -1,0 +1,17 @@
+/*
+ * 설정 화면. 값은 tokens.css 변수만 쓴다.
+ */
+@import '../screens.css';
+
+.settings__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* 연도 고르기: 큰 선택 버튼 두 칸씩 */
+.settings__years {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
