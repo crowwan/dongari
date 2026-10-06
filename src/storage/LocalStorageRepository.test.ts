@@ -41,7 +41,7 @@ describe('SPEC-002 저장 (localStorage)', () => {
     expect(new LocalStorageRepository().save(data)).toEqual({ ok: true })
 
     // 새로고침 = 같은 localStorage 를 새 인스턴스로 다시 읽는다
-    expect(new LocalStorageRepository().load()).toEqual(data)
+    expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data })
   })
 
   it('AC-2 dongari:v2 키 하나에 schemaVersion 2 로 저장한다', () => {
@@ -53,8 +53,8 @@ describe('SPEC-002 저장 (localStorage)', () => {
     expect(JSON.parse(raw ?? '')).toMatchObject({ schemaVersion: 2 })
   })
 
-  it('저장된 데이터가 없으면 빈 초기값으로 시작한다', () => {
-    expect(new LocalStorageRepository().load()).toEqual({ schemaVersion: 2, ledgers: {}, settings: {} })
+  it('저장된 데이터가 없으면 빈 초기값으로 정상(ok) 시작한다', () => {
+    expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data: { schemaVersion: 2, ledgers: {}, settings: {} } })
   })
 
   it('v1 키(accounting_YYYY)는 읽거나 지우거나 바꾸지 않는다', () => {
@@ -62,7 +62,7 @@ describe('SPEC-002 저장 (localStorage)', () => {
     localStorage.setItem('accounting_2025', v1Raw)
 
     const repository = new LocalStorageRepository()
-    expect(repository.load()).toEqual({ schemaVersion: 2, ledgers: {}, settings: {} })
+    expect(repository.load().data).toEqual({ schemaVersion: 2, ledgers: {}, settings: {} })
     repository.save(sampleData())
 
     expect(localStorage.getItem('accounting_2025')).toBe(v1Raw)
@@ -72,11 +72,11 @@ describe('SPEC-002 저장 (localStorage)', () => {
     it.each([
       ['JSON 이 깨짐', '{"schemaVersion": 2,'],
       ['형식이 다름', JSON.stringify({ schemaVersion: 2, ledgers: [] })],
-    ])('%s: 빈 초기값으로 시작하고 원본은 별도 키에 보존한다', (_label, raw) => {
+    ])('%s: 원본을 별도 키에 옮기고 빈 초기값으로 시작했다(recovered)고 알린다', (_label, raw) => {
       localStorage.setItem(STORAGE_KEY, raw)
 
       const repository = new LocalStorageRepository()
-      expect(repository.load()).toEqual({ schemaVersion: 2, ledgers: {}, settings: {} })
+      expect(repository.load()).toEqual({ status: 'recovered', data: { schemaVersion: 2, ledgers: {}, settings: {} } })
 
       const keys = brokenKeys()
       expect(keys).toHaveLength(1)
@@ -89,7 +89,7 @@ describe('SPEC-002 저장 (localStorage)', () => {
       repository.load()
 
       expect(repository.save(sampleData())).toEqual({ ok: true })
-      expect(new LocalStorageRepository().load()).toEqual(sampleData())
+      expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data: sampleData() })
       expect(localStorage.getItem(brokenKeys()[0])).toBe('not json')
     })
 
@@ -97,7 +97,8 @@ describe('SPEC-002 저장 (localStorage)', () => {
       localStorage.setItem(STORAGE_KEY, 'not json')
 
       new LocalStorageRepository().load()
-      new LocalStorageRepository().load()
+      // 두 번째 실행은 원래 키가 비어 있어 처음 실행과 같다
+      expect(new LocalStorageRepository().load().status).toBe('ok')
 
       expect(brokenKeys()).toHaveLength(1)
       expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
@@ -110,18 +111,18 @@ describe('SPEC-002 저장 (localStorage)', () => {
       })
       const repository = new LocalStorageRepository()
 
-      expect(repository.load()).toEqual({ schemaVersion: 2, ledgers: {}, settings: {} })
+      expect(repository.load()).toEqual({ status: 'recovered', data: { schemaVersion: 2, ledgers: {}, settings: {} } })
       expect(localStorage.getItem(brokenKeys()[0])).toBe('not json')
       expect(repository.save(sampleData())).toEqual({ ok: true })
     })
 
-    it('원본을 보존하지 못하면 저장을 막아 원본을 덮어쓰지 않는다', () => {
+    it('원본을 보존하지 못하면 읽기 전용으로 알리고 저장을 막아 원본을 덮어쓰지 않는다', () => {
       localStorage.setItem(STORAGE_KEY, 'not json')
       vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
         throw quotaError()
       })
       const repository = new LocalStorageRepository()
-      repository.load()
+      expect(repository.load()).toEqual({ status: 'read-only', reason: 'unreadable-original', data: { schemaVersion: 2, ledgers: {}, settings: {} } })
 
       expect(repository.save(sampleData())).toEqual({ ok: false, reason: 'unreadable-original' })
       expect(localStorage.getItem(STORAGE_KEY)).toBe('not json')
@@ -129,12 +130,12 @@ describe('SPEC-002 저장 (localStorage)', () => {
   })
 
   describe('상위 버전 데이터', () => {
-    it('빈 초기값으로 시작하되 저장을 막아 상위 버전 원본을 덮어쓰지 않는다', () => {
+    it('빈 초기값의 읽기 전용으로 알리고 저장을 막아 상위 버전 원본을 덮어쓰지 않는다', () => {
       const newer = JSON.stringify({ schemaVersion: 3, ledgers: {}, settings: {} })
       localStorage.setItem(STORAGE_KEY, newer)
 
       const repository = new LocalStorageRepository()
-      expect(repository.load()).toEqual({ schemaVersion: 2, ledgers: {}, settings: {} })
+      expect(repository.load()).toEqual({ status: 'read-only', reason: 'newer-version', data: { schemaVersion: 2, ledgers: {}, settings: {} } })
       expect(repository.save(sampleData())).toEqual({ ok: false, reason: 'newer-version' })
       expect(localStorage.getItem(STORAGE_KEY)).toBe(newer)
     })

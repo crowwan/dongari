@@ -1,5 +1,5 @@
 import type { StoredData } from '../domain/types'
-import type { LedgerRepository, SaveResult } from './LedgerRepository'
+import type { LedgerRepository, LoadResult, SaveResult } from './LedgerRepository'
 import { createEmptyData } from './schema'
 
 // 테스트용 저장소. 저장·읽기 때 복사해서 바깥 객체 변경이 저장값에 새지 않게 한다
@@ -10,8 +10,8 @@ export class MemoryRepository implements LedgerRepository {
     this.data = structuredClone(initial)
   }
 
-  load(): StoredData {
-    return structuredClone(this.data)
+  load(): LoadResult {
+    return { status: 'ok', data: structuredClone(this.data) }
   }
 
   save(data: StoredData): SaveResult {

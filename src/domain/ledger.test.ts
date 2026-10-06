@@ -1,0 +1,279 @@
+import { describe, expect, it } from 'vitest'
+import {
+  addEntry,
+  calculateTotals,
+  createLedger,
+  deleteEntry,
+  FREQUENT_NAMES_LIMIT,
+  frequentNames,
+  groupByMonth,
+  InvalidLedgerInputError,
+  newLedgerDefaults,
+  updateEntry,
+  updateLedgerInfo,
+  type EntryInput,
+} from './ledger'
+import type { Entry, Ledger } from './types'
+
+const NOW = new Date('2026-10-03T09:00:00.000Z')
+
+function entry(overrides: Partial<Entry> & Pick<Entry, 'id'>): Entry {
+  return {
+    month: 1,
+    type: 'expense',
+    name: '간식비',
+    amount: 10_000,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+function ledger(overrides: Partial<Ledger> = {}): Ledger {
+  return { year: 2026, clubName: '꽃동산 동아리', carryover: 100_000, entries: [], ...overrides }
+}
+
+// id·시각을 고정해 결과를 예측할 수 있게 한다
+function fixedDeps(ids: string[] = ['new-1', 'new-2', 'new-3']) {
+  const queue = [...ids]
+  return {
+    createId: () => queue.shift() ?? 'exhausted',
+    now: () => NOW,
+  }
+}
+
+const expenseInput: EntryInput = { month: 10, type: 'expense', name: '대관료', amount: 40_000 }
+
+describe('SPEC-001 장부 계산', () => {
+  describe('잔액', () => {
+    it('잔액 = 이월금 + 수입 합 − 지출 합 이다', () => {
+      const target = ledger({
+        carryover: 100_000,
+        entries: [
+          entry({ id: 'a', type: 'income', name: '회비', amount: 150_000 }),
+          entry({ id: 'b', type: 'expense', amount: 40_000 }),
+          entry({ id: 'c', type: 'expense', amount: 28_340 }),
+        ],
+      })
+
+      expect(calculateTotals(target)).toEqual({ income: 150_000, expense: 68_340, balance: 181_660 })
+    })
+
+    it('기록이 없으면 잔액은 이월금이다 (적자 이월금 포함)', () => {
+      expect(calculateTotals(ledger({ carryover: -5_000 }))).toEqual({ income: 0, expense: 0, balance: -5_000 })
+    })
+
+    it('AC-2 기록을 추가하면 잔액이 다시 계산된다', () => {
+      const next = addEntry(ledger({ carryover: 100_000 }), expenseInput, fixedDeps())
+
+      expect(calculateTotals(next).balance).toBe(60_000)
+    })
+
+    it('AC-2 기록을 수정하면 잔액이 다시 계산된다', () => {
+      const before = ledger({ carryover: 100_000, entries: [entry({ id: 'a', amount: 40_000 })] })
+
+      const next = updateEntry(before, 'a', { month: 1, type: 'expense', name: '간식비', amount: 25_000 })
+
+      expect(calculateTotals(next).balance).toBe(75_000)
+    })
+
+    it('AC-2 기록을 지우면 잔액이 다시 계산된다', () => {
+      const before = ledger({ carryover: 100_000, entries: [entry({ id: 'a', amount: 40_000 })] })
+
+      expect(calculateTotals(deleteEntry(before, 'a')).balance).toBe(100_000)
+    })
+  })
+
+  describe('월별 그룹', () => {
+    it('AC-9 최신 달이 위, 월마다 수입·지출 소계, 기록은 입력 순이다', () => {
+      const entries = [
+        entry({ id: 'sep-income', month: 9, type: 'income', name: '회비', amount: 140_806 }),
+        entry({ id: 'oct-rent', month: 10, name: '대관료', amount: 40_000 }),
+        entry({ id: 'sep-snack', month: 9, name: '간식비', amount: 6_000 }),
+        entry({ id: 'oct-snack', month: 10, name: '간식비', amount: 28_340 }),
+      ]
+
+      const groups = groupByMonth(entries)
+
+      expect(groups.map((group) => group.month)).toEqual([10, 9])
+      expect(groups[0]).toMatchObject({ month: 10, income: 0, expense: 68_340 })
+      expect(groups[0].entries.map((item) => item.id)).toEqual(['oct-rent', 'oct-snack'])
+      expect(groups[1]).toMatchObject({ month: 9, income: 140_806, expense: 6_000 })
+      expect(groups[1].entries.map((item) => item.id)).toEqual(['sep-income', 'sep-snack'])
+    })
+
+    it('기록이 없으면 빈 목록이다', () => {
+      expect(groupByMonth([])).toEqual([])
+    })
+  })
+
+  describe('기록 추가·수정·삭제', () => {
+    it('추가하면 주입한 id·시각으로 맨 뒤에 붙고 원래 장부는 바뀌지 않는다', () => {
+      const before = ledger({ entries: [entry({ id: 'a' })] })
+
+      const next = addEntry(before, { ...expenseInput, name: '  대관료 ' }, fixedDeps(['new-1']))
+
+      expect(next.entries).toHaveLength(2)
+      expect(next.entries[1]).toEqual({
+        id: 'new-1',
+        month: 10,
+        type: 'expense',
+        name: '대관료',
+        amount: 40_000,
+        createdAt: NOW.toISOString(),
+      })
+      expect(before.entries).toHaveLength(1)
+    })
+
+    it('묶음 id 를 함께 넣으면 기록에 남는다', () => {
+      const next = addEntry(ledger(), { ...expenseInput, batchId: 'photo-1' }, fixedDeps())
+
+      expect(next.entries[0].batchId).toBe('photo-1')
+    })
+
+    it('수정하면 id·입력 시각·순서는 그대로 두고 내용만 바꾼다', () => {
+      const before = ledger({
+        entries: [entry({ id: 'a', createdAt: '2026-01-01T00:00:00.000Z' }), entry({ id: 'b' })],
+      })
+
+      const next = updateEntry(before, 'a', { month: 3, type: 'income', name: '회비', amount: 50_000 })
+
+      expect(next.entries.map((item) => item.id)).toEqual(['a', 'b'])
+      expect(next.entries[0]).toEqual({
+        id: 'a',
+        month: 3,
+        type: 'income',
+        name: '회비',
+        amount: 50_000,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      })
+      expect(before.entries[0].amount).toBe(10_000)
+    })
+
+    it('지우면 그 기록만 빠지고 원래 장부는 바뀌지 않는다', () => {
+      const before = ledger({ entries: [entry({ id: 'a' }), entry({ id: 'b' })] })
+
+      const next = deleteEntry(before, 'a')
+
+      expect(next.entries.map((item) => item.id)).toEqual(['b'])
+      expect(before.entries).toHaveLength(2)
+    })
+
+    it('없는 id 를 수정·삭제하면 장부가 그대로다', () => {
+      const before = ledger({ entries: [entry({ id: 'a' })] })
+
+      expect(updateEntry(before, 'zzz', expenseInput)).toEqual(before)
+      expect(deleteEntry(before, 'zzz')).toEqual(before)
+    })
+
+    it.each<[string, EntryInput]>([
+      ['금액 0', { ...expenseInput, amount: 0 }],
+      ['금액 음수', { ...expenseInput, amount: -1 }],
+      ['금액 소수', { ...expenseInput, amount: 1.5 }],
+      ['금액 상한 초과', { ...expenseInput, amount: 1_000_000_000 }],
+      ['이름 빈칸', { ...expenseInput, name: '   ' }],
+      ['월 0', { ...expenseInput, month: 0 }],
+      ['월 13', { ...expenseInput, month: 13 }],
+    ])('%s 이면 저장할 수 없는 기록이라 거부한다', (_label, input) => {
+      expect(() => addEntry(ledger(), input, fixedDeps())).toThrow(InvalidLedgerInputError)
+      expect(() => updateEntry(ledger({ entries: [entry({ id: 'a' })] }), 'a', input)).toThrow(InvalidLedgerInputError)
+    })
+
+    it('금액 상한 999,999,999원은 허용한다', () => {
+      const next = addEntry(ledger(), { ...expenseInput, amount: 999_999_999 }, fixedDeps())
+
+      expect(next.entries[0].amount).toBe(999_999_999)
+    })
+  })
+
+  describe('자주 쓴 항목', () => {
+    it('AC-4 같은 종류로 쓴 이름이 최근 사용 순, 중복 없이 나온다', () => {
+      const entries = [
+        entry({ id: '1', type: 'expense', name: '대관료' }),
+        entry({ id: '2', type: 'income', name: '회비' }),
+        entry({ id: '3', type: 'expense', name: '꽃값' }),
+        entry({ id: '4', type: 'expense', name: '대관료' }),
+      ]
+
+      expect(frequentNames(entries, 'expense').slice(0, 2)).toEqual(['대관료', '꽃값'])
+      expect(frequentNames(entries, 'income')[0]).toBe('회비')
+    })
+
+    it('기록이 없으면 기본 항목(나간 돈: 대관료·간식비 / 들어온 돈: 회비)을 보여준다', () => {
+      expect(frequentNames([], 'expense')).toEqual(['대관료', '간식비'])
+      expect(frequentNames([], 'income')).toEqual(['회비'])
+    })
+
+    it('쓴 이름 뒤에 아직 안 나온 기본 항목을 채운다', () => {
+      const entries = [entry({ id: '1', type: 'expense', name: '꽃값' }), entry({ id: '2', type: 'expense', name: '간식비' })]
+
+      expect(frequentNames(entries, 'expense')).toEqual(['간식비', '꽃값', '대관료'])
+    })
+
+    it(`최대 ${FREQUENT_NAMES_LIMIT}개까지만 보여준다`, () => {
+      const entries = ['가', '나', '다', '라', '마', '바', '사'].map((name, index) =>
+        entry({ id: String(index), type: 'expense', name }),
+      )
+
+      expect(FREQUENT_NAMES_LIMIT).toBe(6)
+      expect(frequentNames(entries, 'expense')).toEqual(['사', '바', '마', '라', '다', '나'])
+    })
+
+    it('개수를 따로 정할 수 있다', () => {
+      expect(frequentNames([], 'expense', 1)).toEqual(['대관료'])
+    })
+  })
+
+  describe('장부 만들기', () => {
+    it('동아리 이름과 이월금으로 빈 장부를 만든다', () => {
+      expect(createLedger(2026, { clubName: ' 꽃동산 ', carryover: -3_000 })).toEqual({
+        year: 2026,
+        clubName: '꽃동산',
+        carryover: -3_000,
+        entries: [],
+      })
+    })
+
+    it.each([
+      ['이월금 소수', { clubName: '꽃동산', carryover: 0.5 }],
+      ['이월금 숫자 아님', { clubName: '꽃동산', carryover: Number.NaN }],
+      ['이월금 상한 초과', { clubName: '꽃동산', carryover: 1_000_000_000 }],
+      ['이월금 하한 초과', { clubName: '꽃동산', carryover: -1_000_000_000 }],
+    ])('%s 이면 거부한다', (_label, info) => {
+      expect(() => createLedger(2026, info)).toThrow(InvalidLedgerInputError)
+      expect(() => updateLedgerInfo(ledger(), info)).toThrow(InvalidLedgerInputError)
+    })
+
+    it('동아리 정보를 고치면 기록은 그대로 두고 이름·이월금만 바뀐다', () => {
+      const before = ledger({ entries: [entry({ id: 'a' })] })
+
+      const next = updateLedgerInfo(before, { clubName: '한랑드림', carryover: 5_000 })
+
+      expect(next).toEqual({ ...before, clubName: '한랑드림', carryover: 5_000 })
+      expect(before.clubName).toBe('꽃동산 동아리')
+    })
+
+    it('AC-8 새 연도 장부의 이월금 기본값은 전년도 잔액이고 동아리 이름도 이어받는다', () => {
+      const lastYear = ledger({
+        year: 2025,
+        clubName: '한랑드림',
+        carryover: 10_000,
+        entries: [
+          entry({ id: 'a', type: 'income', name: '회비', amount: 200_000 }),
+          entry({ id: 'b', type: 'expense', amount: 57_095 }),
+        ],
+      })
+
+      expect(newLedgerDefaults({ '2025': lastYear }, 2026)).toEqual({ clubName: '한랑드림', carryover: 152_905 })
+    })
+
+    it('전년도 장부가 없으면 이월금은 0, 이름은 가장 가까운 연도 장부에서 가져온다', () => {
+      const ledgers = { '2023': ledger({ year: 2023, clubName: '옛이름' }), '2024': ledger({ year: 2024, clubName: '한랑드림' }) }
+
+      expect(newLedgerDefaults(ledgers, 2026)).toEqual({ clubName: '한랑드림', carryover: 0 })
+    })
+
+    it('장부가 하나도 없으면 빈 이름과 이월금 0 이다', () => {
+      expect(newLedgerDefaults({}, 2026)).toEqual({ clubName: '', carryover: 0 })
+    })
+  })
+})
