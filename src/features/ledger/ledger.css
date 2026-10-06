@@ -57,12 +57,12 @@
 
 .ledger__sum-value[data-kind='income'],
 .ledger__row-amount[data-kind='income'] {
-  color: var(--income);
+  color: var(--income-amount);
 }
 
 .ledger__sum-value[data-kind='expense'],
 .ledger__row-amount[data-kind='expense'] {
-  color: var(--expense);
+  color: var(--expense-amount);
 }
 
 .ledger__actions {
@@ -80,7 +80,7 @@
 
 /* 월 묶음: 바탕과 다른 면 + 머리(월, 소계) + 기록 줄 */
 .ledger__month {
-  border-radius: var(--corner-md);
+  border-radius: var(--corner-lg);
   background: var(--surface);
   overflow: hidden;
   display: flex;

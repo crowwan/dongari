@@ -1,13 +1,14 @@
 /*
  * 기본 컴포넌트 모양. 값은 tokens.css 변수만 쓴다.
- * 레이아웃: 버튼·입력칸은 부모 폭을 채우고(위험 글자형 제외), 누르는 곳은 최소 --touch-min.
+ * 스타일: "맑은 은행 앱" — 테두리 대신 면, 강조는 청록 하나. 그림자는 쓰지 않는다.
+ * 레이아웃: 버튼·입력칸은 부모 폭을 채우고(위험 글자형·위쪽 글자 버튼 제외), 누르는 곳은 최소 --touch-min.
  */
 @import '../styles/tokens.css';
 
 .ui-button,
-.ui-big-action,
 .ui-chip,
-.ui-tab,
+.ui-top-button,
+.ui-stepper__arrow,
 .ui-money__field,
 .ui-field__input {
   font-family: var(--typeface);
@@ -16,19 +17,19 @@
 }
 
 .ui-button:focus-visible,
-.ui-big-action:focus-visible,
 .ui-chip:focus-visible,
-.ui-tab:focus-visible {
+.ui-top-button:focus-visible,
+.ui-stepper__arrow:focus-visible {
   outline: var(--focus-ring) solid var(--primary);
   outline-offset: var(--stroke);
 }
 
-/* 버튼: 주(채움) / 보조(테두리) / 위험(빨강 채움) / 위험 글자형(밑줄 글자) */
+/* 버튼: 주(청록 채움) / 보조(옅은 청록 면) / 위험(차분한 빨강 채움) / 위험 글자형(밑줄 글자) */
 .ui-button {
   width: 100%;
   min-height: var(--touch-primary);
   padding: 0 var(--space-4);
-  border: var(--stroke) solid transparent;
+  border: 0;
   border-radius: var(--corner-md);
   font-size: var(--size-large);
   font-weight: var(--weight-bold);
@@ -42,15 +43,13 @@
 }
 
 .ui-button[data-variant='secondary'] {
-  background: var(--surface);
-  border-color: var(--line);
-  color: var(--ink);
-  font-weight: var(--weight-strong);
+  background: var(--primary-soft);
+  color: var(--primary);
 }
 
 .ui-button[data-variant='danger'] {
-  background: var(--expense);
-  color: var(--on-accent);
+  background: var(--danger);
+  color: var(--on-danger);
 }
 
 .ui-button[data-variant='danger-text'] {
@@ -58,7 +57,7 @@
   min-height: var(--touch-min);
   align-self: center;
   background: none;
-  color: var(--expense);
+  color: var(--danger);
   font-size: var(--size-body);
   font-weight: var(--weight-strong);
   text-decoration: underline;
@@ -66,67 +65,23 @@
 }
 
 .ui-button:disabled {
-  background: var(--line);
-  border-color: var(--line);
-  color: var(--muted);
+  background: var(--fill);
+  color: var(--faint);
   cursor: not-allowed;
 }
 
 .ui-button[data-variant='danger-text']:disabled {
   background: none;
-  border-color: transparent;
   text-decoration: none;
 }
 
-/* 큰 행동 버튼: 돈 들어옴(파랑) / 돈 나감(빨강) + 보조 설명 줄 */
-.ui-big-action {
-  width: 100%;
-  min-height: var(--touch-big);
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-radius: var(--corner-md);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  color: var(--on-accent);
-  cursor: pointer;
-}
-
-.ui-big-action[data-kind='income'] {
-  background: var(--income);
-}
-
-.ui-big-action[data-kind='expense'] {
-  background: var(--expense);
-}
-
-.ui-big-action__label {
-  font-size: var(--size-large);
-  font-weight: var(--weight-bold);
-  line-height: var(--line-tight);
-}
-
-.ui-big-action__description {
-  font-size: var(--size-small);
-  font-weight: var(--weight-regular);
-  line-height: var(--line-tight);
-}
-
-.ui-big-action:disabled {
-  background: var(--line);
-  color: var(--muted);
-  cursor: not-allowed;
-}
-
-/* 선택 버튼: 월·항목 고르기. 선택되면 주색 채움 + 굵게 (색만으로 구분하지 않음) */
+/* 선택 버튼: 월·항목 고르기. 안 고른 것은 회색 면, 고르면 청록 채움 + 굵게 (색만으로 구분하지 않음) */
 .ui-chip {
   min-height: var(--touch-min);
   padding: 0 var(--space-4);
-  border: var(--stroke) solid var(--line);
+  border: 0;
   border-radius: var(--corner-sm);
-  background: var(--surface);
+  background: var(--fill);
   color: var(--ink);
   font-size: var(--size-body);
   font-weight: var(--weight-regular);
@@ -135,20 +90,140 @@
 }
 
 .ui-chip[aria-pressed='true'] {
-  border-color: var(--primary);
   background: var(--primary);
   color: var(--on-accent);
   font-weight: var(--weight-bold);
 }
 
+/* 비활성: 면을 지우고 점선 테두리만 남겨 "누를 수 없음"을 모양으로도 보여준다 */
 .ui-chip:disabled {
-  border-style: dashed;
-  background: var(--bg);
-  color: var(--muted);
+  border: var(--stroke) dashed var(--line);
+  background: none;
+  color: var(--faint);
   cursor: not-allowed;
 }
 
-/* 금액 입력칸: 오른쪽 정렬 큰 숫자 + "원" */
+/* 위쪽 글자 버튼: [올해 결산] [설정]. 카드와 같은 흰 면의 알약 */
+.ui-top-button {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--corner-pill);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--size-body);
+  font-weight: var(--weight-strong);
+  line-height: var(--line-tight);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 한 달씩 넘기기: [‹] 9월 [›] */
+.ui-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-family: var(--typeface);
+  color: var(--ink);
+}
+
+.ui-stepper__arrow {
+  flex: none;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  border: 0;
+  border-radius: var(--corner-md);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: var(--size-title);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ui-stepper__arrow:disabled {
+  background: none;
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.ui-stepper__label {
+  margin: 0;
+  font-size: var(--size-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+/* 화면 아래 고정 영역: 흰 면 + 위쪽 가는 선, 홈 표시줄(safe-area) 만큼 띄움 */
+.ui-bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  padding: var(--space-3) var(--gutter) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  border-top: var(--hairline) solid var(--line);
+  background: var(--surface);
+}
+
+.ui-bottom-bar__inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+/* 수입/지출 금액 글자: 크기는 놓인 자리를 따른다 */
+.ui-amount {
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ui-amount[data-kind='income'] {
+  color: var(--income-amount);
+}
+
+.ui-amount[data-kind='expense'] {
+  color: var(--expense-amount);
+}
+
+/* 잔액 카드: 흰 카드 안에 이름 → 큰 숫자 → 보조 줄 */
+.ui-balance {
+  padding: var(--card-pad-block) var(--card-pad-inline);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-family: var(--typeface);
+  color: var(--ink);
+}
+
+.ui-balance__label,
+.ui-balance__note {
+  margin: 0;
+  font-size: var(--size-small);
+  line-height: var(--line-tight);
+  color: var(--muted);
+}
+
+.ui-balance__note {
+  color: var(--faint);
+}
+
+.ui-balance__amount {
+  margin: 0;
+  font-size: var(--size-balance);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+  letter-spacing: var(--letter-number);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 금액 입력칸: 회색 면 위 오른쪽 정렬 큰 숫자 + "원". 고르면 흰 면 + 청록 테두리 */
 .ui-money {
   display: flex;
   flex-direction: column;
@@ -167,39 +242,49 @@
   position: relative;
 }
 
-.ui-money__field {
+.ui-money__field,
+.ui-field__input {
   box-sizing: border-box;
   width: 100%;
   min-height: var(--touch-primary);
-  padding: 0 calc(var(--space-4) + var(--space-8)) 0 var(--space-4);
-  border: var(--stroke) solid var(--line);
+  border: var(--stroke) solid transparent;
   border-radius: var(--corner-sm);
-  background: var(--surface);
+  background: var(--fill);
   color: var(--ink);
+}
+
+.ui-money__field {
+  padding: 0 calc(var(--space-4) + var(--space-8)) 0 var(--space-4);
   font-size: var(--size-amount);
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-number);
   text-align: right;
 }
 
-.ui-money__field::placeholder {
-  color: var(--muted);
+.ui-money__field::placeholder,
+.ui-field__input::placeholder {
+  color: var(--faint);
   font-weight: var(--weight-regular);
 }
 
-.ui-money__field:focus {
+.ui-money__field:focus,
+.ui-field__input:focus {
   border-color: var(--primary);
+  background: var(--surface);
   outline: none;
-  box-shadow: 0 0 0 var(--hairline) var(--primary);
 }
 
-.ui-money__field[aria-invalid='true'] {
-  border-color: var(--expense);
+.ui-money__field[aria-invalid='true'],
+.ui-field__input[aria-invalid='true'] {
+  border-color: var(--danger);
 }
 
-.ui-money__field:disabled {
-  background: var(--bg);
-  color: var(--muted);
+.ui-money__field:disabled,
+.ui-field__input:disabled {
+  border: var(--stroke) dashed var(--line);
+  background: none;
+  color: var(--faint);
 }
 
 .ui-money__unit {
@@ -212,14 +297,15 @@
   pointer-events: none;
 }
 
-.ui-money__error {
+.ui-money__error,
+.ui-field__error {
   margin: 0;
   font-size: var(--size-small);
   font-weight: var(--weight-strong);
-  color: var(--expense);
+  color: var(--danger);
 }
 
-/* 글자 입력칸: 큰 제목 + 큰 글자. 금액 입력칸과 같은 테두리·높이 */
+/* 글자 입력칸: 금액 입력칸과 같은 면·높이 */
 .ui-field {
   display: flex;
   flex-direction: column;
@@ -235,41 +321,8 @@
 }
 
 .ui-field__input {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: var(--touch-primary);
   padding: 0 var(--space-4);
-  border: var(--stroke) solid var(--line);
-  border-radius: var(--corner-sm);
-  background: var(--surface);
-  color: var(--ink);
   font-size: var(--size-large);
-}
-
-.ui-field__input::placeholder {
-  color: var(--muted);
-}
-
-.ui-field__input:focus {
-  border-color: var(--primary);
-  outline: none;
-  box-shadow: 0 0 0 var(--hairline) var(--primary);
-}
-
-.ui-field__input[aria-invalid='true'] {
-  border-color: var(--expense);
-}
-
-.ui-field__input:disabled {
-  background: var(--bg);
-  color: var(--muted);
-}
-
-.ui-field__error {
-  margin: 0;
-  font-size: var(--size-small);
-  font-weight: var(--weight-strong);
-  color: var(--expense);
 }
 
 /* 안내 띠: 노란 면 + 본문 색 글자 */
@@ -285,7 +338,7 @@
   line-height: var(--line-body);
 }
 
-/* 확인 창: 화면 가운데 카드, 아니요/확인 두 버튼 */
+/* 확인 창: 화면 가운데 흰 카드, 아니요(보조)/확인(주·위험) 두 버튼 */
 .ui-dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -301,7 +354,7 @@
   box-sizing: border-box;
   width: 100%;
   max-width: var(--dialog-max);
-  padding: var(--space-6) var(--space-5) var(--space-4);
+  padding: var(--space-6) var(--card-pad-inline) var(--card-pad-inline);
   border-radius: var(--corner-lg);
   background: var(--surface);
   color: var(--ink);
@@ -326,12 +379,12 @@
   gap: var(--space-2);
 }
 
-/* 알림: 아래 탭 위에 잠깐 뜨는 둥근 띠 */
+/* 알림: 화면 아래쪽에 잠깐 뜨는 둥근 띠 (본문색 면 + 바탕색 글자) */
 .ui-toast-region {
   position: fixed;
   left: var(--gutter);
   right: var(--gutter);
-  bottom: calc(var(--touch-primary) + var(--space-6) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--touch-primary) + var(--space-8) + env(safe-area-inset-bottom, 0px));
   z-index: 30;
   display: flex;
   justify-content: center;
@@ -351,96 +404,35 @@
   text-align: center;
 }
 
-/* 하단 탭: 아이콘 + 글자, 화면 아래 고정, 홈 표시줄(safe-area) 만큼 띄움 */
-.ui-tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 5;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  border-top: var(--hairline) solid var(--line);
-  background: var(--surface);
-}
-
-.ui-tabbar__list {
-  max-width: var(--content-max);
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.ui-tab {
-  min-height: var(--touch-primary);
-  padding: var(--space-1) 0;
-  border: 0;
-  background: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  color: var(--muted);
-  font-size: var(--size-small);
-  font-weight: var(--weight-regular);
-  line-height: var(--line-tight);
-  cursor: pointer;
-}
-
-.ui-tab[aria-current='page'] {
-  color: var(--primary);
-  font-weight: var(--weight-bold);
-}
-
-.ui-tab__icon {
-  width: var(--space-6);
-  height: var(--space-6);
-}
-
 /*
- * 눌림: 손가락이 닿은 동안 바탕이 한 단계 진해진다. 폰엔 hover 가 없어 "눌렸다"는 유일한 신호.
+ * 눌림: 손가락이 닿은 동안 바탕이 한 단계 진해진다(다크는 밝아진다). 폰엔 hover 가 없어 "눌렸다"는 유일한 신호.
  * [data-preview-pressed] 안에서는 늘 눌린 모양 — 디자인 카탈로그 미리보기용.
  */
 .ui-button[data-variant='primary']:active:not(:disabled),
-[data-preview-pressed] .ui-button[data-variant='primary']:not(:disabled) {
+[data-preview-pressed] .ui-button[data-variant='primary']:not(:disabled),
+.ui-chip[aria-pressed='true']:active:not(:disabled),
+[data-preview-pressed] .ui-chip[aria-pressed='true']:not(:disabled) {
   background: var(--primary-pressed);
 }
 
 .ui-button[data-variant='secondary']:active:not(:disabled),
-[data-preview-pressed] .ui-button[data-variant='secondary']:not(:disabled),
-.ui-button[data-variant='danger-text']:active:not(:disabled),
-[data-preview-pressed] .ui-button[data-variant='danger-text']:not(:disabled) {
-  background: var(--pressed);
+[data-preview-pressed] .ui-button[data-variant='secondary']:not(:disabled) {
+  background: var(--primary-soft-pressed);
 }
 
 .ui-button[data-variant='danger']:active:not(:disabled),
 [data-preview-pressed] .ui-button[data-variant='danger']:not(:disabled) {
-  background: var(--expense-pressed);
+  background: var(--danger-pressed);
 }
 
-.ui-big-action[data-kind='income']:active:not(:disabled),
-[data-preview-pressed] .ui-big-action[data-kind='income']:not(:disabled) {
-  background: var(--income-pressed);
-}
-
-.ui-big-action[data-kind='expense']:active:not(:disabled),
-[data-preview-pressed] .ui-big-action[data-kind='expense']:not(:disabled) {
-  background: var(--expense-pressed);
-}
-
-.ui-chip:active:not(:disabled),
-[data-preview-pressed] .ui-chip:not(:disabled) {
-  background: var(--pressed);
-}
-
-.ui-chip[aria-pressed='true']:active:not(:disabled),
-[data-preview-pressed] .ui-chip[aria-pressed='true']:not(:disabled) {
-  border-color: var(--primary-pressed);
-  background: var(--primary-pressed);
-}
-
-.ui-tab:active,
-[data-preview-pressed] .ui-tab {
+.ui-button[data-variant='danger-text']:active:not(:disabled),
+[data-preview-pressed] .ui-button[data-variant='danger-text']:not(:disabled),
+.ui-chip[aria-pressed='false']:active:not(:disabled),
+[data-preview-pressed] .ui-chip[aria-pressed='false']:not(:disabled),
+.ui-top-button:active,
+[data-preview-pressed] .ui-top-button,
+.ui-stepper__arrow:active:not(:disabled),
+[data-preview-pressed] .ui-stepper__arrow:not(:disabled) {
   background: var(--pressed);
 }
 
@@ -455,9 +447,9 @@
   }
 
   .ui-button,
-  .ui-big-action,
   .ui-chip,
-  .ui-tab {
+  .ui-top-button,
+  .ui-stepper__arrow {
     transition:
       background-color var(--motion-fast),
       border-color var(--motion-fast),

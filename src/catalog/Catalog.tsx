@@ -1,14 +1,17 @@
 import { useState, type ReactNode } from 'react'
 import { CarryoverField } from '../features/ledger/CarryoverField'
-import { BigActionButton } from '../ui/BigActionButton'
+import { AmountText } from '../ui/AmountText'
+import { BalanceCard } from '../ui/BalanceCard'
+import { BottomActionBar } from '../ui/BottomActionBar'
 import { Button } from '../ui/Button'
 import { ChoiceChip } from '../ui/ChoiceChip'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { MoneyInput } from '../ui/MoneyInput'
+import { MonthStepper } from '../ui/MonthStepper'
 import { NoticeBar } from '../ui/NoticeBar'
-import { TabBar, type TabId } from '../ui/TabBar'
 import { TextField } from '../ui/TextField'
 import { Toast } from '../ui/Toast'
+import { TopTextButton } from '../ui/TopTextButton'
 import './catalog.css'
 
 type ThemeChoice = 'system' | 'light' | 'dark'
@@ -22,19 +25,24 @@ const THEME_CHOICES: { id: ThemeChoice; label: string }[] = [
 const COLOR_TOKENS = [
   '--bg',
   '--surface',
+  '--fill',
+  '--line',
   '--ink',
   '--muted',
-  '--line',
+  '--faint',
   '--primary',
+  '--primary-soft',
   '--on-accent',
-  '--income',
-  '--expense',
+  '--income-amount',
+  '--expense-amount',
+  '--danger',
+  '--on-danger',
   '--warn-bg',
   '--scrim',
   '--pressed',
   '--primary-pressed',
-  '--income-pressed',
-  '--expense-pressed',
+  '--primary-soft-pressed',
+  '--danger-pressed',
 ]
 
 const SIZE_TOKENS = ['--size-small', '--size-body', '--size-large', '--size-title', '--size-amount', '--size-balance']
@@ -51,7 +59,7 @@ export function Catalog() {
   const [amount, setAmount] = useState(28340)
   const [clubName, setClubName] = useState('한랑드림')
   const [carryover, setCarryover] = useState(370482)
-  const [tab, setTab] = useState<TabId>('ledger')
+  const [viewMonth, setViewMonth] = useState(9)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -85,7 +93,7 @@ export function Catalog() {
           <div className="catalog__sizes">
             {SIZE_TOKENS.map((token) => (
               <span key={token} style={{ fontSize: `var(${token})`, lineHeight: 'var(--line-tight)' }}>
-                {token} 들어온 돈 140,000원
+                {token} 수입 140,000원
               </span>
             ))}
           </div>
@@ -120,21 +128,6 @@ export function Catalog() {
               <Button variant="danger-text" disabled>
                 이 기록 지우기
               </Button>
-            </div>
-          </State>
-        </Section>
-
-        <Section title="BigActionButton">
-          <State label="돈 들어옴 / 돈 나감">
-            <div className="catalog__pair">
-              <BigActionButton kind="income" description="회비, 지원금" />
-              <BigActionButton kind="expense" description="대관료, 간식비" />
-            </div>
-          </State>
-          <State label="비활성">
-            <div className="catalog__pair">
-              <BigActionButton kind="income" description="회비, 지원금" disabled />
-              <BigActionButton kind="expense" description="대관료, 간식비" disabled />
             </div>
           </State>
         </Section>
@@ -202,6 +195,63 @@ export function Catalog() {
           </State>
         </Section>
 
+        <Section title="BalanceCard">
+          <State label="잔액 + 보조 줄">
+            <BalanceCard label="지금 잔액" amount={1166193} note="작년 이월금 370,482원 포함" />
+          </State>
+          <State label="적자 (보조 줄 없음)">
+            <BalanceCard label="지금 잔액" amount={-50000} />
+          </State>
+        </Section>
+
+        <Section title="AmountText">
+          <State label="수입(+ 초록) / 지출(− 본문색) · 목록 금액 크기">
+            <div className="catalog__amounts">
+              <span>회비</span>
+              <AmountText type="income" amount={140000} />
+              <span>대관료</span>
+              <AmountText type="expense" amount={40000} />
+              <span>간식비</span>
+              <AmountText type="expense" amount={58280} />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="MonthStepper">
+          <State label={`${viewMonth}월 (눌러 보기) · 1월·12월 끝에서 비활성`}>
+            <MonthStepper
+              month={viewMonth}
+              onPrevious={() => setViewMonth((value) => value - 1)}
+              onNext={() => setViewMonth((value) => value + 1)}
+              previousDisabled={viewMonth === 1}
+              nextDisabled={viewMonth === 12}
+            />
+          </State>
+          <State label="1월 (이전 달 비활성)">
+            <MonthStepper month={1} onPrevious={noop} onNext={noop} previousDisabled />
+          </State>
+        </Section>
+
+        <Section title="TopTextButton">
+          <State label="위쪽 글자 버튼 두 개">
+            <div className="catalog__top">
+              <TopTextButton onClick={noop}>올해 결산</TopTextButton>
+              <TopTextButton onClick={noop}>설정</TopTextButton>
+            </div>
+          </State>
+        </Section>
+
+        <Section title="BottomActionBar">
+          <State label="기본 / 비활성">
+            <div className="catalog__frame catalog__frame--short">
+              <BottomActionBar label="+ 내역 적기" onClick={noop} />
+            </div>
+            <div className="catalog__frame catalog__frame--short">
+              <BottomActionBar label="사진으로 보내기" onClick={noop} disabled />
+            </div>
+          </State>
+        </Section>
+
         <Section title="NoticeBar">
           <State label="저장 실패">
             <NoticeBar message="저장하지 못했어요. 백업 파일을 보내 두세요" />
@@ -222,17 +272,12 @@ export function Catalog() {
               <Button variant="danger">지우기</Button>
               <Button variant="danger-text">이 기록 지우기</Button>
             </div>
-            <div className="catalog__pair">
-              <BigActionButton kind="income" description="회비, 지원금" />
-              <BigActionButton kind="expense" description="대관료, 간식비" />
-            </div>
             <div className="catalog__row">
               <ChoiceChip selected>간식비</ChoiceChip>
               <ChoiceChip selected={false}>대관료</ChoiceChip>
+              <TopTextButton onClick={noop}>설정</TopTextButton>
             </div>
-            <div className="catalog__frame catalog__frame--short">
-              <TabBar current="ledger" onChange={noop} />
-            </div>
+            <MonthStepper month={9} onPrevious={noop} onNext={noop} />
           </div>
         </Section>
 
@@ -270,13 +315,6 @@ export function Catalog() {
           </Button>
         </Section>
 
-        <Section title="TabBar">
-          <State label="지금 탭 · 눌러 보기">
-            <div className="catalog__frame catalog__frame--short">
-              <TabBar current={tab} onChange={setTab} />
-            </div>
-          </State>
-        </Section>
       </main>
 
       <ConfirmDialog

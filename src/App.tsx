@@ -7,9 +7,17 @@ import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices } from './features/storage/storageNotices'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { NoticeBar } from './ui/NoticeBar'
-import { TabBar, type TabId } from './ui/TabBar'
 import { Toast } from './ui/Toast'
 import './features/screens.css'
+
+// 임시 화면 이동 (#26 에서 탭 없는 한 달 보기로 교체 — ADR 003)
+type TabId = 'ledger' | 'report' | 'settings'
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'ledger', label: '장부' },
+  { id: 'report', label: '보고서' },
+  { id: 'settings', label: '설정' },
+]
 
 type AppProps = {
   repository: LedgerRepository
@@ -72,8 +80,30 @@ export default function App({ repository, loaded, options }: AppProps) {
           />
         )}
       </main>
-      <TabBar current={tab} onChange={setTab} />
+      <TemporaryNav current={tab} onChange={setTab} />
       <Toast message={toast} onDone={() => setToast(null)} />
     </div>
+  )
+}
+
+// TabBar(ADR 003 으로 제거)를 대신하는 임시 글자 버튼 줄. 화면 배치는 #26 에서 바꾼다
+function TemporaryNav({ current, onChange }: { current: TabId; onChange: (tab: TabId) => void }) {
+  return (
+    <nav className="app__nav" aria-label="화면 바꾸기" data-testid="tab-bar">
+      <div className="app__nav-list">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className="app__nav-button"
+            aria-current={item.id === current ? 'page' : undefined}
+            data-testid={`tab-${item.id}`}
+            onClick={() => onChange(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </nav>
   )
 }

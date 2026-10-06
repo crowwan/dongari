@@ -1,6 +1,6 @@
 /*
  * 디자인 카탈로그 (개발 모드 전용) 레이아웃.
- * 위에서 아래로 컴포넌트 묶음이 이어지고, 화면 고정 요소(확인 창·알림·하단 탭)는 틀(frame) 안에 가둬 보여준다.
+ * 위에서 아래로 컴포넌트 묶음이 이어지고, 화면 고정 요소(확인 창·알림·아래 고정 버튼)는 틀(frame) 안에 가둬 보여준다.
  */
 @import '../styles/tokens.css';
 
@@ -71,6 +71,22 @@
 .catalog__months {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.catalog__amounts {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--card-pad-block) var(--card-pad-inline);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  font-size: var(--size-body);
+}
+
+.catalog__top {
+  display: flex;
+  justify-content: flex-end;
   gap: var(--space-2);
 }
 
