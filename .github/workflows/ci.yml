@@ -1,8 +1,8 @@
 name: CI
 
 on:
+  # PR 은 문서만 바뀌어도 돌린다: main 보호 규칙이 `test` 체크 통과를 요구해서, 건너뛰면 머지가 막힌다
   pull_request:
-    paths-ignore: ["docs/**", "**/*.md", ".github/ISSUE_TEMPLATE/**"]
   push:
     branches: [main]
     paths-ignore: ["docs/**", "**/*.md", ".github/ISSUE_TEMPLATE/**"]
