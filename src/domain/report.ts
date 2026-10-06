@@ -3,8 +3,9 @@ import { calculateTotals, InvalidLedgerInputError, type LedgerTotals } from './l
 import type { Entry, EntryType, Ledger } from './types'
 
 const MONTHS: readonly number[] = Array.from({ length: 12 }, (_, index) => index + 1)
+// 지출내역 표는 1월↔7월 … 6월↔12월을 한 짝으로 나란히 둔다 (v1 PLANS.md 6.2·6.3)
 const LEFT_MONTHS = MONTHS.slice(0, 6)
-const RIGHT_MONTHS = MONTHS.slice(6)
+const RIGHT_MONTH_OFFSET = 6
 
 // 월별 수입·지출 표 한 줄
 export interface MonthTotal {
@@ -16,16 +17,16 @@ export interface MonthTotal {
 // 지출내역 표 한쪽(왼쪽 1~6월 / 오른쪽 7~12월)의 한 칸 묶음(월·지출내역·금액)
 export interface ExpenseTableCell {
   month: number
-  // 그 달 첫 줄이면 달 칸이 세로로 차지할 줄 수(rowSpan), 같은 달 다음 줄이면 0 (달 칸을 그리지 않는다)
+  // 짝 첫 줄이면 달 칸이 세로로 차지할 줄 수(rowSpan = 짝 높이), 같은 짝 다음 줄이면 0 (달 칸을 그리지 않는다)
   monthRowSpan: number
-  // 지출이 없는 달의 빈 한 줄이면 null
+  // 내용 없는 줄이면 null (지출이 없는 달, 또는 짝 높이를 맞추려고 채운 줄)
   item: { name: string; amount: number } | null
 }
 
-// 지출내역 표 한 줄. 한쪽이 null 이면 좌우 행 수를 맞추려고 아래에 채운 빈 줄
+// 지출내역 표 한 줄. 모든 줄이 좌우 각각 어느 달에 속한다
 export interface ExpenseTableRow {
-  left: ExpenseTableCell | null
-  right: ExpenseTableCell | null
+  left: ExpenseTableCell
+  right: ExpenseTableCell
 }
 
 // 수입내역 한 줄 (같은 이름은 합친 값)
@@ -69,23 +70,32 @@ function sum(entries: readonly Entry[]): number {
   return entries.reduce((total, entry) => total + entry.amount, 0)
 }
 
-// 한쪽 달들을 위에서부터 쌓는다. 지출이 없는 달도 달 칸이 보이도록 빈 한 줄을 차지한다 (v1 ExpenseDetailTable 과 같음)
-function stackExpenseCells(entries: readonly Entry[], months: readonly number[]): ExpenseTableCell[] {
-  return months.flatMap((month): ExpenseTableCell[] => {
-    const expenses = entriesOf(entries, 'expense', month)
-    if (expenses.length === 0) return [{ month, monthRowSpan: 1, item: null }]
-    return expenses.map((entry, index) => ({
+// 짝 높이(height)만큼 한 달의 칸을 만든다. 지출 기록은 입력 순으로 위부터, 남는 줄은 내용 없는 줄
+function monthCells(entries: readonly Entry[], month: number, height: number): ExpenseTableCell[] {
+  const expenses = entriesOf(entries, 'expense', month)
+  return Array.from({ length: height }, (_, index) => {
+    const expense = expenses[index]
+    return {
       month,
-      monthRowSpan: index === 0 ? expenses.length : 0,
-      item: { name: entry.name, amount: entry.amount },
-    }))
+      monthRowSpan: index === 0 ? height : 0,
+      item: expense === undefined ? null : { name: expense.name, amount: expense.amount },
+    }
   })
 }
 
-// 좌우 중 긴 쪽에 맞춰 짧은 쪽 아래를 빈 줄로 채운다
-function pairRows(left: readonly ExpenseTableCell[], right: readonly ExpenseTableCell[]): ExpenseTableRow[] {
-  const rowCount = Math.max(left.length, right.length)
-  return Array.from({ length: rowCount }, (_, index) => ({ left: left[index] ?? null, right: right[index] ?? null }))
+// 짝마다 높이 = max(왼쪽 달 지출 수, 오른쪽 달 지출 수, 1). 그래서 좌우 행 수가 같고 월이 바뀌는 줄도 좌우가 같다
+function expenseTableRows(entries: readonly Entry[]): ExpenseTableRow[] {
+  return LEFT_MONTHS.flatMap((leftMonth) => {
+    const rightMonth = leftMonth + RIGHT_MONTH_OFFSET
+    const height = Math.max(
+      entriesOf(entries, 'expense', leftMonth).length,
+      entriesOf(entries, 'expense', rightMonth).length,
+      1,
+    )
+    const left = monthCells(entries, leftMonth, height)
+    const right = monthCells(entries, rightMonth, height)
+    return left.map((cell, index) => ({ left: cell, right: right[index] }))
+  })
 }
 
 function sumIncomeByName(entries: readonly Entry[]): IncomeItemTotal[] {
@@ -108,7 +118,7 @@ export function yearReport(ledger: Ledger): YearReport {
       expense: sum(entriesOf(entries, 'expense', month)),
     })),
     totals: calculateTotals(ledger),
-    expenseRows: pairRows(stackExpenseCells(entries, LEFT_MONTHS), stackExpenseCells(entries, RIGHT_MONTHS)),
+    expenseRows: expenseTableRows(entries),
     incomeItems: sumIncomeByName(entries),
   }
 }

@@ -22,11 +22,10 @@ function ledger(specs: readonly EntrySpec[], overrides: Partial<Omit<Ledger, 'en
 }
 
 // 지출내역 표 한쪽(왼쪽/오른쪽)을 사람이 읽기 쉬운 문자열 목록으로 바꾼다
-// "1월|대관료|40000" = 그 달 첫 줄, "  |간식비|28340" = 같은 달 다음 줄, "1월||" = 지출 없는 달, "" = 아래 채움 빈 줄
-function side(rows: readonly ExpenseTableRow[], pick: (row: ExpenseTableRow) => ExpenseTableCell | null): string[] {
+// "1월|대관료|40000" = 그 달 첫 줄, "  |간식비|28340" = 같은 달 다음 줄, "1월||" = 지출 없는 달, "  ||" = 짝 높이를 맞춘 빈 줄
+function side(rows: readonly ExpenseTableRow[], pick: (row: ExpenseTableRow) => ExpenseTableCell): string[] {
   return rows.map((row) => {
     const cell = pick(row)
-    if (cell === null) return ''
     const month = cell.monthRowSpan > 0 ? `${cell.month}월` : '  '
     return `${month}|${cell.item?.name ?? ''}|${cell.item?.amount ?? ''}`
   })
@@ -172,26 +171,50 @@ describe('SPEC-003 올해 결산 계산', () => {
   })
 
   describe('지출내역 표 (AC-4)', () => {
-    it('1~6월은 왼쪽, 7~12월은 오른쪽에 달별 지출 기록을 입력 순으로 쌓고, 지출 없는 달은 빈 한 줄을 둔다', () => {
+    it('1월↔7월 … 6월↔12월 짝마다 높이를 맞춘다: 1월 2줄·7월 3줄이면 짝 높이 3, 1월 달 칸이 3줄을 합치고 왼쪽 세 번째 줄은 내용이 없다', () => {
+      const report = yearReport(
+        ledger([
+          [1, 'expense', '대관료', 40_000],
+          [1, 'expense', '간식비', 28_340],
+          [7, 'expense', '대관료', 40_000],
+          [7, 'expense', '간식비(8월)', 38_430],
+          [7, 'expense', '간식비(2건)', 58_280],
+        ]),
+      )
+
+      const firstPair = report.expenseRows.slice(0, 3)
+      expect(firstPair[0].left).toEqual({ month: 1, monthRowSpan: 3, item: { name: '대관료', amount: 40_000 } })
+      expect(firstPair[0].right.monthRowSpan).toBe(3)
+      expect(firstPair[2].left).toEqual({ month: 1, monthRowSpan: 0, item: null })
+      expect(firstPair[2].right.item).toEqual({ name: '간식비(2건)', amount: 58_280 })
+      // 나머지 지출 없는 짝 5개는 1줄씩
+      expect(report.expenseRows).toHaveLength(3 + 5)
+    })
+
+    it('달별 지출 기록을 입력 순으로 넣고, 전체 행 수는 짝 높이의 합이며 좌우 행 수가 같다', () => {
       const report = yearReport(ledger(V1_EXAMPLE_YEAR))
 
+      // 짝 높이: (1,7)=3 (2,8)=2 (3,9)=1 (4,10)=2 (5,11)=1 (6,12)=2
+      expect(report.expenseRows).toHaveLength(11)
       expect(leftSide(report.expenseRows)).toEqual([
         '1월|대관료|40000',
         '  |간식비|28340',
+        '  ||',
         '2월|대관료|40000',
         '  |간식비|31900',
         '3월|대관료|40000',
         '4월|대관료|40000',
+        '  ||',
         '5월|대관료|40000',
         '6월||',
-        '',
-        '',
+        '  ||',
       ])
       expect(rightSide(report.expenseRows)).toEqual([
         '7월|대관료|40000',
         '  |간식비(8월)|38430',
         '  |간식비(2건)|58280',
         '8월|대관료|40000',
+        '  ||',
         '9월|대관료|40000',
         '10월|대관료|40000',
         '  |야유회|627230',
@@ -201,13 +224,12 @@ describe('SPEC-003 올해 결산 계산', () => {
       ])
     })
 
-    it('달 칸은 그 달 첫 줄에만 있고, 그 달이 차지하는 줄 수만큼 세로로 합친다', () => {
+    it('달 칸은 짝의 첫 줄에만 있고 짝 높이만큼 세로로 합쳐, 월이 바뀔 때만 가로 경계가 생긴다', () => {
       const report = yearReport(ledger(V1_EXAMPLE_YEAR))
 
-      const rightSpans = report.expenseRows.map((row) => row.right?.monthRowSpan)
-      expect(rightSpans).toEqual([3, 0, 0, 1, 1, 2, 0, 1, 2, 0])
-      const leftSpans = report.expenseRows.map((row) => row.left?.monthRowSpan ?? null)
-      expect(leftSpans).toEqual([2, 0, 2, 0, 1, 1, 1, 1, null, null])
+      const pairSpans = [3, 0, 0, 2, 0, 1, 2, 0, 1, 2, 0]
+      expect(report.expenseRows.map((row) => row.left.monthRowSpan)).toEqual(pairSpans)
+      expect(report.expenseRows.map((row) => row.right.monthRowSpan)).toEqual(pairSpans)
     })
 
     it('같은 달에 이름이 같은 지출이 있어도 합치지 않는다', () => {
@@ -221,7 +243,7 @@ describe('SPEC-003 올해 결산 계산', () => {
       expect(rightSide(report.expenseRows).slice(0, 3)).toEqual(['7월||', '8월|간식비|10000', '  |간식비|20000'])
     })
 
-    it('지출이 1~6월에만 있어도 좌우 행 수가 같고, 짧은 오른쪽 아래를 빈 줄로 채운다', () => {
+    it('지출이 1~6월에만 있어도 좌우 행 수가 같고, 짝의 오른쪽 달을 빈 줄로 채운다', () => {
       const report = yearReport(
         ledger([
           [1, 'expense', '대관료', 40_000],
@@ -231,7 +253,7 @@ describe('SPEC-003 올해 결산 계산', () => {
         ]),
       )
 
-      // 왼쪽: 1월 3줄 + 2월 1줄 + 3~6월 빈 줄 4 = 8줄, 오른쪽: 7~12월 빈 줄 6 + 채움 2
+      // 짝 높이: (1,7)=3, 나머지 5짝 1줄씩
       expect(report.expenseRows).toHaveLength(8)
       expect(leftSide(report.expenseRows)).toEqual([
         '1월|대관료|40000',
@@ -243,7 +265,7 @@ describe('SPEC-003 올해 결산 계산', () => {
         '5월||',
         '6월||',
       ])
-      expect(rightSide(report.expenseRows)).toEqual(['7월||', '8월||', '9월||', '10월||', '11월||', '12월||', '', ''])
+      expect(rightSide(report.expenseRows)).toEqual(['7월||', '  ||', '  ||', '8월||', '9월||', '10월||', '11월||', '12월||'])
     })
   })
 
@@ -280,7 +302,7 @@ describe('SPEC-003 올해 결산 계산', () => {
         '11월||',
         '12월||',
       ])
-      expect(leftSide(report.expenseRows)[6]).toBe('')
+      expect(leftSide(report.expenseRows)).toEqual(['1월||', '2월||', '3월||', '  ||', '4월||', '5월||', '6월||'])
     })
   })
 })
