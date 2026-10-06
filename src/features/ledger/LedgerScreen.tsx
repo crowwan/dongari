@@ -1,6 +1,6 @@
 import { groupByMonth, type LedgerTotals, type MonthGroup } from '../../domain/ledger'
 import type { EntryType, Ledger } from '../../domain/types'
-import { BigActionButton } from '../../ui/BigActionButton'
+import { Button } from '../../ui/Button'
 import { formatAmount } from '../../ui/money'
 import './ledger.css'
 
@@ -51,8 +51,11 @@ export function LedgerScreen({ year, ledger, totals, onAddEntry, onEditEntry }: 
       </header>
 
       <div className="ledger__actions">
-        <BigActionButton kind="income" description="회비, 지원금" onClick={() => onAddEntry?.('income')} />
-        <BigActionButton kind="expense" description="대관료, 간식비" onClick={() => onAddEntry?.('expense')} />
+        {/* BigActionButton(ADR 003 으로 제거) 대신 임시로 기본 버튼. 아래 고정 [+ 내역 적기] 하나로 #26 에서 교체 */}
+        <Button variant="secondary" onClick={() => onAddEntry?.('income')}>
+          + 돈 들어옴
+        </Button>
+        <Button onClick={() => onAddEntry?.('expense')}>− 돈 나감</Button>
       </div>
 
       {groups.length === 0 ? (
