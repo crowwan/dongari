@@ -1,0 +1,53 @@
+/*
+ * 내역 적기 화면 (기록 입력). 값은 tokens.css 변수만 쓴다.
+ * 위에서 아래로 질문 네 개, 묶음 사이는 선 대신 여백.
+ */
+@import '../screens.css';
+
+/*
+ * 아래 고정 [저장] 영역(BottomActionBar)만큼 끝을 띄워 금액 칸이 가리지 않게 한다.
+ * 고정 영역 높이 = 위 여백 + 안내 한 줄 + 간격 + 주 버튼 + 아래 여백 + 위쪽 선 (ui.css .ui-bottom-bar)
+ */
+.entry {
+  gap: var(--space-6);
+  padding-bottom: calc(
+    var(--space-3) + var(--size-small) * var(--line-tight) + var(--space-2) + var(--touch-primary) + var(--space-4) +
+      var(--hairline) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+/* 질문 하나: 질문 → 고르는 버튼(→ 입력칸) */
+.entry__part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* 질문 글자는 입력칸 이름(ui-field__label, ui-money__label)과 같은 크기·두께 */
+.entry__question {
+  margin: 0;
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+/* 1~12월: 4열 × 3행 */
+.entry__months {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+/* [수입] [지출]: 반씩 나눈 큰 버튼 두 개 */
+.entry__types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+/* 자주 쓴 항목: 글자 폭만큼, 넘치면 다음 줄 */
+.entry__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

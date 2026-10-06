@@ -173,6 +173,20 @@
 .ui-bottom-bar__inner {
   max-width: var(--content-max);
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 버튼 바로 위 한 줄 안내 (누를 수 없는 이유): 가운데, 보조 글자 */
+.ui-bottom-bar__note {
+  margin: 0;
+  font-family: var(--typeface);
+  font-size: var(--size-small);
+  font-weight: var(--weight-strong);
+  line-height: var(--line-tight);
+  color: var(--muted);
+  text-align: center;
 }
 
 /* 수입/지출 금액 글자: 크기는 놓인 자리를 따른다 */

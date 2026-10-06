@@ -250,6 +250,11 @@ export function Catalog() {
               <BottomActionBar label="사진으로 보내기" onClick={noop} disabled />
             </div>
           </State>
+          <State label="비활성 + 안내 (누를 수 없는 이유, 내역 적기 [저장])">
+            <div className="catalog__frame catalog__frame--note">
+              <BottomActionBar label="저장" onClick={noop} disabled note="수입인지 지출인지 골라 주세요" />
+            </div>
+          </State>
         </Section>
 
         <Section title="NoticeBar">

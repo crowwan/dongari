@@ -4,8 +4,8 @@ import {
   calculateTotals,
   createLedger,
   deleteEntry,
-  FREQUENT_NAMES_LIMIT,
-  frequentNames,
+  FREQUENT_CHOICES_LIMIT,
+  frequentChoices,
   firstVisibleMonth,
   InvalidLedgerInputError,
   monthGroup,
@@ -195,40 +195,101 @@ describe('SPEC-001 장부 계산', () => {
   })
 
   describe('자주 쓴 항목', () => {
-    it('AC-4 같은 종류로 쓴 이름이 최근 사용 순, 중복 없이 나온다', () => {
-      const entries = [
-        entry({ id: '1', type: 'expense', name: '대관료' }),
-        entry({ id: '2', type: 'income', name: '회비' }),
-        entry({ id: '3', type: 'expense', name: '꽃값' }),
-        entry({ id: '4', type: 'expense', name: '대관료' }),
-      ]
+    // 이름만 뽑아 보기 쉽게
+    const names = (choices: { name: string }[]) => choices.map((choice) => choice.name)
 
-      expect(frequentNames(entries, 'expense').slice(0, 2)).toEqual(['대관료', '꽃값'])
-      expect(frequentNames(entries, 'income')[0]).toBe('회비')
+    describe('종류를 고른 뒤', () => {
+      it('AC-4 같은 종류로 쓴 이름이 최근 사용 순, 중복 없이 나온다', () => {
+        const entries = [
+          entry({ id: '1', type: 'expense', name: '대관료' }),
+          entry({ id: '2', type: 'income', name: '회비' }),
+          entry({ id: '3', type: 'expense', name: '꽃값' }),
+          entry({ id: '4', type: 'expense', name: '대관료' }),
+        ]
+
+        expect(names(frequentChoices(entries, 'expense')).slice(0, 2)).toEqual(['대관료', '꽃값'])
+        expect(names(frequentChoices(entries, 'income'))[0]).toBe('회비')
+      })
+
+      it('고른 종류의 항목만, 그 종류로 나온다', () => {
+        const entries = [entry({ id: '1', type: 'income', name: '찬조금' }), entry({ id: '2', type: 'expense', name: '꽃값' })]
+
+        expect(frequentChoices(entries, 'income')).toEqual([
+          { name: '찬조금', type: 'income' },
+          { name: '회비', type: 'income' },
+        ])
+      })
+
+      it('기록이 없으면 기본 항목(지출: 대관료·간식비 / 수입: 회비)을 보여준다', () => {
+        expect(frequentChoices([], 'expense')).toEqual([
+          { name: '대관료', type: 'expense' },
+          { name: '간식비', type: 'expense' },
+        ])
+        expect(frequentChoices([], 'income')).toEqual([{ name: '회비', type: 'income' }])
+      })
+
+      it('쓴 이름 뒤에 아직 안 나온 기본 항목을 채운다', () => {
+        const entries = [entry({ id: '1', type: 'expense', name: '꽃값' }), entry({ id: '2', type: 'expense', name: '간식비' })]
+
+        expect(names(frequentChoices(entries, 'expense'))).toEqual(['간식비', '꽃값', '대관료'])
+      })
+
+      it(`최대 ${FREQUENT_CHOICES_LIMIT}개까지만 보여준다`, () => {
+        const entries = ['가', '나', '다', '라', '마', '바', '사'].map((name, index) =>
+          entry({ id: String(index), type: 'expense', name }),
+        )
+
+        expect(FREQUENT_CHOICES_LIMIT).toBe(6)
+        expect(names(frequentChoices(entries, 'expense'))).toEqual(['사', '바', '마', '라', '다', '나'])
+      })
     })
 
-    it('기록이 없으면 기본 항목(지출: 대관료·간식비 / 수입: 회비)을 보여준다', () => {
-      expect(frequentNames([], 'expense')).toEqual(['대관료', '간식비'])
-      expect(frequentNames([], 'income')).toEqual(['회비'])
-    })
+    describe('종류를 고르기 전', () => {
+      it('두 종류를 최근 사용 순으로 섞고, 각 이름에 마지막으로 쓴 종류를 붙인다', () => {
+        const entries = [
+          entry({ id: '1', type: 'expense', name: '대관료' }),
+          entry({ id: '2', type: 'income', name: '찬조금' }),
+          // 같은 이름을 다른 종류로 쓴 적이 있으면 마지막 기록의 종류를 따른다
+          entry({ id: '3', type: 'expense', name: '회비' }),
+          entry({ id: '4', type: 'income', name: '회비' }),
+        ]
 
-    it('쓴 이름 뒤에 아직 안 나온 기본 항목을 채운다', () => {
-      const entries = [entry({ id: '1', type: 'expense', name: '꽃값' }), entry({ id: '2', type: 'expense', name: '간식비' })]
+        expect(frequentChoices(entries).slice(0, 3)).toEqual([
+          { name: '회비', type: 'income' },
+          { name: '찬조금', type: 'income' },
+          { name: '대관료', type: 'expense' },
+        ])
+      })
 
-      expect(frequentNames(entries, 'expense')).toEqual(['간식비', '꽃값', '대관료'])
-    })
+      it('기록이 없으면 기본 항목을 종류와 함께 보여준다 (대관료·간식비 = 지출, 회비 = 수입)', () => {
+        expect(frequentChoices([])).toEqual([
+          { name: '대관료', type: 'expense' },
+          { name: '간식비', type: 'expense' },
+          { name: '회비', type: 'income' },
+        ])
+      })
 
-    it(`최대 ${FREQUENT_NAMES_LIMIT}개까지만 보여준다`, () => {
-      const entries = ['가', '나', '다', '라', '마', '바', '사'].map((name, index) =>
-        entry({ id: String(index), type: 'expense', name }),
-      )
+      it('이미 쓴 이름의 기본 항목은 다시 넣지 않는다', () => {
+        const entries = [entry({ id: '1', type: 'income', name: '간식비' })]
 
-      expect(FREQUENT_NAMES_LIMIT).toBe(6)
-      expect(frequentNames(entries, 'expense')).toEqual(['사', '바', '마', '라', '다', '나'])
+        expect(frequentChoices(entries)).toEqual([
+          { name: '간식비', type: 'income' },
+          { name: '대관료', type: 'expense' },
+          { name: '회비', type: 'income' },
+        ])
+      })
+
+      it(`섞어도 최대 ${FREQUENT_CHOICES_LIMIT}개까지만 보여준다`, () => {
+        const entries = ['가', '나', '다', '라', '마', '바', '사'].map((name, index) =>
+          entry({ id: String(index), type: index % 2 === 0 ? 'income' : 'expense', name }),
+        )
+
+        expect(names(frequentChoices(entries))).toEqual(['사', '바', '마', '라', '다', '나'])
+      })
     })
 
     it('개수를 따로 정할 수 있다', () => {
-      expect(frequentNames([], 'expense', 1)).toEqual(['대관료'])
+      expect(frequentChoices([], 'expense', 1)).toEqual([{ name: '대관료', type: 'expense' }])
     })
   })
 

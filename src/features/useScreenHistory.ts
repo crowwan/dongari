@@ -1,5 +1,5 @@
 // 장부와 그 밖의 화면 오가기 (SPEC-001 화면 구성, 탭 없음)
-// 장부 외 화면을 열 때 방문 기록을 하나 쌓아, 안드로이드 뒤로 버튼(popstate)이 앱을 나가지 않고 장부로 돌아오게 한다
+// 장부 외 화면(입력창 포함)을 열 때 방문 기록을 하나 쌓아, 안드로이드 뒤로 버튼(popstate)이 앱을 나가지 않고 장부로 돌아오게 한다
 import { useEffect, useState } from 'react'
 
 export type Screen =
@@ -7,6 +7,7 @@ export type Screen =
   | { name: 'settings' }
   | { name: 'month-summary'; month: number }
   | { name: 'year-summary' }
+  | { name: 'add-entry'; month: number } // 내역 적기. month: 장부에서 보던 달 (입력 월 기본값)
 
 const LEDGER: Screen = { name: 'ledger' }
 

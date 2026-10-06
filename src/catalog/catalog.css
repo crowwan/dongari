@@ -131,3 +131,8 @@
 .catalog__frame--short {
   height: 120px;
 }
+
+/* 아래 고정 영역 + 안내 줄 */
+.catalog__frame--note {
+  height: 160px;
+}
