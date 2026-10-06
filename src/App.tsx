@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { InstallBanner } from './features/install/InstallBanner'
 import { EntryForm } from './features/ledger/EntryForm'
 import { emptyDraft } from './features/ledger/entryDraft'
 import { LedgerScreen } from './features/ledger/LedgerScreen'
@@ -134,19 +135,23 @@ export default function App({ repository, loaded, options }: AppProps) {
         </>
       )
     }
+    // 홈 화면에 추가하지 않고 열었으면 장부 위에 설치 안내 띠 (SPEC-002)
     return (
-      <LedgerScreen
-        year={year}
-        ledger={ledger.ledger}
-        totals={totals}
-        month={month}
-        onChangeMonth={setViewedMonth}
-        onOpenMonthSummary={(summaryMonth) => navigation.open({ name: 'month-summary', month: summaryMonth })}
-        onOpenYearSummary={() => navigation.open({ name: 'year-summary' })}
-        onOpenSettings={() => navigation.open({ name: 'settings' })}
-        onAddEntry={(entryMonth) => navigation.open({ name: 'add-entry', month: entryMonth })}
-        onEditEntry={(id) => navigation.open({ name: 'edit-entry', id })}
-      />
+      <>
+        <InstallBanner />
+        <LedgerScreen
+          year={year}
+          ledger={ledger.ledger}
+          totals={totals}
+          month={month}
+          onChangeMonth={setViewedMonth}
+          onOpenMonthSummary={(summaryMonth) => navigation.open({ name: 'month-summary', month: summaryMonth })}
+          onOpenYearSummary={() => navigation.open({ name: 'year-summary' })}
+          onOpenSettings={() => navigation.open({ name: 'settings' })}
+          onAddEntry={(entryMonth) => navigation.open({ name: 'add-entry', month: entryMonth })}
+          onEditEntry={(id) => navigation.open({ name: 'edit-entry', id })}
+        />
+      </>
     )
   }
 

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { InstallBannerView } from '../features/install/InstallBanner'
 import { CarryoverField } from '../features/ledger/CarryoverField'
 import { AmountText } from '../ui/AmountText'
 import { BalanceCard } from '../ui/BalanceCard'
@@ -62,6 +63,7 @@ export function Catalog() {
   const [viewMonth, setViewMonth] = useState(9)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [installGuideOpen, setInstallGuideOpen] = useState(false)
 
   return (
     <div className="catalog" data-theme={theme === 'system' ? undefined : theme} data-testid="design-catalog">
@@ -263,6 +265,25 @@ export function Catalog() {
           </State>
           <State label="긴 문장 (시작 안내)">
             <NoticeBar message="저장된 기록을 읽지 못해 새 장부로 시작해요. 예전 기록은 따로 보관해 두었어요" />
+          </State>
+        </Section>
+
+        <Section title="InstallBanner (설치 안내 띠)">
+          <State label="기본 · [방법 보기] (눌러 보기)">
+            <InstallBannerView
+              canInstall={false}
+              guideOpen={installGuideOpen}
+              browser="samsung"
+              onToggleGuide={() => setInstallGuideOpen((open) => !open)}
+              onInstall={noop}
+              onDismiss={noop}
+            />
+          </State>
+          <State label="방법 펼침 · 브라우저를 모를 때 (삼성 인터넷 + 크롬)">
+            <InstallBannerView canInstall={false} guideOpen browser="other" onToggleGuide={noop} onInstall={noop} onDismiss={noop} />
+          </State>
+          <State label="브라우저가 설치를 제안할 때 · [홈 화면에 추가]">
+            <InstallBannerView canInstall guideOpen={false} browser="chrome" onToggleGuide={noop} onInstall={noop} onDismiss={noop} />
           </State>
         </Section>
 
