@@ -16,7 +16,13 @@ import {
   type LedgerTotals,
 } from '../../domain/ledger'
 import type { EntryType, Ledger, StoredData } from '../../domain/types'
-import type { LedgerRepository, LoadResult, ReadOnlyReason, SaveFailureReason } from '../../storage/LedgerRepository'
+import type {
+  LedgerRepository,
+  LoadResult,
+  ReadOnlyReason,
+  SaveFailureReason,
+  SaveResult,
+} from '../../storage/LedgerRepository'
 
 export interface UseLedgerOptions {
   now?: () => Date // 기본 연도·입력 시각·변경 시각 (기본: 지금)
@@ -37,6 +43,7 @@ export interface LedgerState {
   newLedgerDefaults: LedgerInfo // 이 연도 장부를 새로 만들 때 기본값 (AC-8)
   startup: StartupStatus
   saveFailure: SaveFailureReason | undefined // 마지막 저장이 실패했으면 그 이유
+  data: StoredData // 지금 기록 전체 (백업 파일 내용)
   // 자주 쓴 항목 버튼: 종류를 고르기 전(type 없음)엔 두 종류를 섞어서
   frequentChoices: (type?: EntryType) => FrequentChoice[]
   startLedger: (info: LedgerInfo) => void
@@ -45,6 +52,10 @@ export interface LedgerState {
   deleteEntry: (id: string) => boolean // 저장에 성공했는지 (성공일 때만 "지웠어요")
   updateClubInfo: (info: LedgerInfo) => boolean // 저장에 성공했는지 (성공일 때만 알림을 띄운다)
   changeYear: (year: number) => void
+  // 백업 파일 데이터로 통째로 바꾼다 (SPEC-002). 저장에 성공했을 때만 화면을 바꾸고 올해 장부로 연다
+  restoreBackup: (data: StoredData) => SaveResult
+  // 백업 파일을 보냈다고 기록한다 (마지막 백업 시각, 백업 안내 #9 가 쓴다). 저장에 성공했는지
+  recordBackup: () => boolean
 }
 
 function toStartupStatus(result: LoadResult): StartupStatus {
@@ -66,6 +77,8 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
   const [data, setData] = useState(loaded.data)
   const [year, setYear] = useState(() => now().getFullYear())
   const [saveFailure, setSaveFailure] = useState<SaveFailureReason | undefined>()
+  // 시작 상태. 백업 파일을 불러오면 시작 때의 문제(깨진 기록·저장 막힘)가 풀려 ok 가 된다
+  const [startup, setStartup] = useState(() => toStartupStatus(loaded))
   // 같은 이벤트 안에서 여러 번 바꿔도 앞 변경을 잃지 않게 최신 데이터를 따로 들고 있는다
   const latest = useRef(loaded.data)
 
@@ -78,6 +91,17 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     const result = repository.save(next)
     setSaveFailure(result.ok ? undefined : result.reason)
     return result.ok
+  }
+
+  // 변경 시각을 건드리지 않고 그대로 저장한다 (백업 불러오기·백업 시각 기록)
+  function replace(next: StoredData, save: (data: StoredData) => SaveResult): SaveResult {
+    const result = save(next)
+    if (result.ok) {
+      latest.current = next
+      setData(next)
+      setSaveFailure(undefined)
+    }
+    return result
   }
 
   function changeLedger(change: (ledger: Ledger) => Ledger): boolean {
@@ -102,8 +126,9 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     firstMonth: firstVisibleMonth(year, now()),
     isFirstRun: Object.keys(data.ledgers).length === 0,
     newLedgerDefaults: defaultsFor(data.ledgers, year),
-    startup: toStartupStatus(loaded),
+    startup,
     saveFailure,
+    data,
     frequentChoices: (type) => pickFrequentChoices(allEntriesOldestFirst(data), type),
     startLedger: (info) =>
       commit((current) => {
@@ -115,5 +140,21 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     deleteEntry: (id) => changeLedger((item) => deleteEntryFrom(item, id)),
     updateClubInfo: (info) => changeLedger((item) => updateLedgerInfo(item, info)),
     changeYear: setYear,
+    restoreBackup: (backup) => {
+      // 저장하지 못하면 지금 기록을 그대로 둔다: 불러온 것처럼 보였다가 새로고침 때 사라지지 않게
+      const result = replace(backup, (next) => repository.restore(next))
+      if (result.ok) {
+        setYear(now().getFullYear())
+        setStartup({ status: 'ok' })
+      }
+      return result
+    },
+    recordBackup: () => {
+      const next: StoredData = {
+        ...latest.current,
+        settings: { ...latest.current.settings, lastBackupAt: now().toISOString() },
+      }
+      return replace(next, (changed) => repository.save(changed)).ok
+    },
   }
 }

@@ -8,6 +8,7 @@
 .ui-button,
 .ui-chip,
 .ui-top-button,
+.ui-notice__action,
 .ui-stepper__arrow,
 .ui-money__field,
 .ui-field__input {
@@ -19,6 +20,7 @@
 .ui-button:focus-visible,
 .ui-chip:focus-visible,
 .ui-top-button:focus-visible,
+.ui-notice__action:focus-visible,
 .ui-stepper__arrow:focus-visible {
   outline: var(--focus-ring) solid var(--primary);
   outline-offset: var(--stroke);
@@ -339,9 +341,12 @@
   font-size: var(--size-large);
 }
 
-/* 안내 띠: 노란 면 + 본문 색 글자 */
+/* 안내 띠: 노란 면 + 본문 색 글자. 할 일이 있으면 문장 아래 흰 면 버튼 하나 */
 .ui-notice {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--corner-sm);
   background: var(--warn-bg);
@@ -350,6 +355,23 @@
   font-size: var(--size-body);
   font-weight: var(--weight-strong);
   line-height: var(--line-body);
+}
+
+.ui-notice__message {
+  margin: 0;
+}
+
+.ui-notice__action {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--corner-md);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--size-body);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+  cursor: pointer;
 }
 
 /* 확인 창: 화면 가운데 흰 카드, 아니요(보조)/확인(주·위험) 두 버튼 */
@@ -387,10 +409,33 @@
   text-wrap: balance;
 }
 
+.ui-dialog__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* 한글 낱말 가운데서 줄을 바꾸지 않는다 ("장부(기 / 록 5건)" 방지) */
+  word-break: keep-all;
+}
+
+/* 제목 아래 보조 설명: 본문 크기, 보조 글자색 */
+.ui-dialog__description {
+  margin: 0;
+  font-size: var(--size-body);
+  line-height: var(--line-body);
+  color: var(--muted);
+  text-align: center;
+  text-wrap: balance;
+}
+
 .ui-dialog__actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
+}
+
+/* 버튼 하나짜리 알림 창 */
+.ui-dialog__actions[data-count='1'] {
+  grid-template-columns: 1fr;
 }
 
 /* 알림: 화면 아래쪽에 잠깐 뜨는 둥근 띠 (본문색 면 + 바탕색 글자) */
@@ -445,6 +490,8 @@
 [data-preview-pressed] .ui-chip[aria-pressed='false']:not(:disabled),
 .ui-top-button:active,
 [data-preview-pressed] .ui-top-button,
+.ui-notice__action:active,
+[data-preview-pressed] .ui-notice__action,
 .ui-stepper__arrow:active:not(:disabled),
 [data-preview-pressed] .ui-stepper__arrow:not(:disabled) {
   background: var(--pressed);
@@ -463,6 +510,7 @@
   .ui-button,
   .ui-chip,
   .ui-top-button,
+  .ui-notice__action,
   .ui-stepper__arrow {
     transition:
       background-color var(--motion-fast),

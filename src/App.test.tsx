@@ -622,7 +622,11 @@ describe('SPEC-001 앱 뼈대', () => {
 // 읽기는 되지만 저장은 늘 실패하는 저장소 (용량 초과)
 function alwaysFailing(data: StoredData): LedgerRepository {
   const memory = new MemoryRepository(data)
-  return { load: () => memory.load(), save: () => ({ ok: false, reason: 'quota-exceeded' }) }
+  return {
+    load: () => memory.load(),
+    save: () => ({ ok: false, reason: 'quota-exceeded' }),
+    restore: () => ({ ok: false, reason: 'quota-exceeded' }),
+  }
 }
 
 // 안드로이드 뒤로 버튼: 브라우저가 방문 기록을 하나 빼고 popstate 를 보낸다

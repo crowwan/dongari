@@ -141,6 +141,53 @@ describe('SPEC-002 저장 (localStorage)', () => {
     })
   })
 
+  describe('백업 파일로 바꾸기 (restore)', () => {
+    it('AC-3 백업 데이터로 통째로 바꿔 저장하고 새로고침해도 그대로다', () => {
+      const repository = new LocalStorageRepository()
+      repository.load()
+
+      expect(repository.restore(sampleData())).toEqual({ ok: true })
+      expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data: sampleData() })
+    })
+
+    it('원본을 옮기지 못해 막아 둔 저장은 불러오기로 풀린다 (사용자가 바꾸기로 했으므로) — 이후 저장도 된다', () => {
+      localStorage.setItem(STORAGE_KEY, 'not json')
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+        throw quotaError()
+      })
+      const repository = new LocalStorageRepository()
+      expect(repository.load().status).toBe('read-only')
+
+      expect(repository.restore(sampleData())).toEqual({ ok: true })
+      expect(repository.save({ ...sampleData(), settings: {} })).toEqual({ ok: true })
+      expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data: { ...sampleData(), settings: {} } })
+    })
+
+    it('불러오기를 저장하지 못하면 원본을 옮기지 못한 막힘은 그대로 남는다', () => {
+      localStorage.setItem(STORAGE_KEY, 'not json')
+      const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw quotaError()
+      })
+      const repository = new LocalStorageRepository()
+      repository.load()
+
+      expect(repository.restore(sampleData())).toEqual({ ok: false, reason: 'quota-exceeded' })
+      setItem.mockRestore()
+      expect(repository.save(sampleData())).toEqual({ ok: false, reason: 'unreadable-original' })
+      expect(localStorage.getItem(STORAGE_KEY)).toBe('not json')
+    })
+
+    it('상위 버전 원본이 있으면 불러오기도 막아 새 앱의 기록을 덮어쓰지 않는다', () => {
+      const newer = JSON.stringify({ schemaVersion: 3, ledgers: {}, settings: {} })
+      localStorage.setItem(STORAGE_KEY, newer)
+      const repository = new LocalStorageRepository()
+      repository.load()
+
+      expect(repository.restore(sampleData())).toEqual({ ok: false, reason: 'newer-version' })
+      expect(localStorage.getItem(STORAGE_KEY)).toBe(newer)
+    })
+  })
+
   describe('저장 실패', () => {
     it('용량이 부족하면 quota-exceeded 로 알린다', () => {
       vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {

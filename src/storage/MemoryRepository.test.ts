@@ -39,4 +39,11 @@ describe('SPEC-002 저장 (메모리)', () => {
 
     expect(repository.load().data.ledgers['2026'].entries).toHaveLength(1)
   })
+
+  it('AC-3 백업 데이터로 통째로 바꾸면 그 데이터를 돌려준다', () => {
+    const repository = new MemoryRepository()
+
+    expect(repository.restore(sampleData())).toEqual({ ok: true })
+    expect(repository.load()).toEqual({ status: 'ok', data: sampleData() })
+  })
 })

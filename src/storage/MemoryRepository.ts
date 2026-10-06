@@ -18,4 +18,8 @@ export class MemoryRepository implements LedgerRepository {
     this.data = structuredClone(data)
     return { ok: true }
   }
+
+  restore(data: StoredData): SaveResult {
+    return this.save(data)
+  }
 }
