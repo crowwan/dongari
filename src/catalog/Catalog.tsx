@@ -161,7 +161,7 @@ export function Catalog() {
             <MoneyInput label="얼마인가요?" value={amount} onChange={setAmount} />
           </State>
           <State label="빈칸">
-            <MoneyInput label="작년에서 넘어온 돈 (이월금)" value={0} onChange={noop} />
+            <MoneyInput label="작년 이월금" value={0} onChange={noop} />
           </State>
           <State label="오류">
             <MoneyInput label="얼마인가요?" value={0} onChange={noop} error="얼마인지 적어주세요" />

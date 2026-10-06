@@ -5,6 +5,7 @@ import {
   calculateTotals,
   createLedger,
   deleteEntry as deleteEntryFrom,
+  firstVisibleMonth,
   frequentNames as pickFrequentNames,
   newLedgerDefaults as defaultsFor,
   updateEntry as updateEntryIn,
@@ -30,6 +31,7 @@ export interface LedgerState {
   yearChoices: number[] // 설정에서 고를 수 있는 연도: 장부가 있는 연도 + 올해, 최신 순
   ledger: Ledger | undefined // 이 연도 장부. 아직 없으면 undefined
   totals: LedgerTotals | undefined
+  firstMonth: number // 장부 화면에 처음 보이는 달: 올해면 이번 달, 지난 연도면 12월
   isFirstRun: boolean // 장부가 하나도 없다
   newLedgerDefaults: LedgerInfo // 이 연도 장부를 새로 만들 때 기본값 (AC-8)
   startup: StartupStatus
@@ -39,7 +41,7 @@ export interface LedgerState {
   addEntry: (input: EntryInput) => void
   updateEntry: (id: string, input: EntryInput) => void
   deleteEntry: (id: string) => void
-  updateClubInfo: (info: LedgerInfo) => void
+  updateClubInfo: (info: LedgerInfo) => boolean // 저장에 성공했는지 (성공일 때만 알림을 띄운다)
   changeYear: (year: number) => void
 }
 
@@ -65,18 +67,19 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
   // 같은 이벤트 안에서 여러 번 바꿔도 앞 변경을 잃지 않게 최신 데이터를 따로 들고 있는다
   const latest = useRef(loaded.data)
 
-  // 모든 변경은 즉시 저장한다. 실패해도 화면 데이터는 바뀐 대로 두고 이유를 알린다
-  function commit(change: (current: StoredData) => StoredData) {
+  // 모든 변경은 즉시 저장한다. 실패해도 화면 데이터는 바뀐 대로 두고 이유를 알린다. 저장 성공 여부를 돌려준다
+  function commit(change: (current: StoredData) => StoredData): boolean {
     const changed = change(latest.current)
     const next: StoredData = { ...changed, settings: { ...changed.settings, lastChangedAt: now().toISOString() } }
     latest.current = next
     setData(next)
     const result = repository.save(next)
     setSaveFailure(result.ok ? undefined : result.reason)
+    return result.ok
   }
 
-  function changeLedger(change: (ledger: Ledger) => Ledger) {
-    commit((current) => {
+  function changeLedger(change: (ledger: Ledger) => Ledger): boolean {
+    return commit((current) => {
       const ledger = current.ledgers[String(year)]
       if (!ledger) throw new Error(`${year}년 장부가 없다`)
       return { ...current, ledgers: { ...current.ledgers, [String(year)]: change(ledger) } }
@@ -94,6 +97,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     yearChoices: [...new Set([...years, now().getFullYear()])].sort((a, b) => b - a),
     ledger,
     totals: ledger && calculateTotals(ledger),
+    firstMonth: firstVisibleMonth(year, now()),
     isFirstRun: Object.keys(data.ledgers).length === 0,
     newLedgerDefaults: defaultsFor(data.ledgers, year),
     startup: toStartupStatus(loaded),

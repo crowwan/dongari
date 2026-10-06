@@ -1,85 +1,54 @@
 /*
- * 장부 화면, 장부 시작 화면, 이월금 입력. 값은 tokens.css 변수만 쓴다.
+ * 장부 화면(한 달씩 보기), 장부 시작 화면, 이월금 입력. 값은 tokens.css 변수만 쓴다.
  */
 @import '../screens.css';
 
-/* 맨 위 잔액: "연도 동아리" → "지금 남은 돈" → 큰 잔액 → 들어온/나간/작년 요약 */
-.ledger__summary {
+/*
+ * 장부 화면: 아래 고정 [+ 내역 적기] 영역(BottomActionBar)만큼 끝을 띄워 마지막 줄이 가리지 않게 한다.
+ * 고정 영역 높이 = 위 여백 + 주 버튼 + 아래 여백 + 위쪽 선 (ui.css .ui-bottom-bar)
+ */
+.ledger {
+  padding-bottom: calc(
+    var(--space-3) + var(--touch-primary) + var(--space-4) + var(--hairline) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+/* 위쪽: 왼쪽 동아리 이름·연도, 오른쪽 [올해 결산] [설정] */
+.ledger__top {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ledger__title {
+  min-width: 0;
 }
 
 .ledger__club {
   margin: 0;
   font-size: var(--size-body);
-  font-weight: var(--weight-strong);
-  line-height: var(--line-tight);
-  color: var(--muted);
-}
-
-.ledger__balance-label {
-  margin: var(--space-2) 0 0;
-  color: var(--muted);
-}
-
-.ledger__balance {
-  margin: 0;
-  font-size: var(--size-balance);
   font-weight: var(--weight-bold);
   line-height: var(--line-tight);
-  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
-.ledger__sums {
-  margin: var(--space-1) 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
+.ledger__year {
+  margin: 0;
+  font-size: var(--size-small);
+  line-height: var(--line-tight);
   color: var(--muted);
 }
 
-.ledger__sum {
+.ledger__top-actions {
+  flex: none;
   display: flex;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
-.ledger__sum dt,
-.ledger__sum dd {
-  margin: 0;
-}
-
-.ledger__sum-value {
-  font-weight: var(--weight-strong);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-
-.ledger__sum-value[data-kind='income'],
-.ledger__row-amount[data-kind='income'] {
-  color: var(--income-amount);
-}
-
-.ledger__sum-value[data-kind='expense'],
-.ledger__row-amount[data-kind='expense'] {
-  color: var(--expense-amount);
-}
-
-.ledger__actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-}
-
-.ledger__empty {
-  margin: 0;
-  padding: var(--space-8) var(--space-2);
-  color: var(--muted);
-  text-align: center;
-}
-
-/* 월 묶음: 바탕과 다른 면 + 머리(월, 소계) + 기록 줄 */
+/* 그 달 카드: 흰 면 + 소계 두 칸 → 기록 줄 → 정리 보기 버튼 */
 .ledger__month {
+  padding-bottom: var(--space-4);
   border-radius: var(--corner-lg);
   background: var(--surface);
   overflow: hidden;
@@ -87,35 +56,62 @@
   flex-direction: column;
 }
 
-.ledger__month-head {
-  padding: var(--space-4) var(--space-4) var(--space-2);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-1) var(--space-3);
+.ledger__empty {
+  margin: 0;
+  padding: var(--space-6) var(--card-pad-inline) var(--space-2);
+  color: var(--muted);
+  text-align: center;
+  text-wrap: balance;
+  /* 한글은 글자 중간에서 줄이 바뀌지 않게 낱말 단위로 */
+  word-break: keep-all;
 }
 
-.ledger__month-title {
+.ledger__subtotals {
   margin: 0;
-  font-size: var(--size-large);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: var(--hairline) solid var(--line);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.ledger__subtotal {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ledger__subtotal dt {
+  font-size: var(--size-small);
+  line-height: var(--line-tight);
+  color: var(--muted);
+}
+
+.ledger__subtotal-value {
+  margin: 0;
+  font-size: var(--size-amount);
   font-weight: var(--weight-bold);
   line-height: var(--line-tight);
-}
-
-.ledger__month-subtotal {
-  font-size: var(--size-small);
-  color: var(--muted);
+  letter-spacing: var(--letter-number);
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
+.ledger__subtotal-value[data-kind='income'] {
+  color: var(--income-amount);
+}
+
+.ledger__subtotal-value[data-kind='expense'] {
+  color: var(--expense-amount);
+}
+
+/* 기록 줄: 줄 전체를 누르면 고치기. 줄 사이는 선 없이 여백으로 (시안) */
 .ledger__row {
   box-sizing: border-box;
   width: 100%;
   min-height: var(--touch-min);
   padding: var(--space-2) var(--space-4);
   border: 0;
-  border-top: var(--hairline) solid var(--line);
   background: none;
   display: flex;
   align-items: center;
@@ -148,8 +144,11 @@
 .ledger__row-amount {
   flex: none;
   font-size: var(--size-amount);
-  font-weight: var(--weight-bold);
-  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-number);
+}
+
+.ledger__month-action {
+  padding: var(--space-2) var(--space-4) 0;
 }
 
 /* 이월금 입력: 금액칸 아래 "남았어요 / 적자였어요" 두 칸 */

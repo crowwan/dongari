@@ -15,27 +15,33 @@
   letter-spacing: var(--letter-body);
 }
 
-/* 내용 칸: 아래 고정 줄에 가리지 않도록 그 높이 + 홈 표시줄만큼 띄운다 */
+/* 내용 칸: 홈 표시줄만큼 띄운다. 아래 고정 영역이 있는 화면(장부)은 그 화면이 고정 영역 높이만큼 더 띄운다 */
 .app__main {
   box-sizing: border-box;
   max-width: var(--content-max);
   margin: 0 auto;
   padding: calc(var(--space-5) + env(safe-area-inset-top, 0px)) var(--gutter)
-    calc(var(--touch-primary) + var(--space-8) + env(safe-area-inset-bottom, 0px));
+    calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-}
-
-/* 첫 실행처럼 아래 고정 줄이 없는 화면 */
-.app__main[data-tabs='none'] {
-  padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
 }
 
 .screen {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+}
+
+/* 장부 외 화면 맨 위 [← 장부로]: 글자 폭만큼만 왼쪽에 */
+.screen__back {
+  display: flex;
+}
+
+/* 위쪽 오른쪽 글자 버튼 하나 (새 연도 시작 화면의 [설정]) */
+.screen__top-end {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .screen__title {
@@ -73,56 +79,4 @@
   font-size: var(--size-large);
   font-weight: var(--weight-bold);
   line-height: var(--line-tight);
-}
-
-/*
- * 임시 화면 이동 줄 (TabBar 를 ADR 003 에 따라 지운 자리). 글자 버튼 셋, 화면 아래 고정.
- * #26 에서 탭 없는 한 달 보기(위쪽 글자 버튼 + 아래 [+ 내역 적기])로 바꾸면서 지운다.
- */
-.app__nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 5;
-  padding: var(--space-1) var(--gutter) calc(var(--space-1) + env(safe-area-inset-bottom, 0px));
-  border-top: var(--hairline) solid var(--line);
-  background: var(--surface);
-}
-
-.app__nav-list {
-  max-width: var(--content-max);
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
-}
-
-.app__nav-button {
-  min-height: var(--touch-min);
-  border: 0;
-  border-radius: var(--corner-pill);
-  background: none;
-  color: var(--muted);
-  font-family: var(--typeface);
-  font-size: var(--size-body);
-  font-weight: var(--weight-regular);
-  line-height: var(--line-tight);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.app__nav-button[aria-current='page'] {
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-weight: var(--weight-bold);
-}
-
-.app__nav-button:active {
-  background: var(--pressed);
-}
-
-.app__nav-button:focus-visible {
-  outline: var(--focus-ring) solid var(--primary);
-  outline-offset: calc(var(--focus-ring) * -1);
 }

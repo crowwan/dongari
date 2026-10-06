@@ -4,6 +4,7 @@ import type { Ledger } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { ChoiceChip } from '../../ui/ChoiceChip'
 import { TextField } from '../../ui/TextField'
+import { BackToLedger } from '../BackToLedger'
 import { CarryoverField } from '../ledger/CarryoverField'
 import './settings.css'
 
@@ -11,14 +12,16 @@ type SettingsScreenProps = {
   year: number
   yearChoices: number[] // 장부가 있는 연도 + 올해, 최신 순
   ledger: Ledger | undefined // 고른 연도 장부. 아직 없으면 undefined
-  onChangeYear: (year: number) => void
+  onChangeYear: (year: number) => void // 고르면 장부 화면으로 돌아가 그 해를 보여 준다
   onSaveClubInfo: (info: LedgerInfo) => void
+  onBack: () => void
 }
 
 // 설정 (SPEC-001 화면 구성): 동아리 정보, 장부 연도. 기록 백업(SPEC-002)은 #8 에서 이 화면에 묶음을 더한다
-export function SettingsScreen({ year, yearChoices, ledger, onChangeYear, onSaveClubInfo }: SettingsScreenProps) {
+export function SettingsScreen({ year, yearChoices, ledger, onChangeYear, onSaveClubInfo, onBack }: SettingsScreenProps) {
   return (
     <div className="screen" data-testid="settings-screen">
+      <BackToLedger onBack={onBack} />
       <h1 className="screen__title">설정</h1>
 
       <section className="card" aria-labelledby="settings-club">
@@ -37,7 +40,7 @@ export function SettingsScreen({ year, yearChoices, ledger, onChangeYear, onSave
         <h2 className="card__title" id="settings-year">
           장부 연도
         </h2>
-        <p className="screen__note">지난 장부를 보려면 연도를 고르세요.</p>
+        <p className="screen__note">지난 장부를 보려면 연도를 고르세요. 고르면 그 해 장부로 돌아가요.</p>
         <div className="settings__years" role="group" aria-label="장부 연도">
           {yearChoices.map((choice) => (
             <ChoiceChip key={choice} selected={choice === year} onClick={() => onChangeYear(choice)}>
