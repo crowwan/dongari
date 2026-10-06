@@ -33,7 +33,8 @@ function storedWith(...ledgers: Ledger[]): StoredData {
   return {
     ...createEmptyData(),
     ledgers: Object.fromEntries(ledgers.map((item) => [String(item.year), item])),
-    settings: { lastChangedAt: '2026-10-01T00:00:00.000Z' },
+    // 마지막 변경까지 백업해 둔 상태 (30일 백업 안내 #9 가 끼지 않게)
+    settings: { lastChangedAt: '2026-10-01T00:00:00.000Z', lastBackupAt: '2026-10-01T00:00:00.000Z' },
   }
 }
 
@@ -110,7 +111,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
 
       await vi.waitFor(() => expect(shareMock).toHaveBeenCalledOnce())
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
-      expect(repository.load().data.settings.lastBackupAt).toBeUndefined()
+      expect(repository.load().data.settings.lastBackupAt).toBe('2026-10-01T00:00:00.000Z')
     })
 
     it('공유를 못 하는 브라우저면 파일을 내려받고 그때도 백업 시각을 기록한다', async () => {

@@ -241,6 +241,21 @@ export function Catalog() {
               <TopTextButton onClick={noop}>설정</TopTextButton>
             </div>
           </State>
+          <State label="점 표시 (백업 필요 — 화면 읽기 이름 '설정 백업 필요')">
+            <div className="catalog__top">
+              <TopTextButton onClick={noop}>올해 결산</TopTextButton>
+              <TopTextButton onClick={noop} dotLabel="백업 필요">
+                설정
+              </TopTextButton>
+            </div>
+          </State>
+          <State label="점 표시 눌림">
+            <div className="catalog__top" data-preview-pressed="">
+              <TopTextButton onClick={noop} dotLabel="백업 필요">
+                설정
+              </TopTextButton>
+            </div>
+          </State>
         </Section>
 
         <Section title="BottomActionBar">
@@ -268,6 +283,9 @@ export function Catalog() {
           </State>
           <State label="버튼 붙음 (저장 실패 → 백업 파일 보내기)">
             <NoticeBar message="저장하지 못했어요. 백업 파일을 보내 두세요" action={{ label: '백업 파일 보내기', onClick: noop }} />
+          </State>
+          <State label="30일 백업 안내 → 백업 파일 보내기 (#9)">
+            <NoticeBar message="한 달 넘게 백업하지 않았어요" action={{ label: '백업 파일 보내기', onClick: noop }} />
           </State>
           <State label="버튼 눌림">
             <div data-preview-pressed="">
