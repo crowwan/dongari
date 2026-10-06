@@ -139,6 +139,14 @@ describe('SPEC-001 장부 계산', () => {
       expect(next.entries[0].batchId).toBe('photo-1')
     })
 
+    it('수정해도 사진으로 함께 넣은 묶음(batchId)은 그대로 둔다', () => {
+      const before = ledger({ entries: [entry({ id: 'a', batchId: 'photo-1' })] })
+
+      const next = updateEntry(before, 'a', { month: 3, type: 'income', name: '회비', amount: 50_000 })
+
+      expect(next.entries[0].batchId).toBe('photo-1')
+    })
+
     it('수정하면 id·입력 시각·순서는 그대로 두고 내용만 바꾼다', () => {
       const before = ledger({
         entries: [entry({ id: 'a', createdAt: '2026-01-01T00:00:00.000Z' }), entry({ id: 'b' })],

@@ -41,8 +41,8 @@ export interface LedgerState {
   frequentChoices: (type?: EntryType) => FrequentChoice[]
   startLedger: (info: LedgerInfo) => void
   addEntry: (input: EntryInput) => boolean // 저장에 성공했는지 (성공일 때만 "저장했어요" 를 띄운다)
-  updateEntry: (id: string, input: EntryInput) => void
-  deleteEntry: (id: string) => void
+  updateEntry: (id: string, input: EntryInput) => boolean // 저장에 성공했는지 (성공일 때만 "고쳤어요")
+  deleteEntry: (id: string) => boolean // 저장에 성공했는지 (성공일 때만 "지웠어요")
   updateClubInfo: (info: LedgerInfo) => boolean // 저장에 성공했는지 (성공일 때만 알림을 띄운다)
   changeYear: (year: number) => void
 }

@@ -382,16 +382,13 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
     })
 
-    it('입력창을 열면 방문 기록을 하나 쌓고, 안드로이드 뒤로 버튼(popstate)으로 입력창만 닫힌다', async () => {
+    it('AC-12 입력창을 열면 방문 기록을 하나 쌓고, 안드로이드 뒤로 버튼(popstate)으로 입력창만 닫힌다', async () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await stepBack(7)
       await openEntryForm()
       expect(window.history.state).toEqual({ screen: 'add-entry' })
-      await fillExpense('간식비', '5000')
 
-      act(() => {
-        window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
-      })
+      pressBackButton()
 
       expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('3월')
@@ -406,6 +403,176 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    })
+  })
+
+  describe('내역 고치기·지우기', () => {
+    it('AC-6 기록 줄을 누르면 그 기록 값이 채워진 "내역 고치기" 화면이 열린다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await stepBack(6)
+
+      await userEvent.click(screen.getByRole('button', { name: /^대관료/ }))
+
+      expect(screen.getByRole('heading', { level: 1, name: '내역 고치기' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '4월' })).toHaveAttribute('aria-pressed', 'true')
+      expect(within(typeGroup()).getByRole('button', { name: '지출' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByLabelText('직접 적기')).toHaveValue('대관료')
+      expect(screen.getByLabelText('얼마인가요?')).toHaveValue('40,000')
+      expect(window.history.state).toEqual({ screen: 'edit-entry' })
+    })
+
+    it('AC-6 고쳐서 저장하면 확인 없이 장부로 돌아가 목록과 합계에 반영되고 "고쳤어요" 알림이 뜬다', async () => {
+      const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await stepBack(6)
+      await openEditForm('대관료')
+
+      const amount = screen.getByLabelText('얼마인가요?')
+      await userEvent.clear(amount)
+      await userEvent.type(amount, '45000')
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+      expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('4월')
+      expect(screen.getAllByTestId('entry-row').map((row) => row.textContent)).toEqual(['대관료−45,000원'])
+      // 200,000 + 140,000 − 45,000
+      expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('295,000원')
+      expect(screen.getByRole('status')).toHaveTextContent('고쳤어요')
+      expect(repository.load().data.ledgers['2026']?.entries[1]).toEqual({ ...LEDGER_2026.entries[1], amount: 45_000 })
+    })
+
+    it('AC-6 달을 바꿔 저장하면 장부가 바뀐 달을 보여 준다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await stepBack(6)
+      await openEditForm('대관료')
+
+      await userEvent.click(screen.getByRole('button', { name: '3월' }))
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('3월')
+      expect(screen.getAllByTestId('entry-row').map((row) => row.textContent)).toEqual(['회비+140,000원', '대관료−40,000원'])
+    })
+
+    it('고친 내용을 저장하지 못하면 "고쳤어요" 알림 없이 위쪽 실패 안내만 보인다', async () => {
+      renderApp(alwaysFailing(storedWith(LEDGER_2026)))
+      await stepBack(6)
+      await openEditForm('대관료')
+
+      await userEvent.click(screen.getByRole('button', { name: '3월' }))
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+    })
+
+    it('AC-7 [이 내역 지우기] → 확인 창에서 [아니요] 면 지우지 않고 고치기 화면에 남는다', async () => {
+      const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await stepBack(6)
+      await openEditForm('대관료')
+
+      await userEvent.click(screen.getByRole('button', { name: '이 내역 지우기' }))
+      await userEvent.click(within(screen.getByRole('alertdialog', { name: '이 내역을 정말 지울까요?' })).getByRole('button', { name: '아니요' }))
+
+      expect(screen.getByRole('heading', { level: 1, name: '내역 고치기' })).toBeInTheDocument()
+      expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(2)
+    })
+
+    it('AC-7 확인 창에서 [지우기] 를 누르면 지우고 장부로 돌아가 "지웠어요" 알림이 뜬다 (방문 기록은 한 번만 되돌린다)', async () => {
+      const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await stepBack(6)
+      await openEditForm('대관료')
+      const back = vi.spyOn(window.history, 'back')
+
+      await userEvent.click(screen.getByRole('button', { name: '이 내역 지우기' }))
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '지우기' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(back).toHaveBeenCalledOnce()
+      back.mockRestore()
+      expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('4월')
+      expect(screen.queryByTestId('entry-row')).not.toBeInTheDocument()
+      // 200,000 + 140,000
+      expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('340,000원')
+      expect(screen.getByRole('status')).toHaveTextContent('지웠어요')
+      expect(repository.load().data.ledgers['2026']?.entries.map((item) => item.id)).toEqual(['a'])
+    })
+
+    it('지운 내용을 저장하지 못하면 "지웠어요" 알림 없이 위쪽 실패 안내만 보인다', async () => {
+      renderApp(alwaysFailing(storedWith(LEDGER_2026)))
+      await stepBack(6)
+      await openEditForm('대관료')
+
+      await userEvent.click(screen.getByRole('button', { name: '이 내역 지우기' }))
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '지우기' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+    })
+  })
+
+  describe('적던 내용을 버릴까요?', () => {
+    it('바꾼 것이 없으면 고치기 화면의 [← 장부로] 는 묻지 않고 바로 닫는다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await stepBack(6)
+      await openEditForm('대관료')
+
+      await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+
+    it('적던 내용이 있으면 [← 장부로] 에서 묻고, [아니요] 면 적던 내용 그대로 남고 [버리기] 면 저장 없이 장부로 간다', async () => {
+      const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await fillExpense('간식비', '5000')
+
+      await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+      const dialog = screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })
+      await userEvent.click(within(dialog).getByRole('button', { name: '아니요' }))
+
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('직접 적기')).toHaveValue('간식비')
+
+      await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '버리기' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(2)
+    })
+
+    it('고치기 화면에서 바꾼 것이 있어도 묻는다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await stepBack(6)
+      await openEditForm('대관료')
+
+      await userEvent.click(screen.getByRole('button', { name: '5월' }))
+      await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+
+      expect(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).toBeInTheDocument()
+    })
+
+    it('AC-12 적던 내용이 있을 때 뒤로 버튼을 누르면 입력창을 닫지 않고 묻는다. [아니요] 뒤에 다시 누르면 또 묻고, [버리기] 면 장부로', async () => {
+      const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await stepBack(7)
+      await openEntryForm()
+      await fillExpense('간식비', '5000')
+
+      pressBackButton()
+
+      expect(screen.getByRole('heading', { level: 1, name: '내역 적기' })).toBeInTheDocument()
+      await userEvent.click(within(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).getByRole('button', { name: '아니요' }))
+      expect(screen.getByLabelText('직접 적기')).toHaveValue('간식비')
+
+      pressBackButton()
+
+      await userEvent.click(within(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).getByRole('button', { name: '버리기' }))
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('3월')
+      expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(2)
     })
   })
 
@@ -456,6 +623,19 @@ describe('SPEC-001 앱 뼈대', () => {
 function alwaysFailing(data: StoredData): LedgerRepository {
   const memory = new MemoryRepository(data)
   return { load: () => memory.load(), save: () => ({ ok: false, reason: 'quota-exceeded' }) }
+}
+
+// 안드로이드 뒤로 버튼: 브라우저가 방문 기록을 하나 빼고 popstate 를 보낸다
+function pressBackButton() {
+  act(() => {
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+  })
+}
+
+// 장부 기록 줄(이름으로 시작해 금액이 붙은 버튼)을 눌러 고치기 화면을 연다
+async function openEditForm(name: string) {
+  await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}`) }))
+  expect(screen.getByRole('heading', { level: 1, name: '내역 고치기' })).toBeInTheDocument()
 }
 
 async function openEntryForm() {
