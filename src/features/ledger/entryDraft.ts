@@ -15,6 +15,16 @@ export function emptyDraft(month: number): EntryDraft {
   return { month, type: undefined, name: '', amount: 0 }
 }
 
+// 처음 값에서 하나라도 바뀌었나 (적던 내용을 버릴지 물을 때)
+export function isDraftChanged(initial: EntryDraft, draft: EntryDraft): boolean {
+  return (
+    initial.month !== draft.month ||
+    initial.type !== draft.type ||
+    initial.name !== draft.name ||
+    initial.amount !== draft.amount
+  )
+}
+
 // 다 채웠으면 저장할 기록, 빠진 게 있으면 위에서부터 첫 번째 빠진 것의 안내 (AC-5)
 export type DraftCheck = { ok: true; input: EntryInput } | { ok: false; missing: string }
 

@@ -310,8 +310,26 @@ describe('SPEC-001 useLedger', () => {
         saved = result.current.addEntry({ month: 10, type: 'expense', name: '꽃값', amount: 3_000 })
       })
       expect(saved).toBe(true)
-      act(() => result.current.deleteEntry('a'))
-      act(() => result.current.deleteEntry('id-1'))
+
+      // 고치기·지우기도 저장 결과를 돌려준다 (실패면 "고쳤어요"·"지웠어요" 를 띄우지 않게)
+      next = { ok: false, reason: 'quota-exceeded' }
+      act(() => {
+        saved = result.current.updateEntry('a', { month: 3, type: 'income', name: '회비', amount: 1_000 })
+      })
+      expect(saved).toBe(false)
+      act(() => {
+        saved = result.current.deleteEntry('a')
+      })
+      expect(saved).toBe(false)
+      next = { ok: true }
+      act(() => {
+        saved = result.current.updateEntry('id-2', { month: 10, type: 'expense', name: '꽃값', amount: 4_000 })
+      })
+      expect(saved).toBe(true)
+      act(() => {
+        saved = result.current.deleteEntry('id-1')
+      })
+      expect(saved).toBe(true)
       act(() => result.current.deleteEntry('id-2'))
 
       expect(result.current.saveFailure).toBeUndefined()

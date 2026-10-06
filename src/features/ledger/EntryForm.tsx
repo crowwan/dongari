@@ -1,12 +1,14 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { EntryInput, FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
 import { BottomActionBar } from '../../ui/BottomActionBar'
+import { Button } from '../../ui/Button'
 import { ChoiceChip } from '../../ui/ChoiceChip'
+import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
-import { checkDraft, type EntryDraft } from './entryDraft'
+import { checkDraft, isDraftChanged, type EntryDraft } from './entryDraft'
 import './entry.css'
 
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
@@ -23,16 +25,27 @@ type EntryFormProps = {
   frequentChoices: (type?: EntryType) => FrequentChoice[]
   onSave: (input: EntryInput) => void
   onBack: () => void
+  // 처음 값에서 바뀐 것이 있는지 알린다. 바뀌었으면 닫기 전에 "적던 내용을 버릴까요?" 를 묻는다
+  onDirtyChange?: (dirty: boolean) => void
+  // 고치기 화면만: 맨 아래 [이 내역 지우기] → 확인 후 불린다
+  onDelete?: () => void
 }
 
 // 기록 입력 (SPEC-001): 위에서 아래로 몇 월 → 수입/지출 → 무엇 → 얼마, 아래 고정 [저장]
-// 값은 이 폼이 들고, 바깥에는 처음 값(initial)과 저장할 기록(onSave)만 오간다 — 고치기 화면(#14)이 같은 폼을 쓴다
-export function EntryForm({ title, initial, frequentChoices, onSave, onBack }: EntryFormProps) {
+// 값은 이 폼이 들고, 바깥에는 처음 값(initial)과 저장할 기록(onSave), 바뀌었는지(onDirtyChange)만 오간다.
+// 고치기 화면(#14)도 같은 폼에 처음 값을 채우고 onDelete 를 주면 맨 아래 [이 내역 지우기] 가 생긴다
+export function EntryForm({ title, initial, frequentChoices, onSave, onBack, onDirtyChange, onDelete }: EntryFormProps) {
   const [draft, setDraft] = useState(initial)
+  const [askingDelete, setAskingDelete] = useState(false)
   const monthHeadingId = useId()
   const typeHeadingId = useId()
   const nameHeadingId = useId()
   const check = checkDraft(draft)
+  const dirty = isDraftChanged(initial, draft)
+
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
 
   function change(next: Partial<EntryDraft>) {
     setDraft((current) => ({ ...current, ...next }))
@@ -89,6 +102,25 @@ export function EntryForm({ title, initial, frequentChoices, onSave, onBack }: E
       </section>
 
       <MoneyInput label="얼마인가요?" value={draft.amount} onChange={(amount) => change({ amount })} />
+
+      {onDelete && (
+        <>
+          <Button variant="danger-text" onClick={() => setAskingDelete(true)}>
+            이 내역 지우기
+          </Button>
+          <ConfirmDialog
+            open={askingDelete}
+            title="이 내역을 정말 지울까요?"
+            confirmLabel="지우기"
+            danger
+            onConfirm={() => {
+              setAskingDelete(false)
+              onDelete()
+            }}
+            onCancel={() => setAskingDelete(false)}
+          />
+        </>
+      )}
 
       <BottomActionBar
         label="저장"

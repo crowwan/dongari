@@ -96,12 +96,16 @@ export function addEntry(ledger: Ledger, input: EntryInput, deps: EntryDeps): Le
   return { ...ledger, entries: [...ledger.entries, entry] }
 }
 
-// id·입력 시각·순서는 그대로 두고 내용만 바꾼다
+// id·입력 시각·순서는 그대로 두고 내용만 바꾼다. 입력에 묶음이 없으면 원래 묶음(사진으로 함께 넣은 것)도 그대로
 export function updateEntry(ledger: Ledger, id: string, input: EntryInput): Ledger {
   const content = normalizeEntryInput(input)
   return {
     ...ledger,
-    entries: ledger.entries.map((entry) => (entry.id === id ? { id, ...content, createdAt: entry.createdAt } : entry)),
+    entries: ledger.entries.map((entry) => {
+      if (entry.id !== id) return entry
+      const updated: Entry = { id, ...content, createdAt: entry.createdAt }
+      return content.batchId === undefined && entry.batchId !== undefined ? { ...updated, batchId: entry.batchId } : updated
+    }),
   }
 }
 

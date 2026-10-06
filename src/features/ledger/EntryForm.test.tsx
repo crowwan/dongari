@@ -13,20 +13,26 @@ const HISTORY: Entry[] = [
   { id: '3', month: 9, type: 'income', name: '찬조금', amount: 50_000, createdAt: '2026-09-03T00:00:00.000Z' },
 ]
 
-function renderForm(initial: EntryDraft = emptyDraft(9)) {
+function renderForm(initial: EntryDraft = emptyDraft(9), { deletable = false } = {}) {
   const onSave = vi.fn()
   const onBack = vi.fn()
+  const onDirtyChange = vi.fn()
+  const onDelete = vi.fn()
   render(
     <EntryForm
-      title="내역 적기"
+      title={deletable ? '내역 고치기' : '내역 적기'}
       initial={initial}
       frequentChoices={(type?: EntryType) => frequentChoices(HISTORY, type)}
       onSave={onSave}
       onBack={onBack}
+      onDirtyChange={onDirtyChange}
+      onDelete={deletable ? onDelete : undefined}
     />,
   )
-  return { onSave, onBack }
+  return { onSave, onBack, onDirtyChange, onDelete }
 }
+
+const SAVED: EntryDraft = { month: 4, type: 'income', name: '회비', amount: 140_000 }
 
 const saveButton = () => screen.getByRole('button', { name: '저장' })
 const typeGroup = () => screen.getByRole('group', { name: '수입인가요, 지출인가요?' })
@@ -178,5 +184,58 @@ describe('SPEC-001 내역 적기', () => {
 
     expect(onBack).toHaveBeenCalledOnce()
     expect(onSave).not.toHaveBeenCalled()
+  })
+
+  describe('적던 내용 (닫기 전 확인)', () => {
+    it('처음엔 바뀐 것이 없다고 알리고, 하나라도 바꾸면 바뀌었다고 알린다', async () => {
+      const { onDirtyChange } = renderForm()
+      expect(onDirtyChange).toHaveBeenLastCalledWith(false)
+
+      await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
+
+      expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+    })
+
+    it('바꾼 값을 처음 값으로 되돌리면 다시 바뀐 것이 없다고 알린다', async () => {
+      const { onDirtyChange } = renderForm(SAVED, { deletable: true })
+
+      await userEvent.click(screen.getByRole('button', { name: '5월' }))
+      expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+      await userEvent.click(screen.getByRole('button', { name: '4월' }))
+
+      expect(onDirtyChange).toHaveBeenLastCalledWith(false)
+    })
+  })
+
+  describe('내역 고치기', () => {
+    it('[이 내역 지우기] 는 고치기 화면에만 있다', () => {
+      renderForm()
+
+      expect(screen.queryByRole('button', { name: '이 내역 지우기' })).not.toBeInTheDocument()
+    })
+
+    it('AC-7 [이 내역 지우기] 를 누르면 "이 내역을 정말 지울까요?" 를 묻고, [아니요] 면 지우지 않는다', async () => {
+      const { onDelete } = renderForm(SAVED, { deletable: true })
+
+      await userEvent.click(screen.getByRole('button', { name: '이 내역 지우기' }))
+
+      const dialog = screen.getByRole('alertdialog', { name: '이 내역을 정말 지울까요?' })
+      expect(screen.getByTestId('confirm-dialog')).toHaveAttribute('data-variant', 'danger')
+      await userEvent.click(within(dialog).getByRole('button', { name: '아니요' }))
+
+      expect(onDelete).not.toHaveBeenCalled()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('직접 적기')).toHaveValue('회비')
+    })
+
+    it('AC-7 확인 창에서 [지우기] 를 눌러야 지운다', async () => {
+      const { onDelete } = renderForm(SAVED, { deletable: true })
+
+      await userEvent.click(screen.getByRole('button', { name: '이 내역 지우기' }))
+      expect(onDelete).not.toHaveBeenCalled()
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '지우기' }))
+
+      expect(onDelete).toHaveBeenCalledOnce()
+    })
   })
 })
