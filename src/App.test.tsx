@@ -586,10 +586,10 @@ describe('SPEC-001 앱 뼈대', () => {
       )
     })
 
-    it('새 버전 앱의 기록이 있으면 새로고침하라고 알린다', () => {
+    it('새 버전 앱의 기록이 있으면 앱을 닫았다가 다시 열라고 알린다', () => {
       renderApp(new MemoryRepository(), { status: 'read-only', reason: 'newer-version', data: createEmptyData() })
 
-      expect(screen.getByRole('alert')).toHaveTextContent('새 버전 앱에서 쓴 기록이 있어요. 앱을 새로고침해 주세요')
+      expect(screen.getByRole('alert')).toHaveTextContent('새 버전 앱에서 쓴 기록이 있어요. 앱을 닫았다가 다시 열어 주세요')
     })
 
     it('원본을 옮기지 못해 저장을 막았으면 지금 적는 내용이 저장되지 않는다고 알린다', () => {
@@ -622,7 +622,11 @@ describe('SPEC-001 앱 뼈대', () => {
 // 읽기는 되지만 저장은 늘 실패하는 저장소 (용량 초과)
 function alwaysFailing(data: StoredData): LedgerRepository {
   const memory = new MemoryRepository(data)
-  return { load: () => memory.load(), save: () => ({ ok: false, reason: 'quota-exceeded' }) }
+  return {
+    load: () => memory.load(),
+    save: () => ({ ok: false, reason: 'quota-exceeded' }),
+    restore: () => ({ ok: false, reason: 'quota-exceeded' }),
+  }
 }
 
 // 안드로이드 뒤로 버튼: 브라우저가 방문 기록을 하나 빼고 popstate 를 보낸다

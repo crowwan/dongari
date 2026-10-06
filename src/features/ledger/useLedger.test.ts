@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Ledger, StoredData } from '../../domain/types'
 import type { LedgerRepository, LoadResult, SaveResult } from '../../storage/LedgerRepository'
 import { LocalStorageRepository, STORAGE_KEY } from '../../storage/LocalStorageRepository'
@@ -79,6 +79,7 @@ describe('SPEC-001 useLedger', () => {
           return memory.load()
         },
         save: (data) => memory.save(data),
+        restore: (data) => memory.restore(data),
       }
 
       const { result, rerender } = renderLedger(counting, loaded)
@@ -277,6 +278,7 @@ describe('SPEC-001 useLedger', () => {
       const flaky: LedgerRepository = {
         load: () => memory.load(),
         save: (data) => (next.ok ? memory.save(data) : next),
+        restore: (data) => (next.ok ? memory.restore(data) : next),
       }
       const { result } = renderLedger(flaky)
 
@@ -334,6 +336,109 @@ describe('SPEC-001 useLedger', () => {
 
       expect(result.current.saveFailure).toBeUndefined()
       expect(memory.load().data.ledgers['2026']?.entries).toEqual([])
+    })
+  })
+
+  describe('SPEC-002 백업', () => {
+    beforeEach(() => {
+      localStorage.clear()
+    })
+
+    const BACKUP = storedWith(ledger2026({ clubName: '꽃동산' }), { ...ledger2026(), year: 2024 })
+
+    it('지금 기록 전체(data)를 백업용으로 준다', () => {
+      const stored = storedWith(ledger2026())
+      const { result } = renderLedger(new MemoryRepository(stored))
+
+      expect(result.current.data).toEqual(stored)
+    })
+
+    it('AC-3 백업 데이터로 바꾸면 저장하고, 그 데이터 그대로(변경 시각을 덧붙이지 않고) 올해 장부를 보여 준다', () => {
+      const memory = new MemoryRepository(storedWith({ ...ledger2026(), year: 2025 }))
+      const { result } = renderLedger(memory)
+      act(() => result.current.changeYear(2025))
+
+      let restored: SaveResult = { ok: false, reason: 'unknown' }
+      act(() => {
+        restored = result.current.restoreBackup(BACKUP)
+      })
+
+      expect(restored).toEqual({ ok: true })
+      expect(result.current.data).toEqual(BACKUP)
+      expect(result.current.year).toBe(2026)
+      expect(result.current.ledger?.clubName).toBe('꽃동산')
+      expect(result.current.years).toEqual([2026, 2024])
+      expect(memory.load().data).toEqual(BACKUP)
+    })
+
+    it('불러오기를 저장하지 못하면 지금 기록을 그대로 두고 실패를 돌려준다', () => {
+      const stored = storedWith(ledger2026())
+      const memory = new MemoryRepository(stored)
+      const full: LedgerRepository = {
+        load: () => memory.load(),
+        save: () => ({ ok: false, reason: 'quota-exceeded' }),
+        restore: () => ({ ok: false, reason: 'quota-exceeded' }),
+      }
+      const { result } = renderLedger(full)
+
+      let restored: SaveResult = { ok: true }
+      act(() => {
+        restored = result.current.restoreBackup(BACKUP)
+      })
+
+      expect(restored).toEqual({ ok: false, reason: 'quota-exceeded' })
+      expect(result.current.data).toEqual(stored)
+      expect(result.current.saveFailure).toBeUndefined()
+    })
+
+    it('원본을 옮기지 못해 저장을 막았던 상태도 불러오기에 성공하면 시작 안내를 거두고 이후 저장이 된다', () => {
+      localStorage.setItem(STORAGE_KEY, 'not json')
+      const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+        throw new DOMException('용량 초과', 'QuotaExceededError')
+      })
+      const { result } = renderLedger(new LocalStorageRepository())
+      setItem.mockRestore()
+      expect(result.current.startup).toEqual({ status: 'read-only', reason: 'unreadable-original' })
+
+      act(() => {
+        result.current.restoreBackup(BACKUP)
+      })
+
+      expect(result.current.startup).toEqual({ status: 'ok' })
+      let saved = false
+      act(() => {
+        saved = result.current.addEntry({ month: 10, type: 'expense', name: '간식비', amount: 5_000 })
+      })
+      expect(saved).toBe(true)
+      expect(new LocalStorageRepository().load().data.ledgers['2026']?.entries).toHaveLength(3)
+    })
+
+    it('새 버전 기록이 있어 저장을 막은 상태에서는 불러오기도 막고 지금 화면을 그대로 둔다', () => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 3 }))
+      const { result } = renderLedger(new LocalStorageRepository())
+
+      let restored: SaveResult = { ok: true }
+      act(() => {
+        restored = result.current.restoreBackup(BACKUP)
+      })
+
+      expect(restored).toEqual({ ok: false, reason: 'newer-version' })
+      expect(result.current.isFirstRun).toBe(true)
+      expect(result.current.startup).toEqual({ status: 'read-only', reason: 'newer-version' })
+    })
+
+    it('백업을 보냈으면 마지막 백업 시각만 기록하고 변경 시각은 그대로 둔다', () => {
+      const stored = { ...storedWith(ledger2026()), settings: { lastChangedAt: '2026-09-30T00:00:00.000Z' } }
+      const memory = new MemoryRepository(stored)
+      const { result } = renderLedger(memory)
+
+      act(() => result.current.recordBackup())
+
+      expect(memory.load().data.settings).toEqual({
+        lastChangedAt: '2026-09-30T00:00:00.000Z',
+        lastBackupAt: TODAY.toISOString(),
+      })
+      expect(result.current.data.settings.lastBackupAt).toBe(TODAY.toISOString())
     })
   })
 })

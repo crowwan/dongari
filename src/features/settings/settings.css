@@ -15,3 +15,10 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
 }
+
+/* 기록 백업: 보조 버튼 두 개를 위아래로 */
+.settings__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

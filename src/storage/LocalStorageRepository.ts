@@ -46,7 +46,18 @@ export class LocalStorageRepository implements LedgerRepository {
 
   save(data: StoredData): SaveResult {
     if (this.saveBlock) return { ok: false, reason: this.saveBlock }
+    return this.write(data)
+  }
 
+  restore(data: StoredData): SaveResult {
+    if (this.saveBlock === 'newer-version') return { ok: false, reason: this.saveBlock }
+    const result = this.write(data)
+    // 써지지 않았으면 원본도 그대로 남아 있으니 막힘을 유지한다
+    if (result.ok) this.saveBlock = undefined
+    return result
+  }
+
+  private write(data: StoredData): SaveResult {
     try {
       this.storage.setItem(STORAGE_KEY, JSON.stringify(data))
       return { ok: true }

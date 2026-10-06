@@ -103,9 +103,9 @@ updated: 2026-10-06
 | `ChoiceChip` | 선택됨(청록 채움 + 굵게) / 안됨(회색 면) × 기본·눌림, 비활성(점선) (`aria-pressed`) — 월 12칸, 항목 |
 | `MoneyInput` | 빈칸 / 입력됨(콤마·"원") / 포커스(흰 면 + 청록 테두리) / 오류(빨강 테두리 + 문장) / 비활성(점선), 상한 999,999,999 |
 | `TextField` | MoneyInput 과 같은 면·상태 — 동아리 이름, 항목 직접 적기 |
-| `ConfirmDialog` | 기본 / 위험(빨강 확인), 아니요는 보조 버튼, 열리면 "아니요"에 포커스, Esc = 아니요 |
+| `ConfirmDialog` | 기본 / 위험(빨강 확인), 아니요는 보조 버튼, 열리면 "아니요"에 포커스, Esc = 아니요. 제목 아래 설명 한 줄(`description`, 본문 크기 `--muted`, 확인 창 설명으로 읽힘). `cancelLabel={null}` 이면 [확인] 하나짜리 알림 창(`data-variant="notice"`, 그 버튼에 포커스) — "이 파일은 열 수 없어요" (#8) |
 | `Toast` | 보이는 중 / 사라짐 (기본 2초, `role="status"`) |
-| `NoticeBar` | 화면 위 노란 안내 띠 (`role="alert"`) — 저장 실패, 시작 안내 |
+| `NoticeBar` | 화면 위 노란 안내 띠 (문장만 `role="alert"`) — 저장 실패, 시작 안내. 할 일이 있으면 문장 아래 흰 면(`--surface`) 버튼 하나(높이 `--touch-min`, 눌림 `--pressed`) — [백업 파일 보내기]·[백업 파일 불러오기] (#8) |
 | `BalanceCard` | 이름("지금 잔액") → 큰 숫자(`--size-balance`) → 보조 줄(있을 때만), 적자는 `−` |
 | `AmountText` | 수입 `+` 초록 / 지출 `−` 본문색. 글자 크기는 놓인 자리를 따른다 |
 | `MonthStepper` | [‹] 달 [›], 화살표 56px, 끝 달에서 비활성(`previousDisabled`/`nextDisabled`), 이름 "이전 달"/"다음 달", 달 글자는 `aria-live` |
@@ -135,3 +135,4 @@ updated: 2026-10-06
 | 2026-10-06 | "맑은 은행 앱" 스타일: 강조색 청록 하나 + 옅은 청록 보조, 수입 초록·지출 본문색 금액, 위험·오류 빨강 분리, 다크 새로, 반경·카드 여백·잔액 34px. TabBar·BigActionButton 제거, BalanceCard·AmountText·MonthStepper·TopTextButton·BottomActionBar 추가 (#25) | |
 | 2026-10-06 | 설치 안내 띠(InstallBanner) 추가, 앱 아이콘(청록 바탕 + 흰 장부, 토큰 색) (#10) | |
 | 2026-10-06 | 장부 화면을 한 달씩 보기로 조립(BalanceCard·MonthStepper·AmountText·TopTextButton·BottomActionBar), 임시 화면 이동 줄 제거, [← 장부로] 는 TopTextButton (#26) | |
+| 2026-10-06 | NoticeBar 에 버튼 하나, ConfirmDialog 에 설명 줄·버튼 하나 알림 창 추가. 설정 "기록 백업" 카드(보조 버튼 둘) (#8) | |

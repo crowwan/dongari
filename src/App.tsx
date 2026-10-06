@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { BackupDialogs } from './features/backup/BackupDialogs'
+import { useBackup } from './features/backup/useBackup'
 import { InstallBanner } from './features/install/InstallBanner'
 import { EntryForm } from './features/ledger/EntryForm'
 import { emptyDraft } from './features/ledger/entryDraft'
@@ -8,7 +10,7 @@ import { useLedger, type UseLedgerOptions } from './features/ledger/useLedger'
 import { MonthSummaryScreen } from './features/report/MonthSummaryScreen'
 import { YearSummaryScreen } from './features/report/YearSummaryScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
-import { storageNotices } from './features/storage/storageNotices'
+import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
 import { useScreenHistory } from './features/useScreenHistory'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -31,6 +33,16 @@ export default function App({ repository, loaded, options }: AppProps) {
   // 장부 화면에서 넘겨 본 달. 다른 화면에 다녀와도 그대로이고, 연도를 바꾸면 비워서 그 해의 처음 달(올해면 이번 달, 지난 연도면 12월)로
   const [viewedMonth, setViewedMonth] = useState<number | undefined>()
   const [toast, setToast] = useState<string | null>(null)
+  // 백업 파일 보내기·불러오기 (SPEC-002). 불러오면 올해 장부의 처음 달로 돌아가 알린다
+  const backup = useBackup(ledger, {
+    now: options?.now ?? (() => new Date()),
+    onRestored: () => {
+      setViewedMonth(undefined)
+      navigation.backToLedger()
+      setToast('불러왔어요')
+    },
+    onSent: setToast,
+  })
 
   const month = viewedMonth ?? ledger.firstMonth
   const { screen } = navigation
@@ -50,14 +62,30 @@ export default function App({ repository, loaded, options }: AppProps) {
     navigation.backToLedger()
   }
 
-  // 저장 상태 안내는 어느 화면이든 맨 위에 (SPEC-002)
-  const notices = storageNotices(ledger.startup, ledger.saveFailure).map((message) => (
-    <NoticeBar key={message} message={message} />
+  // 저장 상태 안내는 어느 화면이든 맨 위에 (SPEC-002). 할 일이 있으면 백업 버튼을 붙인다
+  const noticeActions: Record<StorageNoticeAction, { label: string; onClick: () => void }> = {
+    'import-backup': { label: '백업 파일 불러오기', onClick: backup.startImport },
+    'send-backup': { label: '백업 파일 보내기', onClick: backup.send },
+  }
+  const storageNoticeList = storageNotices(ledger.startup, ledger.saveFailure)
+  const notices = storageNoticeList.map(({ message, action }) => (
+    <NoticeBar key={message} message={message} action={action && noticeActions[action]} />
   ))
+  const noticeOffersImport = storageNoticeList.some((notice) => notice.action === 'import-backup')
 
   function screenContent(): ReactNode {
     if (ledger.isFirstRun) {
-      return <StartLedgerScreen kind="first" year={ledger.year} defaults={ledger.newLedgerDefaults} onStart={ledger.startLedger} />
+      // 새 폰으로 옮길 때는 장부를 시작하지 않고 백업 파일부터 불러온다 (안내 띠에 같은 버튼이 있으면 하나만)
+      return (
+        <>
+          {!noticeOffersImport && (
+            <div className="screen__top-end">
+              <TopTextButton onClick={backup.startImport}>백업 불러오기</TopTextButton>
+            </div>
+          )}
+          <StartLedgerScreen kind="first" year={ledger.year} defaults={ledger.newLedgerDefaults} onStart={ledger.startLedger} />
+        </>
+      )
     }
 
     switch (screen.name) {
@@ -76,6 +104,8 @@ export default function App({ repository, loaded, options }: AppProps) {
               // 저장에 실패하면 위쪽 안내 띠만 보이고 "바꿨어요" 는 띄우지 않는다
               if (ledger.updateClubInfo(info)) setToast('바꿨어요')
             }}
+            onSendBackup={backup.send}
+            onImportBackup={backup.startImport}
             onBack={navigation.backToLedger}
           />
         )
@@ -170,6 +200,7 @@ export default function App({ repository, loaded, options }: AppProps) {
         onConfirm={navigation.confirmLeave}
         onCancel={navigation.cancelLeave}
       />
+      <BackupDialogs backup={backup} />
       <Toast message={toast} onDone={() => setToast(null)} />
     </div>
   )

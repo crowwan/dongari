@@ -266,6 +266,17 @@ export function Catalog() {
           <State label="긴 문장 (시작 안내)">
             <NoticeBar message="저장된 기록을 읽지 못해 새 장부로 시작해요. 예전 기록은 따로 보관해 두었어요" />
           </State>
+          <State label="버튼 붙음 (저장 실패 → 백업 파일 보내기)">
+            <NoticeBar message="저장하지 못했어요. 백업 파일을 보내 두세요" action={{ label: '백업 파일 보내기', onClick: noop }} />
+          </State>
+          <State label="버튼 눌림">
+            <div data-preview-pressed="">
+              <NoticeBar
+                message="저장된 기록을 읽지 못했어요. 지금 적는 내용은 저장되지 않아요"
+                action={{ label: '백업 파일 불러오기', onClick: noop }}
+              />
+            </div>
+          </State>
         </Section>
 
         <Section title="InstallBanner (설치 안내 띠)">
@@ -320,6 +331,31 @@ export function Catalog() {
                 danger
                 title="이 기록을 정말 지울까요?"
                 confirmLabel="지우기"
+                onConfirm={noop}
+                onCancel={noop}
+              />
+            </div>
+          </State>
+          <State label="설명 붙음 + 위험 (백업 불러오기)">
+            <div className="catalog__frame">
+              <ConfirmDialog
+                open
+                danger
+                title="2026년 장부(기록 12건)를 불러올까요?"
+                description="지금 기록은 불러온 기록으로 바뀌어요"
+                confirmLabel="불러오기"
+                onConfirm={noop}
+                onCancel={noop}
+              />
+            </div>
+          </State>
+          <State label="버튼 하나 알림 (cancelLabel=null)">
+            <div className="catalog__frame">
+              <ConfirmDialog
+                open
+                title="이 파일은 열 수 없어요"
+                description="동아리 회계에서 보낸 백업 파일인지 확인해 주세요"
+                cancelLabel={null}
                 onConfirm={noop}
                 onCancel={noop}
               />

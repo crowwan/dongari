@@ -73,4 +73,33 @@ describe('ConfirmDialog', () => {
 
     expect(screen.getByRole('button', { name: '지우기' })).toHaveAttribute('data-variant', 'danger')
   })
+
+  it('설명 문장이 있으면 제목 아래 보이고 확인 창 설명으로 읽힌다', () => {
+    render(
+      <ConfirmDialog
+        open
+        title="2026년 장부를 불러올까요?"
+        description="지금 기록은 불러온 기록으로 바뀌어요"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription('지금 기록은 불러온 기록으로 바뀌어요')
+  })
+
+  it('아니요 글자를 null 로 주면 버튼 하나짜리 알림 창이 되고 그 버튼에 포커스가 간다 (Esc 는 onCancel)', async () => {
+    const user = userEvent.setup()
+    const handleCancel = vi.fn()
+    render(
+      <ConfirmDialog open title="이 파일은 열 수 없어요" cancelLabel={null} onConfirm={() => {}} onCancel={handleCancel} />,
+    )
+
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: '확인' })).toHaveFocus()
+    expect(screen.getByTestId('confirm-dialog')).toHaveAttribute('data-variant', 'notice')
+
+    await user.keyboard('{Escape}')
+    expect(handleCancel).toHaveBeenCalledTimes(1)
+  })
 })

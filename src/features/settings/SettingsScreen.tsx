@@ -14,11 +14,22 @@ type SettingsScreenProps = {
   ledger: Ledger | undefined // 고른 연도 장부. 아직 없으면 undefined
   onChangeYear: (year: number) => void // 고르면 장부 화면으로 돌아가 그 해를 보여 준다
   onSaveClubInfo: (info: LedgerInfo) => void
+  onSendBackup: () => void
+  onImportBackup: () => void
   onBack: () => void
 }
 
-// 설정 (SPEC-001 화면 구성): 동아리 정보, 장부 연도. 기록 백업(SPEC-002)은 #8 에서 이 화면에 묶음을 더한다
-export function SettingsScreen({ year, yearChoices, ledger, onChangeYear, onSaveClubInfo, onBack }: SettingsScreenProps) {
+// 설정 (SPEC-001 화면 구성): 동아리 정보, 장부 연도, 기록 백업(SPEC-002)
+export function SettingsScreen({
+  year,
+  yearChoices,
+  ledger,
+  onChangeYear,
+  onSaveClubInfo,
+  onSendBackup,
+  onImportBackup,
+  onBack,
+}: SettingsScreenProps) {
   return (
     <div className="screen" data-testid="settings-screen">
       <BackToLedger onBack={onBack} />
@@ -47,6 +58,23 @@ export function SettingsScreen({ year, yearChoices, ledger, onChangeYear, onSave
               {choice}년
             </ChoiceChip>
           ))}
+        </div>
+      </section>
+
+      <section className="card" aria-labelledby="settings-backup" data-testid="settings-backup">
+        <h2 className="card__title" id="settings-backup">
+          기록 백업
+        </h2>
+        <p className="screen__note">
+          폰을 바꾸거나 기록이 지워져도 백업 파일로 되살릴 수 있어요. 카톡 나에게 보내기나 드라이브에 보내 두세요.
+        </p>
+        <div className="settings__actions">
+          <Button variant="secondary" onClick={onSendBackup}>
+            백업 파일 보내기
+          </Button>
+          <Button variant="secondary" onClick={onImportBackup}>
+            백업 파일 불러오기
+          </Button>
         </div>
       </section>
     </div>
