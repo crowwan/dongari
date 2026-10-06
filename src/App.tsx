@@ -110,9 +110,25 @@ export default function App({ repository, loaded, options }: AppProps) {
           />
         )
       case 'month-summary':
-        return <MonthSummaryScreen year={ledger.year} month={screen.month} onBack={navigation.backToLedger} />
+        // 월 정리는 장부가 있을 때 장부 화면에서만 열린다
+        if (!ledger.ledger) return null
+        return (
+          <MonthSummaryScreen
+            ledger={ledger.ledger}
+            month={screen.month}
+            onBack={navigation.backToLedger}
+            onNotify={setToast}
+          />
+        )
       case 'year-summary':
-        return <YearSummaryScreen year={ledger.year} onBack={navigation.backToLedger} />
+        return (
+          <YearSummaryScreen
+            year={ledger.year}
+            ledger={ledger.ledger}
+            onBack={navigation.backToLedger}
+            onNotify={setToast}
+          />
+        )
       case 'add-entry':
         return (
           <EntryForm

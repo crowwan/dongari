@@ -48,6 +48,22 @@ describe('Toast', () => {
     expect(screen.queryByText('지웠어요')).not.toBeInTheDocument()
   })
 
+  it('긴 문장은 읽을 시간을 글자 수만큼 더 준다 (글자당 0.12초, 짧으면 2초)', () => {
+    // 37글자 → 4.44초
+    const message = '사진을 저장했어요. 갤러리의 Download 앨범에서 볼 수 있어요'
+    render(<Harness initial={message} />)
+
+    act(() => {
+      vi.advanceTimersByTime(message.length * 120 - 1)
+    })
+    expect(screen.getByText(message)).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(screen.queryByText(message)).not.toBeInTheDocument()
+  })
+
   it('메시지가 없으면 빈 알림 영역만 남는다', () => {
     render(<Toast message={null} onDone={() => {}} />)
 

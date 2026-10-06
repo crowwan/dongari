@@ -249,7 +249,7 @@ export function Catalog() {
               <BottomActionBar label="+ 내역 적기" onClick={noop} />
             </div>
             <div className="catalog__frame catalog__frame--short">
-              <BottomActionBar label="사진으로 보내기" onClick={noop} disabled />
+              <BottomActionBar label="사진으로 저장" onClick={noop} disabled />
             </div>
           </State>
           <State label="비활성 + 안내 (누를 수 없는 이유, 내역 적기 [저장])">

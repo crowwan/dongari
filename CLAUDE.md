@@ -20,13 +20,13 @@
 - 진행 중 스펙: SPEC-001 한 줄 장부 입력, SPEC-002 안전한 저장과 백업, SPEC-003 보고서 바로 보내기
 - backlog 스펙: SPEC-004 사진으로 한 번에 적기 (draft)
 - GitHub Project: crowwan #3
-- v2 는 거래 기록 모델이다 (`docs/prd.md` 데이터 모델). v1 코드는 보고서(`src/components/report`, `utils/imageExport`)만 남아 #16 에서 옮긴다.
+- v2 는 거래 기록 모델이다 (`docs/prd.md` 데이터 모델). v1 코드는 #16 에서 모두 정리했다 (v1 연말 양식은 `features/report/sheet` 로 옮겨 `YearReport` 를 그린다).
 
 ## 스택
 
 - React 19 + TypeScript + Vite 7, 순수 CSS + 디자인 토큰(`src/styles/tokens.css`). Tailwind 는 #12 에서 걷어냄
 - 저장: localStorage (버전 있는 스키마, `docs/decisions/001-storage.md`)
-- 보고서 이미지: html2canvas
+- 월 정리·올해 결산 사진: html2canvas (누를 때만 불러온다) → `canvas.toBlob` → Blob 주소 `<a download>`
 - 테스트: Vitest + Testing Library (v2.0 에서 도입)
 - 배포: GitHub Pages (`base: '/dongari/'`), 홈 화면 추가·오프라인은 vite-plugin-pwa (#10)
 
@@ -50,12 +50,11 @@ src/
 ├── App.tsx      앱 뼈대: 첫 실행 화면 / 장부(첫 화면)·내역 적기·고치기·설정·월 정리·올해 결산 화면 전환(탭 없음, features/useScreenHistory: 뒤로 버튼·닫기 전 확인) + 저장 상태 안내
 ├── domain/      v2 데이터 타입과 계산 순수 함수 (Entry, Ledger, StoredData, ledger.ts 장부, report.ts 월 정리·올해 결산)
 ├── storage/     v2 저장 계층 (LedgerRepository, LocalStorage·Memory 구현, 스키마 가드, 마이그레이션, 백업 파일 만들기·읽기)
-├── features/    화면 단위 (ledger: 장부·시작·내역 적기·useLedger, settings, report: 월 정리·올해 결산, storage: 저장 안내 문구, backup: 백업 보내기·불러오기 흐름, install: 설치 안내 띠, useScreenHistory·BackToLedger)
+├── features/    화면 단위 (ledger: 장부·시작·내역 적기·useLedger, settings, report: 월 정리·올해 결산·사진으로 저장, report/sheet: v1 연말 양식(인라인 hex 예외), storage: 저장 안내 문구, backup: 백업 보내기·불러오기 흐름, install: 설치 안내 띠, useScreenHistory·BackToLedger)
 ├── pwa/         홈 화면 추가·오프라인 설정 (vite-plugin-pwa 옵션, manifest 색은 tokens.css 에서)
 ├── ui/          기본 컴포넌트 (Button, ChoiceChip, MoneyInput, TextField, NoticeBar, BalanceCard, MonthStepper, …)
 ├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준)
 ├── catalog/     디자인 카탈로그 `/#/dev/catalog` (개발 모드 전용, 프로덕션 번들 제외)
-├── components/report/, utils/, types/   남은 v1 보고서와 그 계산·타입 (#16 에서 정리)
-└── test/        Vitest 설정
+└── test/        Vitest 설정, 여러 테스트가 같이 쓰는 장부 기록(ledgerFixtures: v1 예시 1년치)
 public/icons/  앱 아이콘 (scripts/make-icons.mjs 가 토큰 색으로 만든다)
 ```

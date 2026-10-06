@@ -1,0 +1,124 @@
+/*
+ * 월 정리·올해 결산 화면 (SPEC-003). 값은 tokens.css 변수만 쓴다.
+ * 예외: 올해 결산 양식(sheet/*)은 v1 종이 양식 그대로 사진으로 저장되는 영역이라 인라인 hex 를 쓴다 (docs/design.md).
+ */
+@import '../screens.css';
+
+/*
+ * 아래 고정 [사진으로 저장] 영역(BottomActionBar)만큼 끝을 띄워 마지막 줄이 가리지 않게 한다.
+ * 고정 영역 높이 = 위 여백 + 주 버튼 + 아래 여백 + 위쪽 선 (ui.css .ui-bottom-bar, 장부 화면과 같은 계산)
+ */
+.report {
+  padding-bottom: calc(
+    var(--space-3) + var(--touch-primary) + var(--space-4) + var(--hairline) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+/* 기록 없는 올해 결산 안내 */
+.report__empty {
+  margin: 0;
+  padding: var(--space-6) var(--card-pad-inline);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+  text-wrap: balance;
+  word-break: keep-all;
+}
+
+/* ---------- 월 정리: 사진으로 저장되는 영역(제목 + 세 묶음) ---------- */
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-card {
+  padding: var(--space-3) var(--card-pad-inline) var(--space-2);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-card__title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--size-small);
+  font-weight: var(--weight-strong);
+  line-height: var(--line-tight);
+  color: var(--muted);
+}
+
+.summary-card__empty {
+  margin: 0;
+  padding: var(--space-2) 0;
+  color: var(--muted);
+}
+
+.summary-line {
+  padding: var(--space-2) 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  line-height: var(--line-tight);
+}
+
+.summary-line__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.summary-line__amount {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* 합계·월말 잔액 줄: 위 구분선 + 굵게 */
+.summary-line[data-total] {
+  margin-top: var(--space-1);
+  padding-top: var(--space-3);
+  border-top: var(--hairline) solid var(--line);
+  font-weight: var(--weight-bold);
+}
+
+.summary-line[data-kind='income'] .summary-line__amount {
+  color: var(--income-amount);
+}
+
+/*
+ * 사진으로 그리는 복사본(savePicture.ts 가 data-capturing + data-theme="light" 를 단다):
+ * 글자색은 바깥(.app)에서 다크 값으로 물려받으므로 라이트 --ink 로 다시 정한다.
+ * 흰 바탕에서는 흰 카드가 면으로 구분되지 않으므로 카드 둘레에만 옅은 선을 두르고, 사진 가장자리에 여백을 둔다
+ */
+.summary[data-capturing] {
+  padding: var(--space-5);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.summary[data-capturing] .summary-card {
+  border: var(--hairline) solid var(--line);
+}
+
+/* ---------- 올해 결산: 고정 폭 양식을 화면 폭에 맞춰 줄여 보인다 ---------- */
+
+/* 줄인 양식이 차지할 자리. 높이는 줄인 높이로 맞추고(YearSummaryScreen), 가로로는 절대 넘치지 않게 자른다 */
+.year-fit {
+  overflow: hidden;
+  border-radius: var(--corner-sm);
+}
+
+/* 양식 원래 크기(v1 360px)를 화면 폭 비율(--fit-scale)로 줄이거나 키운다. 두 손가락 확대는 브라우저 기본 확대 */
+.year-fit__target {
+  width: max-content;
+  transform-origin: top left;
+  transform: scale(var(--fit-scale, 1));
+}
+
+/* 사진은 늘 원래 크기로 그린다 */
+.year-fit__target[data-capturing] {
+  transform: none;
+}

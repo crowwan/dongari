@@ -104,7 +104,7 @@ updated: 2026-10-06
 | `MoneyInput` | 빈칸 / 입력됨(콤마·"원") / 포커스(흰 면 + 청록 테두리) / 오류(빨강 테두리 + 문장) / 비활성(점선), 상한 999,999,999 |
 | `TextField` | MoneyInput 과 같은 면·상태 — 동아리 이름, 항목 직접 적기 |
 | `ConfirmDialog` | 기본 / 위험(빨강 확인), 아니요는 보조 버튼, 열리면 "아니요"에 포커스, Esc = 아니요. 제목 아래 설명 한 줄(`description`, 본문 크기 `--muted`, 확인 창 설명으로 읽힘). `cancelLabel={null}` 이면 [확인] 하나짜리 알림 창(`data-variant="notice"`, 그 버튼에 포커스) — "이 파일은 열 수 없어요" (#8) |
-| `Toast` | 보이는 중 / 사라짐 (기본 2초, `role="status"`) |
+| `Toast` | 보이는 중 / 사라짐 (짧은 알림 2초, 긴 문장은 글자당 0.12초, `role="status"`). 두 줄이 되면 낱말 단위로 꺾는다 |
 | `NoticeBar` | 화면 위 노란 안내 띠 (문장만 `role="alert"`) — 저장 실패, 시작 안내. 할 일이 있으면 문장 아래 흰 면(`--surface`) 버튼 하나(높이 `--touch-min`, 눌림 `--pressed`) — [백업 파일 보내기]·[백업 파일 불러오기] (#8) |
 | `BalanceCard` | 이름("지금 잔액") → 큰 숫자(`--size-balance`) → 보조 줄(있을 때만), 적자는 `−` |
 | `AmountText` | 수입 `+` 초록 / 지출 `−` 본문색. 글자 크기는 놓인 자리를 따른다 |
@@ -115,7 +115,19 @@ updated: 2026-10-06
 | `InstallBanner` (`features/install`) | 장부 화면 위 흰 카드 띠(저장 안내의 노란 띠와 구분해 조용히 권함): 굵은 문장 → [방법 보기]/[홈 화면에 추가](보조, 남는 폭) + [닫기](회색 면 `--fill`, 글자 폭) → 펼치면 줄 구분 아래 브라우저 이름(청록) + 순서(`--size-large`). 장부 화면 주 버튼은 [+ 내역 적기] 하나라 여기엔 주 버튼을 쓰지 않는다. 카탈로그는 모양만 그리는 `InstallBannerView` 로 상태별 (#10) |
 | `EntryForm` (`features/ledger`) | 내역 적기: 질문 제목(`--size-large` 굵게, 입력칸 이름과 같은 급) → 월 `ChoiceChip` 4×3 / [수입][지출] 반씩 / 자주 쓴 항목 칩(글자 폭, 줄바꿈) + "직접 적기" `TextField` / `MoneyInput`, 아래 고정 [저장] + 빠진 것 안내. 처음 값을 받아 고치기 화면("내역 고치기")도 같은 모양, 고치기만 금액 칸 밑에 [이 내역 지우기] 위험 글자형(`Button danger-text`) → `ConfirmDialog` 위험. 처음 값과 달라졌으면 닫기 전 "적던 내용을 버릴까요?"(`ConfirmDialog` 위험, [버리기]) (#14) |
 
+| 월 정리 (`features/report/MonthSummaryScreen`) | 제목 → 수입·지출 카드(카드 이름 `--size-small` 회색, 줄마다 이름·금액, 합계 줄은 위 구분선 + 굵게, 수입 합계만 `--income-amount`) → 잔액 카드(전달까지 잔액 / 그 달 수입 − 지출 부호 포함 / 월말 잔액). 한쪽 기록이 없으면 "없어요". 아래 고정 [사진으로 저장] ↔ "만드는 중…"(비활성) (#16) |
+| 올해 결산 (`features/report/YearSummaryScreen`, `sheet/*`) | v1 연말 양식 한 장(360px 고정 폭)을 화면 폭에 맞춰 줄여 보인다. 기록이 없으면 흰 카드에 안내 한 줄 + [사진으로 저장] 비활성 (#16) |
+
 `BalanceCard`·`AmountText`·`MonthStepper`·`TopTextButton`·`BottomActionBar` 는 #25 에서 카탈로그에 먼저 올리고 #26 에서 장부 화면에 붙였다. `TopTextButton` 은 장부 외 화면 맨 위 [← 장부로] 에도 쓴다(화살표는 화면 읽기에서 숨김). `TabBar`·`BigActionButton` 은 ADR 003 에 따라 #25 에서 지웠다.
+
+### 토큰 예외: 올해 결산 양식
+
+`src/features/report/sheet/*` 는 색·글자 크기를 토큰 대신 **인라인 hex·px** 로 쓴다 (`sheetStyles.ts`). 앱 화면이 아니라 사진으로 저장해 단톡방에 올리는 v1 종이 양식이라 테마·토큰이 바뀌어도 v1 과 똑같이 흰 종이·검정 글자·회색 선이어야 하고(SPEC-003 AC-7), 사진을 만드는 html2canvas 1.4 가 oklch() 같은 최신 색 문법을 읽지 못해 v1 때부터 평범한 hex 로 그렸다. 글자(11~14px)도 v1 양식 크기라 14px 미만 금지 기준의 예외이고, 대신 화면에서는 두 손가락으로 확대해 본다.
+
+### 사진으로 저장할 때의 모양
+
+- 월 정리 사진은 화면 모양(토큰)을 그대로 쓰되, 사진으로 그리는 복사본에만 `data-theme="light"` + `data-capturing` 을 단다. 그래서 다크 모드에서 저장해도 흰 바탕·검정 글자다. 흰 바탕 위에서는 흰 카드가 면으로 구분되지 않으므로 사진에서만 카드 둘레에 `--line` 선을 두른다 (`report.css`).
+- 올해 결산 사진은 화면에서 줄여 보이던 양식을 줄이지 않은 360px 그대로 2배로 그린다.
 
 공통 규칙: 누르는 곳 `--touch-min` 이상, 포커스 링 보임, 그림자 없음, 컴포넌트는 토큰 변수만 쓰고 `className`·`style` 을 받지 않는다. 루트에 `data-testid`, 상태가 있으면 `data-state`/`data-variant`/`data-kind`.
 
@@ -134,5 +146,6 @@ updated: 2026-10-06
 | 2026-10-06 | TextField, NoticeBar, CarryoverField 추가. Tailwind 제거(기존 카탈로그 모양 그대로) (#12) | #23 |
 | 2026-10-06 | "맑은 은행 앱" 스타일: 강조색 청록 하나 + 옅은 청록 보조, 수입 초록·지출 본문색 금액, 위험·오류 빨강 분리, 다크 새로, 반경·카드 여백·잔액 34px. TabBar·BigActionButton 제거, BalanceCard·AmountText·MonthStepper·TopTextButton·BottomActionBar 추가 (#25) | |
 | 2026-10-06 | 설치 안내 띠(InstallBanner) 추가, 앱 아이콘(청록 바탕 + 흰 장부, 토큰 색) (#10) | |
+| 2026-10-06 | 월 정리·올해 결산 화면과 [사진으로 저장], 결산 양식 토큰 예외(인라인 hex)와 사진 모양 기록, Toast 긴 문장 시간·낱말 단위 줄바꿈 (#16) | |
 | 2026-10-06 | 장부 화면을 한 달씩 보기로 조립(BalanceCard·MonthStepper·AmountText·TopTextButton·BottomActionBar), 임시 화면 이동 줄 제거, [← 장부로] 는 TopTextButton (#26) | |
 | 2026-10-06 | NoticeBar 에 버튼 하나, ConfirmDialog 에 설명 줄·버튼 하나 알림 창 추가. 설정 "기록 백업" 카드(보조 버튼 둘) (#8) | |

@@ -17,9 +17,9 @@ describe('BottomActionBar', () => {
   it('버튼을 누르면 onClick 이 불린다', async () => {
     const user = userEvent.setup()
     const handleClick = vi.fn()
-    render(<BottomActionBar label="사진으로 보내기" onClick={handleClick} />)
+    render(<BottomActionBar label="사진으로 저장" onClick={handleClick} />)
 
-    await user.click(screen.getByRole('button', { name: '사진으로 보내기' }))
+    await user.click(screen.getByRole('button', { name: '사진으로 저장' }))
 
     expect(handleClick).toHaveBeenCalledTimes(1)
   })
@@ -27,9 +27,9 @@ describe('BottomActionBar', () => {
   it('비활성이면 눌러도 onClick 이 불리지 않는다', async () => {
     const user = userEvent.setup()
     const handleClick = vi.fn()
-    render(<BottomActionBar label="사진으로 보내기" onClick={handleClick} disabled />)
+    render(<BottomActionBar label="사진으로 저장" onClick={handleClick} disabled />)
 
-    await user.click(screen.getByRole('button', { name: '사진으로 보내기' }))
+    await user.click(screen.getByRole('button', { name: '사진으로 저장' }))
 
     expect(handleClick).not.toHaveBeenCalled()
   })
