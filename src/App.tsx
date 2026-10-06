@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { BackupDialogs } from './features/backup/BackupDialogs'
+import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
 import { InstallBanner } from './features/install/InstallBanner'
 import { EntryForm } from './features/ledger/EntryForm'
@@ -34,8 +35,9 @@ export default function App({ repository, loaded, options }: AppProps) {
   const [viewedMonth, setViewedMonth] = useState<number | undefined>()
   const [toast, setToast] = useState<string | null>(null)
   // 백업 파일 보내기·불러오기 (SPEC-002). 불러오면 올해 장부의 처음 달로 돌아가 알린다
+  const now = options?.now ?? (() => new Date())
   const backup = useBackup(ledger, {
-    now: options?.now ?? (() => new Date()),
+    now,
     onRestored: () => {
       setViewedMonth(undefined)
       navigation.backToLedger()
@@ -72,6 +74,10 @@ export default function App({ repository, loaded, options }: AppProps) {
     <NoticeBar key={message} message={message} action={action && noticeActions[action]} />
   ))
   const noticeOffersImport = storageNoticeList.some((notice) => notice.action === 'import-backup')
+  // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부 위 띠는 저장 안내가 없을 때만 (장부 위 띠는 하나만: 저장 > 백업 > 설치)
+  const needsBackup = backupReminderFor(ledger.data, now())
+  const showBackupReminder = needsBackup && storageNoticeList.length === 0
+  const showInstallBanner = !showBackupReminder && storageNoticeList.length === 0
 
   function screenContent(): ReactNode {
     if (ledger.isFirstRun) {
@@ -100,6 +106,7 @@ export default function App({ repository, loaded, options }: AppProps) {
               setViewedMonth(undefined)
               navigation.backToLedger()
             }}
+            lastBackupAt={ledger.data.settings.lastBackupAt}
             onSaveClubInfo={(info) => {
               // 저장에 실패하면 위쪽 안내 띠만 보이고 "바꿨어요" 는 띄우지 않는다
               if (ledger.updateClubInfo(info)) setToast('바꿨어요')
@@ -169,7 +176,12 @@ export default function App({ repository, loaded, options }: AppProps) {
       return (
         <>
           <div className="screen__top-end">
-            <TopTextButton onClick={() => navigation.open({ name: 'settings' })}>설정</TopTextButton>
+            <TopTextButton
+              onClick={() => navigation.open({ name: 'settings' })}
+              dotLabel={needsBackup ? BACKUP_DOT_LABEL : undefined}
+            >
+              설정
+            </TopTextButton>
           </div>
           <StartLedgerScreen
             key={year}
@@ -181,10 +193,11 @@ export default function App({ repository, loaded, options }: AppProps) {
         </>
       )
     }
-    // 홈 화면에 추가하지 않고 열었으면 장부 위에 설치 안내 띠 (SPEC-002)
+    // 장부 위 띠 하나: 30일 백업 안내, 없으면 (홈 화면에 추가하지 않고 열었을 때) 설치 안내 (SPEC-002)
     return (
       <>
-        <InstallBanner />
+        {showBackupReminder && <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={noticeActions['send-backup']} />}
+        {showInstallBanner && <InstallBanner />}
         <LedgerScreen
           year={year}
           ledger={ledger.ledger}
@@ -194,6 +207,7 @@ export default function App({ repository, loaded, options }: AppProps) {
           onOpenMonthSummary={(summaryMonth) => navigation.open({ name: 'month-summary', month: summaryMonth })}
           onOpenYearSummary={() => navigation.open({ name: 'year-summary' })}
           onOpenSettings={() => navigation.open({ name: 'settings' })}
+          settingsNeedsBackup={needsBackup}
           onAddEntry={(entryMonth) => navigation.open({ name: 'add-entry', month: entryMonth })}
           onEditEntry={(id) => navigation.open({ name: 'edit-entry', id })}
         />

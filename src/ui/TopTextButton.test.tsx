@@ -20,4 +20,23 @@ describe('TopTextButton', () => {
     expect(screen.getByRole('button', { name: '설정' })).toHaveAttribute('type', 'button')
     expect(screen.getByTestId('top-text-button')).toBeInTheDocument()
   })
+
+  it('점 표시: 점을 그리고 화면 읽기 이름에도 이유를 붙인다 (색만으로 알리지 않는다)', () => {
+    render(
+      <TopTextButton onClick={() => {}} dotLabel="백업 필요">
+        설정
+      </TopTextButton>,
+    )
+
+    const button = screen.getByRole('button', { name: '설정 백업 필요' })
+    expect(button).toHaveAttribute('data-dot', 'true')
+    expect(screen.getByTestId('top-text-button-dot')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('점 표시가 없으면 점도 숨은 이름도 없다', () => {
+    render(<TopTextButton onClick={() => {}}>설정</TopTextButton>)
+
+    expect(screen.getByRole('button', { name: '설정' })).toHaveAttribute('data-dot', 'false')
+    expect(screen.queryByTestId('top-text-button-dot')).not.toBeInTheDocument()
+  })
 })

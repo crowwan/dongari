@@ -16,6 +16,15 @@
   gap: var(--space-2);
 }
 
+/* 기록 백업: 마지막 백업 날짜 한 줄. 설명보다 또렷하게(본문 크기·본문색·굵게) */
+.settings__last-backup {
+  margin: 0;
+  font-size: var(--size-body);
+  font-weight: var(--weight-strong);
+  line-height: var(--line-tight);
+  color: var(--ink);
+}
+
 /* 기록 백업: 보조 버튼 두 개를 위아래로 */
 .settings__actions {
   display: flex;

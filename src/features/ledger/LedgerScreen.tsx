@@ -7,6 +7,7 @@ import { Button } from '../../ui/Button'
 import { formatAmount } from '../../ui/money'
 import { MonthStepper } from '../../ui/MonthStepper'
 import { TopTextButton } from '../../ui/TopTextButton'
+import { BACKUP_DOT_LABEL } from '../backup/backupReminder'
 import './ledger.css'
 
 type LedgerScreenProps = {
@@ -19,6 +20,8 @@ type LedgerScreenProps = {
   onOpenMonthSummary: (month: number) => void
   onOpenYearSummary: () => void
   onOpenSettings: () => void
+  // 백업이 필요하면 [설정] 에 점 표시 (SPEC-002 30일 백업 안내)
+  settingsNeedsBackup?: boolean
   // [+ 내역 적기] → 보고 있는 달로 입력 화면을 연다 (#13)
   onAddEntry?: (month: number) => void
   // 기록 한 줄 → 그 기록의 고치기 화면을 연다 (#14)
@@ -42,6 +45,7 @@ export function LedgerScreen({
   onOpenMonthSummary,
   onOpenYearSummary,
   onOpenSettings,
+  settingsNeedsBackup = false,
   onAddEntry,
   onEditEntry,
 }: LedgerScreenProps) {
@@ -56,7 +60,9 @@ export function LedgerScreen({
         </div>
         <div className="ledger__top-actions">
           <TopTextButton onClick={onOpenYearSummary}>올해 결산</TopTextButton>
-          <TopTextButton onClick={onOpenSettings}>설정</TopTextButton>
+          <TopTextButton onClick={onOpenSettings} dotLabel={settingsNeedsBackup ? BACKUP_DOT_LABEL : undefined}>
+            설정
+          </TopTextButton>
         </div>
       </header>
 

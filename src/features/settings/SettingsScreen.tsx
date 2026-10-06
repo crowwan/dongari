@@ -5,6 +5,7 @@ import { Button } from '../../ui/Button'
 import { ChoiceChip } from '../../ui/ChoiceChip'
 import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
+import { lastBackupText } from '../backup/backupReminder'
 import { CarryoverField } from '../ledger/CarryoverField'
 import './settings.css'
 
@@ -14,6 +15,7 @@ type SettingsScreenProps = {
   ledger: Ledger | undefined // 고른 연도 장부. 아직 없으면 undefined
   onChangeYear: (year: number) => void // 고르면 장부 화면으로 돌아가 그 해를 보여 준다
   onSaveClubInfo: (info: LedgerInfo) => void
+  lastBackupAt?: string // 마지막으로 백업 파일을 보낸 시각 (기록 백업 카드에 날짜로)
   onSendBackup: () => void
   onImportBackup: () => void
   onBack: () => void
@@ -26,6 +28,7 @@ export function SettingsScreen({
   ledger,
   onChangeYear,
   onSaveClubInfo,
+  lastBackupAt,
   onSendBackup,
   onImportBackup,
   onBack,
@@ -67,6 +70,9 @@ export function SettingsScreen({
         </h2>
         <p className="screen__note">
           폰을 바꾸거나 기록이 지워져도 백업 파일로 되살릴 수 있어요. 카톡 나에게 보내기나 드라이브에 보내 두세요.
+        </p>
+        <p className="settings__last-backup" data-testid="settings-last-backup">
+          {lastBackupText(lastBackupAt)}
         </p>
         <div className="settings__actions">
           <Button variant="secondary" onClick={onSendBackup}>
