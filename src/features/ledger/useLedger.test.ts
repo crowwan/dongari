@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Ledger, StoredData } from '../../domain/types'
-import type { LedgerRepository, SaveResult } from '../../storage/LedgerRepository'
+import type { LedgerRepository, LoadResult, SaveResult } from '../../storage/LedgerRepository'
 import { LocalStorageRepository, STORAGE_KEY } from '../../storage/LocalStorageRepository'
 import { MemoryRepository } from '../../storage/MemoryRepository'
 import { createEmptyData } from '../../storage/schema'
@@ -34,8 +34,10 @@ function options(): UseLedgerOptions {
   return { now: () => TODAY, createId: () => `id-${++seq}` }
 }
 
-function renderLedger(repository: LedgerRepository) {
-  return renderHook(() => useLedger(repository, options()))
+// 진입점처럼 저장소를 한 번만 읽고 그 결과를 훅에 넘긴다
+function renderLedger(repository: LedgerRepository, loaded: LoadResult = repository.load()) {
+  const deps = options()
+  return renderHook(() => useLedger(repository, loaded, deps))
 }
 
 describe('SPEC-001 useLedger', () => {
@@ -65,6 +67,25 @@ describe('SPEC-001 useLedger', () => {
       expect(result.current.isFirstRun).toBe(false)
       expect(result.current.ledger).toEqual({ year: 2026, clubName: '한랑드림', carryover: 30_000, entries: [] })
       expect(repository.load().data.ledgers['2026']?.clubName).toBe('한랑드림')
+    })
+
+    it('렌더 중에 저장소를 다시 읽지 않고 진입점이 넘긴 시작 결과를 쓴다', () => {
+      const memory = new MemoryRepository(storedWith(ledger2026()))
+      const loaded = memory.load()
+      let loadCalls = 0
+      const counting: LedgerRepository = {
+        load: () => {
+          loadCalls += 1
+          return memory.load()
+        },
+        save: (data) => memory.save(data),
+      }
+
+      const { result, rerender } = renderLedger(counting, loaded)
+      rerender()
+
+      expect(loadCalls).toBe(0)
+      expect(result.current.ledger?.clubName).toBe('한랑드림')
     })
 
     it('이미 있는 연도의 장부를 다시 시작하면 기록을 지키려고 거부한다', () => {
@@ -170,6 +191,20 @@ describe('SPEC-001 useLedger', () => {
       expect(result.current.year).toBe(2025)
       expect(result.current.ledger?.clubName).toBe('작년')
       expect(result.current.years).toEqual([2026, 2025])
+    })
+
+    it('고를 수 있는 연도는 장부가 있는 연도와 올해, 최신 순이다', () => {
+      const { result } = renderLedger(
+        new MemoryRepository(storedWith({ ...ledger2026(), year: 2024 }, { ...ledger2026(), year: 2025 })),
+      )
+
+      expect(result.current.yearChoices).toEqual([2026, 2025, 2024])
+    })
+
+    it('올해 장부가 이미 있으면 올해를 두 번 넣지 않는다', () => {
+      const { result } = renderLedger(new MemoryRepository(storedWith(ledger2026(), { ...ledger2026(), year: 2025 })))
+
+      expect(result.current.yearChoices).toEqual([2026, 2025])
     })
 
     it('AC-8 새 연도 장부를 만들면 전년도 잔액이 이월금 기본값으로 들어간다', () => {

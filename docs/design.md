@@ -1,6 +1,6 @@
 ---
 project: 동아리 회계
-updated: 2026-10-03
+updated: 2026-10-06
 ---
 
 # 동아리 회계 디자인
@@ -23,7 +23,7 @@ updated: 2026-10-03
 
 ## 토큰 역할
 
-값은 `src/styles/tokens.css` 에만 있다. 이름은 Tailwind v4 테마 변수(`--color-*`, `--text-*`, `--radius-*` 등)와 겹치지 않게 지었다. 겹치면 v1 화면의 Tailwind 값이 바뀐다.
+값은 `src/styles/tokens.css` 에만 있다. (이름이 Tailwind v4 테마 변수와 겹치지 않는 것은 v1 과 함께 쓰던 때의 흔적이다. Tailwind 는 #12 에서 걷어냈다)
 
 ### 색
 
@@ -94,6 +94,9 @@ updated: 2026-10-03
 | `MoneyInput` | 빈칸 / 입력됨(콤마·"원") / 포커스 / 오류(문장 안내) / 비활성, 상한 999,999,999 |
 | `ConfirmDialog` | 기본 / 위험(빨강 확인), 열리면 "아니요"에 포커스, Esc = 아니요 |
 | `Toast` | 보이는 중 / 사라짐 (기본 2초, `role="status"`) |
+| `TextField` | 빈칸(예시 글자) / 입력됨 / 포커스 / 오류(문장 안내) / 비활성 — 동아리 이름, 항목 직접 적기 |
+| `NoticeBar` | 화면 위 노란 안내 띠 (`role="alert"`) — 저장 실패, 시작 안내 |
+| `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 [남았어요]/[적자였어요] 로 부호를 고른다. 적자면 음수 저장 |
 | `TabBar` | 장부·보고서·설정 × 지금 화면(`aria-current="page"`) / 다른 화면 / 눌림, 아이콘 + 글자, 하단 고정 + safe-area. 화면 이동 버튼이라 `tab` 역할은 쓰지 않는다 |
 
 공통 규칙: 기호만 있는 버튼 없음(항상 글자), 누르는 곳 `--touch-min` 이상, 포커스 링 보임, 컴포넌트는 토큰 변수만 쓰고 `className`·`style` 을 받지 않는다. 루트에 `data-testid`, 상태가 있으면 `data-state`/`data-variant`/`data-kind`.
@@ -109,3 +112,4 @@ updated: 2026-10-03
 | 날짜 | 내용 | PR |
 |---|---|---|
 | 2026-10-03 | 토큰 역할, 기본 컴포넌트 표 작성, 눌림 토큰 추가 (#5) | #21 |
+| 2026-10-06 | TextField, NoticeBar, CarryoverField 추가. Tailwind 제거(기존 카탈로그 모양 그대로) (#12) | |

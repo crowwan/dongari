@@ -27,6 +27,7 @@ export type StartupStatus = { status: 'ok' } | { status: 'recovered' } | { statu
 export interface LedgerState {
   year: number
   years: number[] // 장부가 있는 연도, 최신 순
+  yearChoices: number[] // 설정에서 고를 수 있는 연도: 장부가 있는 연도 + 올해, 최신 순
   ledger: Ledger | undefined // 이 연도 장부. 아직 없으면 undefined
   totals: LedgerTotals | undefined
   isFirstRun: boolean // 장부가 하나도 없다
@@ -53,12 +54,11 @@ function allEntriesOldestFirst(data: StoredData) {
     .flatMap((item) => item.entries)
 }
 
-export function useLedger(repository: LedgerRepository, options: UseLedgerOptions = {}): LedgerState {
+// loaded: 진입점(main.tsx)이 앱 시작 때 한 번 읽은 결과. 읽기는 부작용(깨진 원본 옮기기)이 있어 렌더 중에 하지 않는다
+export function useLedger(repository: LedgerRepository, loaded: LoadResult, options: UseLedgerOptions = {}): LedgerState {
   const now = options.now ?? (() => new Date())
   const createId = options.createId ?? (() => crypto.randomUUID())
 
-  // StrictMode 에서 초기화 함수가 두 번 불려도 React 는 첫 결과를 쓴다
-  const [loaded] = useState(() => repository.load())
   const [data, setData] = useState(loaded.data)
   const [year, setYear] = useState(() => now().getFullYear())
   const [saveFailure, setSaveFailure] = useState<SaveFailureReason | undefined>()
@@ -84,12 +84,14 @@ export function useLedger(repository: LedgerRepository, options: UseLedgerOption
   }
 
   const ledger = data.ledgers[String(year)]
+  const years = Object.values(data.ledgers)
+    .map((item) => item.year)
+    .sort((a, b) => b - a)
 
   return {
     year,
-    years: Object.values(data.ledgers)
-      .map((item) => item.year)
-      .sort((a, b) => b - a),
+    years,
+    yearChoices: [...new Set([...years, now().getFullYear()])].sort((a, b) => b - a),
     ledger,
     totals: ledger && calculateTotals(ledger),
     isFirstRun: Object.keys(data.ledgers).length === 0,

@@ -5,7 +5,7 @@ status: in-progress
 milestone: v2.0
 issue: "#1"
 prototype:
-updated: 2026-10-03
+updated: 2026-10-06
 ---
 
 # SPEC-002 안전한 저장과 백업
@@ -72,6 +72,8 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 ## 기술 메모
 
 - 저장소 계층: `LedgerRepository` 인터페이스(`load`, `save`) + `LocalStorageRepository` 구현. `load()` 는 데이터와 시작 상태(`ok` / `recovered` / `read-only` + 이유)를 함께 돌려준다 (#11). 테스트는 메모리 구현으로. 나중에 IndexedDB·클라우드로 바꿀 때 이 경계만 교체.
+- `load()` 는 깨진 원본을 옮기는 부작용이 있어 진입점(`main.tsx`)에서 앱 시작 때 한 번만 부르고, 그 결과(`LoadResult`)를 `useLedger` 에 넘긴다 (#12).
+- 시작 안내·저장 실패 안내는 화면 맨 위 안내 띠로 띄운다. 저장을 막아 둔(`read-only`) 상태의 저장 실패는 시작 안내 하나로만 알린다 (#12).
 - 스키마 검증: 불러오기·이전 시 런타임 검증 필요(`as` 금지 규칙). 결정: 외부 라이브러리 없이 수동 타입 가드 (`src/storage/schema.ts`, #7).
 - 공유: `navigator.canShare({ files })` → `navigator.share`, 아니면 `<a download>`.
 - PWA: `vite-plugin-pwa`. GitHub Pages `base: '/dongari/'` 에 맞춰 scope 설정.
@@ -91,3 +93,4 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 | 2026-10-03 | 기기 저장 데이터가 깨졌거나 상위 버전일 때 동작 추가, 스키마 검증 방식 확정 (#7) |
 | 2026-10-03 | 깨진 원본은 옮긴 뒤 원래 키를 비워 반복 보존 방지, 금액 범위 명시 (#7) |
 | 2026-10-03 | 시작 상태(`recovered`/`read-only`)와 시작 안내 문구 추가 (#11) |
+| 2026-10-06 | 시작 시 한 번 읽기, 안내 띠 표시 규칙 명시 (#12) |

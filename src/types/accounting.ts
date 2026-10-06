@@ -1,3 +1,4 @@
+// v1 월별 집계 모델. 남은 v1 보고서(src/components/report)만 쓴다 (#16 에서 정리)
 // 기본 정보
 export interface BasicInfo {
   year: number;
@@ -34,6 +35,3 @@ export interface AccountingData {
   incomeItems: IncomeItem[];
   lastUpdated: string;
 }
-
-// 탭 타입
-export type TabType = 'basic' | 'monthly' | 'income' | 'preview';

@@ -1,0 +1,76 @@
+/*
+ * 앱 화면 공통 틀. 값은 tokens.css 변수만 쓴다.
+ * 위에서 아래로 한 방향 흐름, 묶음은 선 대신 여백으로 나눈다.
+ */
+@import '../styles/tokens.css';
+
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--typeface);
+  font-size: var(--size-body);
+  line-height: var(--line-body);
+  letter-spacing: var(--letter-body);
+}
+
+/* 내용 칸: 아래 고정 탭에 가리지 않도록 탭 높이 + 홈 표시줄만큼 띄운다 */
+.app__main {
+  box-sizing: border-box;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: calc(var(--space-5) + env(safe-area-inset-top, 0px)) var(--gutter)
+    calc(var(--touch-primary) + var(--space-8) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* 첫 실행처럼 아래 탭이 없는 화면 */
+.app__main[data-tabs='none'] {
+  padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.screen__title {
+  margin: 0;
+  font-size: var(--size-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+  text-wrap: balance;
+}
+
+.screen__lead {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* 보조 설명 (모르면 0으로 두세요 등) */
+.screen__note {
+  margin: 0;
+  font-size: var(--size-small);
+  color: var(--muted);
+}
+
+/* 설정처럼 묶음이 여럿인 화면의 한 묶음: 바탕과 다른 면으로만 구분 (선·그림자 없음) */
+.card {
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--corner-md);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.card__title {
+  margin: 0;
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}

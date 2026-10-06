@@ -8,7 +8,8 @@
 .ui-big-action,
 .ui-chip,
 .ui-tab,
-.ui-money__field {
+.ui-money__field,
+.ui-field__input {
   font-family: var(--typeface);
   letter-spacing: var(--letter-body);
   -webkit-tap-highlight-color: transparent;
@@ -216,6 +217,72 @@
   font-size: var(--size-small);
   font-weight: var(--weight-strong);
   color: var(--expense);
+}
+
+/* 글자 입력칸: 큰 제목 + 큰 글자. 금액 입력칸과 같은 테두리·높이 */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-family: var(--typeface);
+  color: var(--ink);
+}
+
+.ui-field__label {
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+.ui-field__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--touch-primary);
+  padding: 0 var(--space-4);
+  border: var(--stroke) solid var(--line);
+  border-radius: var(--corner-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--size-large);
+}
+
+.ui-field__input::placeholder {
+  color: var(--muted);
+}
+
+.ui-field__input:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 var(--hairline) var(--primary);
+}
+
+.ui-field__input[aria-invalid='true'] {
+  border-color: var(--expense);
+}
+
+.ui-field__input:disabled {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.ui-field__error {
+  margin: 0;
+  font-size: var(--size-small);
+  font-weight: var(--weight-strong);
+  color: var(--expense);
+}
+
+/* 안내 띠: 노란 면 + 본문 색 글자 */
+.ui-notice {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--corner-sm);
+  background: var(--warn-bg);
+  color: var(--ink);
+  font-family: var(--typeface);
+  font-size: var(--size-body);
+  font-weight: var(--weight-strong);
+  line-height: var(--line-body);
 }
 
 /* 확인 창: 화면 가운데 카드, 아니요/확인 두 버튼 */

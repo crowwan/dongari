@@ -20,11 +20,11 @@
 - 진행 중 스펙: SPEC-001 한 줄 장부 입력, SPEC-002 안전한 저장과 백업, SPEC-003 보고서 바로 보내기
 - backlog 스펙: SPEC-004 사진으로 한 번에 적기 (draft)
 - GitHub Project: crowwan #3
-- v1 코드(`src/`)는 월별 집계 모델이다. v2 는 거래 기록 모델로 새로 짠다 (`docs/prd.md` 데이터 모델).
+- v2 는 거래 기록 모델이다 (`docs/prd.md` 데이터 모델). v1 코드는 보고서(`src/components/report`, `utils/imageExport`)만 남아 #16 에서 옮긴다.
 
 ## 스택
 
-- React 19 + TypeScript + Vite 7 + Tailwind CSS v4
+- React 19 + TypeScript + Vite 7, 순수 CSS + 디자인 토큰(`src/styles/tokens.css`). Tailwind 는 #12 에서 걷어냄
 - 저장: localStorage (버전 있는 스키마, `docs/decisions/001-storage.md`)
 - 보고서 이미지: html2canvas
 - 테스트: Vitest + Testing Library (v2.0 에서 도입)
@@ -46,10 +46,14 @@ npm run deploy               # GitHub Pages
 docs/          기획(prd, specs, decisions, design, qa-checklist)
 dev/active/    이슈별 작업 메모 (머지 후 dev/archive/)
 src/
-├── domain/      v2 데이터 타입 (Entry, Ledger, StoredData)
-├── storage/     v2 저장 계층 (LedgerRepository, 스키마 가드, 마이그레이션)
-├── components/  tabs, report, common (v1)
-├── hooks/       useAccountingData (v1)
-├── types/
-└── utils/       calculations, storage, imageExport (v1)
+├── main.tsx     진입점: 저장소를 한 번 읽어(LoadResult) App 에 넘김, 개발 모드 카탈로그 분기
+├── App.tsx      앱 뼈대: 첫 실행 화면 / 아래 탭(장부·보고서·설정) + 저장 상태 안내
+├── domain/      v2 데이터 타입과 장부 계산 순수 함수 (Entry, Ledger, StoredData, ledger.ts)
+├── storage/     v2 저장 계층 (LedgerRepository, LocalStorage·Memory 구현, 스키마 가드, 마이그레이션)
+├── features/    화면 단위 (ledger: 장부·시작·useLedger, settings, report, storage: 저장 안내 문구)
+├── ui/          기본 컴포넌트 (Button, BigActionButton, ChoiceChip, MoneyInput, TextField, NoticeBar, …)
+├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준)
+├── catalog/     디자인 카탈로그 `/#/dev/catalog` (개발 모드 전용, 프로덕션 번들 제외)
+├── components/report/, utils/, types/   남은 v1 보고서와 그 계산·타입 (#16 에서 정리)
+└── test/        Vitest 설정
 ```

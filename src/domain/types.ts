@@ -2,8 +2,7 @@
 
 export type EntryType = 'income' | 'expense'
 
-// 기록 한 줄 금액 상한 (원). 금액은 1 ~ 이 값 사이의 정수
-// TODO(#21): 머지 후 src/ui/money.ts 의 MONEY_MAX 와 한 곳으로 통합
+// 기록 한 줄 금액 상한 (원). 금액은 1 ~ 이 값 사이의 정수. 입력칸(src/ui/money.ts)도 이 값으로 자른다
 export const ENTRY_AMOUNT_MAX = 999_999_999
 
 // 장부 한 줄. 월별 합계·지출 상세·수입내역은 entries 에서 계산하고 저장하지 않는다

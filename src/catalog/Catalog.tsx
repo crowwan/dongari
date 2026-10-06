@@ -1,10 +1,13 @@
 import { useState, type ReactNode } from 'react'
+import { CarryoverField } from '../features/ledger/CarryoverField'
 import { BigActionButton } from '../ui/BigActionButton'
 import { Button } from '../ui/Button'
 import { ChoiceChip } from '../ui/ChoiceChip'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { MoneyInput } from '../ui/MoneyInput'
+import { NoticeBar } from '../ui/NoticeBar'
 import { TabBar, type TabId } from '../ui/TabBar'
+import { TextField } from '../ui/TextField'
 import { Toast } from '../ui/Toast'
 import './catalog.css'
 
@@ -46,6 +49,8 @@ export function Catalog() {
   const [month, setMonth] = useState(3)
   const [item, setItem] = useState('간식비')
   const [amount, setAmount] = useState(28340)
+  const [clubName, setClubName] = useState('한랑드림')
+  const [carryover, setCarryover] = useState(370482)
   const [tab, setTab] = useState<TabId>('ledger')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -170,6 +175,39 @@ export function Catalog() {
           </State>
           <State label="비활성">
             <MoneyInput label="얼마인가요?" value={140000} onChange={noop} disabled />
+          </State>
+        </Section>
+
+        <Section title="TextField">
+          <State label="입력 (눌러 보기)">
+            <TextField label="동아리 이름" value={clubName} placeholder="예: 한랑드림" onChange={setClubName} />
+          </State>
+          <State label="빈칸">
+            <TextField label="동아리 이름" value="" placeholder="예: 한랑드림" onChange={noop} />
+          </State>
+          <State label="오류">
+            <TextField label="동아리 이름" value="" onChange={noop} error="동아리 이름을 적어주세요" />
+          </State>
+          <State label="비활성">
+            <TextField label="동아리 이름" value="한랑드림" onChange={noop} disabled />
+          </State>
+        </Section>
+
+        <Section title="CarryoverField">
+          <State label={`남았어요 / 적자였어요 (눌러 보기) · 이월금 ${carryover.toLocaleString('ko-KR')}`}>
+            <CarryoverField value={carryover} onChange={setCarryover} />
+          </State>
+          <State label="적자 (음수 이월금)">
+            <CarryoverField value={-50000} onChange={noop} />
+          </State>
+        </Section>
+
+        <Section title="NoticeBar">
+          <State label="저장 실패">
+            <NoticeBar message="저장하지 못했어요. 백업 파일을 보내 두세요" />
+          </State>
+          <State label="긴 문장 (시작 안내)">
+            <NoticeBar message="저장된 기록을 읽지 못해 새 장부로 시작해요. 예전 기록은 따로 보관해 두었어요" />
           </State>
         </Section>
 
