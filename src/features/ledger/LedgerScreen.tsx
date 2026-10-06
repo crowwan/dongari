@@ -1,109 +1,138 @@
-import { groupByMonth, type LedgerTotals, type MonthGroup } from '../../domain/ledger'
-import type { EntryType, Ledger } from '../../domain/types'
+import { monthGroup, type LedgerTotals, type MonthGroup } from '../../domain/ledger'
+import type { Ledger } from '../../domain/types'
+import { AmountText } from '../../ui/AmountText'
+import { BalanceCard } from '../../ui/BalanceCard'
+import { BottomActionBar } from '../../ui/BottomActionBar'
 import { Button } from '../../ui/Button'
 import { formatAmount } from '../../ui/money'
+import { MonthStepper } from '../../ui/MonthStepper'
+import { TopTextButton } from '../../ui/TopTextButton'
 import './ledger.css'
 
 type LedgerScreenProps = {
   year: number
   ledger: Ledger
   totals: LedgerTotals
-  // [돈 들어옴]/[돈 나감] → 그 종류의 입력 화면을 연다 (#13)
-  onAddEntry?: (type: EntryType) => void
-  // 기록 한 줄 → 그 기록의 수정 화면을 연다 (#14)
+  // 보고 있는 달 (1~12). 다른 화면에 다녀와도 그대로이도록 App 이 들고 있다
+  month: number
+  onChangeMonth: (month: number) => void
+  onOpenMonthSummary: (month: number) => void
+  onOpenYearSummary: () => void
+  onOpenSettings: () => void
+  // [+ 내역 적기] → 보고 있는 달로 입력 화면을 연다 (#13)
+  onAddEntry?: (month: number) => void
+  // 기록 한 줄 → 그 기록의 고치기 화면을 연다 (#14)
   onEditEntry?: (id: string) => void
 }
 
-const SIGN: Record<EntryType, string> = { income: '+', expense: '−' }
+// 잔액 카드 보조 줄: 작년 이월금이 잔액에 들어 있다는 것. 적자면 빼기표 대신 "적자", 0원이면 숨긴다
+function carryoverNote(carryover: number): string | undefined {
+  if (carryover > 0) return `작년 이월 ${formatAmount(carryover)}원 포함`
+  if (carryover < 0) return `작년 적자 ${formatAmount(-carryover)}원 포함`
+  return undefined
+}
 
-// 장부 첫 화면 (SPEC-001): 잔액 → 큰 버튼 두 개 → 월별 기록 목록(최신 달이 위)
-export function LedgerScreen({ year, ledger, totals, onAddEntry, onEditEntry }: LedgerScreenProps) {
-  const groups = groupByMonth(ledger.entries)
-
+// 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 글자 버튼 → 잔액 카드 → ‹ N월 › → 그 달 카드 → 아래 고정 [+ 내역 적기]
+export function LedgerScreen({
+  year,
+  ledger,
+  totals,
+  month,
+  onChangeMonth,
+  onOpenMonthSummary,
+  onOpenYearSummary,
+  onOpenSettings,
+  onAddEntry,
+  onEditEntry,
+}: LedgerScreenProps) {
   return (
-    <div className="screen" data-testid="ledger-screen">
-      <header className="ledger__summary">
-        <h1 className="ledger__club">
-          {year}년 {ledger.clubName}
-        </h1>
-        <p className="ledger__balance-label">지금 남은 돈</p>
-        <p className="ledger__balance" data-testid="ledger-balance">
-          {formatAmount(totals.balance)}원
-        </p>
-        <dl className="ledger__sums" data-testid="ledger-sums">
-          <div className="ledger__sum">
-            <dt>들어온 돈</dt>
-            <dd className="ledger__sum-value" data-kind="income">
-              {formatAmount(totals.income)}
-            </dd>
-          </div>
-          <div className="ledger__sum">
-            <dt>나간 돈</dt>
-            <dd className="ledger__sum-value" data-kind="expense">
-              {formatAmount(totals.expense)}
-            </dd>
-          </div>
-          <div className="ledger__sum">
-            <dt>작년에서 넘어온 돈</dt>
-            <dd className="ledger__sum-value">{formatAmount(ledger.carryover)}</dd>
-          </div>
-        </dl>
+    <div className="screen ledger" data-testid="ledger-screen">
+      <header className="ledger__top">
+        <div className="ledger__title">
+          <h1 className="ledger__club">{ledger.clubName}</h1>
+          <p className="ledger__year" data-testid="ledger-year">
+            {year}년
+          </p>
+        </div>
+        <div className="ledger__top-actions">
+          <TopTextButton onClick={onOpenYearSummary}>올해 결산</TopTextButton>
+          <TopTextButton onClick={onOpenSettings}>설정</TopTextButton>
+        </div>
       </header>
 
-      <div className="ledger__actions">
-        {/* BigActionButton(ADR 003 으로 제거) 대신 임시로 기본 버튼. 아래 고정 [+ 내역 적기] 하나로 #26 에서 교체 */}
-        <Button variant="secondary" onClick={() => onAddEntry?.('income')}>
-          + 돈 들어옴
-        </Button>
-        <Button onClick={() => onAddEntry?.('expense')}>− 돈 나감</Button>
-      </div>
+      <BalanceCard label="지금 잔액" amount={totals.balance} note={carryoverNote(ledger.carryover)} />
 
-      {groups.length === 0 ? (
-        <p className="ledger__empty">
-          아직 적은 내용이 없어요.
-          <br />위 버튼으로 시작하세요.
-        </p>
-      ) : (
-        groups.map((group) => <MonthSection key={group.month} group={group} onEditEntry={onEditEntry} />)
-      )}
+      <MonthStepper
+        month={month}
+        onPrevious={() => onChangeMonth(month - 1)}
+        onNext={() => onChangeMonth(month + 1)}
+        previousDisabled={month === 1}
+        nextDisabled={month === 12}
+      />
+
+      <MonthCard
+        group={monthGroup(ledger.entries, month)}
+        onEditEntry={onEditEntry}
+        onOpenMonthSummary={onOpenMonthSummary}
+      />
+
+      <BottomActionBar label="+ 내역 적기" onClick={() => onAddEntry?.(month)} />
     </div>
   )
 }
 
-// 월 소계: 그 달에 있는 쪽만 "들어옴 … · 나감 …"
-function subtotalText(group: MonthGroup): string {
-  const parts = [
-    group.income > 0 ? `들어옴 ${formatAmount(group.income)}` : undefined,
-    group.expense > 0 ? `나감 ${formatAmount(group.expense)}` : undefined,
-  ]
-  return parts.filter((part) => part !== undefined).join(' · ')
+type MonthCardProps = {
+  group: MonthGroup
+  onEditEntry?: (id: string) => void
+  onOpenMonthSummary: (month: number) => void
 }
 
-function MonthSection({ group, onEditEntry }: { group: MonthGroup; onEditEntry?: (id: string) => void }) {
+// 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(입력 순) → [N월 정리 보기]. 기록이 없으면 안내 한 줄만
+function MonthCard({ group, onEditEntry, onOpenMonthSummary }: MonthCardProps) {
+  const { month } = group
+
   return (
-    <section className="ledger__month" data-testid="month-group" data-month={group.month}>
-      <div className="ledger__month-head">
-        <h2 className="ledger__month-title">{group.month}월</h2>
-        <span className="ledger__month-subtotal" data-testid="month-subtotal">
-          {subtotalText(group)}
-        </span>
-      </div>
-      {group.entries.map((entry) => (
-        <button
-          key={entry.id}
-          type="button"
-          className="ledger__row"
-          data-testid="entry-row"
-          data-kind={entry.type}
-          onClick={() => onEditEntry?.(entry.id)}
-        >
-          <span className="ledger__row-name">{entry.name}</span>
-          <span className="ledger__row-amount" data-kind={entry.type}>
-            {SIGN[entry.type]}
-            {formatAmount(entry.amount)}원
-          </span>
-        </button>
-      ))}
+    <section className="ledger__month" data-testid="month-card" data-month={month} aria-label={`${month}월 내역`}>
+      {group.entries.length === 0 ? (
+        <p className="ledger__empty">{month}월에 적은 내역이 없어요. 아래 [+ 내역 적기] 로 적어 보세요</p>
+      ) : (
+        <>
+          <dl className="ledger__subtotals" data-testid="month-subtotal">
+            <div className="ledger__subtotal">
+              <dt>수입</dt>
+              <dd className="ledger__subtotal-value" data-kind="income">
+                {formatAmount(group.income)}원
+              </dd>
+            </div>
+            <div className="ledger__subtotal">
+              <dt>지출</dt>
+              <dd className="ledger__subtotal-value" data-kind="expense">
+                {formatAmount(group.expense)}원
+              </dd>
+            </div>
+          </dl>
+          {group.entries.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className="ledger__row"
+              data-testid="entry-row"
+              data-kind={entry.type}
+              onClick={() => onEditEntry?.(entry.id)}
+            >
+              <span className="ledger__row-name">{entry.name}</span>
+              <span className="ledger__row-amount">
+                <AmountText type={entry.type} amount={entry.amount} />
+              </span>
+            </button>
+          ))}
+          <div className="ledger__month-action">
+            <Button variant="secondary" onClick={() => onOpenMonthSummary(month)}>
+              {month}월 정리 보기
+            </Button>
+          </div>
+        </>
+      )}
     </section>
   )
 }

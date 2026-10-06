@@ -38,7 +38,7 @@ export function StartLedgerScreen({ kind, year, defaults, onStart }: StartLedger
       ) : (
         <div className="ledger__intro">
           <h1 className="screen__title">{year}년 장부를 시작할까요?</h1>
-          <p className="screen__lead">앞선 장부에서 이름과 남은 돈을 채워 두었어요. 다르면 고쳐 주세요.</p>
+          <p className="screen__lead">앞선 장부에서 동아리 이름과 잔액을 채워 두었어요. 다르면 고쳐 주세요.</p>
         </div>
       )}
 

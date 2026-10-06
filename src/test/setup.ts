@@ -7,3 +7,6 @@ import { cleanup } from '@testing-library/react'
 afterEach(() => {
   cleanup()
 })
+
+// jsdom 에는 화면 스크롤이 없다. 화면을 바꿀 때 맨 위로 올리는 호출이 오류 기록을 남기지 않게 빈 동작으로 둔다
+window.scrollTo = () => {}

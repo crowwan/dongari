@@ -17,7 +17,7 @@ function Harness({ initial, onChange }: { initial: number; onChange: (value: num
   )
 }
 
-const LABEL = '작년에서 넘어온 돈 (이월금)'
+const LABEL = '작년 이월금'
 
 describe('SPEC-001 이월금 입력', () => {
   it('기본은 "남았어요"이고 적은 금액이 그대로 이월금이 된다', async () => {

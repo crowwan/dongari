@@ -40,7 +40,7 @@ updated: 2026-10-06
 | `--muted` | 보조 글자(설명, 단위 "원", 위쪽 글자 버튼, 화살표) | 투명도 대신 단색으로 정해 어느 면에서도 대비가 일정 |
 | `--faint` | 가장 옅은 글자(잔액 보조 줄, 예시 글자, 비활성 글자) | 세 번째 단계. 그래도 모든 면에서 AA |
 | `--primary` | 주 버튼·고른 칩 채움, 보조 버튼 글자, 포커스 링, 입력칸 포커스 테두리 | 앱의 단 하나의 포인트 색(짙은 청록). 한 화면에 주 버튼 하나 |
-| `--primary-soft` | 보조 버튼 면, 임시 화면 이동 줄의 지금 화면 | 주 버튼과 같은 계열이라 위계만 낮추고 색이 늘지 않는다 |
+| `--primary-soft` | 보조 버튼 면([N월 정리 보기]) | 주 버튼과 같은 계열이라 위계만 낮추고 색이 늘지 않는다 |
 | `--on-accent` | 청록 채움 위 글자 | 채움 색이 테마마다 바뀌어도 대비를 맞추는 짝 |
 | `--income-amount` | 수입 금액 글자 | 차분한 초록. 부호 `+` 와 같이 쓴다. 버튼 채움에는 쓰지 않는다 |
 | `--expense-amount` | 지출 금액 글자 | 본문색과 같다. 지출은 일상이라 경고처럼 보이지 않게, 부호 `−` 로 구분 |
@@ -113,7 +113,7 @@ updated: 2026-10-06
 | `BottomActionBar` | 화면 아래 고정 흰 면 + 주 버튼 하나 × 기본·비활성, 홈 표시줄(safe-area) 만큼 띄움 |
 | `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 [남았어요]/[적자였어요] 로 부호를 고른다. 적자면 음수 저장 |
 
-`BalanceCard`·`AmountText`·`MonthStepper`·`TopTextButton`·`BottomActionBar` 는 카탈로그에만 먼저 올렸고 장부 화면 연결은 #26 에서 한다. `TabBar`·`BigActionButton` 은 ADR 003 에 따라 #25 에서 지웠다(그 자리는 #26 전까지 임시 글자 버튼 줄과 기본 버튼).
+`BalanceCard`·`AmountText`·`MonthStepper`·`TopTextButton`·`BottomActionBar` 는 #25 에서 카탈로그에 먼저 올리고 #26 에서 장부 화면에 붙였다. `TopTextButton` 은 장부 외 화면 맨 위 [← 장부로] 에도 쓴다(화살표는 화면 읽기에서 숨김). `TabBar`·`BigActionButton` 은 ADR 003 에 따라 #25 에서 지웠다.
 
 공통 규칙: 누르는 곳 `--touch-min` 이상, 포커스 링 보임, 그림자 없음, 컴포넌트는 토큰 변수만 쓰고 `className`·`style` 을 받지 않는다. 루트에 `data-testid`, 상태가 있으면 `data-state`/`data-variant`/`data-kind`.
 
@@ -131,3 +131,4 @@ updated: 2026-10-06
 | 2026-10-03 | 토큰 역할, 기본 컴포넌트 표 작성, 눌림 토큰 추가 (#5) | #21 |
 | 2026-10-06 | TextField, NoticeBar, CarryoverField 추가. Tailwind 제거(기존 카탈로그 모양 그대로) (#12) | #23 |
 | 2026-10-06 | "맑은 은행 앱" 스타일: 강조색 청록 하나 + 옅은 청록 보조, 수입 초록·지출 본문색 금액, 위험·오류 빨강 분리, 다크 새로, 반경·카드 여백·잔액 34px. TabBar·BigActionButton 제거, BalanceCard·AmountText·MonthStepper·TopTextButton·BottomActionBar 추가 (#25) | |
+| 2026-10-06 | 장부 화면을 한 달씩 보기로 조립(BalanceCard·MonthStepper·AmountText·TopTextButton·BottomActionBar), 임시 화면 이동 줄 제거, [← 장부로] 는 TopTextButton (#26) | |

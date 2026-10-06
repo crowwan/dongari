@@ -54,20 +54,20 @@ export function calculateTotals(ledger: Ledger): LedgerTotals {
   return { income, expense, balance: ledger.carryover + income - expense }
 }
 
-// 최신 달이 위. 같은 달 안의 기록은 입력 순을 지킨다
-export function groupByMonth(entries: readonly Entry[]): MonthGroup[] {
-  const byMonth = new Map<number, Entry[]>()
-  for (const entry of entries) {
-    byMonth.set(entry.month, [...(byMonth.get(entry.month) ?? []), entry])
+// 한 달 보기 (AC-9): 그 달 기록(입력 순)과 수입·지출 소계. 기록이 없는 달은 빈 목록
+export function monthGroup(entries: readonly Entry[], month: number): MonthGroup {
+  const monthEntries = entries.filter((entry) => entry.month === month)
+  return {
+    month,
+    income: sumAmounts(monthEntries, 'income'),
+    expense: sumAmounts(monthEntries, 'expense'),
+    entries: monthEntries,
   }
-  return [...byMonth.entries()]
-    .sort(([a], [b]) => b - a)
-    .map(([month, monthEntries]) => ({
-      month,
-      income: sumAmounts(monthEntries, 'income'),
-      expense: sumAmounts(monthEntries, 'expense'),
-      entries: monthEntries,
-    }))
+}
+
+// 장부 화면에 처음 보이는 달: 올해 장부면 이번 달, 지난 연도 장부면 12월
+export function firstVisibleMonth(year: number, today: Date): number {
+  return year === today.getFullYear() ? today.getMonth() + 1 : 12
 }
 
 // 입력을 다듬고 저장 형식 범위를 확인한다. 범위 밖 값이 저장되면 다음 실행 때 데이터 전체가 깨진 것으로 처리되므로 막는다

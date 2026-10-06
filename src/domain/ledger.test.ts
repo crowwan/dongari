@@ -6,8 +6,9 @@ import {
   deleteEntry,
   FREQUENT_NAMES_LIMIT,
   frequentNames,
-  groupByMonth,
+  firstVisibleMonth,
   InvalidLedgerInputError,
+  monthGroup,
   newLedgerDefaults,
   updateEntry,
   updateLedgerInfo,
@@ -83,8 +84,8 @@ describe('SPEC-001 장부 계산', () => {
     })
   })
 
-  describe('월별 그룹', () => {
-    it('AC-9 최신 달이 위, 월마다 수입·지출 소계, 기록은 입력 순이다', () => {
+  describe('한 달 보기', () => {
+    it('AC-9 그 달의 수입·지출 소계와 기록을 입력 순으로 모은다', () => {
       const entries = [
         entry({ id: 'sep-income', month: 9, type: 'income', name: '회비', amount: 140_806 }),
         entry({ id: 'oct-rent', month: 10, name: '대관료', amount: 40_000 }),
@@ -92,17 +93,25 @@ describe('SPEC-001 장부 계산', () => {
         entry({ id: 'oct-snack', month: 10, name: '간식비', amount: 28_340 }),
       ]
 
-      const groups = groupByMonth(entries)
-
-      expect(groups.map((group) => group.month)).toEqual([10, 9])
-      expect(groups[0]).toMatchObject({ month: 10, income: 0, expense: 68_340 })
-      expect(groups[0].entries.map((item) => item.id)).toEqual(['oct-rent', 'oct-snack'])
-      expect(groups[1]).toMatchObject({ month: 9, income: 140_806, expense: 6_000 })
-      expect(groups[1].entries.map((item) => item.id)).toEqual(['sep-income', 'sep-snack'])
+      const october = monthGroup(entries, 10)
+      expect(october).toMatchObject({ month: 10, income: 0, expense: 68_340 })
+      expect(october.entries.map((item) => item.id)).toEqual(['oct-rent', 'oct-snack'])
+      const september = monthGroup(entries, 9)
+      expect(september).toMatchObject({ month: 9, income: 140_806, expense: 6_000 })
+      expect(september.entries.map((item) => item.id)).toEqual(['sep-income', 'sep-snack'])
     })
 
-    it('기록이 없으면 빈 목록이다', () => {
-      expect(groupByMonth([])).toEqual([])
+    it('그 달 기록이 없으면 소계 0, 빈 목록이다', () => {
+      expect(monthGroup([entry({ id: 'a', month: 3 })], 4)).toEqual({ month: 4, income: 0, expense: 0, entries: [] })
+    })
+
+    it('AC-3 처음 보이는 달은 올해 장부면 이번 달이다', () => {
+      expect(firstVisibleMonth(2026, new Date(2026, 9, 3))).toBe(10)
+      expect(firstVisibleMonth(2026, new Date(2026, 0, 1))).toBe(1)
+    })
+
+    it('처음 보이는 달은 지난 연도 장부면 12월이다', () => {
+      expect(firstVisibleMonth(2025, new Date(2026, 9, 3))).toBe(12)
     })
   })
 
@@ -198,7 +207,7 @@ describe('SPEC-001 장부 계산', () => {
       expect(frequentNames(entries, 'income')[0]).toBe('회비')
     })
 
-    it('기록이 없으면 기본 항목(나간 돈: 대관료·간식비 / 들어온 돈: 회비)을 보여준다', () => {
+    it('기록이 없으면 기본 항목(지출: 대관료·간식비 / 수입: 회비)을 보여준다', () => {
       expect(frequentNames([], 'expense')).toEqual(['대관료', '간식비'])
       expect(frequentNames([], 'income')).toEqual(['회비'])
     })

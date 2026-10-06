@@ -193,6 +193,16 @@ describe('SPEC-001 useLedger', () => {
       expect(result.current.years).toEqual([2026, 2025])
     })
 
+    it('AC-3 처음 보이는 달은 올해 장부면 이번 달, 지난 연도로 바꾸면 12월이다', () => {
+      const { result } = renderLedger(new MemoryRepository(storedWith(ledger2026(), { ...ledger2026(), year: 2025 })))
+
+      expect(result.current.firstMonth).toBe(10)
+
+      act(() => result.current.changeYear(2025))
+
+      expect(result.current.firstMonth).toBe(12)
+    })
+
     it('고를 수 있는 연도는 장부가 있는 연도와 올해, 최신 순이다', () => {
       const { result } = renderLedger(
         new MemoryRepository(storedWith({ ...ledger2026(), year: 2024 }, { ...ledger2026(), year: 2025 })),
@@ -270,8 +280,19 @@ describe('SPEC-001 useLedger', () => {
       expect(result.current.saveFailure).toBe('quota-exceeded')
       expect(result.current.ledger?.entries).toHaveLength(1)
 
+      // 화면이 성공 알림을 띄울지 고르도록 저장 결과를 돌려준다
+      let saved = true
+      act(() => {
+        saved = result.current.updateClubInfo({ clubName: '꽃동산', carryover: 0 })
+      })
+      expect(saved).toBe(false)
+
       // 다음 저장이 성공하면 실패 안내를 거둔다
       next = { ok: true }
+      act(() => {
+        saved = result.current.updateClubInfo({ clubName: '한랑드림', carryover: 0 })
+      })
+      expect(saved).toBe(true)
       act(() => result.current.deleteEntry('a'))
 
       expect(result.current.saveFailure).toBeUndefined()
