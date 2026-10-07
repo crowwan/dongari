@@ -60,7 +60,7 @@ updated: 2026-10-03
 Ledger (연도별 장부 1개)
 ├─ year, clubName, carryover(전년도 이월금)
 └─ entries: Entry[]
-     Entry { id, month(1~12), type('income'|'expense'), name, amount, createdAt, batchId? }  // batchId: 사진으로 함께 넣은 묶음 (되돌리기용)
+     Entry { id, month(1~12), day?(1~그 달 마지막 날, v2.2 — 예전 기록엔 없음), type('income'|'expense'), name, amount, createdAt, batchId? }  // batchId: 사진으로 함께 넣은 묶음 (되돌리기용)
 
 Settings { lastBackupAt?, lastChangedAt? }
 ```
