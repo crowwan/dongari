@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from 'react'
 import { itemIcon } from '../domain/itemIcon'
 import type { EntryType } from '../domain/types'
-import { InstallBannerView } from '../features/install/InstallBanner'
+import { InstallGuide } from '../features/install/InstallGuide'
 import { CarryoverField } from '../features/ledger/CarryoverField'
 import { AmountDisplay } from '../ui/AmountDisplay'
 import { AmountText } from '../ui/AmountText'
-import { AnswerChip } from '../ui/AnswerChip'
+import { AnswersCard } from '../ui/AnswersCard'
 import { BalanceCard } from '../ui/BalanceCard'
 import { BottomActionBar } from '../ui/BottomActionBar'
 import { BottomSheet } from '../ui/BottomSheet'
@@ -88,6 +88,7 @@ const ACTION_ICONS: { icon: IconName; label: string }[] = [
   { icon: 'folder', label: '불러오기' },
   { icon: 'chart', label: '결산' },
   { icon: 'settings', label: '설정' },
+  { icon: 'phone', label: '홈 화면에 추가' },
   { icon: 'plus', label: '적기' },
   { icon: 'check', label: '저장' },
   { icon: 'left', label: '장부로' },
@@ -113,6 +114,7 @@ export function Catalog() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [installGuideOpen, setInstallGuideOpen] = useState(false)
+  const [answerMonth, setAnswerMonth] = useState(10)
   const [entryType, setEntryType] = useState<EntryType | null>('expense')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [pickedMonth, setPickedMonth] = useState(10)
@@ -339,18 +341,29 @@ export function Catalog() {
           </Button>
         </Section>
 
-        <Section title="AnswerChip">
-          <State label="하나씩 채우기: 답한 것이 위에 쌓인다 (누르면 고치기)">
-            <div className="catalog__row">
-              <AnswerChip icon="calendar" onClick={noop}>
-                10월
-              </AnswerChip>
-              <AnswerChip icon="expense" onClick={noop}>
-                지출
-              </AnswerChip>
-              <AnswerChip icon={itemIcon('대관료')} onClick={noop}>
-                대관료
-              </AnswerChip>
+        <Section title="AnswersCard (적은 내용 카드)">
+          <State label="하나씩 채우기 · 금액 단계: 달 줄 + 항목 줄 (이름 · 수입/지출) — [달 바꾸기] 눌러 보기">
+            <AnswersCard
+              rows={[
+                { label: '달', icon: 'calendar', value: `${answerMonth}월`, onChange: () => setAnswerMonth((month) => (month % 12) + 1) },
+                { label: '항목', icon: itemIcon('대관료'), value: '대관료 · 지출', onChange: noop },
+              ]}
+            />
+          </State>
+          <State label="항목 단계: 달 줄만">
+            <AnswersCard rows={[{ label: '달', icon: 'calendar', value: '10월', onChange: noop }]} />
+          </State>
+          <State label="새 이름의 수입/지출을 묻는 동안: 항목 줄은 이름만 · 긴 이름">
+            <AnswersCard
+              rows={[
+                { label: '달', icon: 'calendar', value: '5월', onChange: noop },
+                { label: '항목', icon: itemIcon('꽃값'), value: '스승의 날 선생님 꽃다발과 카드 값', onChange: noop },
+              ]}
+            />
+          </State>
+          <State label="[바꾸기] 눌림">
+            <div data-preview-pressed="">
+              <AnswersCard rows={[{ label: '달', icon: 'calendar', value: '10월', onChange: noop }]} />
             </div>
           </State>
         </Section>
@@ -564,22 +577,28 @@ export function Catalog() {
           </State>
         </Section>
 
-        <Section title="InstallBanner (설치 안내 띠)">
-          <State label="기본 · [방법 보기] (눌러 보기)">
-            <InstallBannerView
-              canInstall={false}
-              guideOpen={installGuideOpen}
-              browser="samsung"
-              onToggleGuide={() => setInstallGuideOpen((open) => !open)}
-              onInstall={noop}
-              onDismiss={noop}
-            />
+        <Section title="InstallGuide (홈 화면에 추가 방법 안내)">
+          <State label="설정 [홈 화면에 추가] 줄 (설치 제안이 없으면 누를 때 아래 안내 창)">
+            <div className="catalog__card">
+              <ListRow
+                icon="phone"
+                title="홈 화면에 추가"
+                description="기록이 더 안전해요"
+                onClick={() => setInstallGuideOpen(true)}
+                end={<Icon name="right" />}
+              />
+            </div>
           </State>
-          <State label="방법 펼침 · 브라우저를 모를 때 (삼성 인터넷 + 크롬)">
-            <InstallBannerView canInstall={false} guideOpen browser="other" onToggleGuide={noop} onInstall={noop} onDismiss={noop} />
+          <State label="방법 안내 선택 창 · 삼성 인터넷">
+            <div className="catalog__frame catalog__frame--sheet">
+              <BottomSheet open title="홈 화면에 추가하는 방법" onClose={noop}>
+                <InstallGuide browser="samsung" />
+                <Button onClick={noop}>확인</Button>
+              </BottomSheet>
+            </div>
           </State>
-          <State label="브라우저가 설치를 제안할 때 · [홈 화면에 추가]">
-            <InstallBannerView canInstall guideOpen={false} browser="chrome" onToggleGuide={noop} onInstall={noop} onDismiss={noop} />
+          <State label="브라우저를 모를 때 (삼성 인터넷 + 크롬)">
+            <InstallGuide browser="other" />
           </State>
         </Section>
 
@@ -676,6 +695,10 @@ export function Catalog() {
         onCancel={() => setDialogOpen(false)}
       />
       <Toast message={toast} onDone={() => setToast(null)} />
+      <BottomSheet open={installGuideOpen} title="홈 화면에 추가하는 방법" onClose={() => setInstallGuideOpen(false)}>
+        <InstallGuide browser="chrome" />
+        <Button onClick={() => setInstallGuideOpen(false)}>확인</Button>
+      </BottomSheet>
       <BottomSheet open={sheetOpen} title="몇 월인가요?" onClose={() => setSheetOpen(false)}>
         <MonthPicker
           value={pickedMonth}

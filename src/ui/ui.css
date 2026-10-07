@@ -17,7 +17,7 @@
 .ui-segment__option,
 .ui-months__month,
 .ui-pick,
-.ui-answer,
+.ui-answers__change,
 .ui-amount-display__field,
 .ui-amount-display__add {
   font-family: var(--typeface);
@@ -33,7 +33,7 @@
 .ui-segment__option:focus-visible,
 .ui-months__month:focus-visible,
 .ui-pick:focus-visible,
-.ui-answer:focus-visible,
+.ui-answers__change:focus-visible,
 .ui-amount-display__add:focus-visible,
 .ui-sheet:focus-visible {
   outline: var(--focus-ring) solid var(--accent-ink);
@@ -678,6 +678,9 @@ button.ui-row {
   box-sizing: border-box;
   width: 100%;
   max-width: var(--content-max);
+  /* 폰 글자를 키워 창이 화면보다 길어지면 위쪽 바탕을 조금 남기고 창 안을 내려 본다 (방법 안내 등) */
+  max-height: calc(100% - var(--space-16));
+  overflow-y: auto;
   padding: var(--space-3) var(--gutter) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
   border-radius: var(--corner-xl) var(--corner-xl) 0 0;
   background: var(--surface);
@@ -881,28 +884,121 @@ button.ui-row {
   height: var(--icon-sm);
 }
 
-/* 답한 것 알약: 흰 면 알약, 누르면 고친다 */
-.ui-answer {
-  min-height: var(--touch-min);
-  padding: 0 var(--space-4);
-  border: 0;
-  border-radius: var(--corner-pill);
+/*
+ * 적은 내용 카드 (하나씩 채우기에서 이미 적은 것): 옅은 청록 면 카드 → "✓ 적은 내용" 머리 → 줄마다 흰 면.
+ * 지금 질문의 흰 목록·금액 칸과 면 색(옅은 청록)으로 갈리고, ✓ 동그라미와 머리 글자로 한 번 더 알린다 (색만으로 구분하지 않음)
+ */
+.ui-answers {
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  border-radius: var(--corner-lg);
+  background: var(--primary-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-family: var(--typeface);
+  letter-spacing: var(--letter-body);
+}
+
+.ui-answers__title {
+  margin: 0;
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--accent-ink);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+}
+
+.ui-answers__title .ui-icon {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+
+.ui-answers__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ui-answers__row {
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border-radius: var(--corner-md);
   background: var(--surface);
-  display: inline-flex;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ✓ 동그라미: 청록 글자색 채움 + 카드색 체크 (다크에서도 밝은 청록 위 어두운 체크) */
+.ui-answers__done {
+  flex: none;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  border-radius: var(--corner-pill);
+  background: var(--accent-ink);
+  color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-answers__done .ui-icon {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+
+.ui-answers__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 작은 이름표 ("달" / "항목"): Caption */
+.ui-answers__label {
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--line-tight);
+}
+
+/* 굵은 값: 고치기 화면 "몇 월" 줄(PickRow)의 값과 같은 크기 */
+.ui-answers__value {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
   color: var(--strong);
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+  overflow-wrap: anywhere;
+}
+
+.ui-answers__value .ui-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--muted);
+}
+
+/* [바꾸기]: 면 없는 청록 글자 버튼, 누르는 곳은 56 정사각 이상 */
+.ui-answers__change {
+  flex: none;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--corner-sm);
+  background: transparent;
+  color: var(--accent-ink);
   font-size: var(--text-label-size);
   font-weight: var(--weight-semibold);
   line-height: var(--line-tight);
   white-space: nowrap;
   cursor: pointer;
-}
-
-.ui-answer .ui-icon {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  color: var(--muted);
 }
 
 /* 금액 크게 보기: 흰 카드 — 오른쪽 정렬 큰 숫자 + 작은 "원" → 빠른 더하기 세 칸 */
@@ -1017,8 +1113,8 @@ button.ui-row:active,
 [data-preview-pressed] .ui-months__month[aria-pressed='false'],
 .ui-pick:active,
 [data-preview-pressed] .ui-pick,
-.ui-answer:active,
-[data-preview-pressed] .ui-answer,
+.ui-answers__change:active,
+[data-preview-pressed] .ui-answers__change,
 .ui-amount-display__add:active,
 [data-preview-pressed] .ui-amount-display__add {
   background: var(--pressed);
@@ -1048,7 +1144,7 @@ button.ui-row:active,
   .ui-segment__option,
   .ui-months__month,
   .ui-pick,
-  .ui-answer,
+  .ui-answers__change,
   .ui-amount-display__add {
     transition:
       background-color var(--motion-fast),

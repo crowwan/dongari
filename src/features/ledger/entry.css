@@ -16,12 +16,18 @@
   );
 }
 
-/* 하나씩 채우기에서 답한 것: 화면 제목 바로 아래 알약 줄 (제목과는 묶음 안 간격, 넘치면 다음 줄) */
+/* 하나씩 채우기에서 적은 것: 화면 제목 바로 아래 "적은 내용" 카드 (제목과는 묶음 안 간격) */
 .entry__answers {
   margin-top: calc(var(--stack) - var(--group-gap));
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+}
+
+/* 지금 질문 위 작은 표시 "지금 적을 것": 위 카드의 "적은 내용" 과 짝 (Caption Bold, 청록 글자) */
+.entry__now {
+  margin: 0;
+  color: var(--accent-ink);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
 }
 
 /* 질문 하나: 질문 제목 → 답 */

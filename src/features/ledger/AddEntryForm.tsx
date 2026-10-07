@@ -1,9 +1,9 @@
-import { useEffect, useReducer, type ReactNode } from 'react'
+import { useEffect, useReducer } from 'react'
 import { itemIcon } from '../../domain/itemIcon'
 import type { EntryInput, FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
 import { AmountDisplay } from '../../ui/AmountDisplay'
-import { AnswerChip } from '../../ui/AnswerChip'
+import { AnswersCard, type AnswersCardRow } from '../../ui/AnswersCard'
 import { BottomActionBar } from '../../ui/BottomActionBar'
 import { IconButton } from '../../ui/IconButton'
 import { OptionList } from '../../ui/OptionList'
@@ -15,19 +15,19 @@ import { checkDraft } from './entryDraft'
 import { EntryMonthSheet } from './EntryMonthSheet'
 import { ENTRY_MONTH_SHEET, itemOptions, TYPE_LABELS, TYPE_SEGMENTS } from './entryOptions'
 import {
-  answerChips,
+  answerRows,
   isStepDirty,
   startSteps,
   stepButton,
   stepReducer,
-  type AnswerChipKind,
+  type AnswerRow,
   type StepAction,
   type StepState,
 } from './entrySteps'
 import './entry.css'
 
 type AddEntryFormProps = {
-  // 장부에서 보던 달 (달 알약 기본값, AC-3)
+  // 장부에서 보던 달 ("적은 내용" 카드 달 줄 기본값, AC-3)
   month: number
   // 이번 달 (달 선택 창 테두리). 올해 장부가 아니면 주지 않는다
   currentMonth?: number
@@ -42,7 +42,7 @@ type AddEntryFormProps = {
   onDirtyChange?: (dirty: boolean) => void
 }
 
-// 내역 적기 (SPEC-001 기록 입력, ADR 004): 지금 할 질문 하나만 보이고, 답은 위쪽 알약으로 쌓인다.
+// 내역 적기 (SPEC-001 기록 입력, ADR 004): 지금 할 질문 하나만 보이고, 답은 위쪽 "적은 내용" 카드에 한 줄씩 쌓인다.
 // 무엇인가요?(항목 목록 / 직접 적기 → 처음 쓰는 이름이면 수입·지출) → 얼마인가요? → [저장]. 단계 상태는 entrySteps 순수 함수
 export function AddEntryForm({
   month,
@@ -81,35 +81,34 @@ export function AddEntryForm({
     }
   }
 
-  // 위쪽 답 알약: 달 → 달 선택 창, 종류·항목 → 항목 고르기로 (AC-16)
-  const chips: Record<AnswerChipKind, ReactNode> = {
-    month: (
-      <AnswerChip key="month" icon="calendar" onClick={() => sheets.openSheet(ENTRY_MONTH_SHEET)}>
-        {`${draft.month}월`}
-      </AnswerChip>
-    ),
-    type: draft.type && (
-      <AnswerChip key="type" icon={draft.type} onClick={() => dispatch({ kind: 'revisit-item' })}>
-        {TYPE_LABELS[draft.type]}
-      </AnswerChip>
-    ),
-    name: (
-      <AnswerChip key="name" icon={itemIcon(draft.name)} onClick={() => dispatch({ kind: 'revisit-item' })}>
-        {draft.name}
-      </AnswerChip>
-    ),
+  // "적은 내용" 카드 줄: [달 바꾸기] → 달 선택 창, [항목 바꾸기] → 항목 고르기로 (AC-16, 금액 유지)
+  function cardRow(row: AnswerRow): AnswersCardRow {
+    switch (row.kind) {
+      case 'month':
+        return { label: '달', icon: 'calendar', value: `${row.month}월`, onChange: () => sheets.openSheet(ENTRY_MONTH_SHEET) }
+      case 'item':
+        return {
+          label: '항목',
+          icon: itemIcon(row.name),
+          value: row.type ? `${row.name} · ${TYPE_LABELS[row.type]}` : row.name,
+          onChange: () => dispatch({ kind: 'revisit-item' }),
+        }
+    }
   }
 
   return (
     <div className="screen entry" data-testid="add-entry-form" data-step={state.step}>
       <BackToLedger onBack={onBack} />
       <h1 className="screen__title">내역 적기</h1>
-      <div className="entry__answers" data-testid="entry-answers">
-        {answerChips(state).map((kind) => chips[kind])}
+      <div className="entry__answers">
+        <AnswersCard rows={answerRows(state).map(cardRow)} />
       </div>
 
       {/* 질문이 바뀔 때마다 새로 그려 autoFocus 칸이 포커스를 받는다 */}
       <section className="entry__part" key={state.step}>
+        <p className="entry__now" data-testid="entry-now">
+          지금 적을 것
+        </p>
         <StepQuestion state={state} frequentChoices={frequentChoices} dispatch={dispatch} onSubmit={pressButton} />
       </section>
 

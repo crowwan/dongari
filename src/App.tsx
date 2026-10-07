@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
-import { InstallBanner } from './features/install/InstallBanner'
 import { useKeyboardInset } from './features/keyboard/keyboardInset'
 import { AddEntryForm } from './features/ledger/AddEntryForm'
 import { EditEntryForm } from './features/ledger/EditEntryForm'
@@ -82,10 +81,9 @@ export default function App({ repository, loaded, options }: AppProps) {
     <NoticeBar key={message} message={message} action={action && noticeActions[action]} />
   ))
   const noticeOffersImport = storageNoticeList.some((notice) => notice.action === 'import-backup')
-  // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부·설정 위 띠는 저장 안내가 없을 때만 (띠는 하나만: 저장 > 백업 > 설치)
+  // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부·설정 위 띠는 저장 안내가 없을 때만 (띠는 하나만: 저장 > 백업)
   const needsBackup = backupReminderFor(ledger.data, now())
   const showBackupReminder = needsBackup && storageNoticeList.length === 0
-  const showInstallBanner = !showBackupReminder && storageNoticeList.length === 0
 
   function screenContent(): ReactNode {
     if (ledger.isFirstRun) {
@@ -209,11 +207,10 @@ export default function App({ repository, loaded, options }: AppProps) {
         </>
       )
     }
-    // 장부 위 띠 하나: 30일 백업 안내, 없으면 (홈 화면에 추가하지 않고 열었을 때) 설치 안내 (SPEC-002)
+    // 장부 위 띠: 저장 안내가 없을 때 30일 백업 안내 (SPEC-002). 홈 화면에 추가는 설정 맨 아래 줄로 권한다 (#56)
     return (
       <>
         {showBackupReminder && <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={noticeActions['send-backup']} />}
-        {showInstallBanner && <InstallBanner />}
         <LedgerScreen
           year={year}
           ledger={ledger.ledger}

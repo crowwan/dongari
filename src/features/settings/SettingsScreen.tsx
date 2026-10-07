@@ -11,6 +11,9 @@ import { OptionList } from '../../ui/OptionList'
 import { TextField } from '../../ui/TextField'
 import { BackButton, BackToLedger } from '../BackToLedger'
 import { BACKUP_REMINDER_MESSAGE, lastBackupText } from '../backup/backupReminder'
+import { InstallGuide } from '../install/InstallGuide'
+import { browserInstallEnvironment, useInstallPrompt, type InstallEnvironment } from '../install/installPrompt'
+import { browserKind, shouldOfferInstall } from '../install/installRules'
 import { CarryoverField } from '../ledger/CarryoverField'
 import type { SheetHistory } from '../useScreenHistory'
 import './settings.css'
@@ -19,6 +22,7 @@ import './settings.css'
 const CLUB_NAME_PAGE = 'settings-club-name'
 const CARRYOVER_PAGE = 'settings-carryover'
 const YEAR_SHEET = 'settings-year'
+const INSTALL_GUIDE_SHEET = 'settings-install-guide'
 
 type SettingsScreenProps = {
   year: number
@@ -34,6 +38,8 @@ type SettingsScreenProps = {
   onSendBackup: () => void
   onImportBackup: () => void
   onBack: () => void
+  // 홈 화면에 추가 줄이 보는 브라우저 상태 (기본은 지금 브라우저, 테스트에서 바꿔 넣는다)
+  install?: InstallEnvironment
 }
 
 // 이월금 값: 적자는 빼기표 대신 "적자" (장부 잔액 카드와 같은 말)
@@ -55,7 +61,10 @@ export function SettingsScreen({
   onSendBackup,
   onImportBackup,
   onBack,
+  install = browserInstallEnvironment(),
 }: SettingsScreenProps) {
+  const installPrompt = useInstallPrompt(install.installPrompt)
+
   if (ledger && sheets.sheet === CLUB_NAME_PAGE) {
     return (
       <ClubNameEdit
@@ -111,6 +120,18 @@ export function SettingsScreen({
         <SettingRow icon="folder" title="백업 파일 불러오기" description="새 폰으로 옮길 때" onClick={onImportBackup} />
       </SettingsGroup>
 
+      {/* 홈 화면에 추가 (SPEC-002): 설치 제안이 있으면 브라우저 설치 창, 없으면 방법 안내. 홈 화면 앱이면 묶음째 없다 */}
+      {shouldOfferInstall({ standalone: install.standalone, installed: installPrompt.installed }) && (
+        <SettingsGroup title="앱">
+          <SettingRow
+            icon="phone"
+            title="홈 화면에 추가"
+            description="기록이 더 안전해요"
+            onClick={() => (installPrompt.canInstall ? void installPrompt.install() : sheets.openSheet(INSTALL_GUIDE_SHEET))}
+          />
+        </SettingsGroup>
+      )}
+
       <BottomSheet open={sheets.sheet === YEAR_SHEET} title="어느 해 장부를 볼까요?" onClose={sheets.closeSheet}>
         <OptionList
           label="장부 연도"
@@ -118,6 +139,11 @@ export function SettingsScreen({
           value={String(year)}
           onChange={(picked) => onChangeYear(Number(picked))}
         />
+      </BottomSheet>
+
+      <BottomSheet open={sheets.sheet === INSTALL_GUIDE_SHEET} title="홈 화면에 추가하는 방법" onClose={sheets.closeSheet}>
+        <InstallGuide browser={browserKind(install.userAgent)} />
+        <Button onClick={sheets.closeSheet}>확인</Button>
       </BottomSheet>
     </div>
   )

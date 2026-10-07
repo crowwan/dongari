@@ -19,6 +19,7 @@ import {
   Receipt,
   Settings,
   Share2,
+  Smartphone,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -37,6 +38,7 @@ export type IconName =
   | 'folder'
   | 'chart'
   | 'settings'
+  | 'phone'
   | 'plus'
   | 'check'
   | 'left'
@@ -63,6 +65,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   folder: FolderDown,
   chart: ChartColumn,
   settings: Settings,
+  // 홈 화면에 추가 (폰 홈 화면에 앱 아이콘)
+  phone: Smartphone,
   plus: Plus,
   check: Check,
   left: ChevronLeft,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FrequentChoice } from '../../domain/ledger'
-import { answerChips, isStepDirty, startSteps, stepButton, stepReducer, type StepAction, type StepState } from './entrySteps'
+import { answerRows, isStepDirty, startSteps, stepButton, stepReducer, type StepAction, type StepState } from './entrySteps'
 
 // 처음 상태에서 동작을 차례로 적용한다
 function run(...actions: StepAction[]): StepState {
@@ -15,7 +15,7 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
 
     expect(state.step).toBe('item')
     expect(state.draft).toEqual({ month: 10, type: undefined, name: '', amount: 0 })
-    expect(answerChips(state)).toEqual(['month'])
+    expect(answerRows(state)).toEqual([{ kind: 'month', month: 10 }])
   })
 
   it('AC-4 항목을 고르면 이름과 그 항목의 종류가 정해지고 금액 단계로 넘어간다', () => {
@@ -23,7 +23,11 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
 
     expect(state.step).toBe('amount')
     expect(state.draft).toMatchObject({ name: '대관료', type: 'expense' })
-    expect(answerChips(state)).toEqual(['month', 'type', 'name'])
+    // "적은 내용" 카드: 달 줄 + 항목 줄(이름과 종류를 한 줄에)
+    expect(answerRows(state)).toEqual([
+      { kind: 'month', month: 10 },
+      { kind: 'item', name: '대관료', type: 'expense' },
+    ])
   })
 
   describe('직접 적기', () => {
@@ -45,8 +49,35 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
       expect(state.step).toBe('custom-type')
       expect(state.draft).toMatchObject({ name: '꽃값', type: undefined })
       expect(stepButton(state)).toEqual({ label: '다음', missing: '수입인지 지출인지 골라 주세요' })
-      // 묻는 동안 종류 알약은 없고 이름 알약만 쌓인다
-      expect(answerChips(state)).toEqual(['month', 'name'])
+      // 묻는 동안 항목 줄은 이름만 (종류는 지금 묻는 값이라 카드에 올리지 않는다)
+      expect(answerRows(state)).toEqual([
+        { kind: 'month', month: 10 },
+        { kind: 'item', name: '꽃값', type: undefined },
+      ])
+    })
+
+    it('AC-4 새 이름의 종류를 골라도 [다음] 을 누르기 전에는 카드 항목 줄에 종류를 올리지 않는다', () => {
+      const state = run(
+        { kind: 'start-custom' },
+        { kind: 'type-custom-name', name: '꽃값' },
+        { kind: 'submit-custom-name', knownType: undefined },
+        { kind: 'pick-type', entryType: 'expense' },
+      )
+
+      expect(answerRows(state)).toEqual([
+        { kind: 'month', month: 10 },
+        { kind: 'item', name: '꽃값', type: undefined },
+      ])
+      expect(answerRows(stepReducer(state, { kind: 'submit-type' }))).toEqual([
+        { kind: 'month', month: 10 },
+        { kind: 'item', name: '꽃값', type: 'expense' },
+      ])
+    })
+
+    it('AC-4 이름을 적는 동안에는 항목 줄을 올리지 않는다 (고른 항목을 바꾸러 와 직접 적기로 가도)', () => {
+      const state = run({ kind: 'pick-item', choice: RENT }, { kind: 'revisit-item' }, { kind: 'start-custom' })
+
+      expect(answerRows(state)).toEqual([{ kind: 'month', month: 10 }])
     })
 
     it('AC-15 새 이름의 종류를 고르고 [다음] 을 누르면 금액 단계로 간다', () => {
