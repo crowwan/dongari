@@ -1,7 +1,7 @@
 ---
 id: SPEC-003
 title: 월 정리와 올해 결산
-status: in-progress
+status: done
 milestone: v2.0
 issue: "#3"
 prototype: https://claude.ai/artifact/7ueYA5NyqE5TkLEpk6DDPg

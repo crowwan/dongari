@@ -1,7 +1,7 @@
 ---
 id: SPEC-001
 title: 한 줄 장부 입력
-status: in-progress
+status: done
 milestone: v2.0
 issue: "#2"
 prototype: https://claude.ai/artifact/MSDNF1M41QotjmG49VXvYh
