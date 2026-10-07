@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react'
+import { useEffect, useReducer, useRef, type Ref } from 'react'
 import { itemIcon } from '../../domain/itemIcon'
 import type { EntryInput, FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
@@ -7,6 +7,7 @@ import { AnswersCard, type AnswersCardRow } from '../../ui/AnswersCard'
 import { BottomActionBar } from '../../ui/BottomActionBar'
 import { IconButton } from '../../ui/IconButton'
 import { OptionList } from '../../ui/OptionList'
+import { SavedEntriesCard } from '../../ui/SavedEntriesCard'
 import { SegmentedControl } from '../../ui/SegmentedControl'
 import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
@@ -27,8 +28,10 @@ import {
 import './entry.css'
 
 type AddEntryFormProps = {
-  // 장부에서 보던 달 ("적은 내용" 카드 달 줄 기본값, AC-3)
+  // 장부에서 보던 달 ("적은 내용" 카드 달 줄 기본값, AC-3). 연달아 적을 때는 마지막에 저장한 달
   month: number
+  // 이번에 내역 적기 화면에 들어와 저장한 내역 (연달아 적기, AC-20). 저장할 때마다 App 이 이 화면을 처음 상태로 다시 그린다
+  saved: EntryInput[]
   // 이번 달 (달 선택 창 테두리). 올해 장부가 아니면 주지 않는다
   currentMonth?: number
   // 자주 쓴 항목. 종류를 고르기 전이라 두 종류를 섞어서 받는다
@@ -44,8 +47,10 @@ type AddEntryFormProps = {
 
 // 내역 적기 (SPEC-001 기록 입력, ADR 004): 지금 할 질문 하나만 보이고, 답은 위쪽 "적은 내용" 카드에 한 줄씩 쌓인다.
 // 무엇인가요?(항목 목록 / 직접 적기 → 처음 쓰는 이름이면 수입·지출) → 얼마인가요? → [저장]. 단계 상태는 entrySteps 순수 함수
+// 저장하면 장부로 가지 않고 "무엇인가요?" 부터 다음 내역을 묻는다(연달아 적기 v2.1). 맨 위 "저장한 내역 N건" 카드 + 아래 [다 적었어요]
 export function AddEntryForm({
   month,
+  saved,
   currentMonth,
   frequentChoices,
   lastUsedType,
@@ -58,10 +63,17 @@ export function AddEntryForm({
   const { draft } = state
   const dirty = isStepDirty(state, month)
   const button = stepButton(state)
+  const continuing = saved.length > 0
+  const questionRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
+
+  // 이어서 적을 때는 화면 읽기 초점을 새 질문 제목으로 (금액 칸이 사라져 키패드도 닫힌다)
+  useEffect(() => {
+    if (continuing) questionRef.current?.focus()
+  }, [continuing])
 
   function pressButton() {
     switch (state.step) {
@@ -101,15 +113,22 @@ export function AddEntryForm({
       <BackToLedger onBack={onBack} />
       <h1 className="screen__title">내역 적기</h1>
       <div className="entry__answers">
+        {continuing && <SavedEntriesCard entries={saved} />}
         <AnswersCard rows={answerRows(state).map(cardRow)} />
       </div>
 
       {/* 질문이 바뀔 때마다 새로 그려 autoFocus 칸이 포커스를 받는다 */}
       <section className="entry__part" key={state.step}>
         <p className="entry__now" data-testid="entry-now">
-          지금 적을 것
+          {continuing ? '이어서 적을 것' : '지금 적을 것'}
         </p>
-        <StepQuestion state={state} frequentChoices={frequentChoices} dispatch={dispatch} onSubmit={pressButton} />
+        <StepQuestion
+          state={state}
+          frequentChoices={frequentChoices}
+          dispatch={dispatch}
+          onSubmit={pressButton}
+          questionRef={questionRef}
+        />
       </section>
 
       {button && (
@@ -121,6 +140,8 @@ export function AddEntryForm({
           onClick={pressButton}
         />
       )}
+      {/* 항목 고르기 단계(버튼 없음)에서만. 끝내기도 [← 장부로] 와 같은 길이라 적던 내용이 있으면 묻는다 (AC-21) */}
+      {!button && continuing && <BottomActionBar variant="secondary" label="다 적었어요" onClick={onBack} />}
 
       <EntryMonthSheet
         sheets={sheets}
@@ -137,17 +158,19 @@ type StepQuestionProps = {
   frequentChoices: (type?: EntryType) => FrequentChoice[]
   dispatch: (action: StepAction) => void
   onSubmit: () => void
+  // 항목 고르기 질문 제목 (이어서 적을 때 초점을 옮긴다)
+  questionRef: Ref<HTMLHeadingElement>
 }
 
 // 지금 단계의 질문 하나와 답하는 자리
-function StepQuestion({ state, frequentChoices, dispatch, onSubmit }: StepQuestionProps) {
+function StepQuestion({ state, frequentChoices, dispatch, onSubmit, questionRef }: StepQuestionProps) {
   const { draft } = state
   switch (state.step) {
     case 'item': {
       const choices = frequentChoices()
       return (
         <>
-          <h2 className="entry__question">
+          <h2 className="entry__question" ref={questionRef} tabIndex={-1}>
             무엇인가요?
           </h2>
           <OptionList

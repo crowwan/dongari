@@ -24,11 +24,12 @@ function makeHandlers() {
 type Handlers = ReturnType<typeof makeHandlers>
 
 // 선택 창은 App 처럼 방문 기록 훅이 연다
-function Harness({ month, handlers }: { month: number; handlers: Handlers }) {
+function Harness({ month, saved, handlers }: { month: number; saved: EntryInput[]; handlers: Handlers }) {
   const sheets = useScreenHistory()
   return (
     <AddEntryForm
       month={month}
+      saved={saved}
       currentMonth={10}
       frequentChoices={(type?: EntryType) => frequentChoices(HISTORY, type)}
       lastUsedType={(name) => lastUsedType(HISTORY, name)}
@@ -40,9 +41,10 @@ function Harness({ month, handlers }: { month: number; handlers: Handlers }) {
   )
 }
 
-function renderForm(month = 10) {
+// saved: 이번에 내역 적기 화면에 들어와 이미 저장한 내역 (연달아 적기)
+function renderForm(month = 10, saved: EntryInput[] = []) {
   const handlers = makeHandlers()
-  render(<Harness month={month} handlers={handlers} />)
+  render(<Harness month={month} saved={saved} handlers={handlers} />)
   return handlers
 }
 
@@ -307,5 +309,57 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
 
     expect(onBack).toHaveBeenCalledOnce()
     expect(onSave).not.toHaveBeenCalled()
+  })
+
+  describe('연달아 적기 (v2.1)', () => {
+    const RENT: EntryInput = { month: 10, type: 'expense', name: '대관료', amount: 40_000 }
+    const SNACK: EntryInput = { month: 10, type: 'expense', name: '간식비', amount: 28_340 }
+
+    it('저장한 것이 없으면 "저장한 내역" 카드와 [다 적었어요] 가 없고 "지금 적을 것" 이다', () => {
+      renderForm()
+
+      expect(screen.queryByTestId('saved-entries-card')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: '다 적었어요' })).not.toBeInTheDocument()
+      expect(screen.getByTestId('entry-now')).toHaveTextContent('지금 적을 것')
+    })
+
+    it('AC-20 저장한 것이 있으면 맨 위(적은 내용 카드 위)에 "저장한 내역 N건" 카드가 있고 방금 저장한 줄에 "방금" 이 붙는다', () => {
+      renderForm(10, [RENT, SNACK])
+
+      const card = screen.getByRole('region', { name: '저장한 내역 2건' })
+      expect(card.compareDocumentPosition(screen.getByTestId('answers-card'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+      expect(within(card).getAllByTestId('saved-entries-card-row').map((row) => row.textContent)).toEqual([
+        '대관료 −40,000원',
+        '간식비 방금 −28,340원',
+      ])
+    })
+
+    it('AC-19 이어서 적을 때는 질문 위 표시가 "이어서 적을 것" 이고 화면 읽기 초점이 새 질문 제목에 있다', () => {
+      renderForm(10, [RENT])
+
+      expect(screen.getByTestId('entry-now')).toHaveTextContent('이어서 적을 것')
+      expect(question()).toHaveTextContent('무엇인가요?')
+      expect(question()).toHaveFocus()
+    })
+
+    it('AC-21 항목 고르기 단계에서는 아래에 [다 적었어요](보조 버튼)가 고정되고, 누르면 닫는다', async () => {
+      const { onBack } = renderForm(10, [RENT])
+
+      expect(actionButton()).toHaveAccessibleName('다 적었어요')
+      expect(actionButton()).toHaveAttribute('data-variant', 'secondary')
+      await userEvent.click(actionButton())
+
+      expect(onBack).toHaveBeenCalledOnce()
+    })
+
+    it('금액 단계에서는 [✓ 저장] 만 보이고 [다 적었어요] 는 없다', async () => {
+      renderForm(10, [RENT])
+
+      await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
+
+      expect(within(screen.getByTestId('bottom-action-bar')).getAllByRole('button')).toHaveLength(1)
+      expect(actionButton()).toHaveAccessibleName('저장')
+      expect(screen.queryByRole('button', { name: '다 적었어요' })).not.toBeInTheDocument()
+    })
   })
 })

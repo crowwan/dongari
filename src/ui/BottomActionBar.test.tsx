@@ -50,6 +50,12 @@ describe('BottomActionBar', () => {
     expect(screen.getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-describedby')
   })
 
+  it('보조 버튼(옅은 청록 면)으로도 둘 수 있다 (연달아 적기 [다 적었어요])', () => {
+    render(<BottomActionBar variant="secondary" label="다 적었어요" onClick={() => {}} />)
+
+    expect(screen.getByRole('button', { name: '다 적었어요' })).toHaveAttribute('data-variant', 'secondary')
+  })
+
   it('주 버튼에 아이콘을 붙일 수 있다 ([+ 내역 적기] → 더하기 아이콘 + "내역 적기")', () => {
     render(<BottomActionBar icon="plus" label="내역 적기" onClick={() => {}} />)
 

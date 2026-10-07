@@ -13,6 +13,7 @@ import { YearSummaryScreen } from './features/report/YearSummaryScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
 import { useScreenHistory } from './features/useScreenHistory'
+import type { EntryInput } from './domain/ledger'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import type { IconName } from './ui/Icon'
@@ -35,6 +36,8 @@ export default function App({ repository, loaded, options }: AppProps) {
   // 장부 화면에서 넘겨 본 달. 다른 화면에 다녀와도 그대로이고, 연도를 바꾸면 비워서 그 해의 처음 달(올해면 이번 달, 지난 연도면 12월)로
   const [viewedMonth, setViewedMonth] = useState<number | undefined>()
   const [toast, setToast] = useState<string | null>(null)
+  // 연달아 적기 (SPEC-001 v2.1): 이번에 내역 적기 화면에 들어와 저장한 내역. 장부로 돌아오면 비운다
+  const [chainSaved, setChainSaved] = useState<EntryInput[]>([])
   // 백업 파일 보내기·불러오기 (SPEC-002). 불러오면 올해 장부의 처음 달로 돌아가 알린다
   const now = options?.now ?? (() => new Date())
   const backup = useBackup(ledger, {
@@ -55,6 +58,15 @@ export default function App({ repository, loaded, options }: AppProps) {
   // 이번 달 (달 선택 창 테두리). 지난 연도 장부에는 없다
   const currentMonth = ledger.year === today.getFullYear() ? today.getMonth() + 1 : undefined
   const { screen } = navigation
+  const lastChainSaved = chainSaved.at(-1)
+
+  // 연달아 적은 뒤 장부로 돌아왔으면 마지막에 저장한 달을 보여 주고 "N건을 저장했어요" 를 알린다 (AC-21).
+  // [다 적었어요]·[← 장부로]·뒤로 버튼(버릴까요 [버리기] 포함)이 모두 방문 기록을 되돌리는 같은 길이라, 화면이 바뀐 그리기에서 바로 맞춘다
+  if (screen.name !== 'add-entry' && lastChainSaved !== undefined) {
+    setChainSaved([])
+    setViewedMonth(lastChainSaved.month)
+    setToast(`${chainSaved.length}건을 저장했어요`)
+  }
   // 고치는 기록. 다른 경로로 지워졌으면 undefined
   const editingEntry = screen.name === 'edit-entry' ? ledger.ledger?.entries.find((entry) => entry.id === screen.id) : undefined
   const editingEntryMissing = screen.name === 'edit-entry' && editingEntry === undefined
@@ -64,7 +76,7 @@ export default function App({ repository, loaded, options }: AppProps) {
     if (editingEntryMissing) navigation.backToLedger()
   }, [editingEntryMissing, navigation])
 
-  // 저장·지우기 뒤 장부로: 그 기록의 달을 보여 주고, 기기에 저장했을 때만 알림을 띄운다 (실패면 위쪽 안내 띠만)
+  // 고치기·지우기 뒤 장부로: 그 기록의 달을 보여 주고, 기기에 저장했을 때만 알림을 띄운다 (실패면 위쪽 안내 띠만)
   function returnToLedger(saved: boolean, message: string, entryMonth: number) {
     if (saved) setToast(message)
     setViewedMonth(entryMonth)
@@ -149,12 +161,24 @@ export default function App({ repository, loaded, options }: AppProps) {
       case 'add-entry':
         return (
           <AddEntryForm
-            month={screen.month}
+            // 저장할 때마다 처음 상태("무엇인가요?")로 다시 그린다. 달은 마지막에 저장한 달을 이어 쓰고 항목·금액은 비운다 (AC-19)
+            key={chainSaved.length}
+            month={lastChainSaved?.month ?? screen.month}
+            saved={chainSaved}
             currentMonth={currentMonth}
             frequentChoices={ledger.frequentChoices}
             lastUsedType={ledger.lastUsedType}
             sheets={navigation}
-            onSave={(input) => returnToLedger(ledger.addEntry(input), '저장했어요', input.month)}
+            onSave={(input) => {
+              if (ledger.addEntry(input)) {
+                setChainSaved([...chainSaved, input])
+                return
+              }
+              // 기기에 저장하지 못했으면 지금처럼 장부로 돌아가 위쪽 실패 안내만 (그 전에 저장한 내역은 장부에 그대로)
+              setChainSaved([])
+              setViewedMonth(input.month)
+              navigation.backToLedger()
+            }}
             onBack={navigation.requestBack}
             onDirtyChange={navigation.confirmBeforeLeave}
           />
