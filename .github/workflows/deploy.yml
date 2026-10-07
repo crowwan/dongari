@@ -1,0 +1,77 @@
+name: 배포
+
+# GitHub Pages(gh-pages 브랜치) 자동 배포 (#52)
+# - main push(머지) → 미리보기 /dongari/preview/ : gh-pages 의 preview/ 만 교체, 본 주소는 그대로
+# - 태그 v* push(릴리스) → 본 주소 /dongari/ : gh-pages 를 통째로 교체. preview/ 와 lab/ 도 지워진다.
+#   미리보기는 다음 main push 때 다시 채워진다. 지우는 이유는 CLAUDE.md "배포" 절
+# 이 워크플로는 main 이 아니라 gh-pages 브랜치에만 쓴다
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+# 두 배포가 gh-pages 에 동시에 쓰지 않게 한 줄로 세운다.
+# 진행 중인 배포를 끊으면 반쯤 바뀐 상태가 남을 수 있어 끊지 않고 기다린다
+concurrency:
+  group: deploy-gh-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # 쓰기 토큰은 배포 단계에만 넘긴다 (npm ci·테스트 단계의 git 설정에 남기지 않음)
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # 검사는 CI 워크플로(ci.yml)와 같은 단계를 그대로 반복한다
+      - run: npm ci
+      - name: 린트
+        run: npm run lint
+      - name: 타입 검사
+        run: npm run typecheck
+      - name: 테스트
+        run: npm test
+
+      - name: 빌드 (미리보기 /dongari/preview/)
+        if: github.ref_type == 'branch'
+        run: npm run build:preview
+      - name: 빌드 (본 주소 /dongari/)
+        if: github.ref_type == 'tag'
+        run: npm run build
+
+      # gh-pages 의 --user 는 주소의 [bot] 을 읽지 못해 git 설정으로 작성자를 정한다 (gh-pages 가 이 설정으로 커밋)
+      - name: 배포 커밋 작성자를 github-actions 봇으로
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      # --add 없이 --dest preview: preview/ 안의 옛 파일만 지우고 새로 채운다. 본 주소·lab/ 은 그대로
+      - name: 미리보기 배포
+        if: github.ref_type == 'branch'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          npx gh-pages -d dist --dest preview --silent
+          --repo "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          --message "deploy: 미리보기 ${GITHUB_SHA::7}"
+
+      # --add 없이 루트: gh-pages 전체를 dist 로 바꾼다 (옛 해시 파일·preview/·lab/ 정리)
+      - name: 본 주소 배포
+        if: github.ref_type == 'tag'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          npx gh-pages -d dist --silent
+          --repo "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          --message "deploy: ${GITHUB_REF_NAME}"

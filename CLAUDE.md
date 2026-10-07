@@ -38,16 +38,26 @@ npm install
 npm run dev -- --port 7777   # 개발 서버
 npm run lint
 npm run build
-npm run deploy               # GitHub Pages 본 주소 (/dongari/)
-npm run deploy:preview       # QA 미리보기 (/dongari/preview/)
+npm run build:preview        # 미리보기 경로(/dongari/preview/)로 빌드
 ```
 
 - 빌드 경로는 환경변수 `APP_BASE`(기본 `/dongari/`) 하나로 정한다 (`vite.config.ts`). 화면 파일·아이콘 경로, manifest `id`·`start_url`·`scope`, 서비스 워커 범위가 모두 따라간다. `build:preview` 는 `APP_BASE=/dongari/preview/`.
-- `deploy:preview` 는 gh-pages 브랜치의 `preview/` 폴더만 갈아 끼운다(`--dest preview --add`, 본 주소 파일은 그대로).
-- `deploy` 는 `--add` 없이 gh-pages 브랜치를 통째로 바꾼다 → `preview/` 와 lab 검증 페이지도 함께 지워진다. 릴리스 뒤 미리보기 정리는 이걸로 된다.
+
+### 배포 (자동, `.github/workflows/deploy.yml`, #52)
+
+GitHub Pages 는 `gh-pages` 브랜치를 그대로 보여 준다. 워크플로는 린트·타입 검사·테스트를 통과한 뒤 `gh-pages` 브랜치에만 쓴다(작성자 github-actions 봇).
+
+| 언제 | 어디로 | gh-pages 에서 바뀌는 것 |
+|---|---|---|
+| main 에 머지(push) | 미리보기 `https://crowwan.github.io/dongari/preview/` | `preview/` 폴더만 새로 채움(옛 해시 파일 정리). 본 주소·`lab/` 은 그대로 |
+| 태그 `v*` push (`/release`) | 본 주소 `https://crowwan.github.io/dongari/` | 브랜치 전체를 새 빌드로 바꿈 → 옛 해시 파일·`preview/`·`lab/` 이 지워진다. 미리보기는 다음 main 머지 때 다시 생긴다 |
+
+- 두 배포는 같은 concurrency 그룹에서 차례로 돈다(진행 중인 배포는 끊지 않음). `/release` 는 릴리스 PR 머지(미리보기) 뒤 태그(본 주소) 순서라 마지막에 본 주소 배포가 미리보기를 지운다. 대기 중인 배포가 있을 때 또 하나가 오면 GitHub 이 대기 중인 쪽을 취소하니, 태그 배포가 취소됐으면 Actions 에서 다시 실행한다.
+- 릴리스 때 미리보기를 지우는 이유: 본 주소에 v2(서비스 워커 범위 `/dongari/`)가 올라가면 그 서비스 워커가 `/dongari/preview/` 화면 요청도 받아 본 주소 `index.html` 로 답한다(navigateFallback, 제외 목록 없음). 본 주소를 한 번 연 폰에서는 미리보기가 사실상 안 열리므로, 릴리스 직후 본 주소와 같은 내용의 미리보기를 남겨 둘 이유가 없다. 다음 버전 QA 는 main 머지로 다시 채워진 미리보기를 본 주소를 안 연 테스트용 폰·브라우저에서 한다.
+- 수동 배포(비상용, Actions 가 막혔을 때만): `npm run deploy:preview`(= 워크플로 미리보기와 같은 동작), `npm run deploy`(= 태그 배포와 같은 동작). 내 git 계정으로 gh-pages 에 바로 push 한다.
 - 미리보기 주의:
   - 미리보기와 본 주소는 같은 출처(`crowwan.github.io`)라 localStorage(`dongari:v2`)를 같이 쓴다. 미리보기에서 적은 QA 기록이 본 주소 v2 에도 보인다 → QA 는 테스트용 폰·브라우저로 하거나 끝나고 지운다.
-  - 본 주소에 v2(서비스 워커 범위 `/dongari/`)가 올라간 뒤에는 `/dongari/preview/` 도 그 범위 안이다. 미리보기는 릴리스 전 QA 에만 쓴다.
+  - 본 주소에 v2(서비스 워커 범위 `/dongari/`)가 올라간 뒤에는 `/dongari/preview/` 도 그 범위 안이다(위 이유). 미리보기는 릴리스 전 QA 에만 쓴다.
 
 ## 폴더 구조
 
