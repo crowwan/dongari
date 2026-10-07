@@ -8,6 +8,19 @@ export function lightToken(tokensCss: string, name: string): string {
   return match[1].trim()
 }
 
+// 본 주소 아래에 따로 올리는 화면 폴더: QA 미리보기(preview/)와 실험(lab/). gh-pages 에서 본 주소 옆에 산다
+const SUB_SITES = ['preview', 'lab'] as const
+
+// 본 주소 빌드의 서비스 워커(범위 base)는 하위 폴더 화면 요청도 받는다. 그 요청은 본 앱 index.html 로 답하지 않고
+// 네트워크(그 폴더의 화면)로 보낸다 (#54). 하위 폴더 빌드는 범위가 그 폴더 안이라 본 주소에 닿지 않아 둘 필요가 없다
+function subSiteDenylist(base: string): RegExp[] | undefined {
+  const lastSegment = base.split('/').at(-2) ?? ''
+  if (SUB_SITES.some((name) => name === lastSegment)) return undefined
+  const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  // 서비스 워커는 경로 + 검색어(pathname + search)로 맞춘다. 끝 / 없는 /dongari/preview 도 미리보기다
+  return [new RegExp(`^${escapedBase}(?:${SUB_SITES.join('|')})(?:[/?]|$)`)]
+}
+
 // 홈 화면 추가와 오프라인 실행 설정 (SPEC-002). vite.config.ts 가 tokens.css 내용과 빌드 경로(base)를 넘겨 부른다.
 // base 는 본 주소 '/dongari/' 또는 QA 미리보기 '/dongari/preview/'. 서비스 워커 범위는 플러그인이 vite base 를 따른다
 export function pwaOptions(tokensCss: string, base: string): Partial<VitePWAOptions> {
@@ -45,6 +58,7 @@ export function pwaOptions(tokensCss: string, base: string): Partial<VitePWAOpti
     workbox: {
       globPatterns: ['**/*.{js,css,html,woff2}'],
       cleanupOutdatedCaches: true,
+      navigateFallbackDenylist: subSiteDenylist(base),
     },
   }
 }
