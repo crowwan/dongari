@@ -3,6 +3,7 @@ import { itemIcon } from '../domain/itemIcon'
 import type { EntryType } from '../domain/types'
 import { InstallGuide } from '../features/install/InstallGuide'
 import { CarryoverField } from '../features/ledger/CarryoverField'
+import { SavePictureBar } from '../features/report/SavePictureBar'
 import { AmountDisplay } from '../ui/AmountDisplay'
 import { AmountText } from '../ui/AmountText'
 import { AnswersCard } from '../ui/AnswersCard'
@@ -553,6 +554,19 @@ export function Catalog() {
           <State label="비활성 + 안내 (누를 수 없는 이유, 내역 적기 [저장])">
             <div className="catalog__frame catalog__frame--note">
               <BottomActionBar label="저장" onClick={noop} disabled note="수입인지 지출인지 골라 주세요" />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="SavePictureBar (아이폰, #58)">
+          <State label="공유 시트에서 고를 것 안내">
+            <div className="catalog__frame catalog__frame--note">
+              <SavePictureBar saving={false} sharesToPhotos onSave={noop} />
+            </div>
+          </State>
+          <State label="사진 준비됨 → 한 번 더 누르기">
+            <div className="catalog__frame catalog__frame--note">
+              <SavePictureBar saving={false} ready sharesToPhotos onSave={noop} />
             </div>
           </State>
         </Section>

@@ -54,7 +54,7 @@ function FitToWidth({ targetRef, children }: { targetRef: RefObject<HTMLDivEleme
 
 // 올해 결산 (SPEC-003): v1 연말 양식 한 장을 화면 폭에 맞춰 보이고 아래 고정 [사진으로 저장]. 기록이 없으면 안내만, 저장 비활성 (AC-5)
 export function YearSummaryScreen({ year, ledger, onBack, onNotify, saver = pictureSaver }: YearSummaryScreenProps) {
-  const { targetRef, saving, save } = useSavePicture({ fileName: yearPictureName(year), saver, onNotify })
+  const { targetRef, saving, ready, sharesToPhotos, save } = useSavePicture({ fileName: yearPictureName(year), saver, onNotify })
   // 기록이 하나라도 있어야 결산을 만든다
   const report = ledger && ledger.entries.length > 0 ? yearReport(ledger) : undefined
 
@@ -72,7 +72,7 @@ export function YearSummaryScreen({ year, ledger, onBack, onNotify, saver = pict
       ) : (
         <p className="report__empty">적은 내역이 있어야 결산을 만들 수 있어요</p>
       )}
-      <SavePictureBar saving={saving} onSave={save} disabled={!report} />
+      <SavePictureBar saving={saving} ready={ready} sharesToPhotos={sharesToPhotos} onSave={save} disabled={!report} />
     </div>
   )
 }

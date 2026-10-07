@@ -75,7 +75,7 @@ function signedAmount(value: number): string {
 // 월 정리 (SPEC-003): 제목 → 수입 카드 → 지출 카드 → 잔액 카드, 아래 고정 [⬇ 사진으로 저장]. 사진은 제목부터 잔액 카드까지
 export function MonthSummaryScreen({ ledger, month, onBack, onNotify, saver = pictureSaver }: MonthSummaryScreenProps) {
   const summary = monthSummary(ledger, month)
-  const { targetRef, saving, save } = useSavePicture({ fileName: monthPictureName(ledger.year, month), saver, onNotify })
+  const { targetRef, saving, ready, sharesToPhotos, save } = useSavePicture({ fileName: monthPictureName(ledger.year, month), saver, onNotify })
 
   return (
     <div className="screen report" data-testid="month-summary-screen" data-month={month}>
@@ -92,7 +92,7 @@ export function MonthSummaryScreen({ ledger, month, onBack, onNotify, saver = pi
           <SummaryLine label={`${month}월 말 잔액`} amount={`${formatAmount(summary.closing)}원`} total kind="closing" />
         </section>
       </div>
-      <SavePictureBar saving={saving} onSave={save} />
+      <SavePictureBar saving={saving} ready={ready} sharesToPhotos={sharesToPhotos} onSave={save} />
     </div>
   )
 }
