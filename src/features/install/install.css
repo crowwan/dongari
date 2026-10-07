@@ -1,94 +1,28 @@
 /*
- * 설치 안내 띠 (SPEC-002 홈 화면 추가). 값은 tokens.css 변수만 쓴다.
- * 저장 실패 같은 "알아 둘 것"(노란 안내 띠)과 구분해 흰 카드 면으로 조용히 권한다.
- * 장부 화면의 주 버튼은 아래 [+ 내역 적기] 하나라 여기 버튼은 보조와 회색 면만 쓴다.
+ * 홈 화면에 추가 방법 안내 (SPEC-002, 설정의 선택 창 안). 값은 tokens.css 변수만 쓴다.
+ * 따라 하며 읽으니 본문 크기 그대로, 브라우저 이름은 청록 글자로 순서 묶음을 나눈다.
  */
-@import '../screens.css';
-
-.install-banner {
+.install-guide {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border-radius: var(--corner-md);
-  background: var(--surface);
+  gap: var(--stack);
 }
 
-.install-banner__message {
-  margin: 0;
-  color: var(--strong);
-  font-size: var(--text-body-size);
-  font-weight: var(--weight-semibold);
-  line-height: var(--line-body);
-}
-
-/* [방법 보기]/[홈 화면에 추가] 는 남는 폭을 다 쓰고, [닫기] 는 글자 폭만큼 */
-.install-banner__actions {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.install-banner__actions .ui-button {
-  flex: 1;
-}
-
-.install-banner__close {
-  flex: none;
-  min-width: var(--touch-primary);
-  min-height: var(--touch-primary);
-  padding: 0 var(--space-5);
-  border: 0;
-  border-radius: var(--corner-md);
-  background: var(--fill);
-  color: var(--ink);
-  font-family: var(--typeface);
-  font-size: var(--text-label-size);
-  font-weight: var(--weight-semibold);
-  line-height: var(--line-tight);
-  letter-spacing: var(--letter-body);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background var(--motion-fast) var(--motion-curve);
-}
-
-.install-banner__close:active {
-  background: var(--pressed);
-}
-
-.install-banner__close:focus-visible {
-  outline: var(--focus-ring) solid var(--accent-ink);
-  outline-offset: var(--stroke);
-}
-
-/* 방법 보기: 카드 안 줄 구분 아래에 브라우저별 순서. 따라 하며 읽으니 버튼 글자만큼 크게 */
-.install-banner__guide {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: var(--hairline) solid var(--line);
-}
-
-.install-banner__browser-name {
+.install-guide__browser-name {
   margin: 0 0 var(--space-2);
+  color: var(--accent-ink);
   font-size: var(--text-body-size);
   font-weight: var(--weight-bold);
   line-height: var(--line-tight);
-  color: var(--accent-ink);
 }
 
-.install-banner__steps {
+.install-guide__steps {
   margin: 0;
   padding-left: var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  color: var(--ink);
   font-size: var(--text-body-size);
   line-height: var(--line-body);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .install-banner__close {
-    transition: none;
-  }
 }

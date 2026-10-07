@@ -24,7 +24,7 @@ export type InstallPromptStore = {
   install: () => Promise<void>
 }
 
-// beforeinstallprompt 는 페이지마다 한 번 온다. 장부 화면을 떠났다 와도(띠가 다시 그려져도) 잃지 않게 화면 밖에서 받아 둔다
+// beforeinstallprompt 는 페이지마다 한 번 온다. 설정 화면을 떠났다 와도(줄이 다시 그려져도) 잃지 않게 화면 밖에서 받아 둔다
 export function createInstallPromptStore(target: EventTarget): InstallPromptStore {
   let promptEvent: InstallPromptEvent | null = null
   let state: InstallPromptState = { canInstall: false, installed: false }
@@ -37,7 +37,7 @@ export function createInstallPromptStore(target: EventTarget): InstallPromptStor
 
   target.addEventListener('beforeinstallprompt', (event) => {
     if (!isInstallPromptEvent(event)) return
-    // 브라우저 기본 설치 띠 대신 우리 안내 띠의 버튼으로 연다 (한 화면에 안내가 둘 뜨지 않게)
+    // 브라우저 기본 설치 띠 대신 설정의 [홈 화면에 추가] 줄로 연다 (안내가 둘 뜨지 않게)
     event.preventDefault()
     promptEvent = event
     update({ canInstall: true })
@@ -71,4 +71,22 @@ export const browserInstallPrompt = createInstallPromptStore(globalThis.window ?
 export function useInstallPrompt(store: InstallPromptStore): InstallPromptState & { install: () => Promise<void> } {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
   return { ...state, install: store.install }
+}
+
+// 홈 화면에 추가 줄이 보는 브라우저 상태. 테스트에서는 바꿔 넣는다
+export type InstallEnvironment = {
+  // 홈 화면 아이콘으로 열었는지 (display-mode: standalone)
+  standalone: boolean
+  userAgent: string
+  // 설치 제안을 화면 밖에서 받아 둔 곳 (설정을 떠났다 와도 잃지 않게)
+  installPrompt: InstallPromptStore
+}
+
+// 지금 브라우저 상태
+export function browserInstallEnvironment(): InstallEnvironment {
+  return {
+    standalone: globalThis.matchMedia?.('(display-mode: standalone)').matches ?? false,
+    userAgent: globalThis.navigator?.userAgent ?? '',
+    installPrompt: browserInstallPrompt,
+  }
 }

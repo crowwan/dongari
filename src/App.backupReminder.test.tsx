@@ -110,23 +110,27 @@ describe('SPEC-002 30일 백업 안내', () => {
     expect(screen.queryByText(REMINDER)).not.toBeInTheDocument()
   })
 
-  describe('안내 띠는 하나만: 저장 안내 > 백업 안내 > 설치 안내', () => {
-    it('백업 안내가 보이면 설치 안내 띠는 숨기고, 백업을 보내면 설치 안내 띠가 다시 보인다', async () => {
+  describe('안내 띠는 하나만: 저장 안내 > 백업 안내 (설치 안내 띠는 없다)', () => {
+    it('백업 안내가 없으면 장부 위에 띠가 없다 (설치 안내는 설정의 줄로 옮겼다)', () => {
+      renderApp(new MemoryRepository(storedWith({ lastBackupAt: '2026-10-01T00:00:00.000Z', lastChangedAt: '2026-09-01T00:00:00.000Z' })))
+
+      expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.queryByTestId('notice-bar')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('install-banner')).not.toBeInTheDocument()
+      expect(screen.queryByText('홈 화면에 추가하면 기록이 더 안전해요')).not.toBeInTheDocument()
+    })
+
+    it('백업을 보내 백업 안내 띠가 사라져도 장부 위에 설치 안내 띠가 나타나지 않는다', async () => {
       stubShare()
       renderApp(new MemoryRepository(storedWith(OVERDUE)))
 
       expect(screen.getByText(REMINDER)).toBeInTheDocument()
-      expect(screen.queryByTestId('install-banner')).not.toBeInTheDocument()
 
       await userEvent.click(screen.getByRole('button', { name: '백업 파일 보내기' }))
 
-      expect(await screen.findByTestId('install-banner')).toBeInTheDocument()
-    })
-
-    it('백업 안내가 없으면 설치 안내 띠가 그대로 보인다', () => {
-      renderApp(new MemoryRepository(storedWith({ lastBackupAt: '2026-10-01T00:00:00.000Z', lastChangedAt: '2026-09-01T00:00:00.000Z' })))
-
-      expect(screen.getByTestId('install-banner')).toBeInTheDocument()
+      await vi.waitFor(() => expect(screen.queryByText(REMINDER)).not.toBeInTheDocument())
+      expect(screen.queryByTestId('notice-bar')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('install-banner')).not.toBeInTheDocument()
     })
 
     it('저장 실패 안내가 있으면 백업 안내 띠는 숨긴다 (같은 [백업 파일 보내기] 를 두 번 보이지 않게). 점 표시는 남는다', async () => {
@@ -144,7 +148,6 @@ describe('SPEC-002 30일 백업 안내', () => {
       expect(screen.getByText('저장하지 못했어요. 백업 파일을 보내 두세요')).toBeInTheDocument()
       expect(screen.queryByText(REMINDER)).not.toBeInTheDocument()
       expect(screen.getAllByRole('button', { name: '백업 파일 보내기' })).toHaveLength(1)
-      expect(screen.queryByTestId('install-banner')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: '설정 백업 필요' })).toBeInTheDocument()
     })
   })

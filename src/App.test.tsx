@@ -394,16 +394,16 @@ describe('SPEC-001 앱 뼈대', () => {
       }
     })
 
-    it('AC-3 내역 적기의 달 알약 기본값은 장부에서 보고 있던 달이다', async () => {
+    it('AC-3 내역 적기의 달 줄 기본값은 장부에서 보고 있던 달이다', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await stepBack(7)
 
       await openEntryForm()
 
-      expect(screen.getAllByTestId('answer-chip').map((chip) => chip.textContent)).toEqual(['3월 고치기'])
+      expect(screen.getAllByTestId('answers-card-value').map((value) => value.textContent)).toEqual(['3월'])
     })
 
-    it('AC-4 한 번 이상 쓴 항목이 목록에 보이고, 누르면 이름과 그 항목의 수입/지출이 알약으로 쌓이고 금액 질문으로 넘어간다', async () => {
+    it('AC-4 한 번 이상 쓴 항목이 목록에 보이고, 누르면 이름과 그 항목의 수입/지출이 "적은 내용" 카드 항목 줄로 쌓이고 금액 질문으로 넘어간다', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openEntryForm()
 
@@ -415,11 +415,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       await userEvent.click(within(itemList()).getByRole('button', { name: '회비 수입' }))
 
-      expect(screen.getAllByTestId('answer-chip').map((chip) => chip.textContent)).toEqual([
-        '10월 고치기',
-        '수입 고치기',
-        '회비 고치기',
-      ])
+      expect(screen.getAllByTestId('answers-card-value').map((value) => value.textContent)).toEqual(['10월', '회비 · 수입'])
       expect(screen.getByRole('heading', { level: 2, name: '얼마인가요?' })).toBeInTheDocument()
     })
 
@@ -432,7 +428,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(screen.getByRole('button', { name: '다음' }))
 
       expect(screen.getByRole('heading', { level: 2, name: '얼마인가요?' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: '지출 고치기' })).toBeInTheDocument()
+      expect(screen.getAllByTestId('answers-card-value').map((value) => value.textContent)).toEqual(['10월', '대관료 · 지출'])
     })
 
     it('저장에 실패하면 "저장했어요" 알림 없이 위쪽 실패 안내만 보인다', async () => {
@@ -634,7 +630,7 @@ describe('SPEC-001 앱 뼈대', () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openEntryForm()
       await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
-      await userEvent.click(screen.getByRole('button', { name: '10월 고치기' }))
+      await userEvent.click(screen.getByRole('button', { name: '달 바꾸기' }))
       expect(window.history.state).toEqual({ screen: 'add-entry', sheet: 'entry-month' })
 
       pressBackButton()
@@ -762,9 +758,10 @@ async function fillExpense(name: string, amount: string) {
   await userEvent.type(screen.getByLabelText('얼마인가요?'), amount)
 }
 
-// 내역 적기: 달 알약 → 달 선택 창에서 고른다
+// 내역 적기: "적은 내용" 카드 달 줄(지금 달 확인) [달 바꾸기] → 달 선택 창에서 고른다
 async function pickEntryMonth(current: string, next: string) {
-  await userEvent.click(screen.getByRole('button', { name: `${current} 고치기` }))
+  expect(screen.getAllByTestId('answers-card-value')[0]).toHaveTextContent(current)
+  await userEvent.click(screen.getByRole('button', { name: '달 바꾸기' }))
   await userEvent.click(within(screen.getByRole('dialog', { name: '몇 월인가요?' })).getByRole('button', { name: next }))
 }
 

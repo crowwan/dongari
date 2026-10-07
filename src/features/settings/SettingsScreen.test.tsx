@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { LedgerInfo } from '../../domain/ledger'
 import type { Ledger } from '../../domain/types'
+import { createInstallPromptStore, type InstallPromptStore } from '../install/installPrompt'
 import { useScreenHistory } from '../useScreenHistory'
 import { SettingsScreen } from './SettingsScreen'
 
@@ -15,12 +17,27 @@ type Handlers = {
   onImportBackup?: () => void
 }
 
+const SAMSUNG_UA =
+  'Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36'
+const CHROME_UA =
+  'Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36'
+
+// 홈 화면에 추가 줄이 보는 브라우저 상태. 테스트마다 따로 듣는 곳을 두어 앞 테스트의 설치 제안·설치 완료가 섞이지 않게 한다
+type InstallOptions = { standalone?: boolean; userAgent?: string; installPrompt?: InstallPromptStore }
+
 // ledger 가 null 이면 고른 연도 장부가 아직 없는 경우
-type HarnessProps = { ledger?: Ledger | null; needsBackup?: boolean; lastBackupAt?: string; handlers?: Handlers }
+type HarnessProps = {
+  ledger?: Ledger | null
+  needsBackup?: boolean
+  lastBackupAt?: string
+  handlers?: Handlers
+  install?: InstallOptions
+}
 
 // 선택 창·편집 화면은 App 처럼 방문 기록 훅이 연다
-function Harness({ ledger = LEDGER, needsBackup = false, lastBackupAt, handlers = {} }: HarnessProps) {
+function Harness({ ledger = LEDGER, needsBackup = false, lastBackupAt, handlers = {}, install = {} }: HarnessProps) {
   const sheets = useScreenHistory()
+  const [installPrompt] = useState(() => install.installPrompt ?? createInstallPromptStore(new EventTarget()))
   return (
     <SettingsScreen
       year={2026}
@@ -34,6 +51,7 @@ function Harness({ ledger = LEDGER, needsBackup = false, lastBackupAt, handlers 
       onSendBackup={handlers.onSendBackup ?? vi.fn()}
       onImportBackup={handlers.onImportBackup ?? vi.fn()}
       onBack={vi.fn()}
+      install={{ standalone: install.standalone ?? false, userAgent: install.userAgent ?? CHROME_UA, installPrompt }}
     />
   )
 }
@@ -208,6 +226,136 @@ describe('SPEC-001·002 설정 화면', () => {
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
       expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
+    })
+  })
+
+  describe('SPEC-002 홈 화면에 추가 줄', () => {
+    // 크롬·삼성 인터넷이 설치할 수 있을 때 보내는 이벤트를 흉내 낸다
+    function installPromptWith(outcome: 'accepted' | 'dismissed') {
+      const events = new EventTarget()
+      const store = createInstallPromptStore(events)
+      const prompt = vi.fn(async () => {})
+      const event = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+        prompt,
+        userChoice: Promise.resolve({ outcome, platform: 'web' }),
+      })
+      events.dispatchEvent(event)
+      return { store, events, prompt, event }
+    }
+
+    const installRow = () => screen.queryByRole('button', { name: /홈 화면에 추가/ })
+
+    it('홈 화면에 추가하지 않고 열었으면 맨 아래 "앱" 묶음에 [홈 화면에 추가] 줄이 있다', () => {
+      render(<Harness />)
+
+      const groups = screen.getAllByRole('region')
+      expect(groups.map((group) => group.querySelector('h2')?.textContent)).toEqual([
+        '동아리',
+        '기록 백업',
+        '앱',
+      ])
+      const row = within(screen.getByRole('region', { name: '앱' })).getByTestId('list-row')
+      expect(row.textContent?.trim()).toBe('홈 화면에 추가 기록이 더 안전해요')
+      expect(row.querySelector('[data-icon="phone"]')).toBeInTheDocument()
+      expect(row.querySelector('[data-icon="right"]')).toBeInTheDocument()
+    })
+
+    it('홈 화면 앱으로 열었으면 줄(묶음째)이 없다', () => {
+      render(<Harness install={{ standalone: true }} />)
+
+      expect(screen.queryByRole('region', { name: '앱' })).not.toBeInTheDocument()
+      expect(installRow()).not.toBeInTheDocument()
+    })
+
+    it('브라우저가 설치를 제안했으면 줄을 누를 때 브라우저 설치 창을 바로 열고(기본 설치 띠는 막음), 설치하면 줄을 숨긴다', async () => {
+      const { store, prompt, event } = installPromptWith('accepted')
+      render(<Harness install={{ installPrompt: store }} />)
+
+      expect(event.defaultPrevented).toBe(true)
+      await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+
+      expect(prompt).toHaveBeenCalledOnce()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(installRow()).not.toBeInTheDocument()
+    })
+
+    it('설치 창에서 취소하면 줄은 남고, 다시 누르면 방법 안내가 뜬다 (설치 제안은 한 번만 쓸 수 있다)', async () => {
+      const { store, prompt } = installPromptWith('dismissed')
+      render(<Harness install={{ installPrompt: store }} />)
+
+      await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+      expect(prompt).toHaveBeenCalledOnce()
+      expect(installRow()).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+      expect(screen.getByRole('dialog', { name: '홈 화면에 추가하는 방법' })).toBeInTheDocument()
+    })
+
+    it('다른 경로로 설치가 끝나면(appinstalled) 줄을 숨긴다', () => {
+      const events = new EventTarget()
+      render(<Harness install={{ installPrompt: createInstallPromptStore(events) }} />)
+
+      act(() => {
+        events.dispatchEvent(new Event('appinstalled'))
+      })
+
+      expect(installRow()).not.toBeInTheDocument()
+    })
+
+    describe('방법 안내 (설치 제안이 없을 때)', () => {
+      it('삼성 인터넷이면 아래 메뉴에서 추가하는 순서를 선택 창으로 보인다', async () => {
+        render(<Harness install={{ userAgent: SAMSUNG_UA }} />)
+
+        await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+
+        const sheet = screen.getByRole('dialog', { name: '홈 화면에 추가하는 방법' })
+        const guide = within(sheet).getByTestId('install-guide')
+        expect(guide).toHaveAttribute('data-browser', 'samsung')
+        expect(guide).toHaveTextContent('화면 아래 오른쪽 [≡] 메뉴')
+        expect(guide).toHaveTextContent('[현재 페이지 추가]')
+        expect(guide).not.toHaveTextContent('[⋮]')
+      })
+
+      it('크롬이면 위쪽 메뉴에서 추가하는 순서를 보인다', async () => {
+        render(<Harness install={{ userAgent: CHROME_UA }} />)
+
+        await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+
+        const guide = within(screen.getByRole('dialog')).getByTestId('install-guide')
+        expect(guide).toHaveAttribute('data-browser', 'chrome')
+        expect(guide).toHaveTextContent('화면 위 오른쪽 [⋮] 메뉴')
+        expect(guide).not.toHaveTextContent('[≡]')
+      })
+
+      it('그 밖의 브라우저면 삼성 인터넷과 크롬 순서를 둘 다 보인다', async () => {
+        render(<Harness install={{ userAgent: 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0' }} />)
+
+        await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+
+        const guide = within(screen.getByRole('dialog')).getByTestId('install-guide')
+        expect(guide).toHaveTextContent('[≡]')
+        expect(guide).toHaveTextContent('[⋮]')
+      })
+
+      it('[확인] 을 누르면 창이 닫히고 설정에 남는다', async () => {
+        render(<Harness />)
+        await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+
+        await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '확인' }))
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
+      })
+
+      it('안드로이드 뒤로 버튼을 누르면 창만 닫힌다', async () => {
+        render(<Harness />)
+        await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+
+        pressBackButton()
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
+      })
     })
   })
 })

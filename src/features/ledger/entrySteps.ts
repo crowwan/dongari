@@ -6,7 +6,7 @@
 //                       │                           ▲
 //                       └─ 처음 쓰는 이름 → custom-type ─ 고르고 [다음]
 //
-// 달은 처음부터 정해져 있고(보던 달) 어느 단계에서든 바꿀 수 있다. 종류·항목 알약을 누르면 item 으로 돌아간다(금액 유지)
+// 달은 처음부터 정해져 있고(보던 달) 어느 단계에서든 바꿀 수 있다. "적은 내용" 카드 항목 줄 [바꾸기] 를 누르면 item 으로 돌아간다(금액 유지)
 import type { FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
 import { checkDraft, emptyDraft, isDraftChanged, type EntryDraft } from './entryDraft'
@@ -32,8 +32,8 @@ export type StepAction =
   | { kind: 'change-amount'; amount: number }
   | { kind: 'revisit-item' }
 
-// 위쪽에 쌓이는 답 알약 (위에서부터 달 / 종류 / 항목)
-export type AnswerChipKind = 'month' | 'type' | 'name'
+// 위쪽 "적은 내용" 카드 줄 (위에서부터 달 / 항목). 항목 줄은 이름과 수입/지출을 한 줄에 ("대관료 · 지출")
+export type AnswerRow = { kind: 'month'; month: number } | { kind: 'item'; name: string; type: EntryType | undefined }
 
 // 지금 단계의 아래 고정 버튼. missing 이 있으면 비활성 + 버튼 위 안내 (AC-5)
 export type StepButton = { label: '다음' | '저장'; missing: string | undefined }
@@ -88,12 +88,13 @@ export function stepButton({ step, draft, customName }: StepState): StepButton |
   }
 }
 
-// 답한 것만 알약으로. 지금 묻고 있는 값(이름 적기 중인 이름, 새 이름의 종류)은 알약으로 올리지 않는다
-export function answerChips({ step, draft }: StepState): AnswerChipKind[] {
-  const chips: AnswerChipKind[] = ['month']
-  if (draft.type !== undefined && step !== 'custom-type') chips.push('type')
-  if (draft.name !== '' && step !== 'custom-name') chips.push('name')
-  return chips
+// 답한 것만 카드에. 지금 묻고 있는 값(이름 적기 중인 이름, 새 이름의 종류)은 올리지 않는다
+export function answerRows({ step, draft }: StepState): AnswerRow[] {
+  const rows: AnswerRow[] = [{ kind: 'month', month: draft.month }]
+  if (draft.name !== '' && step !== 'custom-name') {
+    rows.push({ kind: 'item', name: draft.name, type: step === 'custom-type' ? undefined : draft.type })
+  }
+  return rows
 }
 
 // 처음 상태(보던 달만 있음)에서 답한 것이 하나라도 있나 — 있으면 닫기 전에 "적던 내용을 버릴까요?"

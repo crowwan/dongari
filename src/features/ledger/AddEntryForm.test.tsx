@@ -47,7 +47,8 @@ function renderForm(month = 10) {
 }
 
 const itemList = () => screen.getByRole('group', { name: '자주 쓴 항목' })
-const chipNames = () => screen.queryAllByTestId('answer-chip').map((chip) => chip.textContent)
+// "적은 내용" 카드 줄의 값 (위에서부터 달 / 항목)
+const answers = () => screen.queryAllByTestId('answers-card-value').map((value) => value.textContent)
 const actionButton = () => within(screen.getByTestId('bottom-action-bar')).getByRole('button')
 const question = () => screen.getByRole('heading', { level: 2 })
 
@@ -58,11 +59,14 @@ async function writeCustomName(name: string) {
 }
 
 describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
-  it('AC-3 처음에는 위쪽에 보던 달 알약만 있고 "무엇인가요?" 항목 목록만 보인다 (아래 버튼 없음)', () => {
+  it('AC-3 처음에는 "적은 내용" 카드에 보던 달 줄만 있고 "무엇인가요?" 항목 목록만 보인다 (아래 버튼 없음)', () => {
     renderForm(9)
 
     expect(screen.getByRole('heading', { level: 1, name: '내역 적기' })).toBeInTheDocument()
-    expect(chipNames()).toEqual(['9월 고치기'])
+    expect(screen.getByRole('region', { name: '적은 내용' })).toBeInTheDocument()
+    expect(answers()).toEqual(['9월'])
+    expect(screen.getByRole('button', { name: '달 바꾸기' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '항목 바꾸기' })).not.toBeInTheDocument()
     expect(question()).toHaveTextContent('무엇인가요?')
     expect(screen.queryByTestId('bottom-action-bar')).not.toBeInTheDocument()
   })
@@ -83,12 +87,22 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
     expect(rows[0]).toHaveAttribute('data-tone', 'income')
   })
 
-  it('AC-4 항목을 누르면 이름과 그 항목의 수입/지출이 위쪽 알약으로 쌓이고 "얼마인가요?" 로 넘어간다', async () => {
+  it('카드 아래에 "지금 적을 것" 표시와 지금 질문이 있다', () => {
+    renderForm()
+
+    const now = screen.getByTestId('entry-now')
+    expect(now).toHaveTextContent('지금 적을 것')
+    expect(now.nextElementSibling).toBe(question())
+  })
+
+  it('AC-4 항목을 누르면 카드에 항목 줄("대관료 · 지출", 항목 아이콘)이 쌓이고 "얼마인가요?" 로 넘어간다', async () => {
     renderForm()
 
     await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
 
-    expect(chipNames()).toEqual(['10월 고치기', '지출 고치기', '대관료 고치기'])
+    expect(answers()).toEqual(['10월', '대관료 · 지출'])
+    expect(screen.getAllByTestId('answers-card-label').map((label) => label.textContent)).toEqual(['달', '항목'])
+    expect(screen.getAllByTestId('answers-card-value')[1].querySelector('[data-icon="building"]')).toBeInTheDocument()
     expect(question()).toHaveTextContent('얼마인가요?')
     expect(screen.queryByRole('group', { name: '자주 쓴 항목' })).not.toBeInTheDocument()
   })
@@ -155,7 +169,8 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
       const kinds = within(screen.getByRole('group', { name: '수입인가요, 지출인가요?' })).getAllByRole('button')
       expect(kinds.map((kind) => kind.textContent)).toEqual(['수입', '지출'])
       expect(kinds.every((kind) => kind.getAttribute('aria-pressed') === 'false')).toBe(true)
-      expect(chipNames()).toEqual(['10월 고치기', '화환 고치기'])
+      // 지금 묻는 수입/지출은 카드에 올리지 않는다: 항목 줄은 이름만
+      expect(answers()).toEqual(['10월', '화환'])
       expect(actionButton()).toBeDisabled()
       expect(actionButton()).toHaveAccessibleDescription('수입인지 지출인지 골라 주세요')
     })
@@ -178,7 +193,7 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
       await writeCustomName('찬조금')
 
       expect(question()).toHaveTextContent('얼마인가요?')
-      expect(chipNames()).toEqual(['10월 고치기', '수입 고치기', '찬조금 고치기'])
+      expect(answers()).toEqual(['10월', '찬조금 · 수입'])
     })
 
     it('이름 칸에서 키패드 [완료](Enter) 로도 다음으로 넘어간다', async () => {
@@ -188,6 +203,15 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
       await userEvent.type(screen.getByLabelText('직접 적기'), '찬조금{Enter}')
 
       expect(question()).toHaveTextContent('얼마인가요?')
+    })
+
+    it('AC-4 이름을 적는 동안에는 적는 중인 이름을 카드에 올리지 않는다', async () => {
+      renderForm()
+      await userEvent.click(within(itemList()).getByRole('button', { name: '직접 적기' }))
+
+      await userEvent.type(screen.getByLabelText('직접 적기'), '화환')
+
+      expect(answers()).toEqual(['10월'])
     })
 
     it('잘못 눌렀으면 [목록에서 고르기] 로 항목 목록에 돌아간다', async () => {
@@ -200,42 +224,43 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
     })
   })
 
-  describe('AC-16 위쪽 알약을 누르면 그 값을 고친다', () => {
-    it('종류·항목 알약을 누르면 항목 고르기로 돌아가고(지금 이름 체크), 다른 항목을 골라도 금액은 그대로다', async () => {
+  describe('AC-16 "적은 내용" 카드 줄의 [바꾸기] 를 누르면 그 값을 고친다', () => {
+    it('[항목 바꾸기] 를 누르면 항목 고르기로 돌아가고(지금 이름 체크), 다른 항목을 골라도 금액은 그대로다', async () => {
       const { onSave } = renderForm()
       await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
       await userEvent.type(screen.getByLabelText('얼마인가요?'), '40000')
 
-      await userEvent.click(screen.getByRole('button', { name: '대관료 고치기' }))
+      await userEvent.click(screen.getByRole('button', { name: '항목 바꾸기' }))
       expect(within(itemList()).getByRole('button', { name: '대관료 지출' })).toHaveAttribute('aria-pressed', 'true')
       await userEvent.click(within(itemList()).getByRole('button', { name: '회비 수입' }))
 
       expect(screen.getByLabelText('얼마인가요?')).toHaveValue('40,000')
-      await userEvent.click(screen.getByRole('button', { name: '수입 고치기' }))
+      expect(answers()).toEqual(['10월', '회비 · 수입'])
+      await userEvent.click(screen.getByRole('button', { name: '항목 바꾸기' }))
       expect(itemList()).toBeInTheDocument()
       await userEvent.click(within(itemList()).getByRole('button', { name: '회비 수입' }))
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
       expect(onSave).toHaveBeenCalledWith({ month: 10, type: 'income', name: '회비', amount: 40_000 })
     })
 
-    it('달 알약을 누르면 열두 달 선택 창이 열리고, 고르면 창이 닫히며 알약이 바뀐다 (지금 질문 그대로)', async () => {
+    it('[달 바꾸기] 를 누르면 열두 달 선택 창이 열리고, 고르면 창이 닫히며 달 줄이 바뀐다 (지금 질문 그대로)', async () => {
       renderForm()
       await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
 
-      await userEvent.click(screen.getByRole('button', { name: '10월 고치기' }))
+      await userEvent.click(screen.getByRole('button', { name: '달 바꾸기' }))
       const sheet = screen.getByRole('dialog', { name: '몇 월인가요?' })
       expect(within(sheet).getByRole('button', { name: '10월' })).toHaveAttribute('aria-pressed', 'true')
       expect(within(sheet).getByRole('button', { name: '10월' })).toHaveAttribute('aria-current', 'date')
       await userEvent.click(within(sheet).getByRole('button', { name: '3월' }))
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-      expect(chipNames()[0]).toBe('3월 고치기')
+      expect(answers()).toEqual(['3월', '대관료 · 지출'])
       expect(question()).toHaveTextContent('얼마인가요?')
     })
 
     it('선택 창이 열려 있을 때 뒤로 버튼은 선택 창만 닫는다', async () => {
       const { onBack } = renderForm()
-      await userEvent.click(screen.getByRole('button', { name: '10월 고치기' }))
+      await userEvent.click(screen.getByRole('button', { name: '달 바꾸기' }))
 
       act(() => {
         window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
@@ -265,11 +290,11 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
     it('달만 바꿔도 알리고, 처음 달로 되돌리면 다시 없다고 알린다', async () => {
       const { onDirtyChange } = renderForm()
 
-      await userEvent.click(screen.getByRole('button', { name: '10월 고치기' }))
+      await userEvent.click(screen.getByRole('button', { name: '달 바꾸기' }))
       await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '3월' }))
       expect(onDirtyChange).toHaveBeenLastCalledWith(true)
 
-      await userEvent.click(screen.getByRole('button', { name: '3월 고치기' }))
+      await userEvent.click(screen.getByRole('button', { name: '달 바꾸기' }))
       await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '10월' }))
       expect(onDirtyChange).toHaveBeenLastCalledWith(false)
     })

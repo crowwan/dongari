@@ -46,7 +46,7 @@ updated: 2026-10-07
 | `--faint` | #999999 / #7a7a7a | 자리표시 글자("0", "예: 꽃값"), 비활성 글자 | DS `fg-placeholder`. **본문 글자로 쓰지 않는다**(AA 미달 — WCAG 는 자리표시·비활성 글자를 대비 기준에서 뺀다) |
 | `--primary` | #2f5d57 / #2f5d57 | 주 버튼 채움, 고른 달·옛 선택 버튼 채움 | 앱의 단 하나의 브랜드 색. 다크에서도 같은 진한 청록 |
 | `--on-accent` | #ffffff / #ffffff | 청록 채움 위 글자 | 7.44:1 |
-| `--primary-soft` | #e6efed / #1e3330 | 고른 것 바탕, 보조 버튼 면, 수입 줄 원형 아이콘 바탕 | 주 버튼과 같은 계열이라 색이 늘지 않는다 |
+| `--primary-soft` | #e6efed / #1e3330 | 고른 것 바탕, 보조 버튼 면, 수입 줄 원형 아이콘 바탕, 내역 적기 "적은 내용" 카드 면 | 주 버튼과 같은 계열이라 색이 늘지 않는다 |
 | `--accent-ink` | #2f5d57 / #8cc7bc | 고른 것 글자·체크, "바꾸기", 보조 버튼 글자, 이번 달 테두리, 포커스 링, 입력칸 포커스 테두리 | 시안의 `brand-ink`. 다크에서는 밝게 뒤집어 어두운 바탕에서 보인다 |
 | `--income-amount` | #1b705b / #5cc49e | 수입 금액 글자 | 시안의 `plus`(#1F7A63) 를 눌린 줄 위에서도 AA 가 되게 한 단계 진하게 |
 | `--expense-amount` | = `--strong` | 지출 금액 글자 | 지출은 일상이라 경고처럼 보이지 않게, 부호 `−` 로 구분 |
@@ -100,7 +100,7 @@ updated: 2026-10-07
 | `--touch-primary` | 60 | 주 버튼 |
 | `--touch-field` | 64 | 입력칸, 줄 선택(PickRow), 스위치 |
 | `--row-min` | 72 | 원형 아이콘 두 줄 목록 줄 |
-| `--icon-sm` / `--icon-md` | 20 / 24 | 글자 옆 작은 아이콘 / 버튼·줄 아이콘 |
+| `--icon-xs` / `--icon-sm` / `--icon-md` | 16 / 20 / 24 | 작은 머리 글자 옆·✓ 동그라미 안 체크(적은 내용 카드) / 글자 옆 작은 아이콘 / 버튼·줄 아이콘 |
 | `--icon-circle` / `--icon-circle-sm` | 44 / 36 | 줄 앞 원형 아이콘 바탕 / 줄 선택 앞 |
 | `--dot` / `--grab-w` / `--grab-h` | 8 / 40 / 4 | 할 일 점 / 선택 창 손잡이 |
 | `--content-max` / `--dialog-max` | 480 / 400 | 화면 내용 / 확인 창 최대 폭 |
@@ -165,13 +165,13 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 
 ## 아이콘
 
-`src/ui/Icon.tsx` 한 곳에서 `lucide-react` 아이콘을 이름(`IconName`)으로 고른다. 쓴 아이콘만 번들에 들어간다(트리셰이킹, 21개). 시안의 SVG 를 직접 옮기지 않고 Lucide 를 고른 이유: 시안 아이콘 대부분이 이미 Lucide 모양이고, 선 두께·모서리가 한 세트로 맞춰져 있으며(DS "fill/line 혼용 금지, 두께 통일"), 새 아이콘이 필요할 때 같은 세트에서 고르면 된다.
+`src/ui/Icon.tsx` 한 곳에서 `lucide-react` 아이콘을 이름(`IconName`)으로 고른다. 쓴 아이콘만 번들에 들어간다(트리셰이킹, 22개). 시안의 SVG 를 직접 옮기지 않고 Lucide 를 고른 이유: 시안 아이콘 대부분이 이미 Lucide 모양이고, 선 두께·모서리가 한 세트로 맞춰져 있으며(DS "fill/line 혼용 금지, 두께 통일"), 새 아이콘이 필요할 때 같은 세트에서 고르면 된다.
 
 | 이름 | 모양 | 쓰는 곳 |
 |---|---|---|
 | `users` / `building` / `cup` / `gift` / `bank` / `flower` / `receipt` | 사람들 / 건물 / 컵 / 선물 / 은행 / 꽃 / 영수증 | 항목 아이콘 — `itemIcon(name)` 이 이름으로 고른다 |
 | `income` / `expense` | ⊕ / ⊖ | 수입 / 지출 |
-| `calendar` / `pen` / `download` / `share` / `folder` / `chart` / `settings` / `plus` / `check` | 달력 / 연필 / 아래 화살표 / 공유 / 폴더 / 막대그래프 / 톱니 / 더하기 / 체크 | 달, 직접 적기, 사진 저장, 백업 보내기, 백업 불러오기, 결산, 설정, 내역 적기, 저장 |
+| `calendar` / `pen` / `download` / `share` / `folder` / `chart` / `settings` / `phone` / `plus` / `check` | 달력 / 연필 / 아래 화살표 / 공유 / 폴더 / 막대그래프 / 톱니 / 스마트폰 / 더하기 / 체크 | 달, 직접 적기, 사진 저장, 백업 보내기, 백업 불러오기, 결산, 설정, 홈 화면에 추가(폰 홈 화면 — 집 모양은 "우리 집"으로 읽힐 수 있어 폰 모양), 내역 적기, 저장·적은 내용 |
 | `left` / `right` / `down` | ‹ / › / ▾ | 장부로·이전 달 / 다음 달·바꾸기 / 달 고르기 |
 
 `itemIcon(name)`(`src/domain/itemIcon.ts`, SPEC-001 AC-18): 위에서부터 처음 맞는 말 — 회비·회원 → 사람들, 대관·장소·임대 → 건물, 간식·커피·음료·다과 → 컵, 지원금·후원·선물 → 선물, 이자·예금·은행 → 은행, 꽃 → 꽃, 그 밖 → 영수증. 아이콘은 늘 화면 읽기에서 숨기고(`aria-hidden`), 뜻은 옆 글자가 전한다.
@@ -190,7 +190,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `BottomSheet` | 아래에서 올라오는 흰 창(위쪽 반경 24 + 손잡이), 제목 Heading, `role="dialog"`. 바깥 누르기·Esc 로 닫힘, 열면 창에 포커스·닫으면 연 자리로. 안드로이드 뒤로 버튼은 아래 "선택 창과 뒤로 버튼" | 장부 달 고르기 "몇 월을 볼까요?", 설정 연도 "어느 해 장부를 볼까요?" |
 | `MonthPicker` | 3열 × 4행, 고른 달 청록 채움 + 굵게, 이번 달 청록 테두리(`aria-current="date"`, `data-current`) | `BottomSheet` 안 |
 | `PickRow` | 흰 면 한 줄: [원형 아이콘] 값 ··· 바꾸기 ›, "10월 바꾸기"로 읽힌다 · 눌림 | 내역 적기·고치기 "몇 월인가요?" |
-| `AnswerChip` | 흰 알약 [아이콘 값], "대관료 고치기"로 읽힌다 | 하나씩 채우기에서 답한 것 |
+| `AnswersCard` (#56) | 옅은 청록 면 카드(`--primary-soft`, 반경 20) → 머리 "✓ 적은 내용"(Caption SemiBold `--accent-ink`, 카드 이름 = `region` 이름) → 줄마다 흰 면(반경 16): ✓ 동그라미(24, `--accent-ink` 채움 + 카드색 체크) + 작은 이름표(Caption `--muted`) 위 굵은 값(아이콘 20 + 18 Bold, `PickRow` 값과 같은 크기) + [바꾸기](면 없는 청록 글자 16 SemiBold, 56 × 56 이상, "달 바꾸기"로 읽힌다) · 눌림. 지금 질문의 흰 목록·금액 칸과 면 색으로 갈리고 ✓·머리 글자로 한 번 더 알린다 | 하나씩 채우기에서 이미 적은 것 (달 / 항목) |
 | `AmountDisplay` | 흰 카드: 오른쪽 정렬 Display 숫자(숫자 키패드 `inputmode="numeric"`, 콤마 자동, 빈칸이면 자리표시 "0") + 작은 "원" → [+1만] [+5만] [+10만](상한 999,999,999, "1만 원 더하기"로 읽힘, 눌러도 금액 칸 포커스 유지 = 키패드 안 닫힘). 칸 이름은 숨은 `label`, `autoFocus` (#47) | 내역 적기·고치기 "얼마인가요?" |
 | `IconButton` | 아이콘 + 글자. `plain`(면 없음) / `fill`(회색 면, 폭 채움) · 눌림, 점 표시 `dotLabel` | 위쪽 [📊 결산] [⚙ 설정], [‹ 장부로](`BackToLedger`)·[‹ 설정], 카드 안 [🧾 10월 정리 보기], 시작 화면 [📁 백업 불러오기] |
 | `OptionList` (#46, #47) | 여럿 중 하나 줄 목록(줄 64): 고른 줄 옅은 청록 면 + 굵게 + 체크(`aria-pressed`), 줄 앞 원형 아이콘 `icon`, 오른쪽 작은 표시 `note`(Caption, "대관료 지출"로 띄어 읽힘), 수입은 청록 원 `tone="income"`(`data-tone`), 맨 아래 따로 하는 일 줄 `action`(청록 글자, 고르는 줄 아님). 면은 놓인 바탕과 다르게: 화면 바탕 위 흰 면 + 회색 원, 선택 창 안 회색 면 + 흰 원. 줄 사이 선 없음(시안의 선은 DS 규칙대로 뺐다) | 내역 적기·고치기 항목 목록("자주 쓴 항목"), 선택 창 안 장부 연도, 카탈로그 테마 |
@@ -209,7 +209,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `MonthStepper` | [‹] 달 [›] 화살표 아이콘 56px 흰 면, 끝 달에서 비활성. `onPickMonth` 를 주면 가운데 "10월 ▾" 가 버튼("10월 달 고르기", `aria-haspopup="dialog"`) |
 | `BottomActionBar` | 화면 아래 고정 바탕색 면 + 위쪽 가는 선 + 주 버튼 하나(`icon` 가능) × 기본·비활성·비활성 + 안내(버튼 위 본문 크기 한 줄), safe-area 만큼 띄움. 폰 키패드가 레이아웃을 줄이지 않는 브라우저에서는 `--keyboard-inset`(`features/keyboard`) 만큼 올라가 키패드 바로 위 (#47) |
 | `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 한 몸통 스위치 [남았어요 \| 적자였어요] 로 부호를 고른다 (#46) |
-| `InstallBanner` (`features/install`) | 장부 화면 위 흰 면 띠(안내 띠와 같은 반경 16·안쪽 16): SemiBold 문장 → [방법 보기]/[홈 화면에 추가](보조) + [닫기](회색 면) → 펼치면 브라우저별 순서(브라우저 이름 `--accent-ink`) (#10, #46) |
+| `InstallGuide` (`features/install`) | 홈 화면에 추가 방법: 브라우저 이름(Body Bold `--accent-ink`) + 번호 순서(Body). 설정 "앱" 묶음 [📱 홈 화면에 추가] 줄 → 설치 제안이 없을 때 `BottomSheet` "홈 화면에 추가하는 방법" 안 + [확인] (#10, #56. 장부 위 `InstallBanner` 띠는 #56 에서 지움) |
 | `AddEntryForm` / `EditEntryForm` (`features/ledger`) | 아래 "화면 조립" (#47) |
 | 월 정리 / 올해 결산 (`features/report`) | 카드 셋(수입·지출 카드 제목 Heading, 줄은 이름 본문 ··· 금액 제목색, 합계 줄만 구분선 + Bold, 수입 합계 수입 금액색, 잔액 카드 월말 잔액만 Heading 크기) + [⬇ 사진으로 저장] / v1 양식 한 장, 화면 틀(제목 제목색·안내 Caption·아래 버튼)만 토큰 (#16, #48) |
 
@@ -217,9 +217,9 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 
 | 화면 | 부품 |
 |---|---|
-| 장부 | 위쪽 이름(Heading)·연도(Caption) + `IconButton` [결산][설정•] → `BalanceCard` → (묶음 간격) `MonthStepper`(`onPickMonth` → `BottomSheet`+`MonthPicker`) → 그 달 카드(소계 두 칸 + `ListRow` 줄 + `IconButton fill` [N월 정리 보기]) → `BottomActionBar` [+ 내역 적기]. 안내 띠(저장·백업·설치)는 맨 위 하나 |
-| 설정 | [‹ 장부로] → 제목 → (백업 안내 띠) → 묶음 제목(Label 16 SemiBold, `--muted`) + 흰 카드 안 `ListRow` 줄(값 `--muted` + › `--faint`). 이름·이월금 줄 → 편집 화면([‹ 설정] → 제목 → 입력칸 → [✓ 저장], 키패드에 가리지 않게 주 버튼은 입력칸 바로 아래), 연도 줄 → `BottomSheet`+`OptionList` |
-| 내역 적기 (#47) | [‹ 장부로] → 제목 → 답 알약 줄(`AnswerChip` 달 / 종류 / 항목, 제목과 `--stack` 간격, 넘치면 다음 줄) → (묶음 간격) 지금 질문 하나: 1 "무엇인가요?" `OptionList`(최대 6 + [✎ 직접 적기]) + Caption "누르면 바로 다음으로 넘어가요" / 직접 적기 `TextField`(보조 이름) + [‹ 목록에서 고르기] / "수입인가요, 지출인가요?" `SegmentedControl` + Caption / 2 "얼마인가요?" `AmountDisplay` → `BottomActionBar` [다음]·[✓ 저장](1단계엔 없음). 달 알약 → `BottomSheet`+`MonthPicker` |
+| 장부 | 위쪽 이름(Heading)·연도(Caption) + `IconButton` [결산][설정•] → `BalanceCard` → (묶음 간격) `MonthStepper`(`onPickMonth` → `BottomSheet`+`MonthPicker`) → 그 달 카드(소계 두 칸 + `ListRow` 줄 + `IconButton fill` [N월 정리 보기]) → `BottomActionBar` [+ 내역 적기]. 안내 띠(저장 > 백업)는 맨 위 하나 |
+| 설정 | [‹ 장부로] → 제목 → (백업 안내 띠) → 묶음 제목(Label 16 SemiBold, `--muted`) + 흰 카드 안 `ListRow` 줄(값 `--muted` + › `--faint`). 이름·이월금 줄 → 편집 화면([‹ 설정] → 제목 → 입력칸 → [✓ 저장], 키패드에 가리지 않게 주 버튼은 입력칸 바로 아래), 연도 줄 → `BottomSheet`+`OptionList`. 맨 아래 "앱" 묶음 [📱 홈 화면에 추가](보조 줄 "기록이 더 안전해요", 홈 화면 앱이면 묶음째 없음) → 브라우저 설치 창 또는 `BottomSheet`+`InstallGuide` (#56) |
+| 내역 적기 (#47, #56) | [‹ 장부로] → 제목 → `AnswersCard` "적은 내용"(달 줄 / 항목 줄 "대관료 · 지출", 제목과 `--stack` 간격) → (묶음 간격) "지금 적을 것"(Caption Bold `--accent-ink`) + 지금 질문 하나: 1 "무엇인가요?" `OptionList`(최대 6 + [✎ 직접 적기]) + Caption "누르면 바로 다음으로 넘어가요" / 직접 적기 `TextField`(보조 이름) + [‹ 목록에서 고르기] / "수입인가요, 지출인가요?" `SegmentedControl` + Caption / 2 "얼마인가요?" `AmountDisplay` → `BottomActionBar` [다음]·[✓ 저장](1단계엔 없음). [달 바꾸기] → `BottomSheet`+`MonthPicker`, [항목 바꾸기] → 1 |
 | 내역 고치기 (#47) | [‹ 장부로] → 제목 → 질문 넷(묶음 간격 `--group-gap`): 몇 월 `PickRow` [바꾸기] → 달 선택 창 / `SegmentedControl` / `OptionList`(고른 종류만, 지금 이름 체크) + `TextField` "직접 적기" / `AmountDisplay` → (`--section-gap`) [이 내역 지우기] → `BottomActionBar` [✓ 저장] |
 | 시작(첫 실행·새 연도) | 위쪽 오른쪽 `IconButton`([📁 백업 불러오기] / [⚙ 설정•]) → 제목·안내 → `TextField` → `CarryoverField` → [시작하기] |
 
@@ -275,7 +275,8 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-06 | NoticeBar 에 버튼 하나, ConfirmDialog 에 설명 줄·버튼 하나 알림 창 추가 (#8) | |
 | 2026-10-06 | TopTextButton 점 표시, NoticeBar 30일 백업 안내 상태 (#9) | |
 | 2026-10-07 | 타이포 위계 3단과 여백 역할(`--stack-tight`·`--stack`·`--group-gap`·`--section-gap`)을 개인 디자인 시스템 역할 구조로 추가, `labelRole` (#42) | |
-| 2026-10-07 | 디자인 개편 1(ADR 004): 순수 회색 계층·브랜드는 주 버튼만, 글자 크기 DS 기본값 rem(30/24/20/16/16/14, 줄 이름 SemiBold), 좌우 여백 24, 반경 카드 20·컨트롤 16, 스크림 60/70%. Pretendard 가변 서브셋(645KB) 자체 포함 + 미리 저장, lucide-react 아이콘·`itemIcon`. 새 부품 Icon·ListRow·SegmentedControl·BottomSheet·MonthPicker·PickRow·AnswerChip·AmountDisplay·IconButton, Button·BottomActionBar·NoticeBar 아이콘, MonthStepper 달 고르기, 기존 부품 다시 칠하기 (#45) | |
+| 2026-10-07 | 디자인 개편 1(ADR 004): 순수 회색 계층·브랜드는 주 버튼만, 글자 크기 DS 기본값 rem(30/24/20/16/16/14, 줄 이름 SemiBold), 좌우 여백 24, 반경 카드 20·컨트롤 16, 스크림 60/70%. Pretendard 가변 서브셋(645KB) 자체 포함 + 미리 저장, lucide-react 아이콘·`itemIcon`. 새 부품 Icon·ListRow·SegmentedControl·BottomSheet·MonthPicker·PickRow·AnswerChip(#56 에서 지움)·AmountDisplay·IconButton, Button·BottomActionBar·NoticeBar 아이콘, MonthStepper 달 고르기, 기존 부품 다시 칠하기 (#45) | |
 | 2026-10-07 | 디자인 개편 2: 장부(아이콘 버튼·달 선택 창·원형 아이콘 줄·소계 세로선·정리 보기 회색 면 버튼)·설정(묶음 제목 + 줄 목록, 이름·이월금 편집 화면, 연도 선택 창, 백업 안내 띠)·시작 화면 조립. `OptionList` 추가, `ListRow` 띄어 읽기, 이월금 스위치, `TopTextButton` 제거, `BackToLedger` 는 `IconButton`, 선택 창 뒤로 버튼(`useScreenHistory` openSheet/closeSheet), 설치 띠 역할 토큰 (#46) | |
 | 2026-10-07 | 디자인 개편 3: 내역 적기 하나씩 채우기(`AddEntryForm`, 단계 상태 `entrySteps`)·고치기 펼친 모양(`EditEntryForm`) 조립, 달 선택 창 `EntryMonthSheet`. `OptionList` 오른쪽 표시·수입 청록 원·맨 아래 [직접 적기] 줄·놓인 바탕 따라 면 색, `AmountDisplay`·`TextField` `autoFocus`, 빠른 더하기 키패드 유지, 아래 고정 영역 `--keyboard-inset`. `ChoiceChip` 제거(카탈로그 테마는 `OptionList`) (#47) | |
 | 2026-10-07 | 디자인 개편 4: 월 정리 카드 셋(합계 줄만 굵게, 월말 잔액 큰 숫자)·[⬇ 사진으로 저장], 월 정리 사진 자간·숫자 폭 맞춤 끔, 올해 결산 화면 틀(양식·사진 그대로) (#48) | |
+| 2026-10-07 | 내역 적기 답 알약(`AnswerChip`) → "적은 내용" 카드 `AnswersCard`(옅은 청록 면 + 흰 줄 ✓·이름표·굵은 값·[바꾸기]) + "지금 적을 것" 표시, `--icon-xs` 16. 장부 위 설치 안내 띠(`InstallBanner`) 지움 → 설정 "앱" 묶음 [📱 홈 화면에 추가] 줄 + 방법 안내 선택 창(`InstallGuide`), 아이콘 `phone`. `BottomSheet` 가 화면보다 길면 창 안 스크롤 (#56) | |
