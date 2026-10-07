@@ -1,7 +1,7 @@
 ---
 id: SPEC-002
 title: 안전한 저장과 백업
-status: in-progress
+status: done
 milestone: v2.0
 issue: "#1"
 prototype:
