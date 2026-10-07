@@ -39,7 +39,8 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(screen.getByRole('heading', { name: '동아리 회계를 시작해 볼까요?' })).toBeInTheDocument()
       expect(screen.getByLabelText('동아리 이름')).toHaveValue('')
-      expect(screen.getByLabelText('작년 이월금')).toHaveValue('')
+      // 안내 "모르면 0으로 두고…" 와 맞게 이월금 칸은 0 으로 시작한다
+      expect(screen.getByLabelText('작년 이월금')).toHaveValue('0')
       expect(screen.queryByRole('button', { name: '설정' })).not.toBeInTheDocument()
     })
 
@@ -67,6 +68,19 @@ describe('SPEC-001 앱 뼈대', () => {
         carryover: 370_482,
         entries: [],
       })
+    })
+
+    it('이월금을 0 으로 두고 [시작하기] 를 누르면 이월금 0원 장부로 시작한다', async () => {
+      const repository = renderApp()
+
+      await userEvent.type(screen.getByLabelText('동아리 이름'), '한랑드림')
+      await userEvent.clear(screen.getByLabelText('작년 이월금'))
+      await userEvent.type(screen.getByLabelText('작년 이월금'), '0')
+      expect(screen.getByLabelText('작년 이월금')).toHaveValue('0')
+      await userEvent.click(screen.getByRole('button', { name: '시작하기' }))
+
+      expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('0원')
+      expect(repository.load().data.ledgers['2026']?.carryover).toBe(0)
     })
 
     it('작년이 적자였으면 "적자였어요"를 골라 음수 이월금으로 시작한다', async () => {

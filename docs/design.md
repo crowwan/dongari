@@ -200,7 +200,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | 컴포넌트 | 상태 |
 |---|---|
 | `Button` | 주(청록 채움, 높이 60) / 보조(옅은 청록 면 + 청록 글자) / 위험(빨강 채움) / 위험 글자형(밑줄) × 기본·눌림·비활성, 키보드 포커스. 글자 앞 `icon` (#45) |
-| `MoneyInput` / `TextField` | 흰 면 + 옅은 둘레(64) / 포커스 청록 둘레 / 오류 빨강 둘레 + 문장 / 비활성 점선. 이름 글자 역할 `labelRole`, `TextField` `autoFocus` (#47) |
+| `MoneyInput` / `TextField` | 흰 면 + 옅은 둘레(64) / 포커스 청록 둘레 / 오류 빨강 둘레 + 문장 / 비활성 점선. 이름 글자 역할 `labelRole`, `TextField` `autoFocus` (#47). `MoneyInput` 은 0원도 적는 칸(이월금)용: 처음 값 0 은 `0`, 다 지우면 빈칸(자리표시 0), 친 글자를 들고 있어 빈칸과 직접 친 0 을 가른다. 0원이 없는 내역 금액은 `AmountDisplay`(0 = 빈칸) (#59) |
 | `ConfirmDialog` | 기본 / 위험(빨강 확인), 아니요는 보조 버튼, 열리면 "아니요"에 포커스, Esc = 아니요. 설명 줄, `cancelLabel={null}` 이면 버튼 하나짜리 알림 창 |
 | `Toast` | 제목색 면 + 카드색 글자 알약 (2초, 긴 문장은 글자당 0.12초, `role="status"`) |
 | `NoticeBar` | 노란 면(반경 16) + SemiBold 문장(`role="alert"`), 할 일이 있으면 아래 흰 면 버튼 하나(왼쪽 정렬, 아이콘 `action.icon` 가능 — [공유 백업 파일 보내기]) |
@@ -280,3 +280,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-07 | 디자인 개편 3: 내역 적기 하나씩 채우기(`AddEntryForm`, 단계 상태 `entrySteps`)·고치기 펼친 모양(`EditEntryForm`) 조립, 달 선택 창 `EntryMonthSheet`. `OptionList` 오른쪽 표시·수입 청록 원·맨 아래 [직접 적기] 줄·놓인 바탕 따라 면 색, `AmountDisplay`·`TextField` `autoFocus`, 빠른 더하기 키패드 유지, 아래 고정 영역 `--keyboard-inset`. `ChoiceChip` 제거(카탈로그 테마는 `OptionList`) (#47) | |
 | 2026-10-07 | 디자인 개편 4: 월 정리 카드 셋(합계 줄만 굵게, 월말 잔액 큰 숫자)·[⬇ 사진으로 저장], 월 정리 사진 자간·숫자 폭 맞춤 끔, 올해 결산 화면 틀(양식·사진 그대로) (#48) | |
 | 2026-10-07 | 내역 적기 답 알약(`AnswerChip`) → "적은 내용" 카드 `AnswersCard`(옅은 청록 면 + 흰 줄 ✓·이름표·굵은 값·[바꾸기]) + "지금 적을 것" 표시, `--icon-xs` 16. 장부 위 설치 안내 띠(`InstallBanner`) 지움 → 설정 "앱" 묶음 [📱 홈 화면에 추가] 줄 + 방법 안내 선택 창(`InstallGuide`), 아이콘 `phone`. `BottomSheet` 가 화면보다 길면 창 안 스크롤 (#56) | |
+| 2026-10-07 | `MoneyInput` 0원 표시: 처음 값 0 은 `0`, 다 지우면 빈칸, 직접 친 `0` 보임(앞자리 0 정리). 카탈로그 MoneyInput "빈칸" 상태 → "0원", CarryoverField "0원" 상태 추가 (#59) | |

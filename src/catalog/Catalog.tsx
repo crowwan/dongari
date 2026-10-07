@@ -447,10 +447,10 @@ export function Catalog() {
         </Section>
 
         <Section title="MoneyInput">
-          <State label="입력 (눌러 보기)">
+          <State label="입력 (눌러 보기 — 다 지우면 빈칸, 0 을 치면 0)">
             <MoneyInput label="얼마인가요?" value={amount} onChange={setAmount} />
           </State>
-          <State label="빈칸">
+          <State label="0원 (처음 값 0 도 0 으로 보인다, #59)">
             <MoneyInput label="작년 이월금" value={0} onChange={noop} />
           </State>
           <State label="오류">
@@ -488,6 +488,9 @@ export function Catalog() {
           </State>
           <State label="적자 (음수 이월금)">
             <CarryoverField value={-50000} onChange={noop} />
+          </State>
+          <State label={'0원 (시작 화면 "모르면 0으로 두고…")'}>
+            <CarryoverField value={0} onChange={noop} />
           </State>
         </Section>
 
