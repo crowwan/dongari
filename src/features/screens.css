@@ -33,6 +33,11 @@
   gap: var(--space-5);
 }
 
+/* 질문·카드 묶음이 여럿인 화면(내역 적기, 장부 시작, 설정): 묶음 사이를 묶음 안보다 확실히 넓게 */
+.screen--groups {
+  gap: var(--group-gap);
+}
+
 /* 장부 외 화면 맨 위 [← 장부로]: 글자 폭만큼만 왼쪽에 */
 .screen__back {
   display: flex;
@@ -44,10 +49,11 @@
   justify-content: flex-end;
 }
 
+/* 화면 제목: 글자 위계 맨 위 (Title). 질문·카드 제목(Heading)보다 한 단계 크다 */
 .screen__title {
   margin: 0;
-  font-size: var(--size-title);
-  font-weight: var(--weight-bold);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
   line-height: var(--line-tight);
   text-wrap: balance;
 }
@@ -57,10 +63,10 @@
   color: var(--muted);
 }
 
-/* 보조 설명 (모르면 0으로 두세요 등) */
+/* 보조 설명 (모르면 0으로 두세요 등): Caption */
 .screen__note {
   margin: 0;
-  font-size: var(--size-small);
+  font-size: var(--text-caption-size);
   color: var(--muted);
 }
 
@@ -71,12 +77,13 @@
   background: var(--surface);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--stack);
 }
 
+/* 카드 제목: 질문 제목과 같은 Heading */
 .card__title {
   margin: 0;
-  font-size: var(--size-large);
-  font-weight: var(--weight-bold);
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
   line-height: var(--line-tight);
 }

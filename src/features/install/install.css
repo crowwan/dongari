@@ -42,7 +42,7 @@
   color: var(--ink);
   font-family: var(--typeface);
   font-size: var(--size-large);
-  font-weight: var(--weight-strong);
+  font-weight: var(--text-label-weight);
   line-height: var(--line-tight);
   letter-spacing: var(--letter-body);
   cursor: pointer;

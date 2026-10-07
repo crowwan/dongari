@@ -67,4 +67,17 @@ describe('MoneyInput', () => {
 
     expect(screen.getByLabelText('얼마인가요?')).toBeDisabled()
   })
+
+  it('이름은 기본으로 질문 제목 급(heading)으로 보인다', () => {
+    render(<MoneyInput label="얼마인가요?" value={0} onChange={() => {}} />)
+
+    expect(screen.getByTestId('money-input')).toHaveAttribute('data-label-role', 'heading')
+  })
+
+  it('보조 이름(label)으로 낮춰도 화면 읽기 이름은 그대로다', () => {
+    render(<MoneyInput label="작년 이월금" labelRole="label" value={0} onChange={() => {}} />)
+
+    expect(screen.getByTestId('money-input')).toHaveAttribute('data-label-role', 'label')
+    expect(screen.getByLabelText('작년 이월금')).toBeInTheDocument()
+  })
 })

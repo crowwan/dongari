@@ -28,27 +28,28 @@
 
 /* ---------- 월 정리: 사진으로 저장되는 영역(제목 + 세 묶음) ---------- */
 
+/* 제목 → 카드 셋. 카드 사이는 다른 묶음(--group-gap), 카드 안 줄 사이는 좁게 */
 .summary {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--group-gap);
   font-variant-numeric: tabular-nums;
 }
 
 .summary-card {
-  padding: var(--space-3) var(--card-pad-inline) var(--space-2);
+  padding: var(--card-pad-block) var(--card-pad-inline) var(--space-2);
   border-radius: var(--corner-lg);
   background: var(--surface);
   display: flex;
   flex-direction: column;
 }
 
+/* 카드 제목("수입"/"지출"): 설정 카드 제목과 같은 Heading */
 .summary-card__title {
   margin: 0 0 var(--space-1);
-  font-size: var(--size-small);
-  font-weight: var(--weight-strong);
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
   line-height: var(--line-tight);
-  color: var(--muted);
 }
 
 .summary-card__empty {

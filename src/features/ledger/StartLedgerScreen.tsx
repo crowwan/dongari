@@ -22,7 +22,7 @@ export function StartLedgerScreen({ kind, year, defaults, onStart }: StartLedger
 
   return (
     <form
-      className="screen"
+      className="screen screen--groups"
       data-testid="start-ledger-screen"
       data-kind={kind}
       onSubmit={(event) => {
@@ -43,8 +43,11 @@ export function StartLedgerScreen({ kind, year, defaults, onStart }: StartLedger
       )}
 
       <TextField label="동아리 이름" value={clubName} placeholder="예: 한랑드림" onChange={setClubName} />
-      <CarryoverField value={carryover} onChange={setCarryover} />
-      <p className="screen__note">모르면 0으로 두고 나중에 설정에서 바꿀 수 있어요.</p>
+      {/* 이월금 칸과 그 안내는 한 묶음 */}
+      <div className="ledger__field-group">
+        <CarryoverField value={carryover} onChange={setCarryover} />
+        <p className="screen__note">모르면 0으로 두고 나중에 설정에서 바꿀 수 있어요.</p>
+      </div>
 
       <div className="ledger__submit">
         {missingName && <p className="screen__note ledger__submit-why">동아리 이름을 적어주세요</p>}

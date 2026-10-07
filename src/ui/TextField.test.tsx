@@ -38,4 +38,17 @@ describe('TextField', () => {
     expect(field).toHaveAccessibleDescription('동아리 이름을 적어주세요')
     expect(screen.getByTestId('text-field')).toHaveAttribute('data-state', 'error')
   })
+
+  it('이름은 기본으로 질문 제목 급(heading)으로 보인다', () => {
+    render(<TextField label="동아리 이름" value="" onChange={() => {}} />)
+
+    expect(screen.getByTestId('text-field')).toHaveAttribute('data-label-role', 'heading')
+  })
+
+  it('보조 이름(label)으로 낮춰도 화면 읽기 이름은 그대로다', () => {
+    render(<TextField label="직접 적기" labelRole="label" value="" onChange={() => {}} />)
+
+    expect(screen.getByTestId('text-field')).toHaveAttribute('data-label-role', 'label')
+    expect(screen.getByLabelText('직접 적기')).toBeInTheDocument()
+  })
 })

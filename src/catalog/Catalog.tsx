@@ -48,6 +48,18 @@ const COLOR_TOKENS = [
 
 const SIZE_TOKENS = ['--size-small', '--size-body', '--size-large', '--size-title', '--size-amount', '--size-balance']
 
+// 글자 역할 (docs/design.md 타이포 위계): 화면 제목 > 질문·카드 제목 > 보조 이름·본문·보조 설명
+const TEXT_ROLES: { role: string; sample: string; muted?: boolean }[] = [
+  { role: 'title', sample: '내역 적기' },
+  { role: 'heading', sample: '몇 월인가요?' },
+  { role: 'label', sample: '직접 적기', muted: true },
+  { role: 'body', sample: '회비 140,000원' },
+  { role: 'caption', sample: '모르면 0으로 두세요', muted: true },
+]
+
+// 여백 역할: 묶음 안(좁게) < 묶음 사이(넓게) < 큰 구획
+const SPACE_ROLES = ['--stack-tight', '--stack', '--group-gap', '--section-gap']
+
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
 
 const noop = () => {}
@@ -97,6 +109,35 @@ export function Catalog() {
               <span key={token} style={{ fontSize: `var(${token})`, lineHeight: 'var(--line-tight)' }}>
                 {token} 수입 140,000원
               </span>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="글자 역할">
+          <div className="catalog__sizes">
+            {TEXT_ROLES.map(({ role, sample, muted }) => (
+              <span
+                key={role}
+                style={{
+                  fontSize: `var(--text-${role}-size)`,
+                  fontWeight: `var(--text-${role}-weight)`,
+                  lineHeight: 'var(--line-tight)',
+                  color: muted ? 'var(--muted)' : undefined,
+                }}
+              >
+                --text-{role} {sample}
+              </span>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="여백 역할">
+          <div className="catalog__sizes">
+            {SPACE_ROLES.map((token) => (
+              <div key={token} className="catalog__swatch">
+                <span className="catalog__space-bar" style={{ width: `var(${token})` }} />
+                {token}
+              </div>
             ))}
           </div>
         </Section>
@@ -171,6 +212,9 @@ export function Catalog() {
           <State label="비활성">
             <MoneyInput label="얼마인가요?" value={140000} onChange={noop} disabled />
           </State>
+          <State label="보조 이름 (labelRole=label, 설정 카드 안)">
+            <MoneyInput label="작년 이월금" labelRole="label" value={352000} onChange={noop} />
+          </State>
         </Section>
 
         <Section title="TextField">
@@ -185,6 +229,9 @@ export function Catalog() {
           </State>
           <State label="비활성">
             <TextField label="동아리 이름" value="한랑드림" onChange={noop} disabled />
+          </State>
+          <State label="보조 이름 (labelRole=label, 내역 적기 직접 적기)">
+            <TextField label="직접 적기" labelRole="label" value="" placeholder="예: 꽃값" onChange={noop} />
           </State>
         </Section>
 

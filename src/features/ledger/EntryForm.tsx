@@ -86,25 +86,35 @@ export function EntryForm({ title, initial, frequentChoices, onSave, onBack, onD
         <h2 className="entry__question" id={nameHeadingId}>
           무엇인가요?
         </h2>
-        <div className="entry__choices" role="group" aria-label="자주 쓴 항목">
-          {frequentChoices(draft.type).map((choice) => (
-            <ChoiceChip
-              key={choice.name}
-              selected={draft.name.trim() === choice.name}
-              // 이름과 함께 그 항목을 마지막으로 쓴 종류를 고른다 (AC-4)
-              onClick={() => change({ name: choice.name, type: choice.type })}
-            >
-              {choice.name}
-            </ChoiceChip>
-          ))}
+        {/* 답: 자주 쓴 항목 버튼 → "직접 적기" 칸. 칸 이름은 다섯 번째 질문처럼 보이지 않게 보조 이름으로 낮춘다 (#42) */}
+        <div className="entry__answer">
+          <div className="entry__choices" role="group" aria-label="자주 쓴 항목">
+            {frequentChoices(draft.type).map((choice) => (
+              <ChoiceChip
+                key={choice.name}
+                selected={draft.name.trim() === choice.name}
+                // 이름과 함께 그 항목을 마지막으로 쓴 종류를 고른다 (AC-4)
+                onClick={() => change({ name: choice.name, type: choice.type })}
+              >
+                {choice.name}
+              </ChoiceChip>
+            ))}
+          </div>
+          <TextField
+            label="직접 적기"
+            labelRole="label"
+            value={draft.name}
+            placeholder="예: 꽃값"
+            onChange={(name) => change({ name })}
+          />
         </div>
-        <TextField label="직접 적기" value={draft.name} placeholder="예: 꽃값" onChange={(name) => change({ name })} />
       </section>
 
       <MoneyInput label="얼마인가요?" value={draft.amount} onChange={(amount) => change({ amount })} />
 
       {onDelete && (
-        <>
+        // 지우기는 적는 흐름과 다른 큰 구획이라 질문 묶음보다 더 띄운다
+        <div className="entry__danger-zone">
           <Button variant="danger-text" onClick={() => setAskingDelete(true)}>
             이 내역 지우기
           </Button>
@@ -119,7 +129,7 @@ export function EntryForm({ title, initial, frequentChoices, onSave, onBack, onD
             }}
             onCancel={() => setAskingDelete(false)}
           />
-        </>
+        </div>
       )}
 
       <BottomActionBar
