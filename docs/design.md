@@ -37,7 +37,7 @@ updated: 2026-10-07
 |---|---|---|---|
 | `--bg` | #f5f5f5 / #0f0f0f | 화면 바탕, 아래 고정 영역 | 순수 회색. 흰 카드가 떠 보이고 순백보다 눈부심이 적다 |
 | `--surface` | #ffffff / #1c1c1c | 카드, 잔액 카드, 확인 창, 선택 창, 줄 선택, 금액 크게 보기, 답 알약, 옛 입력칸·선택 버튼 | 읽을 덩어리를 바탕과 면으로만 구분 |
-| `--fill` | #f2f2f2 / #2a2a2a | 카드 안 누르는 면: 스위치 몸통, 빠른 더하기, 열두 달 칸, 원형 아이콘 바탕, 회색 면 버튼, 비활성 버튼 | 흰 카드 안에서 "여기를 누른다"가 보이는 회색 |
+| `--fill` | #f2f2f2 / #2a2a2a | 카드 안 누르는 면: 스위치 몸통, 빠른 더하기, 열두 달 칸, 선택 창 안 날 칸·월 넘기기 화살표, 원형 아이콘 바탕, 회색 면 버튼, 비활성 버튼 | 흰 카드 안에서 "여기를 누른다"가 보이는 회색 |
 | `--line` | #e8e8e8 / #303030 | 아래 고정 영역 위쪽 선, 소계 두 칸 사이 세로선, 옛 입력칸 둘레 | 선은 꼭 필요한 곳에만 아주 옅게 |
 | `--line-strong` | #cccccc / #4a4a4a | 옛 선택 버튼 둘레, 비활성 점선, 선택 창 손잡이 | DS `border-strong`. 바탕·카드 어디에 놓여도 둘레가 보이게 |
 | `--strong` | #151515 / #f2f2f2 | 제목·줄 이름·큰 숫자·지출 금액 | DS `fg-strong`. 가장 강한 글자 |
@@ -46,9 +46,9 @@ updated: 2026-10-07
 | `--faint` | #999999 / #7a7a7a | 자리표시 글자("0", "예: 꽃값"), 비활성 글자 | DS `fg-placeholder`. **본문 글자로 쓰지 않는다**(AA 미달 — WCAG 는 자리표시·비활성 글자를 대비 기준에서 뺀다) |
 | `--primary` | #2f5d57 / #2f5d57 | 주 버튼 채움, 고른 달·옛 선택 버튼 채움 | 앱의 단 하나의 브랜드 색. 다크에서도 같은 진한 청록 |
 | `--on-accent` | #ffffff / #ffffff | 청록 채움 위 글자 | 7.44:1 |
-| `--primary-soft` | #e6efed / #1e3330 | 고른 것 바탕, 보조 버튼 면, 수입 줄 원형 아이콘 바탕 | 주 버튼과 같은 계열이라 색이 늘지 않는다 |
+| `--primary-soft` | #e6efed / #1e3330 | 고른 것 바탕, 보조 버튼 면, 수입 줄 원형 아이콘 바탕, 날 격자의 방금 저장한 날 | 주 버튼과 같은 계열이라 색이 늘지 않는다 |
 | `--primary-wash` | #eff5f4 / #0f1514 | 내역 적기 "지금 적는 내역" 카드 안 지금 질문 칸 면 (#68) | 흰 카드 안에 한 칸 가라앉힌 자리: 안의 흰 목록·금액 칸이 떠 보이게 카드(`--surface`)보다 한 단계 어둡게(라이트·다크 모두 카드와 대비 약 1.1:1, 바탕·카드 차이와 같은 정도). 청록 기를 살짝 넣어 둘레(청록)와 한 덩어리로 읽힌다. `--primary-soft` 는 "고른 것" 색이라 쓰지 않았다. 위 글자(`--strong`·`--muted`·`--accent-ink`)는 AA |
-| `--accent-ink` | #2f5d57 / #8cc7bc | 고른 것 글자·체크, "바꾸기", 보조 버튼 글자, 이번 달 테두리, "지금 적는 내역" 카드 둘레·머리 글자, "방금", 포커스 링, 입력칸 포커스 테두리 | 시안의 `brand-ink`. 다크에서는 밝게 뒤집어 어두운 바탕에서 보인다 |
+| `--accent-ink` | #2f5d57 / #8cc7bc | 고른 것 글자·체크, "바꾸기", 보조 버튼 글자, 이번 달·오늘 테두리, "지금 적는 내역" 카드 둘레·머리 글자, "방금", 포커스 링, 입력칸 포커스 테두리 | 시안의 `brand-ink`. 다크에서는 밝게 뒤집어 어두운 바탕에서 보인다 |
 | `--income-amount` | #1b705b / #5cc49e | 수입 금액 글자 | 시안의 `plus`(#1F7A63) 를 눌린 줄 위에서도 AA 가 되게 한 단계 진하게 |
 | `--expense-amount` | = `--strong` | 지출 금액 글자 | 지출은 일상이라 경고처럼 보이지 않게, 부호 `−` 로 구분 |
 | `--danger` / `--on-danger` | #b83232 / #ff8b8b, #ffffff / #2a0f0b | 위험 버튼 채움과 그 글자, 위험 글자형, 오류 문장·테두리, 점 표시 | 시안 #C93838 을 눌린 면 위 AA 가 되게 진하게. 금액에는 쓰지 않는다 |
@@ -91,12 +91,12 @@ updated: 2026-10-07
 | `--section-gap` | 64 | 큰 구획: 적는 흐름 ↔ [이 내역 지우기] |
 | `--gutter` | 24 | 화면 좌우 여백 (DS 모바일 표준) |
 | `--card-pad-block` / `--card-pad-inline` | 20 / 20 | 카드 안쪽 여백, 줄 좌우 여백 |
-| `--corner-sm` | 12 | 컨트롤 안 작은 덩어리: 스위치 손잡이, 빠른 더하기, 열두 달 칸, 안내 띠 버튼 |
+| `--corner-sm` | 12 | 컨트롤 안 작은 덩어리: 스위치 손잡이, 빠른 더하기, 열두 달 칸, 날 칸, 안내 띠 버튼 |
 | `--corner-md` | 16 | 컨트롤: 버튼, 입력칸, 줄 선택, 스위치 몸통, 안내 띠, 월 넘기기 |
 | `--corner-lg` | 20 | 카드, 확인 창 |
 | `--corner-xl` | 24 | 선택 창 위쪽 |
 | `--corner-pill` | 999 | 원형 아이콘, 답 알약, 옛 위쪽 글자 버튼, 알림 |
-| `--hairline` / `--stroke` / `--focus-ring` | 1 / 2 / 3 | 구분선 / 입력칸 둘레·이번 달 테두리 / 키보드 포커스 링 |
+| `--hairline` / `--stroke` / `--focus-ring` | 1 / 2 / 3 | 구분선 / 입력칸 둘레·이번 달·오늘 테두리 / 키보드 포커스 링 |
 | `--touch-min` | 56 | 모든 누르는 곳 최소 (SPEC-001) |
 | `--touch-primary` | 60 | 주 버튼 |
 | `--touch-field` | 64 | 입력칸, 줄 선택(PickRow), 스위치 |
@@ -172,8 +172,8 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 |---|---|---|
 | `users` / `building` / `cup` / `gift` / `bank` / `flower` / `receipt` | 사람들 / 건물 / 컵 / 선물 / 은행 / 꽃 / 영수증 | 항목 아이콘 — `itemIcon(name)` 이 이름으로 고른다 |
 | `income` / `expense` | ⊕ / ⊖ | 수입 / 지출 |
-| `calendar` / `pen` / `download` / `share` / `folder` / `chart` / `settings` / `phone` / `plus` / `check` | 달력 / 연필 / 아래 화살표 / 공유 / 폴더 / 막대그래프 / 톱니 / 스마트폰 / 더하기 / 체크 | 달, 직접 적기, 사진 저장, 백업 보내기, 백업 불러오기, 결산, 설정, 홈 화면에 추가(폰 홈 화면 — 집 모양은 "우리 집"으로 읽힐 수 있어 폰 모양), 내역 적기, 저장·장부에 넣었어요 |
-| `left` / `right` / `down` | ‹ / › / ▾ | 장부로·이전 달 / 다음 달·바꾸기 / 달 고르기 |
+| `calendar` / `pen` / `download` / `share` / `folder` / `chart` / `settings` / `phone` / `plus` / `check` | 달력 / 연필 / 아래 화살표 / 공유 / 폴더 / 막대그래프 / 톱니 / 스마트폰 / 더하기 / 체크 | 날짜, 직접 적기, 사진 저장, 백업 보내기, 백업 불러오기, 결산, 설정, 홈 화면에 추가(폰 홈 화면 — 집 모양은 "우리 집"으로 읽힐 수 있어 폰 모양), 내역 적기, 저장·장부에 넣었어요 |
+| `left` / `right` / `down` | ‹ / › / ▾ | 장부로·이전 달 / 다음 달·바꾸기 / 달 고르기·[10월 ▾] |
 
 `itemIcon(name)`(`src/domain/itemIcon.ts`, SPEC-001 AC-18): 위에서부터 처음 맞는 말 — 회비·회원 → 사람들, 대관·장소·임대 → 건물, 간식·커피·음료·다과 → 컵, 지원금·후원·선물 → 선물, 이자·예금·은행 → 은행, 꽃 → 꽃, 그 밖 → 영수증. 아이콘은 늘 화면 읽기에서 숨기고(`aria-hidden`), 뜻은 옆 글자가 전한다.
 
@@ -190,8 +190,10 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `SegmentedControl` | 회색 몸통 안 두 칸, 고른 쪽만 흰 손잡이 + 굵게(`aria-pressed`, `data-state`). 묶음 이름 `role="group"`. 옵션은 꼭 두 개(`SegmentOptions` 튜플) | 수입/지출, 이월금 [남았어요 \| 적자였어요] (#46) |
 | `BottomSheet` | 아래에서 올라오는 흰 창(위쪽 반경 24 + 손잡이), 제목 Heading, `role="dialog"`. 바깥 누르기·Esc 로 닫힘, 열면 창에 포커스·닫으면 연 자리로. 안드로이드 뒤로 버튼은 아래 "선택 창과 뒤로 버튼" | 장부 달 고르기 "몇 월을 볼까요?", 설정 연도 "어느 해 장부를 볼까요?" |
 | `MonthPicker` | 3열 × 4행, 고른 달 청록 채움 + 굵게, 이번 달 청록 테두리(`aria-current="date"`, `data-current`) | `BottomSheet` 안 |
-| `PickRow` | 흰 면 한 줄: [원형 아이콘] 값 ··· 바꾸기 ›, "10월 바꾸기"로 읽힌다 · 눌림 | 내역 적기·고치기 "몇 월인가요?" |
-| `EntryCard` (#68) | 흰 면 + 청록 둘레(`--stroke` 2, `--accent-ink`, 반경 20) 카드 → 머리 "지금 적는 내역"(Caption Bold `--accent-ink`, 카드 이름 = `region` 이름) → 답한 줄(56 이상, 줄 위 가는 선 `--hairline` `--line`): 작은 이름표(Caption `--muted`, 폭 맞춤) + 굵은 값(아이콘 20 + 18 Bold, `PickRow` 값과 같은 크기) + [바꾸기](면 없는 청록 글자 16 SemiBold, 56 × 56 이상, "달 바꾸기"로 읽힌다) · 눌림 → 맨 아래 지금 질문 칸(`children`, 옅은 청록 면 `--primary-wash`, 안쪽 여백 16, 아래 모서리만 카드 안쪽에 맞춰 둥글게). ✓ 동그라미 없음(✓ 는 "장부에 들어감"에만). 둘레를 `overflow: hidden` 으로 자르지 않는다 — [바꾸기] 포커스 링이 잘린다 | 하나씩 채우기에서 지금 적는 내역 하나 (답한 줄 달 / 항목 + 지금 질문) |
+| `DayPicker` (#77) | 날 격자: 1 ~ 그 달 마지막 날(`days`)만, 5칸씩 줄(`data-columns`), 칸 56 이상 · 칸 사이 `--space-1`(390px 폰의 카드 질문 칸 폭 약 306 에서 칸 폭 58 — `--space-2` 면 54.8 로 56 아래). 숫자 하나(18 Medium, 숫자 폭 맞춤), 화면 읽기는 "7일". 고른 날 청록 채움 + 굵게(`aria-pressed`), 오늘 청록 테두리(`aria-current="date"`), 방금 저장한 날 옅은 청록 면 + 작은 "방금"(Caption Bold `--accent-ink`, `data-recent`, 고른 것은 아님). 면은 놓인 바탕 따라: 카드 질문 칸(옅은 청록) 위 흰 칸, 선택 창 안 회색 칸 · 눌림. 묶음 이름 `label`("10월 날짜") | 내역 적기 "며칠인가요?", 고치기 날짜 선택 창 |
+| `MonthButton` (#77) | 질문 제목 옆 [10월 ▾]: 흰 면(반경 16, 56 이상) + 달 글자(Row 16 SemiBold) + ▾, "10월 달 바꾸기"로 읽힘(`aria-haspopup="dialog"`) · 눌림 | 내역 적기 "며칠인가요?" → 열두 달 선택 창 |
+| `PickRow` | 흰 면 한 줄: [원형 아이콘] 값 ··· 바꾸기 ›, "10월 7일 바꾸기"로 읽힌다 · 눌림 | 고치기 "며칠인가요?" 날짜 줄("10월 7일" / 예전 기록 "10월 · 날짜 없음") |
+| `EntryCard` (#68) | 흰 면 + 청록 둘레(`--stroke` 2, `--accent-ink`, 반경 20) 카드 → 머리 "지금 적는 내역"(Caption Bold `--accent-ink`, 카드 이름 = `region` 이름) → 답한 줄(56 이상, 줄 위 가는 선 `--hairline` `--line`): 작은 이름표(Caption `--muted`, 폭 맞춤) + 굵은 값(아이콘 20 + 18 Bold, `PickRow` 값과 같은 크기) + [바꾸기](면 없는 청록 글자 16 SemiBold, 56 × 56 이상, "날짜 바꾸기"로 읽힌다, 그 값을 지금 묻는 줄은 `onChange` 없이 [바꾸기] 를 그리지 않는다 — #77) · 눌림 → 맨 아래 지금 질문 칸(`children`, 옅은 청록 면 `--primary-wash`, 안쪽 여백 16, 아래 모서리만 카드 안쪽에 맞춰 둥글게). ✓ 동그라미 없음(✓ 는 "장부에 들어감"에만). 둘레를 `overflow: hidden` 으로 자르지 않는다 — [바꾸기] 포커스 링이 잘린다 | 하나씩 채우기에서 지금 적는 내역 하나 (답한 줄 날짜 / 항목 + 지금 질문) |
 | `SavedEntries` (#64, #68) | 면 없는 작은 회색 글자(Caption `--muted`): 머리 ✓(16) + "장부에 넣었어요 · N건"(SemiBold, `region` 이름) → 줄마다 이름 + `AmountText`(부호). 방금 저장한 마지막 줄 이름 옆 "방금"(Bold `--accent-ink`, `data-state="latest"`). 최근 2줄만, N 은 전체. 누르는 곳 없음. 금액도 회색 — 장부 색 규칙(수입 `--income-amount`·지출 `--strong`)의 예외: 이 목록은 "지금 적는 내역" 카드보다 눈에 덜 띄어야 해서(SPEC-001 연달아 적기) 색은 빼고 부호(+/−)로만 수입·지출을 나눈다. 장부 화면에 들어가면 장부 색 그대로 보인다 | 연달아 적기에서 이번에 장부에 넣은 내역 |
 | `AmountDisplay` | 흰 카드: 오른쪽 정렬 Display 숫자(숫자 키패드 `inputmode="numeric"`, 콤마 자동, 빈칸이면 자리표시 "0") + 작은 "원" → [+1만] [+5만] [+10만](상한 999,999,999, "1만 원 더하기"로 읽힘, 눌러도 금액 칸 포커스 유지 = 키패드 안 닫힘). 칸 이름은 숨은 `label`, `autoFocus` (#47) | 내역 적기·고치기 "얼마인가요?" |
 | `IconButton` | 아이콘 + 글자. `plain`(면 없음) / `fill`(회색 면, 폭 채움) · 눌림, 점 표시 `dotLabel` | 위쪽 [📊 결산] [⚙ 설정], [‹ 장부로](`BackToLedger`)·[‹ 설정], 카드 안 [🧾 10월 정리 보기], 시작 화면 [📁 백업 불러오기] |
@@ -219,10 +221,10 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 
 | 화면 | 부품 |
 |---|---|
-| 장부 | 위쪽 이름(Heading)·연도(Caption) + `IconButton` [결산][설정•] → (`--stack`) `BalanceCard` → (묶음 간격 `--group-gap`) `MonthStepper`(`onPickMonth` → `BottomSheet`+`MonthPicker`) → 그 달 카드(소계 두 칸 + `ListRow` 줄 + `IconButton fill` [N월 정리 보기]) → `BottomActionBar` [+ 내역 적기]. 안내 띠(저장 > 백업)는 맨 위 하나. 화면 요소는 `screen screen--stack ledger`, 달 넘기기 묶음은 `margin-top: --group-gap − --stack` (#72) |
+| 장부 | 위쪽 이름(Heading)·연도(Caption) + `IconButton` [결산][설정•] → (`--stack`) `BalanceCard` → (묶음 간격 `--group-gap`) `MonthStepper`(`onPickMonth` → `BottomSheet`+`MonthPicker`) → 그 달 카드(소계 두 칸 + `ListRow` 줄(날짜순, 보조 줄 "7일 · 지출", #77) + `IconButton fill` [N월 정리 보기]) → `BottomActionBar` [+ 내역 적기]. 안내 띠(저장 > 백업)는 맨 위 하나. 화면 요소는 `screen screen--stack ledger`, 달 넘기기 묶음은 `margin-top: --group-gap − --stack` (#72) |
 | 설정 | [‹ 장부로] → 제목 → (백업 안내 띠) → 묶음 제목(Label 16 SemiBold, `--muted`) + 흰 카드 안 `ListRow` 줄(값 `--muted` + › `--faint`). 이름·이월금 줄 → 편집 화면([‹ 설정] → 제목 → 입력칸 → [✓ 저장], 키패드에 가리지 않게 주 버튼은 입력칸 바로 아래), 연도 줄 → `BottomSheet`+`OptionList`. 맨 아래 "앱" 묶음 [📱 홈 화면에 추가](보조 줄 "기록이 더 안전해요", 홈 화면 앱이면 묶음째 없음) → 브라우저 설치 창 또는 `BottomSheet`+`InstallGuide` (#56) |
-| 내역 적기 (#47, #56, #68) | [‹ 장부로] → 제목 → (제목과 `--stack` 간격) `EntryCard` "지금 적는 내역"(답한 줄 달 / 항목 "대관료 · 지출") 안 맨 아래 지금 질문 하나(질문 제목 ↔ 답 `--stack-tight`): 1 "무엇인가요?" `OptionList`(최대 6 + [✎ 직접 적기]) + Caption "누르면 바로 다음으로 넘어가요" / 직접 적기 `TextField`(보조 이름) + [‹ 목록에서 고르기] / "수입인가요, 지출인가요?" `SegmentedControl` + Caption / 2 "얼마인가요?" `AmountDisplay` → `BottomActionBar` [다음]·[✓ 저장](1단계엔 없음). [달 바꾸기] → `BottomSheet`+`MonthPicker`, [항목 바꾸기] → 1. 연달아 적기(#64): 한 건이라도 저장했으면 제목 아래 `SavedEntries`(→ `--stack` → 카드), 질문 제목에 초점, 1단계 아래 고정 보조 [다 적었어요]. 화면 요소는 `screen screen--groups entry` — 묶음 간격을 `.entry` 에 다시 쓰면 `.screen` 공통 간격에 덮인다(#66) |
-| 내역 고치기 (#47) | [‹ 장부로] → 제목 → 질문 넷(묶음 간격 `--group-gap`): 몇 월 `PickRow` [바꾸기] → 달 선택 창 / `SegmentedControl` / `OptionList`(고른 종류만, 지금 이름 체크) + `TextField` "직접 적기" / `AmountDisplay` → (`--section-gap`) [이 내역 지우기] → `BottomActionBar` [✓ 저장] |
+| 내역 적기 (#47, #56, #68, #77) | [‹ 장부로] → 제목 → (제목과 `--stack` 간격) `EntryCard` "지금 적는 내역"(답한 줄 날짜 "10월 7일" / 항목 "대관료 · 지출") 안 맨 아래 지금 질문 하나(질문 제목 ↔ 답 `--stack-tight`): 0 "며칠인가요?" + 제목 옆 `MonthButton` [10월 ▾](제목 줄 `entry__question-row`, 양 끝) → `DayPicker` + Caption "누르면 바로 다음으로 넘어가요"(날짜 줄은 [바꾸기] 없음) / 1 "무엇인가요?" `OptionList`(최대 6 + [✎ 직접 적기]) + Caption "누르면 바로 다음으로 넘어가요" / 직접 적기 `TextField`(보조 이름) + [‹ 목록에서 고르기] / "수입인가요, 지출인가요?" `SegmentedControl` + Caption / 2 "얼마인가요?" `AmountDisplay` → `BottomActionBar` [다음]·[✓ 저장](0·1단계엔 없음). [10월 ▾] → `BottomSheet`+`MonthPicker`, [날짜 바꾸기] → 0, [항목 바꾸기] → 1. 연달아 적기(#64): 한 건이라도 저장했으면 제목 아래 `SavedEntries`(→ `--stack` → 카드), "며칠인가요?" 제목에 초점, 방금 저장한 날 "방금", 0·1단계 아래 고정 보조 [다 적었어요]. 화면 요소는 `screen screen--groups entry` — 묶음 간격을 `.entry` 에 다시 쓰면 `.screen` 공통 간격에 덮인다(#66) |
+| 내역 고치기 (#47, #77) | [‹ 장부로] → 제목 → 질문 넷(묶음 간격 `--group-gap`): "며칠인가요?" `PickRow`("10월 7일" / "10월 · 날짜 없음") [바꾸기] → 날짜 선택 창 `EntryDateSheet`(`BottomSheet` 안 `MonthStepper` [‹ 10월 ›](화살표 회색 면) → `DayPicker`, 안 간격 `--stack`, 날을 누르면 닫힘) / `SegmentedControl` / `OptionList`(고른 종류만, 지금 이름 체크) + `TextField` "직접 적기" / `AmountDisplay` → (`--section-gap`) [이 내역 지우기] → `BottomActionBar` [✓ 저장] |
 | 시작(첫 실행·새 연도) | 위쪽 오른쪽 `IconButton`([📁 백업 불러오기] / [⚙ 설정•]) → 제목·안내 → `TextField` → `CarryoverField` → [시작하기] |
 
 ### 선택 창과 뒤로 버튼 (`useScreenHistory`, #46)
@@ -242,7 +244,7 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 - 화면에서 닫기(고르기·바깥·Esc·[‹ 설정]): `closeSheet()` 가 그 칸을 `back()` 으로 되돌린다. 이 popstate 는 화면을 바꾸지 않는다.
 - 고르자마자 장부로 갈 때(설정 연도): `closeSheet()` 를 부르지 말고 `backToLedger()` 하나만 — 창 칸과 화면 칸을 `history.go(-2)` 로 한 번에 되돌린다.
 - 다른 화면을 열거나 장부로 돌아오면 창은 닫힌 상태로 시작한다.
-- 내역 적기·고치기(#47): 달 알약·"바꾸기" 의 달 선택 창(`'entry-month'`, `EntryMonthSheet`)도 이 방법으로 연다. 창이 열린 채 [저장] 할 일은 없지만, 저장 뒤 `backToLedger()` 는 창이 열려 있어도 두 칸을 되돌린다. 하나씩 채우기는 처음 상태(보던 달만)에서 답한 것이 하나라도 있으면 `confirmBeforeLeave(true)`.
+- 내역 적기·고치기(#47, #77): 내역 적기 "며칠인가요?" [10월 ▾] 의 달 선택 창(`'entry-month'`, `EntryMonthSheet`)과 고치기 날짜 줄 [바꾸기] 의 날짜 선택 창(`'entry-date'`, `EntryDateSheet`)도 이 방법으로 연다. 창이 열린 채 [저장] 할 일은 없지만, 저장 뒤 `backToLedger()` 는 창이 열려 있어도 두 칸을 되돌린다. 하나씩 채우기는 처음 상태(보던 달만)에서 답한 것이 하나라도 있으면 `confirmBeforeLeave(true)`.
 
 공통 규칙: 누르는 곳 `--touch-min` 이상, 포커스 링 보임, 그림자 없음(스위치 손잡이 제외), 컴포넌트는 토큰 변수만 쓰고 `className`·`style` 을 받지 않는다. 루트에 `data-testid`, 상태가 있으면 `data-state`/`data-variant`/`data-kind`/`data-tone`.
 
@@ -287,3 +289,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-07 | "적은 내용" 카드(`AnswersCard`)와 지금 질문을 "지금 적는 내역" 카드 `EntryCard`(흰 면 + 청록 둘레, 답한 줄 + 옅은 면 지금 질문 칸)로 합침, "지금/이어서 적을 것" 표시 지움. `SavedEntriesCard` → 면 없는 회색 글자 `SavedEntries`("✓ 장부에 넣었어요 · N건", 최근 2줄, 금액 회색 예외). 새 색 토큰 `--primary-wash`. 내역 적기·고치기 화면 묶음 간격이 `.screen` 공통 간격(20)에 덮이던 것을 `screen--groups` 로 고침(내역 적기 제목 ↔ 카드 4 → 16, 고치기 질문 묶음 사이 20 → 32, #66). 카탈로그 상태 갱신 (#68) | |
 | 2026-10-07 | `BottomActionBar` 아이폰 키패드: `--keyboard-inset` 으로 고정 영역을 올리던 것을 지우고, 키패드가 떠 있는 동안은 지금 질문 바로 아래 흐름에 두고 키패드 바로 위로 스크롤(면·위쪽 선 없음). 갤럭시는 그대로 고정 (#70) | |
 | 2026-10-07 | 장부 화면 요소 간격이 `.screen` 공통 간격(20)에 덮이던 것을 화면 변형 클래스 `screen--stack`(`--stack` 16)으로 고침, `.ledger` 의 `gap`(`--stack-tight`, 덮여 있던 값) 지움. 위쪽 ↔ 잔액 카드 20 → 16, 잔액 카드 ↔ 달 넘기기 묶음 44 → 32(`--group-gap`). 다른 화면 간격은 그대로 (#72) | |
+| 2026-10-07 | 날짜(일): 새 부품 `DayPicker`(날 격자 5칸씩, 칸 사이 `--space-1` 로 390px 카드 안 칸 58, 고른 날 채움·오늘 테두리·방금 옅은 청록 + "방금", 놓인 바탕 따라 면 색)·`MonthButton`([10월 ▾]). `EntryCard` 줄 [바꾸기] 선택(지금 묻는 줄은 없음), 선택 창 안 `MonthStepper` 화살표 회색 면. 내역 적기 0단계 "며칠인가요?"·고치기 날짜 선택 창·장부 줄 "7일 · 지출" 조립. 카탈로그 DayPicker·MonthButton·EntryCard 날짜 상태 (#77) | |
