@@ -19,11 +19,11 @@ import { MoneyInput } from '../ui/MoneyInput'
 import { MonthPicker } from '../ui/MonthPicker'
 import { MonthStepper } from '../ui/MonthStepper'
 import { NoticeBar } from '../ui/NoticeBar'
+import { OptionList } from '../ui/OptionList'
 import { PickRow } from '../ui/PickRow'
 import { SegmentedControl, type SegmentOptions } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
 import { Toast } from '../ui/Toast'
-import { TopTextButton } from '../ui/TopTextButton'
 import './catalog.css'
 
 type ThemeChoice = 'system' | 'light' | 'dark'
@@ -122,6 +122,7 @@ export function Catalog() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [pickedMonth, setPickedMonth] = useState(10)
   const [quickAmount, setQuickAmount] = useState(40000)
+  const [pickedYear, setPickedYear] = useState('2026')
 
   return (
     <div className="catalog" data-theme={theme === 'system' ? undefined : theme} data-testid="design-catalog">
@@ -288,6 +289,36 @@ export function Catalog() {
           <State label={`고른 달 칠함 · 이번 달(10월) 테두리 (눌러 보기) · ${pickedMonth}월`}>
             <div className="catalog__card catalog__card--pad">
               <MonthPicker value={pickedMonth} currentMonth={10} onChange={setPickedMonth} />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="OptionList">
+          <State label="여럿 중 하나 · 고른 줄 옅은 청록 + 체크 (눌러 보기, 설정 장부 연도)">
+            <div className="catalog__card catalog__card--pad">
+              <OptionList
+                label="장부 연도"
+                options={[
+                  { value: '2026', label: '2026년' },
+                  { value: '2025', label: '2025년' },
+                  { value: '2024', label: '2024년' },
+                ]}
+                value={pickedYear}
+                onChange={setPickedYear}
+              />
+            </div>
+          </State>
+          <State label="아이콘 붙음 · 안 고른 줄 눌림">
+            <div className="catalog__card catalog__card--pad" data-preview-pressed="">
+              <OptionList
+                label="항목"
+                options={[
+                  { value: '대관료', label: '대관료', icon: itemIcon('대관료') },
+                  { value: '회비', label: '회비', icon: itemIcon('회비') },
+                ]}
+                value={null}
+                onChange={noop}
+              />
             </div>
           </State>
         </Section>
@@ -515,30 +546,6 @@ export function Catalog() {
           </State>
         </Section>
 
-        <Section title="TopTextButton">
-          <State label="위쪽 글자 버튼 두 개">
-            <div className="catalog__top">
-              <TopTextButton onClick={noop}>올해 결산</TopTextButton>
-              <TopTextButton onClick={noop}>설정</TopTextButton>
-            </div>
-          </State>
-          <State label="점 표시 (백업 필요 — 화면 읽기 이름 '설정 백업 필요')">
-            <div className="catalog__top">
-              <TopTextButton onClick={noop}>올해 결산</TopTextButton>
-              <TopTextButton onClick={noop} dotLabel="백업 필요">
-                설정
-              </TopTextButton>
-            </div>
-          </State>
-          <State label="점 표시 눌림">
-            <div className="catalog__top" data-preview-pressed="">
-              <TopTextButton onClick={noop} dotLabel="백업 필요">
-                설정
-              </TopTextButton>
-            </div>
-          </State>
-        </Section>
-
         <Section title="BottomActionBar">
           <State label="기본 / 비활성">
             <div className="catalog__frame catalog__frame--short">
@@ -611,7 +618,9 @@ export function Catalog() {
             <div className="catalog__row">
               <ChoiceChip selected>간식비</ChoiceChip>
               <ChoiceChip selected={false}>대관료</ChoiceChip>
-              <TopTextButton onClick={noop}>설정</TopTextButton>
+              <IconButton icon="settings" onClick={noop}>
+                설정
+              </IconButton>
             </div>
             <MonthStepper month={9} onPrevious={noop} onNext={noop} />
           </div>

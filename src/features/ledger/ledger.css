@@ -13,7 +13,12 @@
   );
 }
 
-/* 위쪽: 왼쪽 동아리 이름·연도, 오른쪽 [올해 결산] [설정] */
+/* 위쪽 → 잔액 카드는 붙여서(연관), 달 넘기기 묶음은 한 단계 떨어뜨린다 (시안) */
+.ledger {
+  gap: var(--stack-tight);
+}
+
+/* 위쪽: 왼쪽 동아리 이름·연도, 오른쪽 [결산] [설정] */
 .ledger__top {
   display: flex;
   align-items: center;
@@ -27,28 +32,39 @@
 
 .ledger__club {
   margin: 0;
-  font-size: var(--size-body);
-  font-weight: var(--weight-bold);
+  color: var(--strong);
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
   line-height: var(--line-tight);
   overflow-wrap: anywhere;
 }
 
 .ledger__year {
   margin: 0;
-  font-size: var(--size-small);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-medium);
   line-height: var(--line-tight);
   color: var(--muted);
 }
 
+/* 오른쪽 버튼 둘: 화면 끝 여백에 아이콘이 붙지 않게 버튼 안쪽 여백만큼 바깥으로 */
 .ledger__top-actions {
   flex: none;
   display: flex;
-  gap: var(--space-2);
+  margin-right: calc(var(--space-3) * -1);
+}
+
+/* 달 넘기기 + 그 달 카드: 잔액 카드와는 다른 묶음 (묶음 사이 --group-gap) */
+.ledger__month-group {
+  margin-top: calc(var(--group-gap) - var(--stack-tight));
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
 }
 
 /* 그 달 카드: 흰 면 + 소계 두 칸 → 기록 줄 → 정리 보기 버튼 */
 .ledger__month {
-  padding-bottom: var(--space-4);
+  padding: var(--space-1) 0 var(--space-2);
   border-radius: var(--corner-lg);
   background: var(--surface);
   overflow: hidden;
@@ -58,7 +74,7 @@
 
 .ledger__empty {
   margin: 0;
-  padding: var(--space-6) var(--card-pad-inline) var(--space-2);
+  padding: var(--space-6) var(--card-pad-inline);
   color: var(--muted);
   text-align: center;
   text-wrap: balance;
@@ -66,30 +82,36 @@
   word-break: keep-all;
 }
 
+/* 소계 두 칸: 가운데 가는 세로선 하나로 나눈다 (시안) */
 .ledger__subtotals {
   margin: 0;
-  padding: var(--space-4) var(--space-4) var(--space-3);
-  border-bottom: var(--hairline) solid var(--line);
+  padding: var(--space-3) var(--card-pad-inline);
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
 }
 
 .ledger__subtotal {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ledger__subtotal + .ledger__subtotal {
+  padding-left: var(--space-4);
+  border-left: var(--hairline) solid var(--line);
 }
 
 .ledger__subtotal dt {
-  font-size: var(--size-small);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-medium);
   line-height: var(--line-tight);
   color: var(--muted);
 }
 
 .ledger__subtotal-value {
   margin: 0;
-  font-size: var(--size-amount);
+  font-size: var(--text-heading-size);
   font-weight: var(--weight-bold);
   line-height: var(--line-tight);
   letter-spacing: var(--letter-number);
@@ -105,70 +127,24 @@
   color: var(--expense-amount);
 }
 
-/* 기록 줄: 줄 전체를 누르면 고치기. 줄 사이는 선 없이 여백으로 (시안) */
-.ledger__row {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: var(--touch-min);
-  padding: var(--space-2) var(--space-4);
-  border: 0;
-  background: none;
+/* 기록 줄(ListRow): 줄 사이 선 없이 줄 높이(72)로 나눈다 */
+.ledger__rows {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  color: var(--ink);
-  font-family: var(--typeface);
-  font-size: var(--size-body);
-  line-height: var(--line-tight);
-  letter-spacing: var(--letter-body);
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.ledger__row:active {
-  background: var(--pressed);
-}
-
-.ledger__row:focus-visible {
-  outline: var(--focus-ring) solid var(--primary);
-  outline-offset: calc(var(--focus-ring) * -1);
-}
-
-.ledger__row-name {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.ledger__row-amount {
-  flex: none;
-  font-size: var(--size-amount);
-  letter-spacing: var(--letter-number);
+  flex-direction: column;
 }
 
 .ledger__month-action {
-  padding: var(--space-2) var(--space-4) 0;
+  padding: var(--space-2) var(--card-pad-inline) var(--space-2);
+  display: flex;
 }
 
-/* 이월금 입력: 금액칸 아래 "남았어요 / 적자였어요" 두 칸 */
+/* 이월금 입력: 금액칸 아래 [남았어요 | 적자였어요] 스위치 */
 .carryover {
   display: flex;
   flex-direction: column;
   gap: var(--stack-tight);
 }
 
-.carryover__choices {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .ledger__row {
-    transition: background-color var(--motion-fast);
-  }
-}
 
 /* 장부 시작 화면 (묶음 사이 --group-gap 은 .screen--groups) */
 .ledger__intro {

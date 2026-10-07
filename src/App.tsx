@@ -15,9 +15,10 @@ import { storageNotices, type StorageNoticeAction } from './features/storage/sto
 import { useScreenHistory } from './features/useScreenHistory'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import type { IconName } from './ui/Icon'
+import { IconButton } from './ui/IconButton'
 import { NoticeBar } from './ui/NoticeBar'
 import { Toast } from './ui/Toast'
-import { TopTextButton } from './ui/TopTextButton'
 import './features/screens.css'
 
 type AppProps = {
@@ -65,16 +66,16 @@ export default function App({ repository, loaded, options }: AppProps) {
   }
 
   // 저장 상태 안내는 어느 화면이든 맨 위에 (SPEC-002). 할 일이 있으면 백업 버튼을 붙인다
-  const noticeActions: Record<StorageNoticeAction, { label: string; onClick: () => void }> = {
-    'import-backup': { label: '백업 파일 불러오기', onClick: backup.startImport },
-    'send-backup': { label: '백업 파일 보내기', onClick: backup.send },
+  const noticeActions: Record<StorageNoticeAction, { label: string; icon: IconName; onClick: () => void }> = {
+    'import-backup': { label: '백업 파일 불러오기', icon: 'folder', onClick: backup.startImport },
+    'send-backup': { label: '백업 파일 보내기', icon: 'share', onClick: backup.send },
   }
   const storageNoticeList = storageNotices(ledger.startup, ledger.saveFailure)
   const notices = storageNoticeList.map(({ message, action }) => (
     <NoticeBar key={message} message={message} action={action && noticeActions[action]} />
   ))
   const noticeOffersImport = storageNoticeList.some((notice) => notice.action === 'import-backup')
-  // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부 위 띠는 저장 안내가 없을 때만 (장부 위 띠는 하나만: 저장 > 백업 > 설치)
+  // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부·설정 위 띠는 저장 안내가 없을 때만 (띠는 하나만: 저장 > 백업 > 설치)
   const needsBackup = backupReminderFor(ledger.data, now())
   const showBackupReminder = needsBackup && storageNoticeList.length === 0
   const showInstallBanner = !showBackupReminder && storageNoticeList.length === 0
@@ -86,7 +87,9 @@ export default function App({ repository, loaded, options }: AppProps) {
         <>
           {!noticeOffersImport && (
             <div className="screen__top-end">
-              <TopTextButton onClick={backup.startImport}>백업 불러오기</TopTextButton>
+              <IconButton icon="folder" onClick={backup.startImport}>
+                백업 불러오기
+              </IconButton>
             </div>
           )}
           <StartLedgerScreen kind="first" year={ledger.year} defaults={ledger.newLedgerDefaults} onStart={ledger.startLedger} />
@@ -101,6 +104,8 @@ export default function App({ repository, loaded, options }: AppProps) {
             year={ledger.year}
             yearChoices={ledger.yearChoices}
             ledger={ledger.ledger}
+            sheets={navigation}
+            needsBackup={showBackupReminder}
             onChangeYear={(year) => {
               ledger.changeYear(year)
               setViewedMonth(undefined)
@@ -171,17 +176,19 @@ export default function App({ repository, loaded, options }: AppProps) {
 
   function ledgerScreen(): ReactNode {
     const { year, totals } = ledger
+    const today = now()
     if (!ledger.ledger || !totals) {
       // 고른 연도 장부가 아직 없다. 연도를 바꿀 때마다 그 해 기본값으로 입력칸을 새로 채우고, 위쪽 [설정] 으로 지난 장부를 고를 수 있다
       return (
         <>
           <div className="screen__top-end">
-            <TopTextButton
+            <IconButton
+              icon="settings"
               onClick={() => navigation.open({ name: 'settings' })}
               dotLabel={needsBackup ? BACKUP_DOT_LABEL : undefined}
             >
               설정
-            </TopTextButton>
+            </IconButton>
           </div>
           <StartLedgerScreen
             key={year}
@@ -203,7 +210,9 @@ export default function App({ repository, loaded, options }: AppProps) {
           ledger={ledger.ledger}
           totals={totals}
           month={month}
+          currentMonth={year === today.getFullYear() ? today.getMonth() + 1 : undefined}
           onChangeMonth={setViewedMonth}
+          sheets={navigation}
           onOpenMonthSummary={(summaryMonth) => navigation.open({ name: 'month-summary', month: summaryMonth })}
           onOpenYearSummary={() => navigation.open({ name: 'year-summary' })}
           onOpenSettings={() => navigation.open({ name: 'settings' })}

@@ -10,7 +10,7 @@
   background: var(--bg);
   color: var(--ink);
   font-family: var(--typeface);
-  font-size: var(--size-body);
+  font-size: var(--text-body-size);
   line-height: var(--line-body);
   letter-spacing: var(--letter-body);
 }
@@ -38,15 +38,17 @@
   gap: var(--group-gap);
 }
 
-/* 장부 외 화면 맨 위 [← 장부로]: 글자 폭만큼만 왼쪽에 */
+/* 장부 외 화면 맨 위 [‹ 장부로]: 글자 폭만큼만, 화살표가 화면 좌우 여백 선에 오게 버튼 안쪽 여백만큼 바깥으로 */
 .screen__back {
   display: flex;
+  margin-left: calc(var(--space-3) * -1);
 }
 
-/* 위쪽 오른쪽 글자 버튼 하나 (새 연도 시작 화면의 [설정]) */
+/* 위쪽 오른쪽 아이콘 버튼 하나 (첫 실행 [백업 불러오기], 새 연도 시작 화면의 [설정]) */
 .screen__top-end {
   display: flex;
   justify-content: flex-end;
+  margin-right: calc(var(--space-3) * -1);
 }
 
 /* 화면 제목: 글자 위계 맨 위 (Title). 질문·카드 제목(Heading)보다 한 단계 크다 */
