@@ -36,7 +36,12 @@ function SummaryLine({ label, amount, total = false, kind }: SummaryLineProps) {
   )
 }
 
-// 수입 또는 지출 묶음: 그 달 기록을 입력 순으로(같은 이름도 합치지 않는다) + 합계. 기록이 없으면 "없어요" 한 줄
+// 줄 이름: 앞에 "7일"(장부와 같은 날짜순), 날짜 없는 예전 기록은 이름만 (v2.2)
+function entryLabel({ day, name }: Entry): string {
+  return day === undefined ? name : `${day}일 ${name}`
+}
+
+// 수입 또는 지출 묶음: 그 달 기록을 날짜순으로(같은 이름도 합치지 않는다) + 합계. 기록이 없으면 "없어요" 한 줄
 function EntriesCard({ title, entries, total, kind }: { title: '수입' | '지출'; entries: Entry[]; total: number; kind?: 'income' }) {
   const titleId = useId()
   return (
@@ -49,7 +54,7 @@ function EntriesCard({ title, entries, total, kind }: { title: '수입' | '지�
       ) : (
         <>
           {entries.map((entry) => (
-            <SummaryLine key={entry.id} label={entry.name} amount={`${formatAmount(entry.amount)}원`} />
+            <SummaryLine key={entry.id} label={entryLabel(entry)} amount={`${formatAmount(entry.amount)}원`} />
           ))}
           <SummaryLine label={`${title} 합계`} amount={`${formatAmount(total)}원`} total kind={kind} />
         </>

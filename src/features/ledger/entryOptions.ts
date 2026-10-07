@@ -24,5 +24,5 @@ export function itemOptions(choices: readonly FrequentChoice[]): Option<string>[
   }))
 }
 
-// 기록의 달 선택 창 이름 (방문 기록 한 칸, useScreenHistory)
+// 내역 적기 달 선택 창 이름 (방문 기록 한 칸, useScreenHistory)
 export const ENTRY_MONTH_SHEET = 'entry-month'

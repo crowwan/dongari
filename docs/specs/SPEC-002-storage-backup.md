@@ -24,6 +24,7 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 
 - 모든 변경은 즉시 저장된다. "저장" 개념을 사용자에게 노출하지 않는다(입력창의 [저장] 은 기록 확정 의미).
 - 저장 형식: `dongari:v2` 키 하나에 `{ schemaVersion: 2, ledgers: { [year]: Ledger }, settings }`. 상세 근거는 [ADR 001](../decisions/001-storage.md).
+- 기록 날짜(일, `Entry.day`, v2.2)는 선택 칸이다. 날짜 칸이 생기기 전에 적은 기록과 그때 만든 백업 파일은 날짜 없이 그대로 읽힌다. 칸을 더해도 `schemaVersion` 은 2 그대로다(근거와 기준: ADR 001 "스키마 버전을 올리는 기준", #77).
 - 앱 시작 시 `navigator.storage.persist()` 를 요청한다.
 
 ### 홈 화면 추가 (PWA)
@@ -72,6 +73,7 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 - 형식이 다르거나 깨진 파일을 불러오면 아무것도 바꾸지 않고 "이 파일은 열 수 없어요 / 동아리 회계에서 보낸 백업 파일인지 확인해 주세요" 알림 창([확인] 하나).
 - 앱 시작 시 기기에 저장된 데이터가 깨졌거나 형식이 다르면 원본을 `dongari:v2:broken:<시각>` 키로 옮기고(`dongari:v2` 는 비움) 빈 장부로 시작한다. 다시 열어도 같은 원본을 또 보존하지 않는다. 옮겨 적지 못하면 저장을 막아 원본을 덮어쓰지 않는다.
 - 기록 금액은 1원 ~ 999,999,999원 정수만 저장 데이터로 인정한다. 전년도 이월금은 음수(적자)도 된다.
+- 기록 날짜(일)는 없거나, 있으면 1 ~ 장부 연도 그 달 마지막 날 정수만 인정한다(4월 31일, 윤년이 아닌 해 2월 29일은 형식이 다른 데이터). 범위 밖이면 위 깨진 데이터·형식이 다른 파일과 같이 처리한다.
 - 앱 시작 시 기기에 더 높은 `schemaVersion` 데이터가 있으면 빈 장부로 보여 주되 저장을 막는다(다시 연 새 버전 앱이 다시 읽을 수 있게).
 - 위 두 경우는 앱 시작 때 장부 화면 위에 안내를 띄운다 (`load()` 의 시작 상태로 구분).
 
@@ -107,7 +109,7 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 - 저장소 계층: `LedgerRepository` 인터페이스(`load`, `save`) + `LocalStorageRepository` 구현. `load()` 는 데이터와 시작 상태(`ok` / `recovered` / `read-only` + 이유)를 함께 돌려준다 (#11). 테스트는 메모리 구현으로. 나중에 IndexedDB·클라우드로 바꿀 때 이 경계만 교체.
 - `load()` 는 깨진 원본을 옮기는 부작용이 있어 진입점(`main.tsx`)에서 앱 시작 때 한 번만 부르고, 그 결과(`LoadResult`)를 `useLedger` 에 넘긴다 (#12).
 - 시작 안내·저장 실패 안내는 화면 맨 위 안내 띠로 띄운다. 저장을 막아 둔(`read-only`) 상태의 저장 실패는 시작 안내 하나로만 알린다 (#12).
-- 스키마 검증: 불러오기·이전 시 런타임 검증 필요(`as` 금지 규칙). 결정: 외부 라이브러리 없이 수동 타입 가드 (`src/storage/schema.ts`, #7).
+- 스키마 검증: 불러오기·이전 시 런타임 검증 필요(`as` 금지 규칙). 결정: 외부 라이브러리 없이 수동 타입 가드 (`src/storage/schema.ts`, #7). 날짜(일)는 `isEntry` 가 1~31 정수만, 그 달 마지막 날은 장부 연도를 아는 `isLedger` 가 `domain/entryDate.isDayInMonth` 로 본다 (#77).
 - 공유: `navigator.canShare({ files })` → `navigator.share`, 아니면 `<a download>` + Blob URL. 공유 취소(`AbortError`)는 조용히 끝내고, 그 밖의 공유 실패는 내려받기로 대신한다. 공유 화면은 누른 순간에만 열리므로 파일은 클릭 처리 안에서 동기로 만든다 (#8).
 - 백업 파일: `src/storage/backup.ts` 의 `createBackup`·`readBackup`. 읽기는 `JSON.parse` 실패(`broken`) / 형식 다름(`not-backup`) / 상위 버전(`newer-version`)을 구분하고, 저장소와 같은 `migrate` 를 거친다. 저장소 교체는 `LedgerRepository.restore` (저장 막힘 해제 규칙 포함) (#8).
 - PWA: `vite-plugin-pwa` (`src/pwa/pwaOptions.ts`). 빌드 경로(`APP_BASE`, 기본 `/dongari/`)를 `vite.config.ts` 가 `base` 와 `pwaOptions(tokens, base)` 에 함께 넘겨 id·scope·start_url 과 서비스 워커 범위를 맞춘다. 릴리스 전 QA 미리보기는 `/dongari/preview/`. 배포는 GitHub Actions(`deploy.yml`, #52): main 머지 → 미리보기(gh-pages 의 `preview/` 만 교체), 태그 `v*` → 본 주소(gh-pages 전체 교체, 미리보기는 다음 머지 때 다시 채움). 주의는 `CLAUDE.md` 실행·배포. `registerType: 'autoUpdate'` + `injectRegister: 'script'`(등록만 하는 스크립트, 자동 새로고침 코드 없음), workbox 프리캐시(화면 파일 js·css·html + 아이콘 + manifest), 옛 캐시 정리. 본 주소 빌드에만 `navigateFallbackDenylist`(base 아래 `preview`·`lab` 화면 요청은 본 앱 `index.html` 로 답하지 않음 — 본 주소 서비스 워커가 미리보기를 덮지 않게, v2.1.0 서비스 워커가 깔린 뒤부터, #54). manifest 색은 빌드 때 `tokens.css` 에서 읽는다. 아이콘은 `scripts/make-icons.mjs` 로 토큰 색 SVG → PNG (#10).
@@ -141,3 +143,4 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 | 2026-10-07 | 기술 메모: 본 주소 서비스 워커가 미리보기·lab 화면 요청을 덮지 않게 (#54) |
 | 2026-10-07 | 디자인 개편 2(#46): 설정 "기록 백업" 을 줄 목록으로(보내기 줄 보조 줄에 마지막 백업 날짜, 불러오기 줄 "새 폰으로 옮길 때"), 30일 백업 안내 띠를 설정 화면에도(장부·설정만), 안내 띠·[설정] 버튼 아이콘, 점 표시는 `IconButton` |
 | 2026-10-07 | 홈 화면 추가: 장부 위 설치 안내 띠 → 설정 화면 맨 아래 "앱" 묶음 [홈 화면에 추가] 줄(설치 제안 있으면 설치 창, 없으면 방법 안내 선택 창, 홈 화면 앱·설치 완료면 숨김), 30일 [닫기] 규칙 삭제, 장부 위 띠 순서는 저장 > 백업 둘만, 기술 메모 (#56) |
+| 2026-10-07 | 기록 날짜(일) 선택 칸: 날짜 없는 예전 기록·백업 파일은 그대로 읽힘, 범위(1 ~ 장부 연도 그 달 마지막 날) 밖은 깨진 데이터, `schemaVersion` 2 그대로(ADR 001 기준), 기술 메모 가드 위치 (#77) |

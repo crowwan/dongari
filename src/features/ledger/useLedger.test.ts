@@ -103,12 +103,13 @@ describe('SPEC-001 useLedger', () => {
       const { result } = renderLedger(repository)
       expect(result.current.totals?.balance).toBe(200_000)
 
-      act(() => result.current.addEntry({ month: 10, type: 'expense', name: '간식비', amount: 28_340 }))
+      act(() => result.current.addEntry({ month: 10, day: 3, type: 'expense', name: '간식비', amount: 28_340 }))
 
       expect(result.current.totals).toEqual({ income: 140_000, expense: 68_340, balance: 171_660 })
       expect(repository.load().data.ledgers['2026']?.entries.at(-1)).toEqual({
         id: 'id-1',
         month: 10,
+        day: 3,
         type: 'expense',
         name: '간식비',
         amount: 28_340,
@@ -141,8 +142,8 @@ describe('SPEC-001 useLedger', () => {
       const { result } = renderLedger(repository)
 
       act(() => {
-        result.current.addEntry({ month: 1, type: 'income', name: '회비', amount: 1_000 })
-        result.current.addEntry({ month: 2, type: 'income', name: '회비', amount: 2_000 })
+        result.current.addEntry({ month: 1, day: 3, type: 'income', name: '회비', amount: 1_000 })
+        result.current.addEntry({ month: 2, day: 3, type: 'income', name: '회비', amount: 2_000 })
       })
 
       expect(result.current.ledger?.entries.map((item) => item.amount)).toEqual([1_000, 2_000])
@@ -304,12 +305,12 @@ describe('SPEC-001 useLedger', () => {
       // 기록 추가도 같은 방식으로 저장 결과를 돌려준다 (실패면 "저장했어요" 를 띄우지 않게)
       next = { ok: false, reason: 'quota-exceeded' }
       act(() => {
-        saved = result.current.addEntry({ month: 10, type: 'expense', name: '간식비', amount: 5_000 })
+        saved = result.current.addEntry({ month: 10, day: 3, type: 'expense', name: '간식비', amount: 5_000 })
       })
       expect(saved).toBe(false)
       next = { ok: true }
       act(() => {
-        saved = result.current.addEntry({ month: 10, type: 'expense', name: '꽃값', amount: 3_000 })
+        saved = result.current.addEntry({ month: 10, day: 3, type: 'expense', name: '꽃값', amount: 3_000 })
       })
       expect(saved).toBe(true)
 
@@ -407,7 +408,7 @@ describe('SPEC-001 useLedger', () => {
       expect(result.current.startup).toEqual({ status: 'ok' })
       let saved = false
       act(() => {
-        saved = result.current.addEntry({ month: 10, type: 'expense', name: '간식비', amount: 5_000 })
+        saved = result.current.addEntry({ month: 10, day: 3, type: 'expense', name: '간식비', amount: 5_000 })
       })
       expect(saved).toBe(true)
       expect(new LocalStorageRepository().load().data.ledgers['2026']?.entries).toHaveLength(3)

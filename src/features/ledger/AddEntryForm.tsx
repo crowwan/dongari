@@ -1,18 +1,20 @@
 import { useEffect, useReducer, useRef, type Ref } from 'react'
+import { daysInMonth } from '../../domain/entryDate'
 import { itemIcon } from '../../domain/itemIcon'
 import type { EntryInput, FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
 import { AmountDisplay } from '../../ui/AmountDisplay'
 import { BottomActionBar } from '../../ui/BottomActionBar'
+import { DayPicker } from '../../ui/DayPicker'
 import { EntryCard, type EntryCardRow } from '../../ui/EntryCard'
 import { IconButton } from '../../ui/IconButton'
+import { MonthButton } from '../../ui/MonthButton'
 import { OptionList } from '../../ui/OptionList'
 import { SavedEntries } from '../../ui/SavedEntries'
 import { SegmentedControl } from '../../ui/SegmentedControl'
 import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
 import type { SheetHistory } from '../useScreenHistory'
-import { checkDraft } from './entryDraft'
 import { EntryMonthSheet } from './EntryMonthSheet'
 import { ENTRY_MONTH_SHEET, itemOptions, TYPE_LABELS, TYPE_SEGMENTS } from './entryOptions'
 import {
@@ -20,6 +22,7 @@ import {
   isStepDirty,
   startSteps,
   stepButton,
+  stepInput,
   stepReducer,
   type AnswerRow,
   type StepAction,
@@ -28,12 +31,15 @@ import {
 import './entry.css'
 
 type AddEntryFormProps = {
-  // 장부에서 보던 달 ("지금 적는 내역" 카드 달 줄 기본값, AC-3). 연달아 적을 때는 마지막에 저장한 달
+  // 장부 연도 (그 달 마지막 날, 2월 윤년)
+  year: number
+  // 장부에서 보던 달 ("지금 적는 내역" 카드 날짜 줄 기본값, AC-3). 연달아 적을 때는 마지막에 저장한 달
   month: number
   // 이번에 내역 적기 화면에 들어와 저장한 내역 (연달아 적기, AC-20). 저장할 때마다 App 이 이 화면을 처음 상태로 다시 그린다
   saved: EntryInput[]
-  // 이번 달 (달 선택 창 테두리). 올해 장부가 아니면 주지 않는다
+  // 이번 달 (달 선택 창 테두리)과 오늘 (날 격자 테두리). 올해 장부가 아니면 주지 않는다
   currentMonth?: number
+  currentDay?: number
   // 자주 쓴 항목. 종류를 고르기 전이라 두 종류를 섞어서 받는다
   frequentChoices: (type?: EntryType) => FrequentChoice[]
   // 직접 적은 이름을 예전에 쓴 종류. 처음 쓰는 이름이면 undefined (AC-15)
@@ -47,12 +53,14 @@ type AddEntryFormProps = {
 
 // 내역 적기 (SPEC-001 기록 입력, ADR 004): 적는 내역 하나는 "지금 적는 내역" 카드 하나 — 답한 것은 카드 안 한 줄로 접히고,
 // 지금 할 질문 하나만 같은 카드 맨 아래에 펼쳐진다(AC-23).
-// 무엇인가요?(항목 목록 / 직접 적기 → 처음 쓰는 이름이면 수입·지출) → 얼마인가요? → [저장]. 단계 상태는 entrySteps 순수 함수
-// 저장하면 장부로 가지 않고 "무엇인가요?" 부터 다음 내역을 묻는다(연달아 적기 v2.1). 맨 위 "장부에 넣었어요 · N건" 목록 + 아래 [다 적었어요]
+// 며칠인가요?(날 격자, v2.2) → 무엇인가요?(항목 목록 / 직접 적기 → 처음 쓰는 이름이면 수입·지출) → 얼마인가요? → [저장]. 단계 상태는 entrySteps 순수 함수
+// 저장하면 장부로 가지 않고 "며칠인가요?" 부터 다음 내역을 묻는다(연달아 적기 v2.1, 날은 매번 묻는다). 맨 위 "장부에 넣었어요 · N건" 목록 + 아래 [다 적었어요]
 export function AddEntryForm({
+  year,
   month,
   saved,
   currentMonth,
+  currentDay,
   frequentChoices,
   lastUsedType,
   sheets,
@@ -60,8 +68,9 @@ export function AddEntryForm({
   onBack,
   onDirtyChange,
 }: AddEntryFormProps) {
-  const [state, dispatch] = useReducer(stepReducer, month, startSteps)
+  const [state, dispatch] = useReducer(stepReducer, { year, month }, startSteps)
   const { draft } = state
+  const lastSaved = saved.at(-1)
   const dirty = isStepDirty(state, month)
   const button = stepButton(state)
   const continuing = saved.length > 0
@@ -85,20 +94,27 @@ export function AddEntryForm({
         dispatch({ kind: 'submit-type' })
         return
       case 'amount': {
-        const check = checkDraft(draft)
+        const check = stepInput(state)
         if (check.ok) onSave(check.input)
         return
       }
+      case 'day':
       case 'item':
         return
     }
   }
 
-  // "지금 적는 내역" 카드 답한 줄: [달 바꾸기] → 달 선택 창, [항목 바꾸기] → 항목 고르기로 (AC-16, 금액 유지)
+  // "지금 적는 내역" 카드 답한 줄: [날짜 바꾸기] → 며칠인가요?로 (AC-25, 항목·금액 유지), [항목 바꾸기] → 항목 고르기로 (AC-16, 금액 유지).
+  // 날짜를 묻고 있는 동안 날짜 줄에는 [바꾸기] 가 없다 (질문 제목 옆 [10월 ▾] 로 달을 바꾼다)
   function cardRow(row: AnswerRow): EntryCardRow {
     switch (row.kind) {
-      case 'month':
-        return { label: '달', icon: 'calendar', value: `${row.month}월`, onChange: () => sheets.openSheet(ENTRY_MONTH_SHEET) }
+      case 'date':
+        return {
+          label: '날짜',
+          icon: 'calendar',
+          value: row.day === undefined ? `${row.month}월` : `${row.month}월 ${row.day}일`,
+          onChange: state.step === 'day' ? undefined : () => dispatch({ kind: 'revisit-day' }),
+        }
       case 'item':
         return {
           label: '항목',
@@ -123,6 +139,9 @@ export function AddEntryForm({
               frequentChoices={frequentChoices}
               dispatch={dispatch}
               onSubmit={pressButton}
+              onPickMonth={() => sheets.openSheet(ENTRY_MONTH_SHEET)}
+              today={draft.month === currentMonth ? currentDay : undefined}
+              recentDay={lastSaved?.month === draft.month ? lastSaved.day : undefined}
               questionRef={questionRef}
             />
           </div>
@@ -138,7 +157,7 @@ export function AddEntryForm({
           onClick={pressButton}
         />
       )}
-      {/* 항목 고르기 단계(버튼 없음)에서만. 끝내기도 [← 장부로] 와 같은 길이라 적던 내용이 있으면 묻는다 (AC-21) */}
+      {/* 날·항목 고르기 단계(버튼 없음)에서만. 끝내기도 [← 장부로] 와 같은 길이라 적던 내용이 있으면 묻는다 (AC-21) */}
       {!button && continuing && <BottomActionBar variant="secondary" label="다 적었어요" onClick={onBack} />}
 
       <EntryMonthSheet
@@ -156,14 +175,39 @@ type StepQuestionProps = {
   frequentChoices: (type?: EntryType) => FrequentChoice[]
   dispatch: (action: StepAction) => void
   onSubmit: () => void
-  // 항목 고르기 질문 제목 (이어서 적을 때 초점을 옮긴다)
+  // "며칠인가요?" 제목 옆 [10월 ▾] → 열두 달 선택 창
+  onPickMonth: () => void
+  // 날 격자의 오늘(테두리)과 방금 저장한 날("방금"). 지금 달에 없으면 undefined
+  today: number | undefined
+  recentDay: number | undefined
+  // 처음 질문 제목 (이어서 적을 때 초점을 옮긴다)
   questionRef: Ref<HTMLHeadingElement>
 }
 
 // 지금 단계의 질문 하나와 답하는 자리
-function StepQuestion({ state, frequentChoices, dispatch, onSubmit, questionRef }: StepQuestionProps) {
+function StepQuestion({ state, frequentChoices, dispatch, onSubmit, onPickMonth, today, recentDay, questionRef }: StepQuestionProps) {
   const { draft } = state
   switch (state.step) {
+    case 'day':
+      return (
+        <>
+          <div className="entry__question-row">
+            <h2 className="entry__question" ref={questionRef} tabIndex={-1}>
+              며칠인가요?
+            </h2>
+            <MonthButton month={draft.month} onClick={onPickMonth} />
+          </div>
+          <DayPicker
+            label={`${draft.month}월 날짜`}
+            days={daysInMonth(state.year, draft.month)}
+            value={draft.day ?? null}
+            today={today}
+            recent={recentDay}
+            onChange={(day) => dispatch({ kind: 'pick-day', day })}
+          />
+          <p className="screen__note">누르면 바로 다음으로 넘어가요</p>
+        </>
+      )
     case 'item': {
       const choices = frequentChoices()
       return (

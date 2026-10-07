@@ -49,6 +49,16 @@ function withEntryPatch(patch: Record<string, unknown>): unknown {
   return withLedgerPatch({ entries: [{ ...entry, ...patch }] })
 }
 
+// 그 해 장부에 기록 하나 (2월 29일처럼 장부 연도에 따라 갈리는 날짜)
+function withYearEntry(year: number, patch: Record<string, unknown>): unknown {
+  const entry = { id: 'e1', month: 1, type: 'income', name: '회비', amount: 1000, createdAt: `${year}-01-01T00:00:00.000Z` }
+  return {
+    schemaVersion: 2,
+    ledgers: { [String(year)]: { year, clubName: '동아리', carryover: 0, entries: [{ ...entry, ...patch }] } },
+    settings: {},
+  }
+}
+
 describe('SPEC-002 저장 스키마 검증', () => {
   it('AC-2 빈 초기값은 schemaVersion 2 이고 스스로 검증을 통과한다', () => {
     const empty = createEmptyData()
@@ -65,6 +75,10 @@ describe('SPEC-002 저장 스키마 검증', () => {
     ['금액 1원', withEntryPatch({ amount: 1 })],
     ['금액 상한', withEntryPatch({ amount: ENTRY_AMOUNT_MAX })],
     ['이월금 음수 (전년도 적자)', withLedgerPatch({ carryover: -50_000 })],
+    ['날짜(일) 없는 예전 기록 (v2.2 전)', withEntryPatch({})],
+    ['날짜 1일', withEntryPatch({ day: 1 })],
+    ['날짜 그 달 마지막 날 (1월 31일)', withEntryPatch({ day: 31 })],
+    ['윤년 2월 29일 (2028년 장부)', withYearEntry(2028, { month: 2, day: 29 })],
   ])('경계 안의 값은 인정한다: %s', (_label, raw) => {
     expect(isStoredData(raw)).toBe(true)
   })
@@ -107,6 +121,13 @@ describe('SPEC-002 저장 스키마 검증', () => {
     ['금액이 문자열', withEntryPatch({ amount: '1000' })],
     ['createdAt 없음', withEntryPatch({ createdAt: undefined })],
     ['batchId 가 숫자', withEntryPatch({ batchId: 1 })],
+    ['날짜 0', withEntryPatch({ day: 0 })],
+    ['날짜 32', withEntryPatch({ day: 32 })],
+    ['날짜 소수', withEntryPatch({ day: 1.5 })],
+    ['날짜 문자열', withEntryPatch({ day: '7' })],
+    ['날짜 null', withEntryPatch({ day: null })],
+    ['그 달에 없는 날 (4월 31일)', withEntryPatch({ month: 4, day: 31 })],
+    ['윤년이 아닌 해 2월 29일 (2026년 장부)', withYearEntry(2026, { month: 2, day: 29 })],
   ])('기록 형식이 틀리면 거부한다: %s', (_label, raw) => {
     expect(isStoredData(raw)).toBe(false)
   })

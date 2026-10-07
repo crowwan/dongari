@@ -98,7 +98,25 @@ describe('SPEC-001 장부 화면', () => {
   })
 
   describe('한 달씩 보기', () => {
-    it('AC-9 그 달의 수입·지출 소계와 기록을 입력 순으로 보여준다', () => {
+    it('AC-9 기록은 날짜순(같은 날은 적은 순, 날짜 없는 예전 기록은 맨 뒤)이고 이름 아래 "7일 · 지출"(날짜 없으면 "지출"만)', () => {
+      const dated = ledgerWith([
+        { ...entry('old', 10, 'expense', '옛 기록', 1_000), createdAt: '2026-10-01T00:00:00.000Z' },
+        { ...entry('late', 10, 'income', '회비', 140_000), day: 7, createdAt: '2026-10-09T00:00:00.000Z' },
+        { ...entry('third', 10, 'expense', '대관료', 40_000), day: 3, createdAt: '2026-10-08T00:00:00.000Z' },
+        { ...entry('early', 10, 'expense', '간식비', 5_000), day: 7, createdAt: '2026-10-02T00:00:00.000Z' },
+      ])
+      renderScreen(dated, 10)
+
+      const rows = within(monthCard()).getAllByTestId('list-row')
+      expect(rows.map((row) => row.textContent)).toEqual([
+        '대관료 3일 · 지출 −40,000원',
+        '간식비 7일 · 지출 −5,000원',
+        '회비 7일 · 수입 +140,000원',
+        '옛 기록 지출 −1,000원',
+      ])
+    })
+
+    it('AC-9 그 달의 수입·지출 소계와 기록을 보여준다 (날짜 없는 예전 기록끼리는 적은 순)', () => {
       renderScreen(SAMPLE, 9)
 
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('9월')

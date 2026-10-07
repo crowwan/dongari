@@ -62,4 +62,15 @@ describe('SPEC-001 EntryCard (지금 적는 내역 카드)', () => {
     expect(changeItem).toHaveBeenCalledTimes(1)
     expect(changeMonth).toHaveBeenCalledTimes(1)
   })
+
+  it('AC-24 바꾸기가 없는 줄(지금 묻고 있는 날짜 줄)은 [바꾸기] 없이 값만 보인다', () => {
+    render(
+      <EntryCard rows={[{ label: '날짜', icon: 'calendar', value: '10월' }]}>
+        <h2>며칠인가요?</h2>
+      </EntryCard>,
+    )
+
+    expect(screen.getByTestId('entry-card-value')).toHaveTextContent('10월')
+    expect(screen.queryByRole('button', { name: '날짜 바꾸기' })).not.toBeInTheDocument()
+  })
 })

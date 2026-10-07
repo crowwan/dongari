@@ -53,6 +53,32 @@ describe('SPEC-002 저장 (localStorage)', () => {
     expect(JSON.parse(raw ?? '')).toMatchObject({ schemaVersion: 2 })
   })
 
+  it('날짜(일) 칸이 생기기 전(v2.1) 앱이 저장한 기록을 그대로 읽고, 날짜를 붙인 기록과 함께 schemaVersion 2 로 저장한다', () => {
+    const v21 = sampleData()
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(v21))
+    const repository = new LocalStorageRepository()
+
+    expect(repository.load()).toEqual({ status: 'ok', data: v21 })
+
+    const ledger2026 = v21.ledgers['2026']
+    if (!ledger2026) throw new Error('2026년 장부가 없다')
+    const dated: StoredData = {
+      ...v21,
+      ledgers: {
+        '2026': {
+          ...ledger2026,
+          entries: [
+            ...ledger2026.entries,
+            { id: 'e2', month: 3, day: 31, type: 'income', name: '회비', amount: 50_000, createdAt: '2026-03-31T10:00:00.000Z' },
+          ],
+        },
+      },
+    }
+    expect(repository.save(dated)).toEqual({ ok: true })
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '')).toMatchObject({ schemaVersion: 2 })
+    expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data: dated })
+  })
+
   it('저장된 데이터가 없으면 빈 초기값으로 정상(ok) 시작한다', () => {
     expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data: { schemaVersion: 2, ledgers: {}, settings: {} } })
   })
@@ -72,6 +98,21 @@ describe('SPEC-002 저장 (localStorage)', () => {
     it.each([
       ['JSON 이 깨짐', '{"schemaVersion": 2,'],
       ['형식이 다름', JSON.stringify({ schemaVersion: 2, ledgers: [] })],
+      [
+        '그 달에 없는 날짜 (2026년 2월 29일)',
+        JSON.stringify({
+          schemaVersion: 2,
+          ledgers: {
+            '2026': {
+              year: 2026,
+              clubName: '동아리',
+              carryover: 0,
+              entries: [{ id: 'e1', month: 2, day: 29, type: 'income', name: '회비', amount: 1, createdAt: '2026-02-28T00:00:00.000Z' }],
+            },
+          },
+          settings: {},
+        }),
+      ],
     ])('%s: 원본을 별도 키에 옮기고 빈 초기값으로 시작했다(recovered)고 알린다', (_label, raw) => {
       localStorage.setItem(STORAGE_KEY, raw)
 

@@ -9,6 +9,8 @@ export const ENTRY_AMOUNT_MAX = 999_999_999
 export interface Entry {
   id: string
   month: number // 1~12
+  // 며칠 (1 ~ 그 달 마지막 날, 장부 연도 윤년 반영, v2.2). 새로 적는 내역은 늘 있고, 그 전에 적은 예전 기록에는 없다
+  day?: number
   type: EntryType
   name: string
   amount: number // 1 ~ ENTRY_AMOUNT_MAX 정수

@@ -1,8 +1,9 @@
 // 장부 계산·변경 순수 함수 (SPEC-001). 화면·저장소와 무관하게 Ledger 만 다룬다
+import { byDate, isDayInMonth } from './entryDate'
 import { ENTRY_AMOUNT_MAX, type Entry, type EntryType, type Ledger } from './types'
 
-// 사용자가 입력하는 기록 내용. id·createdAt 은 앱이 붙인다
-export type EntryInput = Pick<Entry, 'month' | 'type' | 'name' | 'amount' | 'batchId'>
+// 사용자가 입력하는 기록 내용. id·createdAt 은 앱이 붙인다. 날짜(일)는 새로 적을 때 꼭 있고, 날짜 없는 예전 기록을 고칠 때만 빠진다
+export type EntryInput = Pick<Entry, 'month' | 'day' | 'type' | 'name' | 'amount' | 'batchId'>
 
 // 장부를 시작하거나 고칠 때 입력하는 동아리 정보
 export type LedgerInfo = Pick<Ledger, 'clubName' | 'carryover'>
@@ -23,7 +24,7 @@ export interface MonthGroup {
   month: number
   income: number
   expense: number
-  entries: Entry[] // 입력 순
+  entries: Entry[] // 날짜순 (entryDate.byDate)
 }
 
 // 자주 쓴 항목 버튼 하나: 이름과, 누르면 함께 고를 종류
@@ -61,9 +62,9 @@ export function calculateTotals(ledger: Ledger): LedgerTotals {
   return { income, expense, balance: ledger.carryover + income - expense }
 }
 
-// 한 달 보기 (AC-9): 그 달 기록(입력 순)과 수입·지출 소계. 기록이 없는 달은 빈 목록
+// 한 달 보기 (AC-9): 그 달 기록(날짜순)과 수입·지출 소계. 기록이 없는 달은 빈 목록
 export function monthGroup(entries: readonly Entry[], month: number): MonthGroup {
-  const monthEntries = entries.filter((entry) => entry.month === month)
+  const monthEntries = byDate(entries.filter((entry) => entry.month === month))
   return {
     month,
     income: sumAmounts(monthEntries, 'income'),
@@ -77,28 +78,37 @@ export function firstVisibleMonth(year: number, today: Date): number {
   return year === today.getFullYear() ? today.getMonth() + 1 : 12
 }
 
-// 입력을 다듬고 저장 형식 범위를 확인한다. 범위 밖 값이 저장되면 다음 실행 때 데이터 전체가 깨진 것으로 처리되므로 막는다
-function normalizeEntryInput(input: EntryInput): EntryInput {
+// 입력을 다듬고 저장 형식 범위를 확인한다. 범위 밖 값이 저장되면 다음 실행 때 데이터 전체가 깨진 것으로 처리되므로 막는다.
+// 날짜(일)는 장부 연도의 그 달 안이어야 한다 (2월은 윤년 반영)
+function normalizeEntryInput(year: number, input: EntryInput): EntryInput {
   const name = input.name.trim()
   if (!Number.isInteger(input.month) || input.month < 1 || input.month > 12) {
     throw new InvalidLedgerInputError(`월은 1~12 사이여야 한다: ${input.month}`)
+  }
+  if (input.day !== undefined && !isDayInMonth(year, input.month, input.day)) {
+    throw new InvalidLedgerInputError(`${year}년 ${input.month}월에 없는 날이다: ${input.day}`)
   }
   if (name.length === 0) throw new InvalidLedgerInputError('항목 이름이 비어 있다')
   if (!Number.isInteger(input.amount) || input.amount < 1 || input.amount > ENTRY_AMOUNT_MAX) {
     throw new InvalidLedgerInputError(`금액은 1 ~ ${ENTRY_AMOUNT_MAX} 정수여야 한다: ${input.amount}`)
   }
+  // 없는 값은 키째 빼서 저장 데이터에 `day: undefined` 같은 빈 칸이 남지 않게 한다
   const normalized: EntryInput = { month: input.month, type: input.type, name, amount: input.amount }
-  return input.batchId === undefined ? normalized : { ...normalized, batchId: input.batchId }
+  const dated = input.day === undefined ? normalized : { ...normalized, day: input.day }
+  return input.batchId === undefined ? dated : { ...dated, batchId: input.batchId }
 }
 
+// 새로 적는 내역은 날짜(일)가 꼭 있다 (AC-24). 날짜 없는 기록은 v2.2 전에 적은 예전 기록뿐이다
 export function addEntry(ledger: Ledger, input: EntryInput, deps: EntryDeps): Ledger {
-  const entry: Entry = { id: deps.createId(), ...normalizeEntryInput(input), createdAt: deps.now().toISOString() }
+  if (input.day === undefined) throw new InvalidLedgerInputError('새로 적는 내역에 날짜(일)가 없다')
+  const entry: Entry = { id: deps.createId(), ...normalizeEntryInput(ledger.year, input), createdAt: deps.now().toISOString() }
   return { ...ledger, entries: [...ledger.entries, entry] }
 }
 
-// id·입력 시각·순서는 그대로 두고 내용만 바꾼다. 입력에 묶음이 없으면 원래 묶음(사진으로 함께 넣은 것)도 그대로
+// id·입력 시각·순서는 그대로 두고 내용만 바꾼다. 입력에 묶음이 없으면 원래 묶음(사진으로 함께 넣은 것)도 그대로.
+// 날짜는 입력 그대로: 날짜 없는 예전 기록은 날짜 없이도 저장된다 (AC-25)
 export function updateEntry(ledger: Ledger, id: string, input: EntryInput): Ledger {
-  const content = normalizeEntryInput(input)
+  const content = normalizeEntryInput(ledger.year, input)
   return {
     ...ledger,
     entries: ledger.entries.map((entry) => {

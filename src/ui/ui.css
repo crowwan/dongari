@@ -16,6 +16,8 @@
 .ui-options__option,
 .ui-segment__option,
 .ui-months__month,
+.ui-days__day,
+.ui-month-button,
 .ui-pick,
 .ui-entry-card__change,
 .ui-amount-display__field,
@@ -32,6 +34,8 @@
 .ui-stepper__pick:focus-visible,
 .ui-segment__option:focus-visible,
 .ui-months__month:focus-visible,
+.ui-days__day:focus-visible,
+.ui-month-button:focus-visible,
 .ui-pick:focus-visible,
 .ui-entry-card__change:focus-visible,
 .ui-amount-display__add:focus-visible,
@@ -748,6 +752,94 @@ button.ui-row {
 }
 
 /*
+ * 날 격자 (SPEC-001 v2.2 "며칠인가요?"): 5칸씩 줄. 열두 달과 같은 모양 규칙 — 고른 날 청록 채움 + 굵게, 오늘 청록 테두리.
+ * 칸 사이는 열두 달(--space-2)보다 좁게(--space-1): 390px 폰의 "지금 적는 내역" 카드 질문 칸(폭 약 306) 안에서도 칸 폭이 56 이상 (306 − 4 × 4) ÷ 5 = 58.
+ * 면은 놓인 바탕과 다르게: 지금 질문 칸(옅은 청록 면) 위 흰 칸, 선택 창(흰 면) 안 회색 칸
+ */
+.ui-days {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.ui-days__day {
+  min-height: var(--touch-min);
+  padding: var(--space-1) 0;
+  border: 0;
+  border-radius: var(--corner-sm);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  font-size: var(--size-large);
+  font-weight: var(--weight-medium);
+  line-height: var(--line-tight);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.ui-sheet .ui-days__day {
+  background: var(--fill);
+}
+
+.ui-days__day[data-current='true'] {
+  box-shadow: inset 0 0 0 var(--stroke) var(--accent-ink);
+}
+
+/* 방금 저장한 날: 옅은 청록 면 + 작은 "방금" (고른 것은 아니다 — 매번 누른다) */
+.ui-days__day[data-recent='true'] {
+  background: var(--primary-soft);
+}
+
+.ui-days__recent {
+  color: var(--accent-ink);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-bold);
+}
+
+.ui-days__day[aria-pressed='true'] {
+  background: var(--primary);
+  color: var(--on-accent);
+  font-weight: var(--weight-bold);
+}
+
+.ui-days__day[aria-pressed='true'] .ui-days__recent {
+  color: var(--on-accent);
+}
+
+/* 질문 제목 옆 달 버튼 [10월 ▾]: 흰 면 + 달 글자 + ▾ (누르면 열두 달 선택 창) */
+.ui-month-button {
+  flex: none;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border: 0;
+  border-radius: var(--corner-md);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--strong);
+  font-size: var(--text-row-size);
+  font-weight: var(--text-row-weight);
+  line-height: var(--line-tight);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ui-month-button .ui-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--muted);
+}
+
+/* 선택 창 안 월 넘기기 [‹ 10월 ›]: 흰 면 위라 화살표 칸을 회색 면으로 */
+.ui-sheet .ui-stepper__arrow {
+  background: var(--fill);
+}
+
+/*
  * 여럿 중 하나 줄 목록, 고른 줄은 옅은 청록 면 + 굵게 + 체크.
  * 면은 놓인 바탕과 달라야 보인다: 화면 바탕(회색) 위에서는 흰 면 + 회색 원, 선택 창(흰 면) 안에서는 회색 면 + 흰 원
  */
@@ -1132,7 +1224,9 @@ button.ui-row {
 .ui-button[data-variant='primary']:active:not(:disabled),
 [data-preview-pressed] .ui-button[data-variant='primary']:not(:disabled),
 .ui-months__month[aria-pressed='true']:active,
-[data-preview-pressed] .ui-months__month[aria-pressed='true'] {
+[data-preview-pressed] .ui-months__month[aria-pressed='true'],
+.ui-days__day[aria-pressed='true']:active,
+[data-preview-pressed] .ui-days__day[aria-pressed='true'] {
   border-color: var(--primary-pressed);
   background: var(--primary-pressed);
 }
@@ -1167,6 +1261,10 @@ button.ui-row:active,
 [data-preview-pressed] .ui-segment__option[aria-pressed='false'],
 .ui-months__month[aria-pressed='false']:active,
 [data-preview-pressed] .ui-months__month[aria-pressed='false'],
+.ui-days__day[aria-pressed='false']:active,
+[data-preview-pressed] .ui-days__day[aria-pressed='false'],
+.ui-month-button:active,
+[data-preview-pressed] .ui-month-button,
 .ui-pick:active,
 [data-preview-pressed] .ui-pick,
 .ui-entry-card__change:active,
@@ -1199,6 +1297,8 @@ button.ui-row:active,
   .ui-options__option,
   .ui-segment__option,
   .ui-months__month,
+  .ui-days__day,
+  .ui-month-button,
   .ui-pick,
   .ui-entry-card__change,
   .ui-amount-display__add {

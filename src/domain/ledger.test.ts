@@ -43,7 +43,7 @@ function fixedDeps(ids: string[] = ['new-1', 'new-2', 'new-3']) {
   }
 }
 
-const expenseInput: EntryInput = { month: 10, type: 'expense', name: '대관료', amount: 40_000 }
+const expenseInput: EntryInput = { month: 10, day: 7, type: 'expense', name: '대관료', amount: 40_000 }
 
 describe('SPEC-001 장부 계산', () => {
   describe('잔액', () => {
@@ -86,7 +86,18 @@ describe('SPEC-001 장부 계산', () => {
   })
 
   describe('한 달 보기', () => {
-    it('AC-9 그 달의 수입·지출 소계와 기록을 입력 순으로 모은다', () => {
+    it('AC-9 그 달의 수입·지출 소계와 기록을 날짜순으로 모은다 (같은 날은 적은 순, 날짜 없는 예전 기록은 맨 뒤)', () => {
+      const entries = [
+        entry({ id: 'old', month: 10, createdAt: '2026-10-01T00:00:00.000Z' }),
+        entry({ id: '7th-late', month: 10, day: 7, createdAt: '2026-10-09T00:00:00.000Z' }),
+        entry({ id: '3rd', month: 10, day: 3, createdAt: '2026-10-08T00:00:00.000Z' }),
+        entry({ id: '7th-early', month: 10, day: 7, createdAt: '2026-10-02T00:00:00.000Z' }),
+      ]
+
+      expect(monthGroup(entries, 10).entries.map((item) => item.id)).toEqual(['3rd', '7th-early', '7th-late', 'old'])
+    })
+
+    it('AC-9 그 달의 수입·지출 소계와 기록을 모은다 (날짜 없는 예전 기록끼리는 적은 순)', () => {
       const entries = [
         entry({ id: 'sep-income', month: 9, type: 'income', name: '회비', amount: 140_806 }),
         entry({ id: 'oct-rent', month: 10, name: '대관료', amount: 40_000 }),
@@ -126,6 +137,7 @@ describe('SPEC-001 장부 계산', () => {
       expect(next.entries[1]).toEqual({
         id: 'new-1',
         month: 10,
+        day: 7,
         type: 'expense',
         name: '대관료',
         amount: 40_000,
@@ -191,9 +203,49 @@ describe('SPEC-001 장부 계산', () => {
       ['이름 빈칸', { ...expenseInput, name: '   ' }],
       ['월 0', { ...expenseInput, month: 0 }],
       ['월 13', { ...expenseInput, month: 13 }],
+      ['날 0', { ...expenseInput, day: 0 }],
+      ['날 32', { ...expenseInput, day: 32 }],
+      ['날 소수', { ...expenseInput, day: 1.5 }],
+      ['그 달에 없는 날 (4월 31일)', { ...expenseInput, month: 4, day: 31 }],
+      ['윤년이 아닌 해 2월 29일', { ...expenseInput, month: 2, day: 29 }],
     ])('%s 이면 저장할 수 없는 기록이라 거부한다', (_label, input) => {
       expect(() => addEntry(ledger(), input, fixedDeps())).toThrow(InvalidLedgerInputError)
       expect(() => updateEntry(ledger({ entries: [entry({ id: 'a' })] }), 'a', input)).toThrow(InvalidLedgerInputError)
+    })
+
+    it('AC-24 새로 적는 내역은 날짜(일)가 꼭 있어야 한다', () => {
+      const withoutDay: EntryInput = { month: 10, type: 'expense', name: '대관료', amount: 40_000 }
+
+      expect(() => addEntry(ledger(), withoutDay, fixedDeps())).toThrow(InvalidLedgerInputError)
+    })
+
+    it('AC-24 2월 마지막 날은 장부 연도의 윤년을 따른다', () => {
+      const leap = addEntry(ledger({ year: 2028 }), { ...expenseInput, month: 2, day: 29 }, fixedDeps())
+
+      expect(leap.entries[0]).toMatchObject({ month: 2, day: 29 })
+      expect(() => addEntry(ledger({ year: 2026 }), { ...expenseInput, month: 2, day: 29 }, fixedDeps())).toThrow(
+        InvalidLedgerInputError,
+      )
+    })
+
+    it('AC-25 날짜 없는 예전 기록은 날짜 없이 그대로 고쳐 저장할 수 있다', () => {
+      const before = ledger({ entries: [entry({ id: 'a', month: 3 })] })
+
+      const next = updateEntry(before, 'a', { month: 3, type: 'expense', name: '간식비', amount: 5_000 })
+
+      expect(next.entries[0]).not.toHaveProperty('day')
+      expect(next.entries[0].amount).toBe(5_000)
+    })
+
+    it('AC-25 고치기에서 날짜를 바꾸면 그 날짜로 저장된다 (예전 기록에 날짜를 붙여도 된다)', () => {
+      const before = ledger({ entries: [entry({ id: 'a', month: 3 }), entry({ id: 'b', month: 3, day: 5 })] })
+
+      const next = updateEntry(updateEntry(before, 'a', { ...expenseInput, month: 3, day: 9 }), 'b', { ...expenseInput, month: 4, day: 30 })
+
+      expect(next.entries.map(({ month, day }) => ({ month, day }))).toEqual([
+        { month: 3, day: 9 },
+        { month: 4, day: 30 },
+      ])
     })
 
     it('금액 상한 999,999,999원은 허용한다', () => {
