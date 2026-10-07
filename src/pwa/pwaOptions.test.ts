@@ -69,6 +69,50 @@ describe('SPEC-002 홈 화면 추가 (PWA) 설정', () => {
   })
 })
 
+describe('SPEC-002 본 주소 서비스 워커가 미리보기 주소를 덮지 않게 (#54)', () => {
+  // 서비스 워커는 화면 요청의 경로(pathname + search)를 제외 목록과 맞춰 본다
+  const isDenied = (denylist: RegExp[] | undefined, path: string) =>
+    (denylist ?? []).some((rule) => rule.test(path))
+
+  it('본 주소 빌드(/dongari/)는 미리보기·lab 화면 요청을 본 앱 화면(index.html)으로 답하지 않는다', () => {
+    const denylist = pwaOptions(tokensCss, '/dongari/').workbox?.navigateFallbackDenylist
+
+    expect(isDenied(denylist, '/dongari/preview/')).toBe(true)
+    expect(isDenied(denylist, '/dongari/preview/index.html')).toBe(true)
+    expect(isDenied(denylist, '/dongari/preview')).toBe(true)
+    expect(isDenied(denylist, '/dongari/preview?from=home')).toBe(true)
+    expect(isDenied(denylist, '/dongari/lab/')).toBe(true)
+    expect(isDenied(denylist, '/dongari/lab/demo.html')).toBe(true)
+  })
+
+  it('본 주소 빌드는 본 화면 요청은 그대로 본 앱 화면으로 답한다 (오프라인 실행 유지)', () => {
+    const denylist = pwaOptions(tokensCss, '/dongari/').workbox?.navigateFallbackDenylist
+
+    expect(isDenied(denylist, '/dongari/')).toBe(false)
+    expect(isDenied(denylist, '/dongari/index.html')).toBe(false)
+    expect(isDenied(denylist, '/dongari/?source=pwa')).toBe(false)
+    // 이름이 preview·lab 으로 시작할 뿐인 경로는 미리보기가 아니다
+    expect(isDenied(denylist, '/dongari/previews/')).toBe(false)
+    expect(isDenied(denylist, '/dongari/laboratory')).toBe(false)
+  })
+
+  it('미리보기 빌드(/dongari/preview/)는 제외 목록을 두지 않는다 (서비스 워커 범위가 미리보기 안이라 본 주소에 닿지 않음)', () => {
+    const preview = pwaOptions(tokensCss, '/dongari/preview/').workbox
+
+    expect(preview?.navigateFallbackDenylist).toBeUndefined()
+  })
+
+  it('제외 목록은 빌드 경로에서 만든다 (주소가 바뀌어도 따라간다)', () => {
+    const denylist = pwaOptions(tokensCss, '/club.app/').workbox?.navigateFallbackDenylist
+
+    expect(isDenied(denylist, '/club.app/preview/')).toBe(true)
+    expect(isDenied(denylist, '/club.app/lab/')).toBe(true)
+    // 경로의 . 은 아무 글자가 아니라 . 그대로 맞춘다
+    expect(isDenied(denylist, '/clubxapp/preview/')).toBe(false)
+    expect(isDenied(denylist, '/dongari/preview/')).toBe(false)
+  })
+})
+
 describe('tokens.css 라이트 값 읽기', () => {
   it('다크 값이 아닌 :root 라이트 값을 읽는다', () => {
     const css = `:root,\n[data-theme='light'] {\n  --bg: #f3f5f7;\n}\n[data-theme='dark'] {\n  --bg: #12171b;\n}`
