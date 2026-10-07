@@ -233,17 +233,28 @@
 
 /*
  * 화면 아래 고정 영역: 바탕색 + 위쪽 가는 선, 홈 표시줄(safe-area) 만큼 띄움.
- * 폰 키패드가 레이아웃을 줄이지 않는 브라우저에서는 가려진 높이(--keyboard-inset, features/keyboard)만큼 올려 키패드 바로 위에 둔다
+ * 갤럭시는 키패드만큼 레이아웃이 줄어(interactive-widget) 고정된 채 키패드 바로 위에 온다
  */
 .ui-bottom-bar {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: var(--keyboard-inset, 0px);
+  bottom: 0;
   z-index: 5;
   padding: var(--space-3) var(--gutter) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
   border-top: var(--hairline) solid var(--line);
   background: var(--bg);
+}
+
+/*
+ * 키패드가 레이아웃을 줄이지 않는 브라우저(아이폰)에서 키패드가 떠 있는 동안: 고정을 풀고 화면 흐름 안, 지금 질문 바로 아래에 둔다.
+ * 좌우 여백은 내용 칸이 이미 주고, 아래 여백은 키패드와 버튼 사이 숨 쉴 틈 (keyboard.ts, #70)
+ */
+.ui-bottom-bar[data-keyboard='open'] {
+  position: static;
+  padding: 0 0 var(--space-4);
+  border-top: none;
+  background: none;
 }
 
 .ui-bottom-bar__inner {

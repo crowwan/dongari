@@ -209,7 +209,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `BalanceCard` | 이름(Caption Medium) → 큰 숫자(Display 30, "원" 60%) → 보조 줄(있을 때만), 적자는 `−` |
 | `AmountText` | 수입 `+` 밝은 청록 / 지출 `−` 제목색. 크기는 놓인 자리를 따른다 |
 | `MonthStepper` | [‹] 달 [›] 화살표 아이콘 56px 흰 면, 끝 달에서 비활성. `onPickMonth` 를 주면 가운데 "10월 ▾" 가 버튼("10월 달 고르기", `aria-haspopup="dialog"`) |
-| `BottomActionBar` | 화면 아래 고정 바탕색 면 + 위쪽 가는 선 + 버튼 하나(`icon` 가능, 기본 주 버튼 / `variant="secondary"` 보조 — 연달아 적기 [다 적었어요], #64) × 기본·비활성·비활성 + 안내(버튼 위 본문 크기 한 줄), safe-area 만큼 띄움. 폰 키패드가 레이아웃을 줄이지 않는 브라우저에서는 `--keyboard-inset`(`features/keyboard`) 만큼 올라가 키패드 바로 위 (#47) |
+| `BottomActionBar` | 화면 아래 고정 바탕색 면 + 위쪽 가는 선 + 버튼 하나(`icon` 가능, 기본 주 버튼 / `variant="secondary"` 보조 — 연달아 적기 [다 적었어요], #64) × 기본·비활성·비활성 + 안내(버튼 위 본문 크기 한 줄), safe-area 만큼 띄움. 폰 키패드가 레이아웃을 줄이지 않는 브라우저(아이폰)에서 키패드가 떠 있는 동안은 고정을 풀고 지금 질문 바로 아래 흐름에(면·선 없이 안내 + 버튼, 아래 `--space-4`) 두고 키패드 바로 위로 스크롤 (`data-keyboard="open"`, `ui/keyboard`, #70) |
 | `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 한 몸통 스위치 [남았어요 \| 적자였어요] 로 부호를 고른다 (#46) |
 | `InstallGuide` (`features/install`) | 홈 화면에 추가 방법: 브라우저 이름(Body Bold `--accent-ink`) + 번호 순서(Body). 설정 "앱" 묶음 [📱 홈 화면에 추가] 줄 → 설치 제안이 없을 때 `BottomSheet` "홈 화면에 추가하는 방법" 안 + [확인] (#10, #56. 장부 위 `InstallBanner` 띠는 #56 에서 지움) |
 | `AddEntryForm` / `EditEntryForm` (`features/ledger`) | 아래 "화면 조립" (#47) |
@@ -285,3 +285,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-07 | `MoneyInput` 0원 표시: 처음 값 0 은 `0`, 다 지우면 빈칸, 직접 친 `0` 보임(앞자리 0 정리). 카탈로그 MoneyInput "빈칸" 상태 → "0원", CarryoverField "0원" 상태 추가 (#59) | |
 | 2026-10-07 | 연달아 적기: `SavedEntriesCard`(흰 카드 "저장한 내역 N건", 방금 줄 옅은 청록 + "방금", 4줄 넘으면 최근 3줄), `BottomActionBar` 보조 버튼, 내역 적기 조립. 카탈로그 상태 추가 (#64) | |
 | 2026-10-07 | "적은 내용" 카드(`AnswersCard`)와 지금 질문을 "지금 적는 내역" 카드 `EntryCard`(흰 면 + 청록 둘레, 답한 줄 + 옅은 면 지금 질문 칸)로 합침, "지금/이어서 적을 것" 표시 지움. `SavedEntriesCard` → 면 없는 회색 글자 `SavedEntries`("✓ 장부에 넣었어요 · N건", 최근 2줄, 금액 회색 예외). 새 색 토큰 `--primary-wash`. 내역 적기·고치기 화면 묶음 간격이 `.screen` 공통 간격(20)에 덮이던 것을 `screen--groups` 로 고침(내역 적기 제목 ↔ 카드 4 → 16, 고치기 질문 묶음 사이 20 → 32, #66). 카탈로그 상태 갱신 (#68) | |
+| 2026-10-07 | `BottomActionBar` 아이폰 키패드: `--keyboard-inset` 으로 고정 영역을 올리던 것을 지우고, 키패드가 떠 있는 동안은 지금 질문 바로 아래 흐름에 두고 키패드 바로 위로 스크롤(면·위쪽 선 없음). 갤럭시는 그대로 고정 (#70) | |
