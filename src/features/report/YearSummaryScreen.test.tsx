@@ -129,6 +129,13 @@ describe('SPEC-003 올해 결산 화면', () => {
     expect(screen.getByRole('button', { name: '사진으로 저장' })).toBeDisabled()
   })
 
+  it('아래 고정 [사진으로 저장] 은 글자 앞에 내려받기 아이콘이 있다', () => {
+    renderYear(V1_EXAMPLE)
+
+    const button = screen.getByRole('button', { name: '사진으로 저장' })
+    expect(button.querySelector('[data-icon="download"]')).toBeInTheDocument()
+  })
+
   it('[사진으로 저장] 은 결산 양식만 사진으로 만들어 "동아리회계-2025년-결산.png" 로 내려받는다', async () => {
     const { saver, onNotify } = renderYear(V1_EXAMPLE)
 

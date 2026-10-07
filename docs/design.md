@@ -212,7 +212,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 [남았어요]/[적자였어요] 로 부호를 고른다 |
 | `InstallBanner` (`features/install`) | 장부 화면 위 흰 카드 띠: 굵은 문장 → [방법 보기]/[홈 화면에 추가](보조) + [닫기](회색 면) → 펼치면 브라우저별 순서 (#10) |
 | `EntryForm` (`features/ledger`) | 내역 적기(옛 한 화면 네 질문 — #47 에서 하나씩 채우기로 바뀐다) |
-| 월 정리 / 올해 결산 (`features/report`) | 카드 세 장 + [사진으로 저장] / v1 양식 한 장 (#16, #48 에서 다시 칠한다) |
+| 월 정리 / 올해 결산 (`features/report`) | 카드 셋(수입·지출 카드 제목 Heading, 줄은 이름 본문 ··· 금액 제목색, 합계 줄만 구분선 + Bold, 수입 합계 수입 금액색, 잔액 카드 월말 잔액만 Heading 크기) + [⬇ 사진으로 저장] / v1 양식 한 장, 화면 틀(제목 제목색·안내 Caption·아래 버튼)만 토큰 (#16, #48) |
 
 공통 규칙: 누르는 곳 `--touch-min` 이상, 포커스 링 보임, 그림자 없음(스위치 손잡이 제외), 컴포넌트는 토큰 변수만 쓰고 `className`·`style` 을 받지 않는다. 루트에 `data-testid`, 상태가 있으면 `data-state`/`data-variant`/`data-kind`/`data-tone`.
 
@@ -223,6 +223,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 ### 사진으로 저장할 때의 모양
 
 - 월 정리 사진은 화면 모양(토큰)을 그대로 쓰되, 사진으로 그리는 복사본에만 `data-theme="light"` + `data-capturing` 을 단다. 흰 바탕 위에서는 흰 카드가 면으로 구분되지 않으므로 사진에서만 카드 둘레에 `--line` 선을 두른다 (`report.css`).
+- 사진에서는 자간(`letter-spacing`)과 숫자 폭 맞춤(`tabular-nums`)을 끈다. html2canvas 1.4 는 자간이 있으면 글자를 한 자씩 그리면서 숫자 폭 맞춤을 읽지 못해 "1 40,000" 처럼 숫자 사이가 벌어진다 (#48).
 - 올해 결산 사진은 화면에서 줄여 보이던 양식을 줄이지 않은 360px 그대로 2배로 그린다.
 
 ## 접근성
@@ -247,3 +248,4 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | 2026-10-06 | TopTextButton 점 표시, NoticeBar 30일 백업 안내 상태 (#9) | |
 | 2026-10-07 | 타이포 위계 3단과 여백 역할(`--stack-tight`·`--stack`·`--group-gap`·`--section-gap`)을 개인 디자인 시스템 역할 구조로 추가, `labelRole` (#42) | |
 | 2026-10-07 | 디자인 개편 1(ADR 004): 순수 회색 계층·브랜드는 주 버튼만, 글자 크기 DS 기본값 rem(30/24/20/16/16/14, 줄 이름 SemiBold), 좌우 여백 24, 반경 카드 20·컨트롤 16, 스크림 60/70%. Pretendard 가변 서브셋(645KB) 자체 포함 + 미리 저장, lucide-react 아이콘·`itemIcon`. 새 부품 Icon·ListRow·SegmentedControl·BottomSheet·MonthPicker·PickRow·AnswerChip·AmountDisplay·IconButton, Button·BottomActionBar·NoticeBar 아이콘, MonthStepper 달 고르기, 기존 부품 다시 칠하기 (#45) | |
+| 2026-10-07 | 디자인 개편 4: 월 정리 카드 셋(합계 줄만 굵게, 월말 잔액 큰 숫자)·[⬇ 사진으로 저장], 월 정리 사진 자간·숫자 폭 맞춤 끔, 올해 결산 화면 틀(양식·사진 그대로) (#48) | |

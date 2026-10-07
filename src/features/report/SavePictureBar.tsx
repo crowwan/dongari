@@ -7,9 +7,14 @@ type SavePictureBarProps = {
   disabled?: boolean
 }
 
-// 월 정리·올해 결산 아래 고정 [사진으로 저장]. 만드는 동안은 "만드는 중…" 으로 바뀌고 누를 수 없다
+// 월 정리·올해 결산 아래 고정 [⬇ 사진으로 저장]. 만드는 동안은 "만드는 중…" 으로 바뀌고 누를 수 없다
 export function SavePictureBar({ saving, onSave, disabled = false }: SavePictureBarProps) {
   return (
-    <BottomActionBar label={saving ? '만드는 중…' : '사진으로 저장'} onClick={onSave} disabled={disabled || saving} />
+    <BottomActionBar
+      icon="download"
+      label={saving ? '만드는 중…' : '사진으로 저장'}
+      onClick={onSave}
+      disabled={disabled || saving}
+    />
   )
 }
