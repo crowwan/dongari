@@ -48,4 +48,23 @@ describe('MonthStepper', () => {
 
     expect(screen.getByTestId('month-stepper-label')).toHaveAttribute('aria-live', 'polite')
   })
+
+  it('onPickMonth 가 없으면 가운데 달은 글자일 뿐 버튼이 아니다', () => {
+    render(<MonthStepper month={9} onPrevious={() => {}} onNext={() => {}} />)
+
+    expect(screen.getAllByRole('button')).toHaveLength(2)
+  })
+
+  it('onPickMonth 를 주면 가운데 달(▾)을 눌러 달 고르기 창을 연다', async () => {
+    const user = userEvent.setup()
+    const onPickMonth = vi.fn()
+    render(<MonthStepper month={10} onPrevious={() => {}} onNext={() => {}} onPickMonth={onPickMonth} />)
+
+    const middle = screen.getByRole('button', { name: '10월 달 고르기' })
+    expect(middle).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('10월')
+    await user.click(middle)
+
+    expect(onPickMonth).toHaveBeenCalledTimes(1)
+  })
 })

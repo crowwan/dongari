@@ -26,7 +26,7 @@
 
 .catalog__title {
   margin: 0;
-  font-size: var(--size-title);
+  font-size: var(--text-title-size);
   font-weight: var(--weight-bold);
   line-height: var(--line-tight);
 }
@@ -135,6 +135,51 @@
 /* 아래 고정 영역 + 안내 줄 */
 .catalog__frame--note {
   height: 160px;
+}
+
+/* 아래에서 올라오는 선택 창 + 열두 달 */
+.catalog__frame--sheet {
+  height: 400px;
+}
+
+/* 줄 목록을 담는 흰 카드 (장부의 그 달 카드처럼) */
+.catalog__card {
+  padding: var(--space-1) 0;
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.catalog__card--pad {
+  padding: var(--card-pad-block) var(--card-pad-inline);
+}
+
+/* 아이콘 모음: 원형 바탕 + 이름 */
+.catalog__icons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4) var(--space-2);
+}
+
+.catalog__icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-caption-size);
+  color: var(--muted);
+  text-align: center;
+}
+
+.catalog__icon-circle {
+  width: var(--icon-circle);
+  height: var(--icon-circle);
+  border-radius: var(--corner-pill);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--strong);
 }
 
 /* 여백 역할 토큰: 폭으로 크기를 보여주는 막대 */

@@ -149,7 +149,10 @@ v1 은 월별 수입 총액, 월별 지출 상세, 연간 수입내역을 따로
 
 - 화면 구조: `features/ledger`(장부·입력), `features/report`(월 정리·올해 결산), `features/settings` 로 나누고, 계산은 순수 함수(`domain/ledger.ts`)로 분리해 단위 테스트한다.
 - 상태: `useLedger()` 훅이 저장소(SPEC-002)를 감싼다. 외부 상태 라이브러리는 도입하지 않는다.
-- 토큰: `src/styles/tokens.css` 에 큰 글씨 기준 토큰 정의, 컴포넌트는 토큰만 사용. (공용 design-system 은 토큰 파일 미작성이라 아직 소비하지 않음)
+- 토큰: `src/styles/tokens.css` 에 큰 글씨 기준 토큰 정의, 컴포넌트는 토큰만 사용. 공용 design-system 은 토큰 파일이 없어 CONCEPT.md 의 역할 구조·이름 체계를 옮겨 쓴다(#42, #45). 글자 크기는 rem.
+- 글꼴: Pretendard 가변 굵기를 앱 파일로 포함(`src/styles/font.css`, 자주 쓰는 한글 2,780자 서브셋 645KB, `scripts/subset-font.py`), 서비스 워커가 미리 저장한다.
+- 아이콘: `lucide-react`(쓴 것만 번들), `ui/Icon`. 항목 아이콘은 `domain/itemIcon.ts` 순수 함수(AC-18).
+- 선택 창(`ui/BottomSheet`)의 안드로이드 뒤로 버튼 닫기는 창을 여는 화면이 `useScreenHistory` 방문 기록으로 잇는다(#47).
 - 디자인 카탈로그 `/#/dev/catalog` (개발 모드 전용).
 - 뒤로가기: 장부 외 화면(설정·월 정리·올해 결산)과 입력창을 열 때 `history.pushState`, `popstate` 로 장부로 돌아오기/닫기. [← 장부로] 도 `history.back()` 으로 같은 길을 쓴다. 장부로 돌아가는 중(popstate 를 기다리는 동안)에는 다시 `back()` 하지 않는다(두 번 빠지면 앱이 닫힌다).
 - 닫기 전 확인: 화면이 `useScreenHistory().confirmBeforeLeave(바뀐 것 있음)` 로 알려 두면 [← 장부로](`requestBack`)와 popstate 모두 화면을 닫지 않고 확인 창을 띄운다. popstate 로 빠진 방문 기록은 그 자리에서 다시 쌓아(`pushState`) 확인 창이 떠 있는 동안이나 [아니요] 뒤에도 뒤로 버튼이 앱을 나가지 않게 하고, [버리기] 는 그 기록을 `back()` 으로 되돌려 장부로 간다. 저장·지우기 뒤에는 묻지 않는 `backToLedger` 를 쓴다.
@@ -181,3 +184,4 @@ v1 은 월별 수입 총액, 월별 지출 상세, 연간 수입내역을 따로
 | 2026-10-06 | 용어 "사진으로 보내기" → "사진으로 저장" (SPEC-003 변경에 맞춤) |
 | 2026-10-07 | 큰 글씨 기준에 글자 위계 3단·묶음 간격 규칙 추가, "직접 적기" 는 질문이 아닌 칸 이름(작고 옅게)으로 명시 (#42) |
 | 2026-10-07 | 디자인 개편(ADR 004): 내역 적기를 하나씩 채우기로, 디자인 시스템 글자 크기·색·아이콘 규칙, 장부 줄 아이콘·달 선택 창, AC-1·3·4·5 수정, AC-15~18 추가 |
+| 2026-10-07 | 기술 메모: 디자인 시스템 토큰 소비 방식, 글꼴(Pretendard 서브셋)·아이콘(lucide-react, itemIcon), 선택 창 뒤로 버튼은 #47 (#45) |

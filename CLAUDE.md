@@ -24,7 +24,8 @@
 
 ## 스택
 
-- React 19 + TypeScript + Vite 7, 순수 CSS + 디자인 토큰(`src/styles/tokens.css`). Tailwind 는 #12 에서 걷어냄
+- React 19 + TypeScript + Vite 7, 순수 CSS + 디자인 토큰(`src/styles/tokens.css`, 개인 디자인 시스템 역할 구조). Tailwind 는 #12 에서 걷어냄
+- 글꼴 Pretendard(앱에 포함, 오프라인 미리 저장), 아이콘 lucide-react (#45)
 - 저장: localStorage (버전 있는 스키마, `docs/decisions/001-storage.md`)
 - 월 정리·올해 결산 사진: html2canvas (누를 때만 불러온다) → `canvas.toBlob` → Blob 주소 `<a download>`
 - 테스트: Vitest + Testing Library (v2.0 에서 도입)
@@ -60,8 +61,8 @@ src/
 ├── storage/     v2 저장 계층 (LedgerRepository, LocalStorage·Memory 구현, 스키마 가드, 마이그레이션, 백업 파일 만들기·읽기)
 ├── features/    화면 단위 (ledger: 장부·시작·내역 적기·useLedger, settings, report: 월 정리·올해 결산·사진으로 저장, report/sheet: v1 연말 양식(인라인 hex 예외), storage: 저장 안내 문구, backup: 백업 보내기·불러오기 흐름, install: 설치 안내 띠, useScreenHistory·BackToLedger)
 ├── pwa/         홈 화면 추가·오프라인 설정 (vite-plugin-pwa 옵션, manifest 색은 tokens.css 에서)
-├── ui/          기본 컴포넌트 (Button, ChoiceChip, MoneyInput, TextField, NoticeBar, BalanceCard, MonthStepper, …)
-├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준)
+├── ui/          기본 컴포넌트 (Button, Icon, ListRow, SegmentedControl, BottomSheet, MonthPicker, PickRow, AnswerChip, AmountDisplay, IconButton, NoticeBar, BalanceCard, MonthStepper, …)
+├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준), font.css + fonts/ (Pretendard 가변 서브셋, scripts/subset-font.py 로 만든다)
 ├── catalog/     디자인 카탈로그 `/#/dev/catalog` (개발 모드 전용, 프로덕션 번들 제외)
 └── test/        Vitest 설정, 여러 테스트가 같이 쓰는 장부 기록(ledgerFixtures: v1 예시 1년치)
 public/icons/  앱 아이콘 (scripts/make-icons.mjs 가 토큰 색으로 만든다)

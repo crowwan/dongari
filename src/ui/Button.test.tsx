@@ -46,4 +46,11 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled()
     expect(handleClick).not.toHaveBeenCalled()
   })
+
+  it('아이콘을 주면 글자 앞에 붙이고, 이름은 글자로만 읽힌다', () => {
+    render(<Button icon="plus">내역 적기</Button>)
+
+    const button = screen.getByRole('button', { name: '내역 적기' })
+    expect(button.querySelector('[data-icon="plus"]')).toHaveAttribute('aria-hidden', 'true')
+  })
 })
