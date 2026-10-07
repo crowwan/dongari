@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <title>동아리 회계 관리</title>
+    <meta name="description" content="동아리 수입·지출을 한 줄씩 적으면 월 정리와 올해 결산을 만들어 주는 모바일 웹 앱" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="동아리 회계 관리" />
+    <meta property="og:description" content="동아리 수입·지출을 한 줄씩 적으면 월 정리와 올해 결산을 만들어 주는 모바일 웹 앱" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://crowwan.github.io/dongari/" />
+
+    <!-- 탭 아이콘. 홈 화면 아이콘과 manifest 링크·서비스 워커 등록은 빌드 때 vite-plugin-pwa 가 넣는다 (src/pwa/pwaOptions.ts).
+         iOS 전용 메타(apple-*)는 대상 기기(갤럭시)가 아니라 두지 않는다 (SPEC-002).
+         / 로 시작하는 public 파일 경로는 빌드 때 Vite 가 빌드 경로(APP_BASE, vite.config.ts)를 앞에 붙인다 -->
+    <link rel="icon" type="image/svg+xml" href="/dongari/preview/icons/favicon.svg" />
+
+    <!-- Theme Color: 주소창을 화면 바탕(tokens.css --bg)과 같게. HTML 에선 CSS 변수를 못 써 값을 옮겨 적는다 -->
+    <meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#12171b" media="(prefers-color-scheme: dark)" />
+    <script type="module" crossorigin src="/dongari/preview/assets/index-rqit-DC1.js"></script>
+    <link rel="stylesheet" crossorigin href="/dongari/preview/assets/index-Nn4Sj3FM.css">
+  <link rel="manifest" href="/dongari/preview/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/dongari/preview/registerSW.js"></script></head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

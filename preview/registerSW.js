@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/dongari/preview/sw.js', { scope: '/dongari/preview/' })})}
