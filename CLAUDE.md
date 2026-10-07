@@ -27,7 +27,7 @@
 - React 19 + TypeScript + Vite 7, 순수 CSS + 디자인 토큰(`src/styles/tokens.css`, 개인 디자인 시스템 역할 구조). Tailwind 는 #12 에서 걷어냄
 - 글꼴 Pretendard(앱에 포함, 오프라인 미리 저장), 아이콘 lucide-react (#45)
 - 저장: localStorage (버전 있는 스키마, `docs/decisions/001-storage.md`)
-- 월 정리·올해 결산 사진: html2canvas (누를 때만 불러온다) → `canvas.toBlob` → Blob 주소 `<a download>`
+- 월 정리·올해 결산 사진: html2canvas (누를 때만 불러온다) → `canvas.toBlob` → Blob 주소 `<a download>`. 아이폰·아이패드는 공유 시트(`navigator.share`, "이미지 저장")로 사진 앱에 (#58)
 - 테스트: Vitest + Testing Library (v2.0 에서 도입)
 - 배포: GitHub Pages (`base: '/dongari/'`), 홈 화면 추가·오프라인은 vite-plugin-pwa (#10)
 

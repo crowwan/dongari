@@ -32,25 +32,37 @@ export function downloadFile(file: File, urls: ObjectUrls = URL): void {
   window.setTimeout(() => urls.revokeObjectURL(url), REVOKE_DELAY_MS)
 }
 
-function isAbort(error: unknown): boolean {
-  return error instanceof DOMException && error.name === 'AbortError'
+// shared: 공유 완료 / cancelled: 사용자가 공유 화면을 닫음
+// notAllowed: 누른 순간이 지나 브라우저가 공유 화면을 열어 주지 않음 (한 번 더 누르면 열린다)
+// unavailable: 파일 공유를 못 하는 브라우저이거나 다른 이유로 실패
+export type ShareResult = 'shared' | 'cancelled' | 'notAllowed' | 'unavailable'
+
+function isDomError(error: unknown, name: string): boolean {
+  return error instanceof DOMException && error.name === name
 }
 
-// 사용자가 누른 순간(클릭 처리 안)에 불러야 공유 화면이 열린다. 공유가 거부되면 내려받기로 대신한다
+// 공유 화면(파일 하나)을 연다. 사용자가 누른 순간(클릭 처리 안)에 불러야 열린다
+export async function shareFile(file: File, api: ShareApi | undefined = globalThis.navigator): Promise<ShareResult> {
+  const data: ShareData = { files: [file] }
+  if (!api?.share || !api.canShare?.(data)) return 'unavailable'
+  try {
+    await api.share({ ...data, title: file.name })
+    return 'shared'
+  } catch (error) {
+    if (isDomError(error, 'AbortError')) return 'cancelled'
+    if (isDomError(error, 'NotAllowedError')) return 'notAllowed'
+    return 'unavailable'
+  }
+}
+
+// 공유가 거부되면 내려받기로 대신한다
 export async function sendFile(
   file: File,
   api: ShareApi | undefined = globalThis.navigator,
   download: (file: File) => void = downloadFile,
 ): Promise<SendResult> {
-  const data: ShareData = { files: [file] }
-  if (api?.share && api.canShare?.(data)) {
-    try {
-      await api.share({ ...data, title: file.name })
-      return 'shared'
-    } catch (error) {
-      if (isAbort(error)) return 'cancelled'
-    }
-  }
+  const result = await shareFile(file, api)
+  if (result === 'shared' || result === 'cancelled') return result
   download(file)
   return 'downloaded'
 }
