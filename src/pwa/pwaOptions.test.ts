@@ -7,7 +7,7 @@ import { lightToken, pwaOptions } from './pwaOptions'
 const tokensCss = readFileSync('src/styles/tokens.css', 'utf8')
 
 describe('SPEC-002 홈 화면 추가 (PWA) 설정', () => {
-  const options = pwaOptions(tokensCss)
+  const options = pwaOptions(tokensCss, '/dongari/')
   const manifest = options.manifest || undefined
 
   it('GitHub Pages 주소(/dongari/)에서 홈 화면 앱으로 열리게 한다', () => {
@@ -20,6 +20,21 @@ describe('SPEC-002 홈 화면 추가 (PWA) 설정', () => {
       id: '/dongari/',
       display: 'standalone',
     })
+  })
+
+  it('빌드 경로를 바꾸면(QA 미리보기 /dongari/preview/) 홈 화면 앱도 그 경로에서 열린다', () => {
+    const preview = pwaOptions(tokensCss, '/dongari/preview/').manifest || undefined
+
+    expect(preview).toMatchObject({
+      start_url: '/dongari/preview/',
+      scope: '/dongari/preview/',
+      id: '/dongari/preview/',
+    })
+  })
+
+  it('빌드 경로가 / 로 시작하고 끝나지 않으면 빌드를 멈춘다 (홈 화면 앱 범위가 틀어지지 않게)', () => {
+    expect(() => pwaOptions(tokensCss, 'dongari/preview/')).toThrow('dongari/preview/')
+    expect(() => pwaOptions(tokensCss, '/dongari/preview')).toThrow('/dongari/preview')
   })
 
   it('앱 바탕색과 주소창 색은 tokens.css 의 라이트 바탕(--bg)과 같다', () => {

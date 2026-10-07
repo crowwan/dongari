@@ -14,7 +14,8 @@
     <meta property="og:url" content="https://crowwan.github.io/dongari/" />
 
     <!-- 탭 아이콘. 홈 화면 아이콘과 manifest 링크·서비스 워커 등록은 빌드 때 vite-plugin-pwa 가 넣는다 (src/pwa/pwaOptions.ts).
-         iOS 전용 메타(apple-*)는 대상 기기(갤럭시)가 아니라 두지 않는다 (SPEC-002) -->
+         iOS 전용 메타(apple-*)는 대상 기기(갤럭시)가 아니라 두지 않는다 (SPEC-002).
+         / 로 시작하는 public 파일 경로는 빌드 때 Vite 가 빌드 경로(APP_BASE, vite.config.ts)를 앞에 붙인다 -->
     <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
 
     <!-- Theme Color: 주소창을 화면 바탕(tokens.css --bg)과 같게. HTML 에선 CSS 변수를 못 써 값을 옮겨 적는다 -->
