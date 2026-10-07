@@ -9,15 +9,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--card-pad-block) var(--card-pad-inline);
-  border-radius: var(--corner-lg);
+  padding: var(--space-4);
+  border-radius: var(--corner-md);
   background: var(--surface);
 }
 
 .install-banner__message {
   margin: 0;
-  font-size: var(--size-body);
-  font-weight: var(--weight-bold);
+  color: var(--strong);
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-semibold);
   line-height: var(--line-body);
 }
 
@@ -41,8 +42,8 @@
   background: var(--fill);
   color: var(--ink);
   font-family: var(--typeface);
-  font-size: var(--size-large);
-  font-weight: var(--text-label-weight);
+  font-size: var(--text-label-size);
+  font-weight: var(--weight-semibold);
   line-height: var(--line-tight);
   letter-spacing: var(--letter-body);
   cursor: pointer;
@@ -55,7 +56,7 @@
 }
 
 .install-banner__close:focus-visible {
-  outline: var(--focus-ring) solid var(--primary);
+  outline: var(--focus-ring) solid var(--accent-ink);
   outline-offset: var(--stroke);
 }
 
@@ -70,10 +71,10 @@
 
 .install-banner__browser-name {
   margin: 0 0 var(--space-2);
-  font-size: var(--size-body);
+  font-size: var(--text-body-size);
   font-weight: var(--weight-bold);
   line-height: var(--line-tight);
-  color: var(--primary);
+  color: var(--accent-ink);
 }
 
 .install-banner__steps {
@@ -82,7 +83,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  font-size: var(--size-large);
+  font-size: var(--text-body-size);
   line-height: var(--line-body);
 }
 

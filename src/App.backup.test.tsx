@@ -85,8 +85,8 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
     await openSettings()
 
     const card = within(screen.getByRole('region', { name: '기록 백업' }))
-    expect(card.getByRole('button', { name: '백업 파일 보내기' })).toBeInTheDocument()
-    expect(card.getByRole('button', { name: '백업 파일 불러오기' })).toBeInTheDocument()
+    expect(card.getByRole('button', { name: /^백업 파일 보내기/ })).toBeInTheDocument()
+    expect(card.getByRole('button', { name: /^백업 파일 불러오기/ })).toBeInTheDocument()
   })
 
   describe('보내기', () => {
@@ -95,7 +95,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openSettings()
 
-      await userEvent.click(screen.getByRole('button', { name: '백업 파일 보내기' }))
+      await userEvent.click(screen.getByRole('button', { name: /^백업 파일 보내기/ }))
 
       expect(shareMock).toHaveBeenCalledOnce()
       expect(sharedFiles.map((file) => file.name)).toEqual(['동아리회계-백업-2026-10-03.txt'])
@@ -113,7 +113,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openSettings()
 
-      await userEvent.click(screen.getByRole('button', { name: '백업 파일 보내기' }))
+      await userEvent.click(screen.getByRole('button', { name: /^백업 파일 보내기/ }))
 
       await vi.waitFor(() => expect(shareMock).toHaveBeenCalledOnce())
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
@@ -128,7 +128,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openSettings()
 
-      await userEvent.click(screen.getByRole('button', { name: '백업 파일 보내기' }))
+      await userEvent.click(screen.getByRole('button', { name: /^백업 파일 보내기/ }))
 
       expect(click).toHaveBeenCalledOnce()
       expect(await screen.findByText('백업 파일을 다운로드 폴더에 저장했어요')).toBeInTheDocument()
@@ -142,8 +142,9 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const memory = new MemoryRepository(storedWith(LEDGER_2026))
       renderApp({ load: () => memory.load(), save: () => ({ ok: false, reason: 'quota-exceeded' }), restore: (data) => memory.restore(data) })
       await openSettings()
+      await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
       await userEvent.type(screen.getByLabelText('동아리 이름'), '2')
-      await userEvent.click(screen.getByRole('button', { name: '바꾼 내용 저장' }))
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       await userEvent.click(within(screen.getByTestId('notice-bar')).getByRole('button', { name: '백업 파일 보내기' }))
 
@@ -157,7 +158,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const { sharedFiles } = stubShare()
       renderApp(new MemoryRepository(original))
       await openSettings()
-      await userEvent.click(screen.getByRole('button', { name: '백업 파일 보내기' }))
+      await userEvent.click(screen.getByRole('button', { name: /^백업 파일 보내기/ }))
       await screen.findByText('백업 파일을 보냈어요')
       const backupFile = sharedFiles[0]
       cleanup()
@@ -198,6 +199,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
     it('설정에서 [불러오기] 하면 바꿔 저장하고 장부로 돌아가 올해 장부의 이번 달을 보여 준다', async () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2025)))
       await openSettings()
+      await userEvent.click(screen.getByRole('button', { name: /^장부 연도/ }))
       await userEvent.click(within(screen.getByRole('group', { name: '장부 연도' })).getByRole('button', { name: '2025년' }))
       await openSettings()
 
@@ -269,7 +271,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '불러오기' }))
 
       expect(screen.queryByTestId('notice-bar')).not.toBeInTheDocument()
-      await userEvent.click(screen.getByRole('button', { name: '+ 내역 적기' }))
+      await userEvent.click(screen.getByRole('button', { name: '내역 적기' }))
       await userEvent.click(screen.getByRole('button', { name: '지출' }))
       await userEvent.type(screen.getByLabelText('직접 적기'), '간식비')
       await userEvent.type(screen.getByLabelText('얼마인가요?'), '5000')

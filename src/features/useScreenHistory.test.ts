@@ -196,4 +196,94 @@ describe('SPEC-001 화면 이동과 뒤로가기', () => {
       expect(result.current.confirmingLeave).toBe(false)
     })
   })
+  describe('선택 창(덮개)과 뒤로 버튼', () => {
+    it('선택 창을 열면 방문 기록을 한 칸 쌓는다 (장부 화면에서도)', () => {
+      const { result } = renderHook(() => useScreenHistory())
+
+      act(() => result.current.openSheet('month'))
+
+      expect(result.current.sheet).toBe('month')
+      expect(push).toHaveBeenCalledWith({ screen: 'ledger', sheet: 'month' }, '')
+    })
+
+    it('선택 창이 열려 있을 때 뒤로 버튼을 누르면 선택 창만 닫히고 화면은 그대로다', () => {
+      const result = renderOpened()
+      act(() => result.current.openSheet('year'))
+
+      pressBackButton()
+
+      expect(result.current.sheet).toBeNull()
+      expect(result.current.screen).toEqual({ name: 'add-entry', month: 3 })
+      expect(back).not.toHaveBeenCalled()
+    })
+
+    it('장부 화면의 선택 창도 뒤로 버튼으로 닫히고 장부에 남는다', () => {
+      const { result } = renderHook(() => useScreenHistory())
+      act(() => result.current.openSheet('month'))
+
+      pressBackButton()
+
+      expect(result.current.sheet).toBeNull()
+      expect(result.current.screen).toEqual({ name: 'ledger' })
+    })
+
+    it('선택 창을 화면에서 닫으면(고르기·바깥 누르기) 쌓은 칸을 되돌리고, 그 popstate 는 화면을 바꾸지 않는다', () => {
+      const result = renderOpened()
+      act(() => result.current.openSheet('year'))
+
+      act(() => result.current.closeSheet())
+
+      expect(result.current.sheet).toBeNull()
+      expect(back).toHaveBeenCalledOnce()
+      pressBackButton()
+      expect(result.current.screen).toEqual({ name: 'add-entry', month: 3 })
+    })
+
+    it('닫힌 선택 창을 또 닫아도 방문 기록은 되돌리지 않는다', () => {
+      const result = renderOpened()
+
+      act(() => result.current.closeSheet())
+
+      expect(back).not.toHaveBeenCalled()
+    })
+
+    it('선택 창이 열려 있을 때 뒤로 버튼은 버릴까요 확인보다 먼저 선택 창만 닫는다', () => {
+      const result = renderOpened()
+      act(() => result.current.confirmBeforeLeave(true))
+      act(() => result.current.openSheet('month'))
+
+      pressBackButton()
+
+      expect(result.current.sheet).toBeNull()
+      expect(result.current.confirmingLeave).toBe(false)
+      expect(result.current.screen).toEqual({ name: 'add-entry', month: 3 })
+
+      // 선택 창이 닫힌 뒤 뒤로 버튼은 다시 버릴까요를 묻는다
+      pressBackButton()
+      expect(result.current.confirmingLeave).toBe(true)
+    })
+
+    it('선택 창에서 고르고 바로 장부로 갈 때(backToLedger)는 선택 창 칸과 화면 칸을 한 번에 되돌린다', () => {
+      const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+      const result = renderOpened()
+      act(() => result.current.openSheet('year'))
+
+      act(() => result.current.backToLedger())
+
+      expect(go).toHaveBeenCalledWith(-2)
+      expect(back).not.toHaveBeenCalled()
+      expect(result.current.sheet).toBeNull()
+      pressBackButton()
+      expect(result.current.screen).toEqual({ name: 'ledger' })
+    })
+
+    it('다른 화면을 열면 선택 창은 닫힌 상태로 시작한다', () => {
+      const { result } = renderHook(() => useScreenHistory())
+      act(() => result.current.openSheet('month'))
+
+      act(() => result.current.open({ name: 'settings' }))
+
+      expect(result.current.sheet).toBeNull()
+    })
+  })
 })

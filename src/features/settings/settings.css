@@ -1,34 +1,73 @@
 /*
- * 설정 화면. 값은 tokens.css 변수만 쓴다.
+ * 설정 화면과 그 편집 화면. 값은 tokens.css 변수만 쓴다.
  */
 @import '../screens.css';
 
-/* 카드 안 입력칸 사이: 이름 ↔ 칸(--stack-tight)보다 넓고, 카드 사이(--group-gap)보다 좁게 */
-.settings__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack);
+/* 목록 화면: [‹ 장부로] → 제목 → (안내 띠) → 묶음들. 묶음 사이는 --group-gap 을 묶음 제목 위에 둔다 */
+.settings {
+  gap: var(--stack-tight);
 }
 
-/* 연도 고르기: 큰 선택 버튼 두 칸씩 */
-.settings__years {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
-}
-
-/* 기록 백업: 마지막 백업 날짜 한 줄. 설명보다 또렷하게(본문 크기·본문색·굵게) */
-.settings__last-backup {
-  margin: 0;
-  font-size: var(--size-body);
-  font-weight: var(--text-label-weight);
-  line-height: var(--line-tight);
-  color: var(--ink);
-}
-
-/* 기록 백업: 보조 버튼 두 개를 위아래로 */
-.settings__actions {
+.settings__group {
+  margin-top: calc(var(--group-gap) - var(--stack-tight));
   display: flex;
   flex-direction: column;
   gap: var(--stack-tight);
+}
+
+/* 묶음 제목: 작게 (화면 제목·줄 이름보다 낮은 보조 이름) */
+.settings__group-title {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-label-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+}
+
+/* 흰 카드 안 줄 목록 (줄 사이 선 없음) */
+.settings__list {
+  padding: var(--space-1) 0;
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings__note {
+  margin: 0;
+  padding: var(--space-4) var(--card-pad-inline);
+  font-size: var(--text-caption-size);
+  color: var(--muted);
+}
+
+/* 줄 오른쪽: 지금 값(회색) + 화살표. 긴 이름은 말줄임 */
+.settings__end {
+  max-width: 50vw;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--muted);
+}
+
+.settings__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body-size);
+}
+
+.settings__end .ui-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--faint);
+}
+
+/* 편집 화면 머리: [‹ 설정] 과 제목은 한 덩어리 */
+.settings__edit-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }

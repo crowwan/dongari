@@ -57,6 +57,15 @@ describe('SPEC-001 이월금 입력', () => {
     expect(screen.getByLabelText(LABEL)).toHaveValue('30,000')
   })
 
+  it('남았어요/적자였어요는 한 몸통 스위치(세그먼트)다', () => {
+    render(<Harness initial={0} onChange={() => {}} />)
+
+    expect(screen.getByRole('group', { name: '작년 장부가 남았나요, 적자였나요?' })).toHaveAttribute(
+      'data-testid',
+      'segmented-control',
+    )
+  })
+
   it('설정 카드 안에서는 금액 칸 이름을 보조 이름(label)으로 낮출 수 있다', () => {
     render(<CarryoverField value={0} onChange={() => {}} labelRole="label" />)
 

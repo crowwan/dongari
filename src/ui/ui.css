@@ -7,7 +7,6 @@
 
 .ui-button,
 .ui-chip,
-.ui-top-button,
 .ui-icon-button,
 .ui-notice__action,
 .ui-stepper__arrow,
@@ -15,6 +14,7 @@
 .ui-money__field,
 .ui-field__input,
 .ui-row,
+.ui-options__option,
 .ui-segment__option,
 .ui-months__month,
 .ui-pick,
@@ -28,7 +28,6 @@
 
 .ui-button:focus-visible,
 .ui-chip:focus-visible,
-.ui-top-button:focus-visible,
 .ui-icon-button:focus-visible,
 .ui-notice__action:focus-visible,
 .ui-stepper__arrow:focus-visible,
@@ -44,7 +43,8 @@
 }
 
 /* 줄 버튼은 카드 안을 꽉 채우므로 링을 안쪽에 */
-.ui-row:focus-visible {
+.ui-row:focus-visible,
+.ui-options__option:focus-visible {
   outline: var(--focus-ring) solid var(--accent-ink);
   outline-offset: calc(var(--focus-ring) * -1);
 }
@@ -164,30 +164,13 @@
   cursor: not-allowed;
 }
 
-/* 위쪽 글자 버튼(옛 모양): [올해 결산] [설정]. 개편 2 에서 IconButton 으로 바뀐다 */
-.ui-top-button {
-  min-height: var(--touch-min);
-  padding: 0 var(--space-4);
-  border: 0;
-  border-radius: var(--corner-pill);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: var(--text-label-size);
-  font-weight: var(--weight-semibold);
-  line-height: var(--line-tight);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
 /* 점 표시: 할 일이 있다는 작은 빨간 점. 글자 오른쪽 위에 붙고, 같은 뜻을 화면 읽기 이름에도 붙인다 */
-.ui-top-button[data-dot='true'],
 .ui-icon-button[data-dot='true'] {
   position: relative;
   /* 점이 글자에 붙지 않게 오른쪽을 점 자리만큼 넓힌다 */
   padding-right: var(--space-6);
 }
 
-.ui-top-button__dot,
 .ui-icon-button__dot {
   position: absolute;
   top: var(--space-3);
@@ -781,6 +764,66 @@ button.ui-row {
   font-weight: var(--weight-bold);
 }
 
+/* 여럿 중 하나 줄 목록: 흰 면 안에 줄, 고른 줄은 옅은 청록 면 + 굵게 + 체크 (선택 창 안에서는 회색 면 위에 흰 줄) */
+.ui-options {
+  border-radius: var(--corner-md);
+  background: var(--fill);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-options__option {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--touch-field);
+  padding: 0 var(--space-4);
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--ink);
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-medium);
+  line-height: var(--line-tight);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ui-options__icon {
+  flex: none;
+  width: var(--icon-circle-sm);
+  height: var(--icon-circle-sm);
+  border-radius: var(--corner-pill);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.ui-options__icon .ui-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+.ui-options__label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ui-options__option[aria-pressed='true'] {
+  background: var(--primary-soft);
+  color: var(--strong);
+  font-weight: var(--weight-bold);
+}
+
+.ui-options__option[aria-pressed='true'] > .ui-icon {
+  color: var(--accent-ink);
+}
+
 /* 정해진 값 바꾸기: 흰 면 한 줄 — [아이콘] 값 ··· 바꾸기 › */
 .ui-pick {
   box-sizing: border-box;
@@ -958,8 +1001,6 @@ button.ui-row {
 [data-preview-pressed] .ui-button[data-variant='danger-text']:not(:disabled),
 .ui-chip[aria-pressed='false']:active:not(:disabled),
 [data-preview-pressed] .ui-chip[aria-pressed='false']:not(:disabled),
-.ui-top-button:active,
-[data-preview-pressed] .ui-top-button,
 .ui-icon-button:active,
 [data-preview-pressed] .ui-icon-button,
 .ui-notice__action:active,
@@ -970,6 +1011,8 @@ button.ui-row {
 [data-preview-pressed] .ui-stepper__pick,
 button.ui-row:active,
 [data-preview-pressed] button.ui-row,
+.ui-options__option[aria-pressed='false']:active,
+[data-preview-pressed] .ui-options__option[aria-pressed='false'],
 .ui-segment__option[aria-pressed='false']:active,
 [data-preview-pressed] .ui-segment__option[aria-pressed='false'],
 .ui-months__month[aria-pressed='false']:active,
@@ -999,12 +1042,12 @@ button.ui-row:active,
 
   .ui-button,
   .ui-chip,
-  .ui-top-button,
   .ui-icon-button,
   .ui-notice__action,
   .ui-stepper__arrow,
   .ui-stepper__pick,
   .ui-row,
+  .ui-options__option,
   .ui-segment__option,
   .ui-months__month,
   .ui-pick,

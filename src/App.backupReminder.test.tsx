@@ -98,12 +98,15 @@ describe('SPEC-002 30일 백업 안내', () => {
     expect(screen.getByText(REMINDER)).toBeInTheDocument()
   })
 
-  it('장부 화면에만 띠가 보인다 (설정 화면에는 없다)', async () => {
+  it('점 표시를 보고 설정에 오면 설정 화면에도 같은 띠가 보이고, 월 정리·올해 결산에는 없다', async () => {
     renderApp(new MemoryRepository(storedWith(OVERDUE)))
 
     await userEvent.click(screen.getByRole('button', { name: '설정 백업 필요' }))
-
     expect(screen.getByTestId('settings-screen')).toBeInTheDocument()
+    expect(within(screen.getByTestId('notice-bar')).getByText(REMINDER)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+
+    await userEvent.click(await screen.findByRole('button', { name: '결산' }))
     expect(screen.queryByText(REMINDER)).not.toBeInTheDocument()
   })
 
@@ -132,9 +135,10 @@ describe('SPEC-002 30일 백업 안내', () => {
 
       // 기록 하나를 고쳐 저장 실패를 만든다
       await userEvent.click(screen.getByRole('button', { name: '설정 백업 필요' }))
+      await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
       await userEvent.clear(screen.getByLabelText('동아리 이름'))
       await userEvent.type(screen.getByLabelText('동아리 이름'), '새이름')
-      await userEvent.click(screen.getByRole('button', { name: '바꾼 내용 저장' }))
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
       expect(screen.getByText('저장하지 못했어요. 백업 파일을 보내 두세요')).toBeInTheDocument()
@@ -145,7 +149,7 @@ describe('SPEC-002 30일 백업 안내', () => {
     })
   })
 
-  describe('설정 > 기록 백업 카드의 마지막 백업 날짜', () => {
+  describe('설정 > 기록 백업 [백업 파일 보내기] 줄의 마지막 백업 날짜', () => {
     it('마지막 백업 날짜를 보여 준다', async () => {
       const lastBackupAt = new Date(2026, 8, 3, 10, 0).toISOString()
       renderApp(new MemoryRepository(storedWith({ lastBackupAt, lastChangedAt: lastBackupAt })))
@@ -164,7 +168,7 @@ describe('SPEC-002 30일 백업 안내', () => {
       const card = within(screen.getByRole('region', { name: '기록 백업' }))
       expect(card.getByText('아직 백업하지 않았어요')).toBeInTheDocument()
 
-      await userEvent.click(card.getByRole('button', { name: '백업 파일 보내기' }))
+      await userEvent.click(card.getByRole('button', { name: /^백업 파일 보내기/ }))
 
       expect(await card.findByText('마지막 백업: 2026년 10월 6일')).toBeInTheDocument()
     })

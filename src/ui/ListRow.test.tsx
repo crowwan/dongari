@@ -18,6 +18,12 @@ describe('ListRow', () => {
     expect(row.querySelector('[data-icon="building"]')).toHaveAttribute('aria-hidden', 'true')
   })
 
+  it('누르는 줄의 이름은 이름·보조 줄·오른쪽을 띄어 읽는다', () => {
+    render(<ListRow icon="users" title="회비" description="수입" end={<AmountText type="income" amount={140000} />} onClick={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: '회비 수입 +140,000원' })).toBeInTheDocument()
+  })
+
   it('수입 줄은 원형 아이콘을 청록으로 칠한다 (data-tone)', () => {
     render(<ListRow icon="users" tone="income" title="회비" />)
 

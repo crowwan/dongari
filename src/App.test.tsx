@@ -102,7 +102,7 @@ describe('SPEC-001 앱 뼈대', () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2025)))
 
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
-      await userEvent.click(within(screen.getByRole('group', { name: '장부 연도' })).getByRole('button', { name: '2025년' }))
+      await chooseYear(2025)
 
       expect(screen.getByTestId('ledger-year')).toHaveTextContent('2025년')
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('12월')
@@ -124,13 +124,52 @@ describe('SPEC-001 앱 뼈대', () => {
       await stepBack(6)
 
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('4월')
-      expect(screen.getAllByTestId('entry-row').map((row) => row.textContent)).toEqual(['대관료−40,000원'])
+      expect(entryRows().map((row) => row.textContent)).toEqual(['대관료 지출 −40,000원'])
+    })
+
+    it('AC-9 가운데 "10월 ▾" 를 누르면 달 선택 창(이번 달 테두리)이 열리고, 고르면 창이 닫히고 그 달을 보여준다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+
+      await userEvent.click(screen.getByRole('button', { name: '10월 달 고르기' }))
+      const sheet = screen.getByRole('dialog', { name: '몇 월을 볼까요?' })
+      expect(within(sheet).getByRole('button', { name: '10월' })).toHaveAttribute('aria-current', 'date')
+      await userEvent.click(within(sheet).getByRole('button', { name: '4월' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('4월')
+      expect(entryRows().map((row) => row.textContent)).toEqual(['대관료 지출 −40,000원'])
+    })
+
+    it('지난 연도 장부의 달 선택 창에는 이번 달 테두리가 없다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2025, LEDGER_2026)))
+      await userEvent.click(screen.getByRole('button', { name: '설정' }))
+      await chooseYear(2025)
+      await screen.findByTestId('ledger-screen')
+
+      await userEvent.click(screen.getByRole('button', { name: '12월 달 고르기' }))
+
+      expect(within(screen.getByRole('dialog')).queryByRole('button', { current: 'date' })).not.toBeInTheDocument()
+    })
+
+    it('달 선택 창은 방문 기록을 한 칸 쌓고, 안드로이드 뒤로 버튼은 창만 닫아 장부에 남는다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      const push = vi.spyOn(window.history, 'pushState')
+
+      await userEvent.click(screen.getByRole('button', { name: '10월 달 고르기' }))
+      expect(push).toHaveBeenCalledWith({ screen: 'ledger', sheet: 'ledger-month' }, '')
+      push.mockRestore()
+
+      pressBackButton()
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('10월')
     })
 
     it('아래 고정 [+ 내역 적기] 하나만 있고 예전 [돈 들어옴] [돈 나감] 버튼은 없다', () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
 
-      expect(within(screen.getByTestId('bottom-action-bar')).getByRole('button', { name: '+ 내역 적기' })).toBeEnabled()
+      expect(within(screen.getByTestId('bottom-action-bar')).getByRole('button', { name: '내역 적기' })).toBeEnabled()
       expect(screen.queryByRole('button', { name: /돈 들어옴|돈 나감/ })).not.toBeInTheDocument()
     })
   })
@@ -151,10 +190,10 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('3월')
     })
 
-    it('위쪽 [올해 결산] 은 올해 결산 화면을, [설정] 은 설정 화면을 연다', async () => {
+    it('위쪽 [결산] 은 올해 결산 화면을, [설정] 은 설정 화면을 연다', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
 
-      await userEvent.click(screen.getByRole('button', { name: '올해 결산' }))
+      await userEvent.click(screen.getByRole('button', { name: '결산' }))
       expect(screen.getByRole('heading', { level: 1, name: '2026년 결산' })).toBeInTheDocument()
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
@@ -195,7 +234,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
     it('[← 장부로] 는 쌓은 방문 기록을 되돌린다 (그다음 뒤로 버튼은 앱 기본 동작)', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
-      await userEvent.click(screen.getByRole('button', { name: '올해 결산' }))
+      await userEvent.click(screen.getByRole('button', { name: '결산' }))
       const back = vi.spyOn(window.history, 'back')
 
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
@@ -209,7 +248,7 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(document.body).not.toHaveTextContent('보고서')
 
       await stepBack(7)
-      for (const name of ['3월 정리 보기', '올해 결산', '설정']) {
+      for (const name of ['3월 정리 보기', '결산', '설정']) {
         await userEvent.click(screen.getByRole('button', { name }))
         expect(document.body).not.toHaveTextContent('보고서')
         await userEvent.click(screen.getByRole('button', { name: '장부로' }))
@@ -218,18 +257,25 @@ describe('SPEC-001 앱 뼈대', () => {
   })
 
   describe('설정', () => {
-    it('동아리 이름·이월금을 고쳐 저장하면 "바꿨어요" 알림이 뜨고 장부 화면과 저장소에 반영된다', async () => {
+    it('동아리 이름·이월금을 각 편집 화면에서 고쳐 저장하면 "바꿨어요" 알림이 뜨고 설정 목록·장부 화면과 저장소에 반영된다', async () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
-
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
+
+      await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
       const name = screen.getByLabelText('동아리 이름')
       await userEvent.clear(name)
       await userEvent.type(name, '꽃동산')
-      await userEvent.click(screen.getByRole('button', { name: '적자였어요' }))
-      await userEvent.click(screen.getByRole('button', { name: '바꾼 내용 저장' }))
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       expect(screen.getByRole('status')).toHaveTextContent('바꿨어요')
+      expect(screen.getByRole('button', { name: /^동아리 이름/ })).toHaveTextContent('꽃동산')
+
+      await userEvent.click(screen.getByRole('button', { name: /^작년 이월금/ }))
+      await userEvent.click(screen.getByRole('button', { name: '적자였어요' }))
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
       expect(repository.load().data.ledgers['2026']).toMatchObject({ clubName: '꽃동산', carryover: -200_000 })
+      expect(screen.getByRole('button', { name: /^작년 이월금/ })).toHaveTextContent('적자 200,000원')
 
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
@@ -242,39 +288,41 @@ describe('SPEC-001 앱 뼈대', () => {
     it('저장에 실패하면 "바꿨어요" 알림 없이 위쪽 안내만 보인다', async () => {
       renderApp(alwaysFailing(storedWith(LEDGER_2026)))
 
-      await userEvent.click(screen.getByRole('button', { name: '설정' }))
-      await userEvent.type(screen.getByLabelText('동아리 이름'), '2')
-      await userEvent.click(screen.getByRole('button', { name: '바꾼 내용 저장' }))
+      await renameClub('2')
 
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
       expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
     })
 
-    it('바꾼 내용이 없거나 이름이 비면 [바꾼 내용 저장] 을 누를 수 없다', async () => {
+    it('편집 화면에서 안드로이드 뒤로 버튼을 누르면 설정 목록으로, 한 번 더 누르면 장부로 돌아온다', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
-
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
-      expect(screen.getByRole('button', { name: '바꾼 내용 저장' })).toBeDisabled()
+      await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
 
-      await userEvent.clear(screen.getByLabelText('동아리 이름'))
+      pressBackButton()
+      expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
 
-      expect(screen.getByRole('button', { name: '바꾼 내용 저장' })).toBeDisabled()
-      expect(screen.getByText('동아리 이름을 적어주세요')).toBeInTheDocument()
+      pressBackButton()
+      expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
     })
 
-    it('연도는 장부가 있는 연도와 올해 중에서 고르고, 고르면 장부 화면으로 돌아와 그 해 12월을 보여준다', async () => {
+    it('연도는 장부가 있는 연도와 올해 중에서 선택 창으로 고르고, 고르면 선택 창·설정 방문 기록을 한 번에 되돌려 장부 화면에서 그 해 12월을 보여준다', async () => {
       renderApp(new MemoryRepository(storedWith({ ...LEDGER_2025, year: 2024, clubName: '옛이름' }, LEDGER_2026)))
 
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
-      const years = screen.getByRole('group', { name: '장부 연도' })
+      await userEvent.click(screen.getByRole('button', { name: /^장부 연도/ }))
+      const years = within(screen.getByRole('dialog', { name: '어느 해 장부를 볼까요?' })).getByRole('group', {
+        name: '장부 연도',
+      })
       expect(within(years).getAllByRole('button').map((button) => button.textContent)).toEqual(['2026년', '2024년'])
       expect(within(years).getByRole('button', { name: '2026년' })).toHaveAttribute('aria-pressed', 'true')
-      const back = vi.spyOn(window.history, 'back')
+      const go = vi.spyOn(window.history, 'go')
 
       await userEvent.click(within(years).getByRole('button', { name: '2024년' }))
 
-      expect(back).toHaveBeenCalledOnce()
-      back.mockRestore()
+      expect(go).toHaveBeenCalledWith(-2)
+      go.mockRestore()
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('옛이름')
       expect(screen.getByTestId('ledger-year')).toHaveTextContent('2024년')
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('12월')
@@ -285,9 +333,11 @@ describe('SPEC-001 앱 뼈대', () => {
       await stepBack(7)
 
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
-      await userEvent.click(screen.getByRole('button', { name: '2025년' }))
+      await chooseYear(2025)
+      await screen.findByTestId('ledger-screen')
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
-      await userEvent.click(screen.getByRole('button', { name: '2026년' }))
+      await chooseYear(2026)
+      await screen.findByTestId('ledger-screen')
 
       expect(screen.getByTestId('ledger-year')).toHaveTextContent('2026년')
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('10월')
@@ -308,9 +358,9 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('4월')
-      expect(screen.getAllByTestId('entry-row').map((row) => row.textContent)).toEqual([
-        '대관료−40,000원',
-        '간식비−58,280원',
+      expect(entryRows().map((row) => row.textContent)).toEqual([
+        '대관료 지출 −40,000원',
+        '간식비 지출 −58,280원',
       ])
       // 300,000 − 58,280
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('241,720원')
@@ -434,7 +484,7 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('4월')
-      expect(screen.getAllByTestId('entry-row').map((row) => row.textContent)).toEqual(['대관료−45,000원'])
+      expect(entryRows().map((row) => row.textContent)).toEqual(['대관료 지출 −45,000원'])
       // 200,000 + 140,000 − 45,000
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('295,000원')
       expect(screen.getByRole('status')).toHaveTextContent('고쳤어요')
@@ -451,7 +501,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('3월')
-      expect(screen.getAllByTestId('entry-row').map((row) => row.textContent)).toEqual(['회비+140,000원', '대관료−40,000원'])
+      expect(entryRows().map((row) => row.textContent)).toEqual(['회비 수입 +140,000원', '대관료 지출 −40,000원'])
     })
 
     it('고친 내용을 저장하지 못하면 "고쳤어요" 알림 없이 위쪽 실패 안내만 보인다', async () => {
@@ -492,7 +542,7 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(back).toHaveBeenCalledOnce()
       back.mockRestore()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('4월')
-      expect(screen.queryByTestId('entry-row')).not.toBeInTheDocument()
+      expect(within(screen.getByTestId('month-card')).queryByTestId('list-row')).not.toBeInTheDocument()
       // 200,000 + 140,000
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('340,000원')
       expect(screen.getByRole('status')).toHaveTextContent('지웠어요')
@@ -608,9 +658,7 @@ describe('SPEC-001 앱 뼈대', () => {
       renderApp(alwaysFailing(storedWith(LEDGER_2026)))
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 
-      await userEvent.click(screen.getByRole('button', { name: '설정' }))
-      await userEvent.type(screen.getByLabelText('동아리 이름'), '2')
-      await userEvent.click(screen.getByRole('button', { name: '바꾼 내용 저장' }))
+      await renameClub('2')
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
       expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
@@ -643,7 +691,7 @@ async function openEditForm(name: string) {
 }
 
 async function openEntryForm() {
-  await userEvent.click(screen.getByRole('button', { name: '+ 내역 적기' }))
+  await userEvent.click(screen.getByRole('button', { name: '내역 적기' }))
   expect(screen.getByRole('heading', { level: 1, name: '내역 적기' })).toBeInTheDocument()
 }
 
@@ -654,6 +702,25 @@ async function fillExpense(name: string, amount: string) {
   await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
   await userEvent.type(screen.getByLabelText('직접 적기'), name)
   await userEvent.type(screen.getByLabelText('얼마인가요?'), amount)
+}
+
+// 장부 → 설정 → 동아리 이름 편집 화면에서 이름 뒤에 글자를 붙여 저장한다 (설정 목록으로 돌아온다)
+async function renameClub(suffix: string) {
+  await userEvent.click(screen.getByRole('button', { name: '설정' }))
+  await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
+  await userEvent.type(screen.getByLabelText('동아리 이름'), suffix)
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+}
+
+// 보고 있는 달 카드의 기록 줄
+function entryRows() {
+  return within(screen.getByTestId('month-card')).getAllByTestId('list-row')
+}
+
+// 설정 > 장부 연도 줄 → 선택 창에서 연도를 고른다
+async function chooseYear(year: number) {
+  await userEvent.click(screen.getByRole('button', { name: /^장부 연도/ }))
+  await userEvent.click(within(screen.getByRole('group', { name: '장부 연도' })).getByRole('button', { name: `${year}년` }))
 }
 
 // [‹] 을 여러 번 눌러 앞 달로 간다

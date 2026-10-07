@@ -1,14 +1,24 @@
 import { monthGroup, type LedgerTotals, type MonthGroup } from '../../domain/ledger'
-import type { Ledger } from '../../domain/types'
+import { itemIcon } from '../../domain/itemIcon'
+import type { EntryType, Ledger } from '../../domain/types'
 import { AmountText } from '../../ui/AmountText'
 import { BalanceCard } from '../../ui/BalanceCard'
 import { BottomActionBar } from '../../ui/BottomActionBar'
-import { Button } from '../../ui/Button'
+import { BottomSheet } from '../../ui/BottomSheet'
+import { IconButton } from '../../ui/IconButton'
+import { ListRow } from '../../ui/ListRow'
 import { formatAmount } from '../../ui/money'
+import { MonthPicker } from '../../ui/MonthPicker'
 import { MonthStepper } from '../../ui/MonthStepper'
-import { TopTextButton } from '../../ui/TopTextButton'
 import { BACKUP_DOT_LABEL } from '../backup/backupReminder'
+import type { SheetHistory } from '../useScreenHistory'
 import './ledger.css'
+
+// 장부 화면의 선택 창 이름
+const MONTH_SHEET = 'ledger-month'
+
+// 줄 보조 줄: 색만으로 구분하지 않게 수입/지출을 글자로도
+const TYPE_LABEL: Record<EntryType, string> = { income: '수입', expense: '지출' }
 
 type LedgerScreenProps = {
   year: number
@@ -16,7 +26,11 @@ type LedgerScreenProps = {
   totals: LedgerTotals
   // 보고 있는 달 (1~12). 다른 화면에 다녀와도 그대로이도록 App 이 들고 있다
   month: number
+  // 이번 달 (달 선택 창에 테두리). 올해 장부가 아니면 없다
+  currentMonth?: number
   onChangeMonth: (month: number) => void
+  // 달 선택 창을 여닫는 방문 기록 (안드로이드 뒤로 버튼으로 창만 닫히게)
+  sheets: SheetHistory
   onOpenMonthSummary: (month: number) => void
   onOpenYearSummary: () => void
   onOpenSettings: () => void
@@ -35,13 +49,15 @@ function carryoverNote(carryover: number): string | undefined {
   return undefined
 }
 
-// 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 글자 버튼 → 잔액 카드 → ‹ N월 › → 그 달 카드 → 아래 고정 [+ 내역 적기]
+// 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 [결산][설정] → 잔액 카드 → ‹ N월 ▾ › → 그 달 카드 → 아래 고정 [+ 내역 적기]
 export function LedgerScreen({
   year,
   ledger,
   totals,
   month,
+  currentMonth,
   onChangeMonth,
+  sheets,
   onOpenMonthSummary,
   onOpenYearSummary,
   onOpenSettings,
@@ -59,30 +75,50 @@ export function LedgerScreen({
           </p>
         </div>
         <div className="ledger__top-actions">
-          <TopTextButton onClick={onOpenYearSummary}>올해 결산</TopTextButton>
-          <TopTextButton onClick={onOpenSettings} dotLabel={settingsNeedsBackup ? BACKUP_DOT_LABEL : undefined}>
+          <IconButton icon="chart" onClick={onOpenYearSummary}>
+            결산
+          </IconButton>
+          <IconButton
+            icon="settings"
+            onClick={onOpenSettings}
+            dotLabel={settingsNeedsBackup ? BACKUP_DOT_LABEL : undefined}
+          >
             설정
-          </TopTextButton>
+          </IconButton>
         </div>
       </header>
 
       <BalanceCard label="지금 잔액" amount={totals.balance} note={carryoverNote(ledger.carryover)} />
 
-      <MonthStepper
-        month={month}
-        onPrevious={() => onChangeMonth(month - 1)}
-        onNext={() => onChangeMonth(month + 1)}
-        previousDisabled={month === 1}
-        nextDisabled={month === 12}
-      />
+      <div className="ledger__month-group">
+        <MonthStepper
+          month={month}
+          onPrevious={() => onChangeMonth(month - 1)}
+          onNext={() => onChangeMonth(month + 1)}
+          previousDisabled={month === 1}
+          nextDisabled={month === 12}
+          onPickMonth={() => sheets.openSheet(MONTH_SHEET)}
+        />
 
-      <MonthCard
-        group={monthGroup(ledger.entries, month)}
-        onEditEntry={onEditEntry}
-        onOpenMonthSummary={onOpenMonthSummary}
-      />
+        <MonthCard
+          group={monthGroup(ledger.entries, month)}
+          onEditEntry={onEditEntry}
+          onOpenMonthSummary={onOpenMonthSummary}
+        />
+      </div>
 
-      <BottomActionBar label="+ 내역 적기" onClick={() => onAddEntry?.(month)} />
+      <BottomActionBar icon="plus" label="내역 적기" onClick={() => onAddEntry?.(month)} />
+
+      <BottomSheet open={sheets.sheet === MONTH_SHEET} title="몇 월을 볼까요?" onClose={sheets.closeSheet}>
+        <MonthPicker
+          value={month}
+          currentMonth={currentMonth}
+          onChange={(picked) => {
+            onChangeMonth(picked)
+            sheets.closeSheet()
+          }}
+        />
+      </BottomSheet>
     </div>
   )
 }
@@ -93,7 +129,7 @@ type MonthCardProps = {
   onOpenMonthSummary: (month: number) => void
 }
 
-// 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(입력 순) → [N월 정리 보기]. 기록이 없으면 안내 한 줄만
+// 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(입력 순, 원형 아이콘) → [N월 정리 보기]. 기록이 없으면 안내 한 줄만
 function MonthCard({ group, onEditEntry, onOpenMonthSummary }: MonthCardProps) {
   const { month } = group
 
@@ -117,25 +153,23 @@ function MonthCard({ group, onEditEntry, onOpenMonthSummary }: MonthCardProps) {
               </dd>
             </div>
           </dl>
-          {group.entries.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              className="ledger__row"
-              data-testid="entry-row"
-              data-kind={entry.type}
-              onClick={() => onEditEntry?.(entry.id)}
-            >
-              <span className="ledger__row-name">{entry.name}</span>
-              <span className="ledger__row-amount">
-                <AmountText type={entry.type} amount={entry.amount} />
-              </span>
-            </button>
-          ))}
+          <div className="ledger__rows">
+            {group.entries.map((entry) => (
+              <ListRow
+                key={entry.id}
+                icon={itemIcon(entry.name)}
+                tone={entry.type === 'income' ? 'income' : 'neutral'}
+                title={entry.name}
+                description={TYPE_LABEL[entry.type]}
+                end={<AmountText type={entry.type} amount={entry.amount} />}
+                onClick={() => onEditEntry?.(entry.id)}
+              />
+            ))}
+          </div>
           <div className="ledger__month-action">
-            <Button variant="secondary" onClick={() => onOpenMonthSummary(month)}>
-              {month}월 정리 보기
-            </Button>
+            <IconButton icon="receipt" variant="fill" onClick={() => onOpenMonthSummary(month)}>
+              {`${month}월 정리 보기`}
+            </IconButton>
           </div>
         </>
       )}

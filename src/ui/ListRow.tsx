@@ -25,9 +25,10 @@ export function ListRow({ icon, tone = 'neutral', title, description, end, onCli
       </span>
       <span className="ui-row__text">
         <span className="ui-row__title">{title}</span>
-        {description && <span className="ui-row__description">{description}</span>}
+        {/* 줄 버튼 이름이 "회비 수입 +140,000원" 처럼 띄어 읽히게 */}
+        {description && <> <span className="ui-row__description">{description}</span></>}
       </span>
-      {end !== undefined && <span className="ui-row__end">{end}</span>}
+      {end !== undefined && <> <span className="ui-row__end">{end}</span></>}
     </>
   )
 
