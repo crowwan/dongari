@@ -14,7 +14,10 @@ const HISTORY: Entry[] = [
   { id: '3', month: 9, type: 'income', name: '찬조금', amount: 50_000, createdAt: '2026-09-03T00:00:00.000Z' },
 ]
 
-const SAVED: EntryDraft = { month: 4, type: 'income', name: '회비', amount: 140_000 }
+// 4월 7일에 적은 회비
+const SAVED: EntryDraft = { month: 4, day: 7, type: 'income', name: '회비', amount: 140_000 }
+// 날짜(일) 칸이 생기기 전에 적은 예전 기록
+const OLD_SAVED: EntryDraft = { ...SAVED, day: undefined }
 
 function makeHandlers() {
   return {
@@ -32,8 +35,10 @@ function Harness({ initial, handlers }: { initial: EntryDraft; handlers: Handler
   const sheets = useScreenHistory()
   return (
     <EditEntryForm
+      year={2026}
       initial={initial}
       currentMonth={10}
+      currentDay={3}
       frequentChoices={(type?: EntryType) => frequentChoices(HISTORY, type)}
       sheets={sheets}
       onSave={handlers.onSave}
@@ -51,6 +56,7 @@ function renderForm(initial: EntryDraft = SAVED) {
 }
 
 const saveButton = () => screen.getByRole('button', { name: '저장' })
+const dateSheet = () => screen.getByRole('dialog', { name: '며칠인가요?' })
 const typeGroup = () => screen.getByRole('group', { name: '수입인가요, 지출인가요?' })
 const itemList = () => screen.getByRole('group', { name: '자주 쓴 항목' })
 const itemNames = () =>
@@ -59,13 +65,13 @@ const itemNames = () =>
     .map((button) => button.textContent)
 
 describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
-  it('위에서부터 몇 월(한 줄 + 바꾸기) → 수입/지출 스위치 → 무엇(항목 목록 + 직접 적기 칸) → 얼마, 맨 아래 [이 내역 지우기], 아래 고정 [저장]', () => {
+  it('위에서부터 날짜(한 줄 "4월 7일" + 바꾸기) → 수입/지출 스위치 → 무엇(항목 목록 + 직접 적기 칸) → 얼마, 맨 아래 [이 내역 지우기], 아래 고정 [저장]', () => {
     renderForm()
 
     expect(screen.getByRole('heading', { level: 1, name: '내역 고치기' })).toBeInTheDocument()
     const questions = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
-    expect(questions).toEqual(['몇 월인가요?', '수입인가요, 지출인가요?', '무엇인가요?', '얼마인가요?'])
-    expect(screen.getByRole('button', { name: '4월 바꾸기' })).toBeInTheDocument()
+    expect(questions).toEqual(['며칠인가요?', '수입인가요, 지출인가요?', '무엇인가요?', '얼마인가요?'])
+    expect(screen.getByRole('button', { name: '4월 7일 바꾸기' })).toBeInTheDocument()
     expect(screen.getByTestId('segmented-control')).toBeInTheDocument()
     expect(screen.getByTestId('amount-display')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '이 내역 지우기' })).toBeInTheDocument()
@@ -90,22 +96,72 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
     expect(screen.queryByRole('heading', { name: '직접 적기' })).not.toBeInTheDocument()
   })
 
-  describe('몇 월', () => {
-    it('[바꾸기] 를 누르면 열두 달 선택 창이 열리고, 고르면 창이 닫히며 그 달로 바뀐다', async () => {
+  describe('AC-25 날짜', () => {
+    it('[바꾸기] 를 누르면 날짜 선택 창([‹ 4월 ›] + 날 격자, 고른 날 표시)이 열리고, 날을 누르면 창이 닫히며 그 날로 바뀐다', async () => {
       renderForm()
 
-      await userEvent.click(screen.getByRole('button', { name: '4월 바꾸기' }))
-      const sheet = screen.getByRole('dialog', { name: '몇 월인가요?' })
-      expect(within(sheet).getByRole('button', { name: '4월' })).toHaveAttribute('aria-pressed', 'true')
-      await userEvent.click(within(sheet).getByRole('button', { name: '3월' }))
+      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
+      expect(within(dateSheet()).getByTestId('month-stepper-label')).toHaveTextContent('4월')
+      expect(within(dateSheet()).getAllByRole('button', { name: /일$/ })).toHaveLength(30)
+      expect(within(dateSheet()).getByRole('button', { name: '7일' })).toHaveAttribute('aria-pressed', 'true')
+      await userEvent.click(within(dateSheet()).getByRole('button', { name: '12일' }))
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: '3월 바꾸기' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '4월 12일 바꾸기' })).toBeInTheDocument()
+    })
+
+    it('창의 [‹] [›] 로 달을 넘겨 다른 달의 날을 고를 수 있고, 이번 달이면 오늘에 테두리', async () => {
+      renderForm()
+      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
+
+      for (let step = 0; step < 6; step += 1) {
+        await userEvent.click(within(dateSheet()).getByRole('button', { name: '다음 달' }))
+      }
+      expect(within(dateSheet()).getByTestId('month-stepper-label')).toHaveTextContent('10월')
+      expect(within(dateSheet()).getByRole('button', { name: '3일' })).toHaveAttribute('aria-current', 'date')
+      // 다른 달에서는 고른 날 표시가 없다
+      expect(dateSheet().querySelector('[aria-pressed="true"]')).not.toBeInTheDocument()
+      await userEvent.click(within(dateSheet()).getByRole('button', { name: '31일' }))
+
+      expect(screen.getByRole('button', { name: '10월 31일 바꾸기' })).toBeInTheDocument()
+    })
+
+    it('날을 고르지 않고 창을 닫으면 날짜는 그대로다', async () => {
+      renderForm()
+      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
+      await userEvent.click(within(dateSheet()).getByRole('button', { name: '이전 달' }))
+
+      await userEvent.keyboard('{Escape}')
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '4월 7일 바꾸기' })).toBeInTheDocument()
+    })
+
+    it('날짜 없는 예전 내역은 "4월 · 날짜 없음" 으로 보이고, 그대로 저장할 수 있다', async () => {
+      const { onSave } = renderForm(OLD_SAVED)
+
+      expect(screen.getByRole('button', { name: '4월 · 날짜 없음 바꾸기' })).toBeInTheDocument()
+      expect(saveButton()).toBeEnabled()
+      await userEvent.click(screen.getByRole('button', { name: '1만 원 더하기' }))
+      await userEvent.click(saveButton())
+
+      expect(onSave).toHaveBeenCalledWith({ month: 4, type: 'income', name: '회비', amount: 150_000 })
+    })
+
+    it('날짜 없는 예전 내역도 날짜를 골라 붙일 수 있다 (고른 날 없이 그 달 격자가 열린다)', async () => {
+      const { onSave } = renderForm(OLD_SAVED)
+
+      await userEvent.click(screen.getByRole('button', { name: '4월 · 날짜 없음 바꾸기' }))
+      expect(dateSheet().querySelector('[aria-pressed="true"]')).not.toBeInTheDocument()
+      await userEvent.click(within(dateSheet()).getByRole('button', { name: '20일' }))
+      await userEvent.click(saveButton())
+
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 20, type: 'income', name: '회비', amount: 140_000 })
     })
 
     it('선택 창이 열려 있을 때 뒤로 버튼은 선택 창만 닫는다', async () => {
       const { onBack } = renderForm()
-      await userEvent.click(screen.getByRole('button', { name: '4월 바꾸기' }))
+      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
 
       act(() => {
         window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
@@ -157,17 +213,18 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
     })
   })
 
-  it('AC-6 고쳐서 [저장] 을 누르면 고친 달·종류·이름·금액을 넘긴다', async () => {
+  it('AC-6 고쳐서 [저장] 을 누르면 고친 달·날짜·종류·이름·금액을 넘긴다', async () => {
     const { onSave } = renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: '4월 바꾸기' }))
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '5월' }))
+    await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
+    await userEvent.click(within(dateSheet()).getByRole('button', { name: '다음 달' }))
+    await userEvent.click(within(dateSheet()).getByRole('button', { name: '31일' }))
     await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
     await userEvent.click(within(itemList()).getByRole('button', { name: '꽃값 지출' }))
     await userEvent.click(screen.getByRole('button', { name: '1만 원 더하기' }))
     await userEvent.click(saveButton())
 
-    expect(onSave).toHaveBeenCalledWith({ month: 5, type: 'expense', name: '꽃값', amount: 150_000 })
+    expect(onSave).toHaveBeenCalledWith({ month: 5, day: 31, type: 'expense', name: '꽃값', amount: 150_000 })
   })
 
   describe('적던 내용 (닫기 전 확인)', () => {
@@ -178,6 +235,18 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
 
       expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+    })
+
+    it('날짜만 바꿔도 바뀌었다고 알리고, 같은 날로 되돌리면 다시 바뀐 것이 없다고 알린다', async () => {
+      const { onDirtyChange } = renderForm()
+
+      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
+      await userEvent.click(within(dateSheet()).getByRole('button', { name: '8일' }))
+      expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+
+      await userEvent.click(screen.getByRole('button', { name: '4월 8일 바꾸기' }))
+      await userEvent.click(within(dateSheet()).getByRole('button', { name: '7일' }))
+      expect(onDirtyChange).toHaveBeenLastCalledWith(false)
     })
 
     it('바꾼 값을 처음 값으로 되돌리면 다시 바뀐 것이 없다고 알린다', async () => {

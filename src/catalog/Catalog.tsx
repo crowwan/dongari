@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { daysInMonth } from '../domain/entryDate'
 import { itemIcon } from '../domain/itemIcon'
 import type { EntryType } from '../domain/types'
 import { InstallGuide } from '../features/install/InstallGuide'
@@ -11,11 +12,13 @@ import { BottomActionBar } from '../ui/BottomActionBar'
 import { BottomSheet } from '../ui/BottomSheet'
 import { Button } from '../ui/Button'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
+import { DayPicker } from '../ui/DayPicker'
 import { EntryCard } from '../ui/EntryCard'
 import { Icon, type IconName } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { ListRow } from '../ui/ListRow'
 import { MoneyInput } from '../ui/MoneyInput'
+import { MonthButton } from '../ui/MonthButton'
 import { MonthPicker } from '../ui/MonthPicker'
 import { MonthStepper } from '../ui/MonthStepper'
 import { NoticeBar } from '../ui/NoticeBar'
@@ -70,7 +73,7 @@ const SIZE_TOKENS = ['--size-small', '--size-body', '--size-large', '--size-amou
 const TEXT_ROLES: { role: string; sample: string; muted?: boolean }[] = [
   { role: 'display', sample: '1,166,193원' },
   { role: 'title', sample: '내역 적기' },
-  { role: 'heading', sample: '몇 월인가요?' },
+  { role: 'heading', sample: '며칠인가요?' },
   { role: 'row', sample: '대관료' },
   { role: 'label', sample: '직접 적기', muted: true },
   { role: 'body', sample: '회비 140,000원' },
@@ -84,7 +87,7 @@ const ITEM_NAMES = ['회비', '대관료', '간식비', '행사지원금', '예�
 const ACTION_ICONS: { icon: IconName; label: string }[] = [
   { icon: 'income', label: '수입' },
   { icon: 'expense', label: '지출' },
-  { icon: 'calendar', label: '달' },
+  { icon: 'calendar', label: '날짜' },
   { icon: 'pen', label: '직접 적기' },
   { icon: 'download', label: '사진 저장' },
   { icon: 'share', label: '보내기' },
@@ -133,6 +136,8 @@ export function Catalog() {
   const [quickAmount, setQuickAmount] = useState(40000)
   const [pickedYear, setPickedYear] = useState('2026')
   const [pickedItem, setPickedItem] = useState('대관료')
+  const [pickedDay, setPickedDay] = useState<number | null>(null)
+  const [sheetMonth, setSheetMonth] = useState(10)
 
   return (
     <div className="catalog" data-theme={theme === 'system' ? undefined : theme} data-testid="design-catalog">
@@ -282,6 +287,9 @@ export function Catalog() {
           <State label="정해진 값 + 바꾸기 (누르면 열두 달 선택 창)">
             <PickRow icon="calendar" value={`${pickedMonth}월`} onClick={() => setSheetOpen(true)} />
           </State>
+          <State label="고치기 날짜 줄: 날짜 없는 예전 기록 (v2.2)">
+            <PickRow icon="calendar" value="10월 · 날짜 없음" onClick={noop} />
+          </State>
           <State label="아이콘 없음 · 눌림">
             <div data-preview-pressed="">
               <PickRow value="2026년" onClick={noop} />
@@ -293,6 +301,68 @@ export function Catalog() {
           <State label={`고른 달 칠함 · 이번 달(10월) 테두리 (눌러 보기) · ${pickedMonth}월`}>
             <div className="catalog__card catalog__card--pad">
               <MonthPicker value={pickedMonth} currentMonth={10} onChange={setPickedMonth} />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="DayPicker (날 격자, v2.2)">
+          <State label={`카드 질문 칸 위 흰 칸 · 5칸씩 · 오늘(7일) 테두리 · 고른 날 칠함 (눌러 보기) · ${pickedDay ?? '안 고름'}`}>
+            <div className="catalog__wash">
+              <DayPicker label="10월 날짜" days={31} value={pickedDay} today={7} onChange={setPickedDay} />
+            </div>
+          </State>
+          <State label='연달아 적기: 방금 저장한 날(5일) 옅은 청록 + "방금" — 미리 고르지 않음'>
+            <div className="catalog__wash">
+              <DayPicker label="10월 날짜" days={31} value={null} today={7} recent={5} onChange={noop} />
+            </div>
+          </State>
+          <State label="날짜 바꾸기로 돌아왔을 때: 고른 날(5일)이 방금 저장한 날과 같음">
+            <div className="catalog__wash">
+              <DayPicker label="10월 날짜" days={31} value={5} recent={5} onChange={noop} />
+            </div>
+          </State>
+          <State label="2026년 2월 (28일까지) / 2028년 2월 (윤년, 29일까지)">
+            <div className="catalog__wash">
+              <DayPicker label="2026년 2월 날짜" days={28} value={null} onChange={noop} />
+            </div>
+            <div className="catalog__wash">
+              <DayPicker label="2028년 2월 날짜" days={29} value={29} onChange={noop} />
+            </div>
+          </State>
+          <State label="선택 창 안: 회색 칸 + [‹ 10월 ›] (고치기 날짜 선택 창, 달 넘겨 보기)">
+            <div className="catalog__frame catalog__frame--sheet">
+              <BottomSheet open title="며칠인가요?" onClose={noop}>
+                <MonthStepper
+                  month={sheetMonth}
+                  onPrevious={() => setSheetMonth((value) => value - 1)}
+                  onNext={() => setSheetMonth((value) => value + 1)}
+                  previousDisabled={sheetMonth === 1}
+                  nextDisabled={sheetMonth === 12}
+                />
+                <DayPicker
+                  label={`${sheetMonth}월 날짜`}
+                  days={daysInMonth(2026, sheetMonth)}
+                  value={sheetMonth === 10 ? 7 : null}
+                  today={sheetMonth === 10 ? 3 : undefined}
+                  onChange={noop}
+                />
+              </BottomSheet>
+            </div>
+          </State>
+          <State label="눌림 (안 고른 칸 / 고른 칸)">
+            <div className="catalog__wash" data-preview-pressed="">
+              <DayPicker label="눌림" days={5} value={2} onChange={noop} />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="MonthButton (질문 제목 옆 달 버튼)">
+          <State label='"며칠인가요?" 옆 [10월 ▾] → 열두 달 선택 창 (눌러 보기) · 눌림'>
+            <div className="catalog__wash catalog__row">
+              <MonthButton month={pickedMonth} onClick={() => setSheetOpen(true)} />
+              <div data-preview-pressed="">
+                <MonthButton month={2} onClick={noop} />
+              </div>
             </div>
           </State>
         </Section>
@@ -354,10 +424,27 @@ export function Catalog() {
         </Section>
 
         <Section title="EntryCard (지금 적는 내역 카드)">
-          <State label="금액 단계: 달 줄 + 항목 줄 (이름 · 수입/지출) → 옅은 면에 지금 질문 — [달 바꾸기] 눌러 보기">
+          <State label="며칠인가요? 단계 (v2.2): 날짜 줄은 달만, [바꾸기] 없음 → 제목 + [10월 ▾] + 날 격자">
+            <EntryCard rows={[{ label: '날짜', icon: 'calendar', value: '10월' }]}>
+              <div className="catalog__stack">
+                <div className="catalog__question-row">
+                  <h2 className="catalog__question">며칠인가요?</h2>
+                  <MonthButton month={10} onClick={() => setSheetOpen(true)} />
+                </div>
+                <DayPicker label="10월 날짜" days={31} value={null} today={7} recent={5} onChange={noop} />
+                <p className="catalog__state">누르면 바로 다음으로 넘어가요</p>
+              </div>
+            </EntryCard>
+          </State>
+          <State label="금액 단계: 날짜 줄 + 항목 줄 (이름 · 수입/지출) → 옅은 면에 지금 질문 — [날짜 바꾸기] 눌러 보기">
             <EntryCard
               rows={[
-                { label: '달', icon: 'calendar', value: `${answerMonth}월`, onChange: () => setAnswerMonth((month) => (month % 12) + 1) },
+                {
+                  label: '날짜',
+                  icon: 'calendar',
+                  value: `${answerMonth}월 7일`,
+                  onChange: () => setAnswerMonth((month) => (month % 12) + 1),
+                },
                 { label: '항목', icon: itemIcon('대관료'), value: '대관료 · 지출', onChange: noop },
               ]}
             >
@@ -367,8 +454,8 @@ export function Catalog() {
               </div>
             </EntryCard>
           </State>
-          <State label="항목 단계: 달 줄만 → 항목 목록 + 안내">
-            <EntryCard rows={[{ label: '달', icon: 'calendar', value: '10월', onChange: noop }]}>
+          <State label="항목 단계: 날짜 줄만 → 항목 목록 + 안내">
+            <EntryCard rows={[{ label: '날짜', icon: 'calendar', value: '10월 7일', onChange: noop }]}>
               <div className="catalog__stack">
                 <h2 className="catalog__question">무엇인가요?</h2>
                 <OptionList
@@ -388,7 +475,7 @@ export function Catalog() {
           <State label="새 이름의 수입/지출을 묻는 동안: 항목 줄은 이름만 · 긴 이름 → 스위치">
             <EntryCard
               rows={[
-                { label: '달', icon: 'calendar', value: '5월', onChange: noop },
+                { label: '날짜', icon: 'calendar', value: '5월 15일', onChange: noop },
                 { label: '항목', icon: itemIcon('꽃값'), value: '스승의 날 선생님 꽃다발과 카드 값', onChange: noop },
               ]}
             >
@@ -400,7 +487,7 @@ export function Catalog() {
           </State>
           <State label="[바꾸기] 눌림">
             <div data-preview-pressed="">
-              <EntryCard rows={[{ label: '달', icon: 'calendar', value: '10월', onChange: noop }]}>
+              <EntryCard rows={[{ label: '날짜', icon: 'calendar', value: '10월 7일', onChange: noop }]}>
                 <h2 className="catalog__question">무엇인가요?</h2>
               </EntryCard>
             </div>

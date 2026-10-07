@@ -32,6 +32,14 @@
   gap: var(--stack-tight);
 }
 
+/* 질문 제목 + 옆 버튼 ("며칠인가요?" [10월 ▾]): 제목은 왼쪽, 버튼은 오른쪽 끝 */
+.entry__question-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 /* 질문 제목: Heading */
 .entry__question {
   margin: 0;
@@ -51,6 +59,13 @@
 .entry__aside {
   display: flex;
   margin-left: calc(var(--space-3) * -1);
+}
+
+/* 고치기 날짜 선택 창 안: [‹ 10월 ›] → 날 격자 (선택 창 안 요소 사이 간격) */
+.entry__date-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
 }
 
 /* 고치기 화면의 [이 내역 지우기]: 적는 흐름과 다른 큰 구획이라 질문 묶음 사이보다 더 띄운다 */

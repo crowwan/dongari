@@ -1,4 +1,5 @@
 // 월 정리·올해 결산 계산 순수 함수 (SPEC-003). 화면은 이 결과를 그대로 그리기만 한다
+import { byDate } from './entryDate'
 import { calculateTotals, InvalidLedgerInputError, type LedgerTotals } from './ledger'
 import type { Entry, EntryType, Ledger } from './types'
 
@@ -53,7 +54,7 @@ export type OpeningBalance =
 
 export interface MonthSummary {
   month: number
-  incomeEntries: Entry[] // 입력 순, 이름이 같아도 합치지 않는다
+  incomeEntries: Entry[] // 날짜순(장부와 같게), 이름이 같아도 합치지 않는다
   expenseEntries: Entry[]
   income: number
   expense: number
@@ -62,15 +63,16 @@ export interface MonthSummary {
   closing: number // 월말 잔액
 }
 
+// 그 달 그 종류 기록, 장부와 같은 날짜순 (같은 날은 적은 순, 날짜 없는 예전 기록은 맨 뒤)
 function entriesOf(entries: readonly Entry[], type: EntryType, month: number): Entry[] {
-  return entries.filter((entry) => entry.type === type && entry.month === month)
+  return byDate(entries.filter((entry) => entry.type === type && entry.month === month))
 }
 
 function sum(entries: readonly Entry[]): number {
   return entries.reduce((total, entry) => total + entry.amount, 0)
 }
 
-// 짝 높이(height)만큼 한 달의 칸을 만든다. 지출 기록은 입력 순으로 위부터, 남는 줄은 내용 없는 줄
+// 짝 높이(height)만큼 한 달의 칸을 만든다. 지출 기록은 날짜순으로 위부터(양식에 날짜 칸은 없다, v2.2), 남는 줄은 내용 없는 줄
 function monthCells(entries: readonly Entry[], month: number, height: number): ExpenseTableCell[] {
   const expenses = entriesOf(entries, 'expense', month)
   return Array.from({ length: height }, (_, index) => {

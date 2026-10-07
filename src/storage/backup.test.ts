@@ -80,6 +80,37 @@ describe('SPEC-002 백업 파일 읽기', () => {
     })
   })
 
+  it('날짜(일)가 있는 기록도 그대로 다시 읽힌다 (v2.2)', () => {
+    const dated = ledger(2026, 2)
+    const data = storedWith({ ...dated, entries: [{ ...dated.entries[0], day: 7 }, dated.entries[1]] })
+
+    const result = readBackup(createBackup(data, NOW).text)
+
+    expect(result.ok && result.data.ledgers['2026']?.entries.map((entry) => entry.day)).toEqual([7, undefined])
+  })
+
+  it('날짜(일) 칸이 생기기 전(v2.1) 앱이 만든 백업 파일을 그대로 읽는다 (버전을 올리지 않아 마이그레이션도 없다)', () => {
+    // v2.1.0 이 만든 파일 내용 그대로 (기록에 day 가 없다)
+    const v21File = `{
+  "schemaVersion": 2,
+  "ledgers": {
+    "2026": {
+      "year": 2026,
+      "clubName": "한랑드림",
+      "carryover": 370482,
+      "entries": [
+        { "id": "a", "month": 10, "type": "expense", "name": "대관료", "amount": 40000, "createdAt": "2026-10-02T01:00:00.000Z" }
+      ]
+    }
+  },
+  "settings": { "lastBackupAt": "2026-10-06T00:00:00.000Z" }
+}`
+
+    const result = readBackup(v21File)
+
+    expect(result).toEqual({ ok: true, data: JSON.parse(v21File), summary: { years: [2026], entryCount: 1 } })
+  })
+
   it('장부가 없는 백업 파일도 읽는다 (요약은 비어 있음)', () => {
     expect(readBackup(createBackup(createEmptyData(), NOW).text)).toEqual({
       ok: true,
@@ -101,6 +132,7 @@ describe('SPEC-002 백업 파일 읽기', () => {
     ['schemaVersion 이 없음', JSON.stringify({ ledgers: {}, settings: {} })],
     ['현재 버전인데 형식이 틀림', JSON.stringify({ schemaVersion: 2, ledgers: [], settings: {} })],
     ['금액 범위를 벗어난 기록', JSON.stringify(storedWith({ ...ledger(2026, 1), entries: [{ ...ledger(2026, 1).entries[0], amount: 0 }] }))],
+    ['그 달에 없는 날짜의 기록 (3월 32일)', JSON.stringify(storedWith({ ...ledger(2026, 1), entries: [{ ...ledger(2026, 1).entries[0], day: 32 }] }))],
     ['JSON 배열', '[]'],
   ])('AC-4 형식이 다른 파일은 not-backup 으로 거부한다: %s', (_label, text) => {
     expect(readBackup(text)).toEqual({ ok: false, reason: 'not-backup' })

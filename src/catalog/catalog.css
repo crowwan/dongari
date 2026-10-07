@@ -185,6 +185,21 @@
 }
 
 /* EntryCard 상태 안 지금 질문 제목 (화면의 내역 적기 질문과 같은 Heading) */
+/* "지금 적는 내역" 카드 질문 칸과 같은 옅은 청록 면 (날 격자·달 버튼이 놓이는 자리) */
+.catalog__wash {
+  padding: var(--space-4);
+  border-radius: var(--corner-lg);
+  background: var(--primary-wash);
+}
+
+/* 질문 제목 + 옆 버튼 (내역 적기 entry__question-row 와 같은 배치) */
+.catalog__question-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .catalog__question {
   margin: 0;
   font-size: var(--text-heading-size);

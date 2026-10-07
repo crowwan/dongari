@@ -44,7 +44,22 @@ describe('SPEC-003 월 정리 화면', () => {
     expect(screen.getByRole('heading', { level: 1, name: '2026년 9월 정리' })).toBeInTheDocument()
   })
 
-  it('그 달 수입·지출 내역을 입력 순으로(이름이 같아도 합치지 않고) 보이고 각 합계를 보인다 (AC-8)', () => {
+  it('AC-8 그 달 내역은 장부와 같은 날짜순이고 줄 이름 앞에 "7일"(날짜 없는 예전 기록은 생략, 맨 뒤)', () => {
+    // 9월 기록: 대관료(날짜 없음) · 회비(15일) · 간식비(15일) · 간식비(2일)
+    const dated: Ledger = {
+      ...SEPTEMBER,
+      entries: SEPTEMBER.entries.map((item, index) => {
+        const day = [1, 1, undefined, 15, 15, 2][index]
+        return day === undefined ? item : { ...item, day }
+      }),
+    }
+    renderSummary(dated, 9)
+
+    expect(linesOf('수입')).toEqual(['15일 회비140,000원', '수입 합계140,000원'])
+    expect(linesOf('지출')).toEqual(['2일 간식비30,000원', '15일 간식비28,280원', '대관료40,000원', '지출 합계98,280원'])
+  })
+
+  it('그 달 수입·지출 내역을 이름이 같아도 합치지 않고 보이고 각 합계를 보인다 (AC-8)', () => {
     renderSummary(SEPTEMBER, 9)
 
     expect(linesOf('수입')).toEqual(['회비140,000원', '수입 합계140,000원'])

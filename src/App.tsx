@@ -51,8 +51,10 @@ export default function App({ repository, loaded, options }: AppProps) {
 
   const month = viewedMonth ?? ledger.firstMonth
   const today = now()
-  // 이번 달 (달 선택 창 테두리). 지난 연도 장부에는 없다
-  const currentMonth = ledger.year === today.getFullYear() ? today.getMonth() + 1 : undefined
+  // 이번 달·오늘 (달 선택 창·날 격자 테두리). 지난 연도 장부에는 없다
+  const isThisYear = ledger.year === today.getFullYear()
+  const currentMonth = isThisYear ? today.getMonth() + 1 : undefined
+  const currentDay = isThisYear ? today.getDate() : undefined
   const { screen } = navigation
   const lastChainSaved = chainSaved.at(-1)
 
@@ -157,11 +159,13 @@ export default function App({ repository, loaded, options }: AppProps) {
       case 'add-entry':
         return (
           <AddEntryForm
-            // 저장할 때마다 처음 상태("무엇인가요?")로 다시 그린다. 달은 마지막에 저장한 달을 이어 쓰고 항목·금액은 비운다 (AC-19)
+            // 저장할 때마다 처음 상태("며칠인가요?")로 다시 그린다. 달은 마지막에 저장한 달을 이어 쓰고 날·항목·금액은 비운다 (AC-19, AC-24)
             key={chainSaved.length}
+            year={ledger.year}
             month={lastChainSaved?.month ?? screen.month}
             saved={chainSaved}
             currentMonth={currentMonth}
+            currentDay={currentDay}
             frequentChoices={ledger.frequentChoices}
             lastUsedType={ledger.lastUsedType}
             sheets={navigation}
@@ -181,13 +185,15 @@ export default function App({ repository, loaded, options }: AppProps) {
         )
       case 'edit-entry': {
         if (!editingEntry) return null
-        const { id, month: entryMonth, type, name, amount } = editingEntry
+        const { id, month: entryMonth, day, type, name, amount } = editingEntry
         return (
           <EditEntryForm
             // 다른 기록을 고치러 오면 처음 값부터 다시
             key={id}
-            initial={{ month: entryMonth, type, name, amount }}
+            year={ledger.year}
+            initial={{ month: entryMonth, day, type, name, amount }}
             currentMonth={currentMonth}
+            currentDay={currentDay}
             frequentChoices={ledger.frequentChoices}
             sheets={navigation}
             onSave={(input) => returnToLedger(ledger.updateEntry(id, input), '고쳤어요', input.month)}

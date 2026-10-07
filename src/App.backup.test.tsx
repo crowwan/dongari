@@ -272,6 +272,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
 
       expect(screen.queryByTestId('notice-bar')).not.toBeInTheDocument()
       await userEvent.click(screen.getByRole('button', { name: '내역 적기' }))
+      await userEvent.click(screen.getByRole('button', { name: '3일' }))
       await userEvent.click(screen.getByRole('button', { name: '간식비 지출' }))
       await userEvent.type(screen.getByLabelText('얼마인가요?'), '5000')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))

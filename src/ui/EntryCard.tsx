@@ -6,10 +6,10 @@ export type EntryCardRow = {
   // 작은 이름표 (예: "달", "항목"). [바꾸기] 의 화면 읽기 이름에도 붙는다 ("달 바꾸기")
   label: string
   icon: IconName
-  // 답한 값 (예: "10월", "대관료 · 지출")
+  // 답한 값 (예: "10월 7일", "대관료 · 지출")
   value: string
-  // [바꾸기]: 그 값 고치기
-  onChange: () => void
+  // [바꾸기]: 그 값 고치기. 없으면 [바꾸기] 를 그리지 않는다 (지금 그 값을 묻고 있을 때)
+  onChange?: () => void
 }
 
 type EntryCardProps = {
@@ -38,10 +38,12 @@ export function EntryCard({ rows, children }: EntryCardProps) {
               <Icon name={icon} />
               {value}
             </span>
-            <button type="button" className="ui-entry-card__change" onClick={onChange}>
-              {/* 눈에는 "바꾸기", 화면 읽기에는 무엇을 바꾸는지까지 ("달 바꾸기") */}
-              <span className="ui-visually-hidden">{label}</span> 바꾸기
-            </button>
+            {onChange && (
+              <button type="button" className="ui-entry-card__change" onClick={onChange}>
+                {/* 눈에는 "바꾸기", 화면 읽기에는 무엇을 바꾸는지까지 ("날짜 바꾸기") */}
+                <span className="ui-visually-hidden">{label}</span> 바꾸기
+              </button>
+            )}
           </li>
         ))}
       </ul>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { InvalidLedgerInputError } from './ledger'
 import { monthSummary, yearReport, type ExpenseTableCell, type ExpenseTableRow } from './report'
+import type { Ledger } from './types'
 import { ledger, V1_EXAMPLE_YEAR, type EntrySpec } from '../test/ledgerFixtures'
 
 // 지출내역 표 한쪽(왼쪽/오른쪽)을 사람이 읽기 쉬운 문자열 목록으로 바꾼다
@@ -14,6 +15,17 @@ function side(rows: readonly ExpenseTableRow[], pick: (row: ExpenseTableRow) => 
 }
 
 const leftSide = (rows: readonly ExpenseTableRow[]) => side(rows, (row) => row.left)
+
+// 기록에 입력 순서대로 날짜(일)를 붙인다. undefined 면 날짜 없는 예전 기록
+function withDays(target: Ledger, days: readonly (number | undefined)[]): Ledger {
+  return {
+    ...target,
+    entries: target.entries.map((entry, index) => {
+      const day = days[index]
+      return day === undefined ? entry : { ...entry, day }
+    }),
+  }
+}
 const rightSide = (rows: readonly ExpenseTableRow[]) => side(rows, (row) => row.right)
 
 // PLANS.md 9장 v1 샘플 데이터 (1월만 있음)를 기록으로 옮긴 것
@@ -189,6 +201,21 @@ describe('SPEC-003 올해 결산 계산', () => {
       expect(rightSide(report.expenseRows).slice(0, 3)).toEqual(['7월||', '8월|간식비|10000', '  |간식비|20000'])
     })
 
+    it('달별 지출은 장부와 같은 날짜순이다 (같은 날은 적은 순, 날짜 없는 예전 기록은 맨 뒤, 날짜 칸은 없다)', () => {
+      const report = yearReport(
+        withDays(
+          ledger([
+            [1, 'expense', '옛 기록', 1_000],
+            [1, 'expense', '20일', 2_000],
+            [1, 'expense', '3일', 3_000],
+          ]),
+          [undefined, 20, 3],
+        ),
+      )
+
+      expect(leftSide(report.expenseRows).slice(0, 3)).toEqual(['1월|3일|3000', '  |20일|2000', '  |옛 기록|1000'])
+    })
+
     it('지출이 1~6월에만 있어도 좌우 행 수가 같고, 짝의 오른쪽 달을 빈 줄로 채운다', () => {
       const report = yearReport(
         ledger([
@@ -267,7 +294,7 @@ describe('SPEC-003 월 정리 계산', () => {
     { carryover: 1_024_473 },
   )
 
-  it('그 달 수입·지출 내역을 입력 순으로, 이름이 같아도 합치지 않고 담고 각 합계를 낸다 (AC-8)', () => {
+  it('그 달 수입·지출 내역을 이름이 같아도 합치지 않고 담고 각 합계를 낸다 (AC-8)', () => {
     const summary = monthSummary(sample, 9)
 
     expect(summary.month).toBe(9)
@@ -279,6 +306,18 @@ describe('SPEC-003 월 정리 계산', () => {
     ])
     expect(summary.income).toBe(140_000)
     expect(summary.expense).toBe(98_280)
+  })
+
+  it('그 달 수입·지출 내역은 장부와 같은 날짜순이다 (같은 날은 적은 순, 날짜 없는 예전 기록은 맨 뒤) (AC-8)', () => {
+    // 9월 기록: 대관료(없음) · 회비(15일) · 간식비(15일) · 간식비(2일)
+    const summary = monthSummary(withDays(sample, [1, 1, undefined, 15, 15, 2, 3]), 9)
+
+    expect(summary.expenseEntries.map((entry) => [entry.day, entry.amount])).toEqual([
+      [2, 30_000],
+      [15, 28_280],
+      [undefined, 40_000],
+    ])
+    expect(summary.incomeEntries.map((entry) => entry.day)).toEqual([15])
   })
 
   it('전달까지 잔액(이월금 + 1월~전달 수입 − 지출), 그 달 수입−지출, 월말 잔액을 낸다 (AC-8)', () => {

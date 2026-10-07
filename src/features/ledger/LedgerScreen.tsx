@@ -1,6 +1,6 @@
 import { monthGroup, type LedgerTotals, type MonthGroup } from '../../domain/ledger'
 import { itemIcon } from '../../domain/itemIcon'
-import type { EntryType, Ledger } from '../../domain/types'
+import type { Entry, EntryType, Ledger } from '../../domain/types'
 import { AmountText } from '../../ui/AmountText'
 import { BalanceCard } from '../../ui/BalanceCard'
 import { BottomActionBar } from '../../ui/BottomActionBar'
@@ -19,6 +19,11 @@ const MONTH_SHEET = 'ledger-month'
 
 // 줄 보조 줄: 색만으로 구분하지 않게 수입/지출을 글자로도
 const TYPE_LABEL: Record<EntryType, string> = { income: '수입', expense: '지출' }
+
+// 줄 보조 줄: "7일 · 지출", 날짜 없는 예전 기록은 "지출"만 (AC-9)
+function rowDescription({ day, type }: Entry): string {
+  return day === undefined ? TYPE_LABEL[type] : `${day}일 · ${TYPE_LABEL[type]}`
+}
 
 type LedgerScreenProps = {
   year: number
@@ -129,7 +134,7 @@ type MonthCardProps = {
   onOpenMonthSummary: (month: number) => void
 }
 
-// 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(입력 순, 원형 아이콘) → [N월 정리 보기]. 기록이 없으면 안내 한 줄만
+// 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(날짜순, 원형 아이콘, 보조 줄 "7일 · 지출") → [N월 정리 보기]. 기록이 없으면 안내 한 줄만
 function MonthCard({ group, onEditEntry, onOpenMonthSummary }: MonthCardProps) {
   const { month } = group
 
@@ -160,7 +165,7 @@ function MonthCard({ group, onEditEntry, onOpenMonthSummary }: MonthCardProps) {
                 icon={itemIcon(entry.name)}
                 tone={entry.type === 'income' ? 'income' : 'neutral'}
                 title={entry.name}
-                description={TYPE_LABEL[entry.type]}
+                description={rowDescription(entry)}
                 end={<AmountText type={entry.type} amount={entry.amount} />}
                 onClick={() => onEditEntry?.(entry.id)}
               />
