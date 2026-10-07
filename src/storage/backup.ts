@@ -33,11 +33,14 @@ function localDate(now: Date): string {
 }
 
 // 확장자는 .txt: 안드로이드 크롬·삼성 인터넷은 .json 파일을 공유 화면으로 보내지 않는다 (SPEC-002 변경 이력 #8).
-// 내용은 JSON 이고, 메모 앱으로 열어도 읽히게 두 칸 들여쓰기로 줄을 나눈다
+// 내용은 JSON 이고, 메모 앱으로 열어도 읽히게 두 칸 들여쓰기로 줄을 나눈다.
+// 파일의 마지막 백업 시각은 그 파일을 만든 시각: 새 폰에서 불러온 직후 백업 안내가 뜨지 않게 (SPEC-002 #38).
+// 기기 데이터는 바꾸지 않는다 — 기기의 마지막 백업은 보내기에 성공했을 때만 남긴다
 export function createBackup(data: StoredData, now: Date): BackupFile {
+  const contents: StoredData = { ...data, settings: { ...data.settings, lastBackupAt: now.toISOString() } }
   return {
     fileName: `동아리회계-백업-${localDate(now)}.txt`,
-    text: JSON.stringify(data, null, 2),
+    text: JSON.stringify(contents, null, 2),
   }
 }
 

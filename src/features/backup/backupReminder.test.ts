@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StoredData } from '../../domain/types'
+import { createBackup, readBackup } from '../../storage/backup'
 import { createEmptyData } from '../../storage/schema'
 import { BACKUP_REMINDER_DAYS, backupReminderFor, firstRecordedAt, lastBackupText, needsBackupReminder } from './backupReminder'
 
@@ -100,6 +101,17 @@ describe('SPEC-002 저장 데이터로 백업 안내 판단', () => {
 
     const backedUpAfterChange = dataWith({ lastChangedAt: BACKUP, lastBackupAt: '2026-09-02T00:00:00.000Z' }, [BACKUP])
     expect(backupReminderFor(backedUpAfterChange, at(backupMs + 90 * DAY))).toBe(false)
+  })
+
+  it('30일 넘게 백업하지 않은 장부로 만든 백업 파일을 불러온 직후에는 안내하지 않는다', () => {
+    // 9월 1일 백업 뒤 9월 10일에 기록을 바꾸고 40일 지났다 → 기기에서는 안내 대상
+    const stale = dataWith({ lastChangedAt: '2026-09-10T00:00:00.000Z', lastBackupAt: BACKUP }, [BACKUP])
+    const now = at(backupMs + 40 * DAY)
+    expect(backupReminderFor(stale, now)).toBe(true)
+
+    const restored = readBackup(createBackup(stale, now).text)
+
+    expect(restored.ok && backupReminderFor(restored.data, now)).toBe(false)
   })
 })
 
