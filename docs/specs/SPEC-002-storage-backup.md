@@ -107,7 +107,7 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 - 스키마 검증: 불러오기·이전 시 런타임 검증 필요(`as` 금지 규칙). 결정: 외부 라이브러리 없이 수동 타입 가드 (`src/storage/schema.ts`, #7).
 - 공유: `navigator.canShare({ files })` → `navigator.share`, 아니면 `<a download>` + Blob URL. 공유 취소(`AbortError`)는 조용히 끝내고, 그 밖의 공유 실패는 내려받기로 대신한다. 공유 화면은 누른 순간에만 열리므로 파일은 클릭 처리 안에서 동기로 만든다 (#8).
 - 백업 파일: `src/storage/backup.ts` 의 `createBackup`·`readBackup`. 읽기는 `JSON.parse` 실패(`broken`) / 형식 다름(`not-backup`) / 상위 버전(`newer-version`)을 구분하고, 저장소와 같은 `migrate` 를 거친다. 저장소 교체는 `LedgerRepository.restore` (저장 막힘 해제 규칙 포함) (#8).
-- PWA: `vite-plugin-pwa` (`src/pwa/pwaOptions.ts`). GitHub Pages `base: '/dongari/'` 에 맞춰 scope·start_url 설정. `registerType: 'autoUpdate'` + `injectRegister: 'script'`(등록만 하는 스크립트, 자동 새로고침 코드 없음), workbox 프리캐시(화면 파일 js·css·html + 아이콘 + manifest), 옛 캐시 정리. manifest 색은 빌드 때 `tokens.css` 에서 읽는다. 아이콘은 `scripts/make-icons.mjs` 로 토큰 색 SVG → PNG (#10).
+- PWA: `vite-plugin-pwa` (`src/pwa/pwaOptions.ts`). 빌드 경로(`APP_BASE`, 기본 `/dongari/`)를 `vite.config.ts` 가 `base` 와 `pwaOptions(tokens, base)` 에 함께 넘겨 id·scope·start_url 과 서비스 워커 범위를 맞춘다. 릴리스 전 QA 미리보기는 `/dongari/preview/` (`npm run deploy:preview`, 주의는 `CLAUDE.md` 실행). `registerType: 'autoUpdate'` + `injectRegister: 'script'`(등록만 하는 스크립트, 자동 새로고침 코드 없음), workbox 프리캐시(화면 파일 js·css·html + 아이콘 + manifest), 옛 캐시 정리. manifest 색은 빌드 때 `tokens.css` 에서 읽는다. 아이콘은 `scripts/make-icons.mjs` 로 토큰 색 SVG → PNG (#10).
 - 30일 백업 안내: `features/backup/backupReminder.ts` 의 `needsBackupReminder({ lastBackupAt, lastChangedAt, firstRecordedAt, now })`(시각 주입 순수 함수)와 저장 데이터에서 판단하는 `backupReminderFor(data, now)`. 점 표시는 `TopTextButton` 의 `dotLabel`. 띠 하나만 고르는 순서는 `App.tsx` (#9).
 - 설치 안내 띠: `features/install` (`installRules` 표시 조건, `installPrompt` 설치 제안을 화면 밖에서 받아 둠 — 장부 화면을 떠났다 와도 잃지 않게). iOS 전용 메타(apple-*)는 두지 않는다 (#10).
 
@@ -133,3 +133,4 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 | 2026-10-06 | 열린 질문 결정: 상위 버전 안내와 상위 버전 백업 파일 거부 문구를 "새로고침" 대신 "앱을 닫았다가 다시 열어 주세요"·"앱을 닫았다가 다시 연 뒤 불러와 주세요" 로 (홈 화면 앱에는 새로고침 버튼이 없고, autoUpdate 라 다시 열면 새 버전) (#8) |
 | 2026-10-06 | 30일 백업 안내 구체화: 백업한 적 없으면 처음 기록한 날부터, 정확히 30일부터, 깨진 시각 처리, 띠 [백업 파일 보내기]·보내면 사라짐, [설정] 점의 화면 읽기 이름 "설정 백업 필요", 장부 위 띠는 하나만(저장 > 백업 > 설치 — 저장 안내가 있으면 설치 띠도 숨김), 설정 카드 마지막 백업 날짜 추가 (#9) |
 | 2026-10-07 | 열린 질문 결정: 백업 파일 안 마지막 백업 시각은 그 파일을 만든 시각으로 적는다(새 폰에서 불러온 직후 백업 안내가 뜨지 않게, 기기 기록은 그대로 보내기 성공 때만) (#38) |
+| 2026-10-07 | 기술 메모: 빌드 경로 `APP_BASE`, QA 미리보기 `/dongari/preview/` |

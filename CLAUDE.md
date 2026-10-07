@@ -37,8 +37,16 @@ npm install
 npm run dev -- --port 7777   # 개발 서버
 npm run lint
 npm run build
-npm run deploy               # GitHub Pages
+npm run deploy               # GitHub Pages 본 주소 (/dongari/)
+npm run deploy:preview       # QA 미리보기 (/dongari/preview/)
 ```
+
+- 빌드 경로는 환경변수 `APP_BASE`(기본 `/dongari/`) 하나로 정한다 (`vite.config.ts`). 화면 파일·아이콘 경로, manifest `id`·`start_url`·`scope`, 서비스 워커 범위가 모두 따라간다. `build:preview` 는 `APP_BASE=/dongari/preview/`.
+- `deploy:preview` 는 gh-pages 브랜치의 `preview/` 폴더만 갈아 끼운다(`--dest preview --add`, 본 주소 파일은 그대로).
+- `deploy` 는 `--add` 없이 gh-pages 브랜치를 통째로 바꾼다 → `preview/` 와 lab 검증 페이지도 함께 지워진다. 릴리스 뒤 미리보기 정리는 이걸로 된다.
+- 미리보기 주의:
+  - 미리보기와 본 주소는 같은 출처(`crowwan.github.io`)라 localStorage(`dongari:v2`)를 같이 쓴다. 미리보기에서 적은 QA 기록이 본 주소 v2 에도 보인다 → QA 는 테스트용 폰·브라우저로 하거나 끝나고 지운다.
+  - 본 주소에 v2(서비스 워커 범위 `/dongari/`)가 올라간 뒤에는 `/dongari/preview/` 도 그 범위 안이다. 미리보기는 릴리스 전 QA 에만 쓴다.
 
 ## 폴더 구조
 

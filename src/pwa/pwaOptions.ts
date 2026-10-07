@@ -1,8 +1,5 @@
 import type { VitePWAOptions } from 'vite-plugin-pwa'
 
-// GitHub Pages 주소 (vite.config.ts base 와 같다)
-const APP_PATH = '/dongari/'
-
 // tokens.css 맨 앞 라이트 블록(:root, [data-theme='light'])의 값을 읽는다. manifest 는 CSS 변수를 못 써 빌드 때 옮겨 적는다
 export function lightToken(tokensCss: string, name: string): string {
   const lightBlock = tokensCss.slice(0, tokensCss.indexOf('}') + 1)
@@ -11,8 +8,12 @@ export function lightToken(tokensCss: string, name: string): string {
   return match[1].trim()
 }
 
-// 홈 화면 추가와 오프라인 실행 설정 (SPEC-002). vite.config.ts 가 tokens.css 내용을 넘겨 부른다
-export function pwaOptions(tokensCss: string): Partial<VitePWAOptions> {
+// 홈 화면 추가와 오프라인 실행 설정 (SPEC-002). vite.config.ts 가 tokens.css 내용과 빌드 경로(base)를 넘겨 부른다.
+// base 는 본 주소 '/dongari/' 또는 QA 미리보기 '/dongari/preview/'. 서비스 워커 범위는 플러그인이 vite base 를 따른다
+export function pwaOptions(tokensCss: string, base: string): Partial<VitePWAOptions> {
+  if (!base.startsWith('/') || !base.endsWith('/')) {
+    throw new Error(`빌드 경로(APP_BASE)는 / 로 시작하고 끝나야 해요: ${base}`)
+  }
   const background = lightToken(tokensCss, '--bg')
 
   return {
@@ -22,13 +23,13 @@ export function pwaOptions(tokensCss: string): Partial<VitePWAOptions> {
     injectRegister: 'script',
     includeAssets: ['icons/favicon.svg'],
     manifest: {
-      id: APP_PATH,
+      id: base,
       name: '동아리 회계',
       short_name: '동아리 회계',
       description: '동아리 수입·지출을 한 줄씩 적으면 월 정리와 올해 결산을 만들어 주는 장부',
       lang: 'ko',
-      start_url: APP_PATH,
-      scope: APP_PATH,
+      start_url: base,
+      scope: base,
       display: 'standalone',
       orientation: 'portrait',
       theme_color: background,
