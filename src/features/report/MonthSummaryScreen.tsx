@@ -22,10 +22,11 @@ type SummaryLineProps = {
   label: string
   amount: string
   total?: boolean
-  kind?: 'income'
+  // income: 수입 합계(수입 금액색) / closing: 월말 잔액(큰 숫자)
+  kind?: 'income' | 'closing'
 }
 
-// 정리 한 줄: 왼쪽 이름, 오른쪽 금액. 합계 줄은 위에 구분선 + 굵게
+// 정리 한 줄: 왼쪽 이름, 오른쪽 금액. 합계 줄만 위에 구분선 + 굵게
 function SummaryLine({ label, amount, total = false, kind }: SummaryLineProps) {
   return (
     <div className="summary-line" data-total={total || undefined} data-kind={kind} data-testid="summary-line">
@@ -71,7 +72,7 @@ function signedAmount(value: number): string {
   return `${value > 0 ? '+' : ''}${formatAmount(value)}원`
 }
 
-// 월 정리 (SPEC-003): 제목 → 수입 → 지출 → 잔액 묶음, 아래 고정 [사진으로 저장]. 사진은 제목부터 잔액 묶음까지
+// 월 정리 (SPEC-003): 제목 → 수입 카드 → 지출 카드 → 잔액 카드, 아래 고정 [⬇ 사진으로 저장]. 사진은 제목부터 잔액 카드까지
 export function MonthSummaryScreen({ ledger, month, onBack, onNotify, saver = pictureSaver }: MonthSummaryScreenProps) {
   const summary = monthSummary(ledger, month)
   const { targetRef, saving, save } = useSavePicture({ fileName: monthPictureName(ledger.year, month), saver, onNotify })
@@ -88,7 +89,7 @@ export function MonthSummaryScreen({ ledger, month, onBack, onNotify, saver = pi
         <section className="summary-card" aria-label="잔액">
           <SummaryLine {...openingLine(summary.opening)} />
           <SummaryLine label={`${month}월 수입 − 지출`} amount={signedAmount(summary.net)} />
-          <SummaryLine label={`${month}월 말 잔액`} amount={`${formatAmount(summary.closing)}원`} total />
+          <SummaryLine label={`${month}월 말 잔액`} amount={`${formatAmount(summary.closing)}원`} total kind="closing" />
         </section>
       </div>
       <SavePictureBar saving={saving} onSave={save} />

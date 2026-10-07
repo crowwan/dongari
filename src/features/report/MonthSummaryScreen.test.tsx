@@ -86,6 +86,21 @@ describe('SPEC-003 월 정리 화면', () => {
     expect(within(expense).queryByTestId('summary-line')).not.toBeInTheDocument()
   })
 
+  it('합계 줄과 월말 잔액 줄만 굵은 합계 줄이고, 수입 합계는 수입 금액 표시, 월말 잔액은 큰 숫자다', () => {
+    renderSummary(SEPTEMBER, 9)
+
+    const totals = screen.getAllByTestId('summary-line').filter((line) => line.dataset.total !== undefined)
+    expect(totals.map((line) => line.textContent)).toEqual(['수입 합계140,000원', '지출 합계98,280원', '9월 말 잔액1,166,193원'])
+    expect(totals.map((line) => line.dataset.kind ?? null)).toEqual(['income', null, 'closing'])
+  })
+
+  it('아래 고정 [사진으로 저장] 은 글자 앞에 내려받기 아이콘이 있다', () => {
+    renderSummary(SEPTEMBER, 9)
+
+    const button = screen.getByRole('button', { name: '사진으로 저장' })
+    expect(button.querySelector('[data-icon="download"]')).toBeInTheDocument()
+  })
+
   it('[사진으로 저장] 은 제목과 세 묶음이 든 정리 영역을 사진으로 만들어 "동아리회계-2026년-9월-정리.png" 로 내려받는다', async () => {
     const { saver, onNotify } = renderSummary(SEPTEMBER, 9)
 

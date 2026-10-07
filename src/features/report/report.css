@@ -14,6 +14,11 @@
   );
 }
 
+/* 화면 제목("2026년 9월 정리", "2026년 결산"): 가장 강한 글자색 */
+.report .screen__title {
+  color: var(--strong);
+}
+
 /* 기록 없는 올해 결산 안내 */
 .report__empty {
   margin: 0;
@@ -26,27 +31,33 @@
   word-break: keep-all;
 }
 
-/* ---------- 월 정리: 사진으로 저장되는 영역(제목 + 세 묶음) ---------- */
+/* ---------- 월 정리: 사진으로 저장되는 영역(제목 + 카드 셋) ---------- */
 
-/* 제목 → 카드 셋. 카드 사이는 다른 묶음(--group-gap), 카드 안 줄 사이는 좁게 */
+/* 제목 → 수입 카드 → 지출 카드 → 잔액 카드. 카드 사이는 한 묶음 안 간격(--stack), 제목 아래만 조금 더 띄운다 (시안 ③) */
 .summary {
   display: flex;
   flex-direction: column;
-  gap: var(--group-gap);
+  gap: var(--stack);
   font-variant-numeric: tabular-nums;
 }
 
+.summary > .screen__title {
+  margin-bottom: var(--space-1);
+}
+
 .summary-card {
-  padding: var(--card-pad-block) var(--card-pad-inline) var(--space-2);
+  padding: var(--card-pad-block) var(--card-pad-inline);
   border-radius: var(--corner-lg);
   background: var(--surface);
   display: flex;
   flex-direction: column;
+  gap: var(--space-1);
 }
 
-/* 카드 제목("수입"/"지출"): 설정 카드 제목과 같은 Heading */
+/* 카드 제목("수입"/"지출"): 질문·카드 제목과 같은 Heading */
 .summary-card__title {
   margin: 0 0 var(--space-1);
+  color: var(--strong);
   font-size: var(--text-heading-size);
   font-weight: var(--text-heading-weight);
   line-height: var(--line-tight);
@@ -58,12 +69,14 @@
   color: var(--muted);
 }
 
+/* 내역 줄: 이름(본문) ··· 금액(제목 글자색). 굵기는 합계 줄에만 */
 .summary-line {
   padding: var(--space-2) 0;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: var(--space-3);
+  font-size: var(--text-body-size);
   line-height: var(--line-tight);
 }
 
@@ -75,6 +88,7 @@
 .summary-line__amount {
   flex: none;
   white-space: nowrap;
+  color: var(--strong);
 }
 
 /* 합계·월말 잔액 줄: 위 구분선 + 굵게 */
@@ -82,6 +96,7 @@
   margin-top: var(--space-1);
   padding-top: var(--space-3);
   border-top: var(--hairline) solid var(--line);
+  color: var(--strong);
   font-weight: var(--weight-bold);
 }
 
@@ -89,15 +104,28 @@
   color: var(--income-amount);
 }
 
+/* 월말 잔액: 이 화면의 답이라 금액만 한 단계 크게 (Heading 20) */
+.summary-line[data-kind='closing'] .summary-line__amount {
+  font-size: var(--text-heading-size);
+  letter-spacing: var(--letter-number);
+}
+
 /*
  * 사진으로 그리는 복사본(savePicture.ts 가 data-capturing + data-theme="light" 를 단다):
  * 글자색은 바깥(.app)에서 다크 값으로 물려받으므로 라이트 --ink 로 다시 정한다.
- * 흰 바탕에서는 흰 카드가 면으로 구분되지 않으므로 카드 둘레에만 옅은 선을 두르고, 사진 가장자리에 여백을 둔다
+ * 흰 바탕에서는 흰 카드가 면으로 구분되지 않으므로 카드 둘레에만 옅은 선을 두르고, 사진 가장자리에 여백을 둔다.
+ * html2canvas 는 자간이 있으면 글자를 한 자씩, 숫자 폭 맞춤(tabular-nums) 없이 그려 "1 40,000" 처럼 벌어지므로 사진에서만 둘 다 끈다
  */
 .summary[data-capturing] {
   padding: var(--space-5);
   background: var(--surface);
   color: var(--ink);
+}
+
+.summary[data-capturing],
+.summary[data-capturing] * {
+  letter-spacing: normal;
+  font-variant-numeric: normal;
 }
 
 .summary[data-capturing] .summary-card {
