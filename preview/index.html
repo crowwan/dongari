@@ -2,7 +2,9 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- interactive-widget=resizes-content: 폰 키패드가 뜨면 화면(레이아웃)을 키패드만큼 줄여 아래 고정 [저장] 이 키패드 바로 위에 오게 한다
+         (크롬 108+ 기본은 resizes-visual 이라 고정 영역이 키패드 뒤로 숨는다). 메타를 모르는 브라우저는 features/keyboard 가 받친다 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
 
     <title>동아리 회계 관리</title>
     <meta name="description" content="동아리 수입·지출을 한 줄씩 적으면 월 정리와 올해 결산을 만들어 주는 모바일 웹 앱" />
@@ -21,8 +23,8 @@
     <!-- Theme Color: 주소창을 화면 바탕(tokens.css --bg)과 같게. HTML 에선 CSS 변수를 못 써 값을 옮겨 적는다 -->
     <meta name="theme-color" content="#f5f5f5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0f0f0f" media="(prefers-color-scheme: dark)" />
-    <script type="module" crossorigin src="/dongari/preview/assets/index-JUKsmI1w.js"></script>
-    <link rel="stylesheet" crossorigin href="/dongari/preview/assets/index-COVcovqQ.css">
+    <script type="module" crossorigin src="/dongari/preview/assets/index-BSyJuUYZ.js"></script>
+    <link rel="stylesheet" crossorigin href="/dongari/preview/assets/index-Bzdy_TAi.css">
   <link rel="manifest" href="/dongari/preview/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/dongari/preview/registerSW.js"></script></head>
   <body>
     <div id="root"></div>
