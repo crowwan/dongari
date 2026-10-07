@@ -6,12 +6,12 @@ import { CarryoverField } from '../features/ledger/CarryoverField'
 import { SavePictureBar } from '../features/report/SavePictureBar'
 import { AmountDisplay } from '../ui/AmountDisplay'
 import { AmountText } from '../ui/AmountText'
-import { AnswersCard } from '../ui/AnswersCard'
 import { BalanceCard } from '../ui/BalanceCard'
 import { BottomActionBar } from '../ui/BottomActionBar'
 import { BottomSheet } from '../ui/BottomSheet'
 import { Button } from '../ui/Button'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
+import { EntryCard } from '../ui/EntryCard'
 import { Icon, type IconName } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
 import { ListRow } from '../ui/ListRow'
@@ -21,7 +21,7 @@ import { MonthStepper } from '../ui/MonthStepper'
 import { NoticeBar } from '../ui/NoticeBar'
 import { OptionList, type Option } from '../ui/OptionList'
 import { PickRow } from '../ui/PickRow'
-import { SavedEntriesCard, type SavedEntry } from '../ui/SavedEntriesCard'
+import { SavedEntries, type SavedEntry } from '../ui/SavedEntries'
 import { SegmentedControl, type SegmentOptions } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
 import { Toast } from '../ui/Toast'
@@ -48,6 +48,7 @@ const COLOR_TOKENS = [
   '--primary',
   '--on-accent',
   '--primary-soft',
+  '--primary-wash',
   '--accent-ink',
   '--income-amount',
   '--expense-amount',
@@ -352,42 +353,69 @@ export function Catalog() {
           </Button>
         </Section>
 
-        <Section title="AnswersCard (적은 내용 카드)">
-          <State label="하나씩 채우기 · 금액 단계: 달 줄 + 항목 줄 (이름 · 수입/지출) — [달 바꾸기] 눌러 보기">
-            <AnswersCard
+        <Section title="EntryCard (지금 적는 내역 카드)">
+          <State label="금액 단계: 달 줄 + 항목 줄 (이름 · 수입/지출) → 옅은 면에 지금 질문 — [달 바꾸기] 눌러 보기">
+            <EntryCard
               rows={[
                 { label: '달', icon: 'calendar', value: `${answerMonth}월`, onChange: () => setAnswerMonth((month) => (month % 12) + 1) },
                 { label: '항목', icon: itemIcon('대관료'), value: '대관료 · 지출', onChange: noop },
               ]}
-            />
+            >
+              <div className="catalog__stack">
+                <h2 className="catalog__question">얼마인가요?</h2>
+                <AmountDisplay label="얼마인가요?" value={40000} onChange={noop} />
+              </div>
+            </EntryCard>
           </State>
-          <State label="항목 단계: 달 줄만">
-            <AnswersCard rows={[{ label: '달', icon: 'calendar', value: '10월', onChange: noop }]} />
+          <State label="항목 단계: 달 줄만 → 항목 목록 + 안내">
+            <EntryCard rows={[{ label: '달', icon: 'calendar', value: '10월', onChange: noop }]}>
+              <div className="catalog__stack">
+                <h2 className="catalog__question">무엇인가요?</h2>
+                <OptionList
+                  label="자주 쓴 항목"
+                  options={[
+                    { value: '대관료', label: '대관료', icon: itemIcon('대관료'), note: '지출' },
+                    { value: '회비', label: '회비', icon: itemIcon('회비'), note: '수입', tone: 'income' },
+                  ]}
+                  value={null}
+                  onChange={noop}
+                  action={{ label: '직접 적기', icon: 'pen', onClick: noop }}
+                />
+                <p className="catalog__state">누르면 바로 다음으로 넘어가요</p>
+              </div>
+            </EntryCard>
           </State>
-          <State label="새 이름의 수입/지출을 묻는 동안: 항목 줄은 이름만 · 긴 이름">
-            <AnswersCard
+          <State label="새 이름의 수입/지출을 묻는 동안: 항목 줄은 이름만 · 긴 이름 → 스위치">
+            <EntryCard
               rows={[
                 { label: '달', icon: 'calendar', value: '5월', onChange: noop },
                 { label: '항목', icon: itemIcon('꽃값'), value: '스승의 날 선생님 꽃다발과 카드 값', onChange: noop },
               ]}
-            />
+            >
+              <div className="catalog__stack">
+                <h2 className="catalog__question">수입인가요, 지출인가요?</h2>
+                <SegmentedControl label="수입인가요, 지출인가요?" options={ENTRY_TYPES} value={null} onChange={noop} />
+              </div>
+            </EntryCard>
           </State>
           <State label="[바꾸기] 눌림">
             <div data-preview-pressed="">
-              <AnswersCard rows={[{ label: '달', icon: 'calendar', value: '10월', onChange: noop }]} />
+              <EntryCard rows={[{ label: '달', icon: 'calendar', value: '10월', onChange: noop }]}>
+                <h2 className="catalog__question">무엇인가요?</h2>
+              </EntryCard>
             </div>
           </State>
         </Section>
 
-        <Section title="SavedEntriesCard (저장한 내역 카드, 연달아 적기)">
-          <State label='한 건: 방금 저장한 줄 옅은 청록 바탕 + "방금"'>
-            <SavedEntriesCard entries={SAVED_ENTRIES.slice(0, 1)} />
+        <Section title="SavedEntries (장부에 넣었어요 목록, 연달아 적기)">
+          <State label='한 건: 방금 저장한 줄 이름 옆 "방금"'>
+            <SavedEntries entries={SAVED_ENTRIES.slice(0, 1)} />
           </State>
-          <State label="수입·지출 섞임: 장부와 같은 금액 색·부호 · 긴 이름">
-            <SavedEntriesCard entries={SAVED_ENTRIES.slice(0, 4)} />
+          <State label="수입·지출 섞임: 금액도 회색, 부호로 구분 · 긴 이름">
+            <SavedEntries entries={SAVED_ENTRIES.slice(0, 3)} />
           </State>
-          <State label="4줄을 넘으면 최근 3줄만 (제목은 전체 5건)">
-            <SavedEntriesCard entries={SAVED_ENTRIES} />
+          <State label="최근 2줄만 (머리는 전체 5건)">
+            <SavedEntries entries={SAVED_ENTRIES} />
           </State>
         </Section>
 

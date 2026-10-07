@@ -17,7 +17,7 @@
 .ui-segment__option,
 .ui-months__month,
 .ui-pick,
-.ui-answers__change,
+.ui-entry-card__change,
 .ui-amount-display__field,
 .ui-amount-display__add {
   font-family: var(--typeface);
@@ -33,7 +33,7 @@
 .ui-segment__option:focus-visible,
 .ui-months__month:focus-visible,
 .ui-pick:focus-visible,
-.ui-answers__change:focus-visible,
+.ui-entry-card__change:focus-visible,
 .ui-amount-display__add:focus-visible,
 .ui-sheet:focus-visible {
   outline: var(--focus-ring) solid var(--accent-ink);
@@ -885,89 +885,60 @@ button.ui-row {
 }
 
 /*
- * 적은 내용 카드 (하나씩 채우기에서 이미 적은 것): 옅은 청록 면 카드 → "✓ 적은 내용" 머리 → 줄마다 흰 면.
- * 지금 질문의 흰 목록·금액 칸과 면 색(옅은 청록)으로 갈리고, ✓ 동그라미와 머리 글자로 한 번 더 알린다 (색만으로 구분하지 않음)
+ * 지금 적는 내역 카드 (하나씩 채우기에서 적는 내역 하나): 흰 면 + 청록 둘레 → 머리 "지금 적는 내역"(Caption Bold 청록)
+ * → 답한 줄(이름표 + 굵은 값 + [바꾸기], 줄 위 가는 선) → 맨 아래 옅은 청록 면에 지금 질문.
+ * 장부에 넣은 것(면 없는 회색 글자, ✓)과 둘레·머리 글자로 갈린다 (색만으로 구분하지 않음)
  */
-.ui-answers {
-  padding: var(--space-1) var(--space-2) var(--space-2);
+.ui-entry-card {
+  border: var(--stroke) solid var(--accent-ink);
   border-radius: var(--corner-lg);
-  background: var(--primary-soft);
+  background: var(--surface);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
   font-family: var(--typeface);
   letter-spacing: var(--letter-body);
 }
 
-.ui-answers__title {
+.ui-entry-card__title {
   margin: 0;
-  padding: var(--space-2) var(--space-2) var(--space-1);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
+  padding: var(--space-4) var(--space-4) var(--space-2);
   color: var(--accent-ink);
   font-size: var(--text-caption-size);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
   line-height: var(--line-tight);
 }
 
-.ui-answers__title .ui-icon {
-  width: var(--icon-xs);
-  height: var(--icon-xs);
-}
-
-.ui-answers__list {
+.ui-entry-card__list {
   margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
 }
 
-.ui-answers__row {
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
-  border-radius: var(--corner-md);
-  background: var(--surface);
+/* 답한 줄: 위쪽 가는 선으로 머리·다음 줄과 나눈다. 오른쪽은 [바꾸기] 누르는 곳이 카드 끝까지 오게 좁게 */
+.ui-entry-card__row {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-1) 0 var(--space-4);
+  border-top: var(--hairline) solid var(--line);
   display: flex;
   align-items: center;
   gap: var(--space-3);
 }
 
-/* ✓ 동그라미: 청록 글자색 채움 + 카드색 체크 (다크에서도 밝은 청록 위 어두운 체크) */
-.ui-answers__done {
+/* 작은 이름표 ("달" / "항목"): Caption, 줄마다 값이 같은 자리에서 시작하게 폭을 맞춘다 */
+.ui-entry-card__label {
   flex: none;
-  width: var(--icon-md);
-  height: var(--icon-md);
-  border-radius: var(--corner-pill);
-  background: var(--accent-ink);
-  color: var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ui-answers__done .ui-icon {
-  width: var(--icon-xs);
-  height: var(--icon-xs);
-}
-
-.ui-answers__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 작은 이름표 ("달" / "항목"): Caption */
-.ui-answers__label {
+  min-width: var(--space-8);
   color: var(--muted);
   font-size: var(--text-caption-size);
   line-height: var(--line-tight);
 }
 
 /* 굵은 값: 고치기 화면 "몇 월" 줄(PickRow)의 값과 같은 크기 */
-.ui-answers__value {
+.ui-entry-card__value {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -978,14 +949,15 @@ button.ui-row {
   overflow-wrap: anywhere;
 }
 
-.ui-answers__value .ui-icon {
+.ui-entry-card__value .ui-icon {
+  flex: none;
   width: var(--icon-sm);
   height: var(--icon-sm);
   color: var(--muted);
 }
 
 /* [바꾸기]: 면 없는 청록 글자 버튼, 누르는 곳은 56 정사각 이상 */
-.ui-answers__change {
+.ui-entry-card__change {
   flex: none;
   min-width: var(--touch-min);
   min-height: var(--touch-min);
@@ -1002,27 +974,43 @@ button.ui-row {
 }
 
 /*
- * 연달아 적기 "저장한 내역 N건" (SPEC-001 연달아 적기): 흰 카드 → 머리(Caption SemiBold, 보조 글자) → 줄 ✓ + 이름 + 금액.
- * 누르는 줄이 아니라 "적은 내용" 카드(옅은 청록, [바꾸기])와 면 색으로 갈린다. 방금 저장한 줄만 옅은 청록 바탕 + "방금"
+ * 지금 질문: 카드 안 맨 아래 옅은 청록 면(--primary-wash). 안의 흰 목록·금액 칸이 떠 보인다.
+ * 카드 둘레 안쪽 모서리에 맞춰 아래 모서리만 둥글린다 (overflow: hidden 은 [바꾸기] 포커스 링을 자르므로 쓰지 않는다)
+ */
+.ui-entry-card__question {
+  padding: var(--space-4);
+  border-top: var(--hairline) solid var(--line);
+  border-radius: 0 0 calc(var(--corner-lg) - var(--stroke)) calc(var(--corner-lg) - var(--stroke));
+  background: var(--primary-wash);
+}
+
+/*
+ * 연달아 적기 "장부에 넣었어요 · N건" (SPEC-001 연달아 적기): 면 없는 작은 회색 글자 — 머리 ✓ + 글자 → 줄 이름 + 부호 붙은 금액.
+ * "지금 적는 내역" 카드보다 눈에 덜 띄게 금액도 회색(수입/지출은 부호로 구분). 방금 저장한 줄만 이름 옆 청록 "방금"
  */
 .ui-saved {
-  padding: var(--space-3) var(--space-2) var(--space-2);
-  border-radius: var(--corner-lg);
-  background: var(--surface);
+  padding: 0 var(--space-1);
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  color: var(--muted);
   font-family: var(--typeface);
+  font-size: var(--text-caption-size);
   letter-spacing: var(--letter-body);
+  line-height: var(--line-tight);
 }
 
 .ui-saved__title {
   margin: 0;
-  padding: 0 var(--space-2) var(--space-1);
-  color: var(--muted);
-  font-size: var(--text-caption-size);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   font-weight: var(--weight-semibold);
-  line-height: var(--line-tight);
+}
+
+.ui-saved__title .ui-icon {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
 }
 
 .ui-saved__list {
@@ -1031,54 +1019,31 @@ button.ui-row {
   list-style: none;
   display: flex;
   flex-direction: column;
+  gap: var(--space-1);
 }
 
-/* 줄마다 같은 안쪽 여백: 방금 줄에 바탕이 깔려도 글자 자리가 움직이지 않는다 */
 .ui-saved__row {
-  padding: var(--space-2);
-  border-radius: var(--corner-sm);
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
-  color: var(--strong);
-  font-size: var(--text-row-size);
-  line-height: var(--line-tight);
-}
-
-.ui-saved__row[data-state='latest'] {
-  background: var(--primary-soft);
-}
-
-/* ✓ 동그라미: "적은 내용" 카드와 같은 모양 */
-.ui-saved__done {
-  flex: none;
-  width: var(--icon-md);
-  height: var(--icon-md);
-  border-radius: var(--corner-pill);
-  background: var(--accent-ink);
-  color: var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ui-saved__done .ui-icon {
-  width: var(--icon-xs);
-  height: var(--icon-xs);
 }
 
 .ui-saved__name {
   flex: 1;
   min-width: 0;
-  font-weight: var(--text-row-weight);
   overflow-wrap: anywhere;
 }
 
-/* "방금": 이름 옆 작은 청록 글자 */
+/* 금액: 장부 색 규칙(수입 초록·지출 본문색) 대신 회색, 굵기도 줄 글자와 같게 */
+.ui-saved .ui-amount[data-kind] {
+  color: inherit;
+  font-weight: inherit;
+}
+
+/* "방금": 이름 옆 청록 글자 */
 .ui-saved__latest {
   color: var(--accent-ink);
-  font-size: var(--text-caption-size);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
 }
 
 /* 금액 크게 보기: 흰 카드 — 오른쪽 정렬 큰 숫자 + 작은 "원" → 빠른 더하기 세 칸 */
@@ -1193,8 +1158,8 @@ button.ui-row:active,
 [data-preview-pressed] .ui-months__month[aria-pressed='false'],
 .ui-pick:active,
 [data-preview-pressed] .ui-pick,
-.ui-answers__change:active,
-[data-preview-pressed] .ui-answers__change,
+.ui-entry-card__change:active,
+[data-preview-pressed] .ui-entry-card__change,
 .ui-amount-display__add:active,
 [data-preview-pressed] .ui-amount-display__add {
   background: var(--pressed);
@@ -1224,7 +1189,7 @@ button.ui-row:active,
   .ui-segment__option,
   .ui-months__month,
   .ui-pick,
-  .ui-answers__change,
+  .ui-entry-card__change,
   .ui-amount-display__add {
     transition:
       background-color var(--motion-fast),

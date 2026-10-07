@@ -3,11 +3,11 @@ import { itemIcon } from '../../domain/itemIcon'
 import type { EntryInput, FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
 import { AmountDisplay } from '../../ui/AmountDisplay'
-import { AnswersCard, type AnswersCardRow } from '../../ui/AnswersCard'
 import { BottomActionBar } from '../../ui/BottomActionBar'
+import { EntryCard, type EntryCardRow } from '../../ui/EntryCard'
 import { IconButton } from '../../ui/IconButton'
 import { OptionList } from '../../ui/OptionList'
-import { SavedEntriesCard } from '../../ui/SavedEntriesCard'
+import { SavedEntries } from '../../ui/SavedEntries'
 import { SegmentedControl } from '../../ui/SegmentedControl'
 import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
@@ -28,7 +28,7 @@ import {
 import './entry.css'
 
 type AddEntryFormProps = {
-  // 장부에서 보던 달 ("적은 내용" 카드 달 줄 기본값, AC-3). 연달아 적을 때는 마지막에 저장한 달
+  // 장부에서 보던 달 ("지금 적는 내역" 카드 달 줄 기본값, AC-3). 연달아 적을 때는 마지막에 저장한 달
   month: number
   // 이번에 내역 적기 화면에 들어와 저장한 내역 (연달아 적기, AC-20). 저장할 때마다 App 이 이 화면을 처음 상태로 다시 그린다
   saved: EntryInput[]
@@ -45,9 +45,10 @@ type AddEntryFormProps = {
   onDirtyChange?: (dirty: boolean) => void
 }
 
-// 내역 적기 (SPEC-001 기록 입력, ADR 004): 지금 할 질문 하나만 보이고, 답은 위쪽 "적은 내용" 카드에 한 줄씩 쌓인다.
+// 내역 적기 (SPEC-001 기록 입력, ADR 004): 적는 내역 하나는 "지금 적는 내역" 카드 하나 — 답한 것은 카드 안 한 줄로 접히고,
+// 지금 할 질문 하나만 같은 카드 맨 아래에 펼쳐진다(AC-23).
 // 무엇인가요?(항목 목록 / 직접 적기 → 처음 쓰는 이름이면 수입·지출) → 얼마인가요? → [저장]. 단계 상태는 entrySteps 순수 함수
-// 저장하면 장부로 가지 않고 "무엇인가요?" 부터 다음 내역을 묻는다(연달아 적기 v2.1). 맨 위 "저장한 내역 N건" 카드 + 아래 [다 적었어요]
+// 저장하면 장부로 가지 않고 "무엇인가요?" 부터 다음 내역을 묻는다(연달아 적기 v2.1). 맨 위 "장부에 넣었어요 · N건" 목록 + 아래 [다 적었어요]
 export function AddEntryForm({
   month,
   saved,
@@ -93,8 +94,8 @@ export function AddEntryForm({
     }
   }
 
-  // "적은 내용" 카드 줄: [달 바꾸기] → 달 선택 창, [항목 바꾸기] → 항목 고르기로 (AC-16, 금액 유지)
-  function cardRow(row: AnswerRow): AnswersCardRow {
+  // "지금 적는 내역" 카드 답한 줄: [달 바꾸기] → 달 선택 창, [항목 바꾸기] → 항목 고르기로 (AC-16, 금액 유지)
+  function cardRow(row: AnswerRow): EntryCardRow {
     switch (row.kind) {
       case 'month':
         return { label: '달', icon: 'calendar', value: `${row.month}월`, onChange: () => sheets.openSheet(ENTRY_MONTH_SHEET) }
@@ -109,27 +110,24 @@ export function AddEntryForm({
   }
 
   return (
-    <div className="screen entry" data-testid="add-entry-form" data-step={state.step}>
+    <div className="screen screen--groups entry" data-testid="add-entry-form" data-step={state.step}>
       <BackToLedger onBack={onBack} />
       <h1 className="screen__title">내역 적기</h1>
-      <div className="entry__answers">
-        {continuing && <SavedEntriesCard entries={saved} />}
-        <AnswersCard rows={answerRows(state).map(cardRow)} />
+      <div className="entry__now">
+        {continuing && <SavedEntries entries={saved} />}
+        <EntryCard rows={answerRows(state).map(cardRow)}>
+          {/* 질문이 바뀔 때마다 새로 그려 autoFocus 칸이 포커스를 받는다 */}
+          <div className="entry__part" key={state.step}>
+            <StepQuestion
+              state={state}
+              frequentChoices={frequentChoices}
+              dispatch={dispatch}
+              onSubmit={pressButton}
+              questionRef={questionRef}
+            />
+          </div>
+        </EntryCard>
       </div>
-
-      {/* 질문이 바뀔 때마다 새로 그려 autoFocus 칸이 포커스를 받는다 */}
-      <section className="entry__part" key={state.step}>
-        <p className="entry__now" data-testid="entry-now">
-          {continuing ? '이어서 적을 것' : '지금 적을 것'}
-        </p>
-        <StepQuestion
-          state={state}
-          frequentChoices={frequentChoices}
-          dispatch={dispatch}
-          onSubmit={pressButton}
-          questionRef={questionRef}
-        />
-      </section>
 
       {button && (
         <BottomActionBar

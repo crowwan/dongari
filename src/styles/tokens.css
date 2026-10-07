@@ -26,6 +26,8 @@
   --primary: #2f5d57;
   --on-accent: #ffffff;
   --primary-soft: #e6efed;
+  /* 옅은 청록 면: 흰 카드 안에 한 칸 가라앉힌 자리("지금 적는 내역" 카드의 지금 질문). 안의 흰 목록·금액 칸이 떠 보인다 */
+  --primary-wash: #eff5f4;
   --accent-ink: #2f5d57;
   /* 금액: 수입은 밝은 청록 글자, 지출은 제목 글자색 (둘 다 부호와 함께) */
   --income-amount: #1b705b;
@@ -61,6 +63,7 @@
     --primary: #2f5d57;
     --on-accent: #ffffff;
     --primary-soft: #1e3330;
+    --primary-wash: #0f1514;
     --accent-ink: #8cc7bc;
     --income-amount: #5cc49e;
     --expense-amount: var(--strong);
@@ -91,6 +94,7 @@
   --primary: #2f5d57;
   --on-accent: #ffffff;
   --primary-soft: #1e3330;
+  --primary-wash: #0f1514;
   --accent-ink: #8cc7bc;
   --income-amount: #5cc49e;
   --expense-amount: var(--strong);
@@ -194,7 +198,7 @@
   --row-min: 72px; /* 아이콘이 붙은 두 줄 목록 줄 */
 
   /* 아이콘 (정사각 상자) */
-  --icon-xs: 16px; /* 작은 머리 글자 옆, ✓ 동그라미 안 체크 (적은 내용 카드) */
+  --icon-xs: 16px; /* 작은 머리 글자 옆 ("장부에 넣었어요" ✓) */
   --icon-sm: 20px; /* 글자 옆 작은 아이콘 (바꾸기 ›, 적은 값) */
   --icon-md: 24px; /* 버튼·줄 아이콘 */
   --icon-circle: 44px; /* 줄 앞 원형 아이콘 바탕 */

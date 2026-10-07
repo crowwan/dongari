@@ -49,8 +49,8 @@ function renderForm(month = 10, saved: EntryInput[] = []) {
 }
 
 const itemList = () => screen.getByRole('group', { name: '자주 쓴 항목' })
-// "적은 내용" 카드 줄의 값 (위에서부터 달 / 항목)
-const answers = () => screen.queryAllByTestId('answers-card-value').map((value) => value.textContent)
+// "지금 적는 내역" 카드 답한 줄의 값 (위에서부터 달 / 항목)
+const answers = () => screen.queryAllByTestId('entry-card-value').map((value) => value.textContent)
 const actionButton = () => within(screen.getByTestId('bottom-action-bar')).getByRole('button')
 const question = () => screen.getByRole('heading', { level: 2 })
 
@@ -61,11 +61,11 @@ async function writeCustomName(name: string) {
 }
 
 describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
-  it('AC-3 처음에는 "적은 내용" 카드에 보던 달 줄만 있고 "무엇인가요?" 항목 목록만 보인다 (아래 버튼 없음)', () => {
+  it('AC-3 처음에는 "지금 적는 내역" 카드에 보던 달 줄만 있고 "무엇인가요?" 항목 목록만 보인다 (아래 버튼 없음)', () => {
     renderForm(9)
 
     expect(screen.getByRole('heading', { level: 1, name: '내역 적기' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: '적은 내용' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: '지금 적는 내역' })).toBeInTheDocument()
     expect(answers()).toEqual(['9월'])
     expect(screen.getByRole('button', { name: '달 바꾸기' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '항목 바꾸기' })).not.toBeInTheDocument()
@@ -89,12 +89,34 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
     expect(rows[0]).toHaveAttribute('data-tone', 'income')
   })
 
-  it('카드 아래에 "지금 적을 것" 표시와 지금 질문이 있다', () => {
+  it('AC-23 지금 질문(제목 + 항목 목록 + 안내)은 "지금 적는 내역" 카드 안, 답한 줄 아래에 있고 "지금 적을 것" 표시는 없다', () => {
     renderForm()
 
-    const now = screen.getByTestId('entry-now')
-    expect(now).toHaveTextContent('지금 적을 것')
-    expect(now.nextElementSibling).toBe(question())
+    const card = screen.getByRole('region', { name: '지금 적는 내역' })
+    const now = within(card).getByTestId('entry-card-question')
+    expect(within(now).getByRole('heading', { level: 2, name: '무엇인가요?' })).toBe(question())
+    expect(within(now).getByRole('group', { name: '자주 쓴 항목' })).toBeInTheDocument()
+    expect(within(now).getByText('누르면 바로 다음으로 넘어가요')).toBeInTheDocument()
+    expect(within(card).getByTestId('entry-card-row').compareDocumentPosition(now)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(screen.queryByText('지금 적을 것')).not.toBeInTheDocument()
+  })
+
+  it('AC-23 직접 적기 이름 칸·[목록에서 고르기], 수입/지출 스위치, 금액 칸도 카드 안 지금 질문 칸에 있다', async () => {
+    renderForm()
+    const now = () => screen.getByTestId('entry-card-question')
+
+    await userEvent.click(within(itemList()).getByRole('button', { name: '직접 적기' }))
+    expect(within(now()).getByLabelText('직접 적기')).toBeInTheDocument()
+    expect(within(now()).getByRole('button', { name: '목록에서 고르기' })).toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText('직접 적기'), '새항목')
+    await userEvent.click(screen.getByRole('button', { name: '다음' }))
+    expect(within(now()).getByRole('group', { name: '수입인가요, 지출인가요?' })).toBeInTheDocument()
+
+    await userEvent.click(within(now()).getByRole('button', { name: '지출' }))
+    await userEvent.click(screen.getByRole('button', { name: '다음' }))
+    expect(within(now()).getByLabelText('얼마인가요?')).toBeInTheDocument()
+    expect(within(now()).getByRole('button', { name: '1만 원 더하기' })).toBeInTheDocument()
   })
 
   it('AC-4 항목을 누르면 카드에 항목 줄("대관료 · 지출", 항목 아이콘)이 쌓이고 "얼마인가요?" 로 넘어간다', async () => {
@@ -103,8 +125,8 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
     await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
 
     expect(answers()).toEqual(['10월', '대관료 · 지출'])
-    expect(screen.getAllByTestId('answers-card-label').map((label) => label.textContent)).toEqual(['달', '항목'])
-    expect(screen.getAllByTestId('answers-card-value')[1].querySelector('[data-icon="building"]')).toBeInTheDocument()
+    expect(screen.getAllByTestId('entry-card-label').map((label) => label.textContent)).toEqual(['달', '항목'])
+    expect(screen.getAllByTestId('entry-card-value')[1].querySelector('[data-icon="building"]')).toBeInTheDocument()
     expect(question()).toHaveTextContent('얼마인가요?')
     expect(screen.queryByRole('group', { name: '자주 쓴 항목' })).not.toBeInTheDocument()
   })
@@ -226,7 +248,7 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
     })
   })
 
-  describe('AC-16 "적은 내용" 카드 줄의 [바꾸기] 를 누르면 그 값을 고친다', () => {
+  describe('AC-16 "지금 적는 내역" 카드 답한 줄의 [바꾸기] 를 누르면 그 값을 고친다', () => {
     it('[항목 바꾸기] 를 누르면 항목 고르기로 돌아가고(지금 이름 체크), 다른 항목을 골라도 금액은 그대로다', async () => {
       const { onSave } = renderForm()
       await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
@@ -315,29 +337,28 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
     const RENT: EntryInput = { month: 10, type: 'expense', name: '대관료', amount: 40_000 }
     const SNACK: EntryInput = { month: 10, type: 'expense', name: '간식비', amount: 28_340 }
 
-    it('저장한 것이 없으면 "저장한 내역" 카드와 [다 적었어요] 가 없고 "지금 적을 것" 이다', () => {
+    it('저장한 것이 없으면 "장부에 넣었어요" 목록과 [다 적었어요] 가 없다', () => {
       renderForm()
 
-      expect(screen.queryByTestId('saved-entries-card')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('saved-entries')).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: '다 적었어요' })).not.toBeInTheDocument()
-      expect(screen.getByTestId('entry-now')).toHaveTextContent('지금 적을 것')
     })
 
-    it('AC-20 저장한 것이 있으면 맨 위(적은 내용 카드 위)에 "저장한 내역 N건" 카드가 있고 방금 저장한 줄에 "방금" 이 붙는다', () => {
+    it('AC-20 저장한 것이 있으면 맨 위("지금 적는 내역" 카드 위)에 "장부에 넣었어요 · N건" 목록이 있고 방금 저장한 줄에 "방금" 이 붙는다', () => {
       renderForm(10, [RENT, SNACK])
 
-      const card = screen.getByRole('region', { name: '저장한 내역 2건' })
-      expect(card.compareDocumentPosition(screen.getByTestId('answers-card'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-      expect(within(card).getAllByTestId('saved-entries-card-row').map((row) => row.textContent)).toEqual([
+      const card = screen.getByRole('region', { name: '장부에 넣었어요 · 2건' })
+      expect(card.compareDocumentPosition(screen.getByTestId('entry-card'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+      expect(within(card).getAllByTestId('saved-entries-row').map((row) => row.textContent)).toEqual([
         '대관료 −40,000원',
         '간식비 방금 −28,340원',
       ])
     })
 
-    it('AC-19 이어서 적을 때는 질문 위 표시가 "이어서 적을 것" 이고 화면 읽기 초점이 새 질문 제목에 있다', () => {
+    it('AC-19 이어서 적을 때는 화면 읽기 초점이 새 질문 제목에 있고 "이어서 적을 것" 표시는 없다', () => {
       renderForm(10, [RENT])
 
-      expect(screen.getByTestId('entry-now')).toHaveTextContent('이어서 적을 것')
+      expect(screen.queryByText('이어서 적을 것')).not.toBeInTheDocument()
       expect(question()).toHaveTextContent('무엇인가요?')
       expect(question()).toHaveFocus()
     })

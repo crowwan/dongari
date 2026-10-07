@@ -7,30 +7,22 @@
 /*
  * 아래 고정 [저장]/[다음] 영역(BottomActionBar)만큼 끝을 띄워 마지막 칸이 가리지 않게 한다.
  * 고정 영역 높이 = 위 여백 + 안내 한 줄 + 간격 + 주 버튼 + 아래 여백 + 위쪽 선 (ui.css .ui-bottom-bar)
+ * 묶음 사이 --group-gap 은 화면 요소의 screen--groups 가 준다. 여기서 gap 을 다시 쓰면 같은 우선순위의 .screen 과
+ * 스타일시트 불러오기 순서로 승부가 갈려 .screen 공통 간격에 덮인다 (#66)
  */
 .entry {
-  gap: var(--group-gap);
   padding-bottom: calc(
     var(--space-3) + var(--text-body-size) * var(--line-tight) + var(--space-2) + var(--touch-primary) + var(--space-4) +
       var(--hairline) + env(safe-area-inset-bottom, 0px)
   );
 }
 
-/* 하나씩 채우기에서 적은 것: 화면 제목 바로 아래 ("저장한 내역" 카드 →) "적은 내용" 카드 (제목·카드 사이는 묶음 안 간격) */
-.entry__answers {
+/* 하나씩 채우기: 화면 제목 바로 아래 ("장부에 넣었어요" 목록 →) "지금 적는 내역" 카드 (제목·카드 사이는 묶음 안 간격) */
+.entry__now {
   margin-top: calc(var(--stack) - var(--group-gap));
   display: flex;
   flex-direction: column;
   gap: var(--stack);
-}
-
-/* 지금 질문 위 작은 표시 "지금 적을 것": 위 카드의 "적은 내용" 과 짝 (Caption Bold, 청록 글자) */
-.entry__now {
-  margin: 0;
-  color: var(--accent-ink);
-  font-size: var(--text-caption-size);
-  font-weight: var(--weight-bold);
-  line-height: var(--line-tight);
 }
 
 /* 질문 하나: 질문 제목 → 답 */
