@@ -6,16 +6,13 @@
 /*
  * 장부 화면: 아래 고정 [+ 내역 적기] 영역(BottomActionBar)만큼 끝을 띄워 마지막 줄이 가리지 않게 한다.
  * 고정 영역 높이 = 위 여백 + 주 버튼 + 아래 여백 + 위쪽 선 (ui.css .ui-bottom-bar)
+ * 위쪽 → 잔액 카드 사이 --stack 은 화면 요소의 screen--stack 이 준다. 여기서 gap 을 다시 쓰면 같은 우선순위의 .screen 과
+ * 스타일시트 불러오기 순서로 승부가 갈려 .screen 공통 간격에 덮인다 (#72)
  */
 .ledger {
   padding-bottom: calc(
     var(--space-3) + var(--touch-primary) + var(--space-4) + var(--hairline) + env(safe-area-inset-bottom, 0px)
   );
-}
-
-/* 위쪽 → 잔액 카드는 붙여서(연관), 달 넘기기 묶음은 한 단계 떨어뜨린다 (시안) */
-.ledger {
-  gap: var(--stack-tight);
 }
 
 /* 위쪽: 왼쪽 동아리 이름·연도, 오른쪽 [결산] [설정] */
@@ -54,9 +51,9 @@
   margin-right: calc(var(--space-3) * -1);
 }
 
-/* 달 넘기기 + 그 달 카드: 잔액 카드와는 다른 묶음 (묶음 사이 --group-gap) */
+/* 달 넘기기 + 그 달 카드: 잔액 카드와는 다른 묶음 (묶음 사이 --group-gap = 화면 간격 --stack + 이 margin) */
 .ledger__month-group {
-  margin-top: calc(var(--group-gap) - var(--stack-tight));
+  margin-top: calc(var(--group-gap) - var(--stack));
   display: flex;
   flex-direction: column;
   gap: var(--stack);

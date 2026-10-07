@@ -66,7 +66,7 @@ export function LedgerScreen({
   onEditEntry,
 }: LedgerScreenProps) {
   return (
-    <div className="screen ledger" data-testid="ledger-screen">
+    <div className="screen screen--stack ledger" data-testid="ledger-screen">
       <header className="ledger__top">
         <div className="ledger__title">
           <h1 className="ledger__club">{ledger.clubName}</h1>
