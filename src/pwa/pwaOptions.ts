@@ -40,9 +40,10 @@ export function pwaOptions(tokensCss: string, base: string): Partial<VitePWAOpti
         { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       ],
     },
-    // 미리 저장: 화면 파일은 아래 glob, 아이콘은 includeAssets 와 manifest 아이콘, manifest 는 플러그인이 넣는다 (겹치지 않게 나눔)
+    // 미리 저장: 화면 파일·글꼴(Pretendard woff2)은 아래 glob, 아이콘은 includeAssets 와 manifest 아이콘,
+    // manifest 는 플러그인이 넣는다 (겹치지 않게 나눔). 글꼴이 빠지면 오프라인에서 기기 글꼴로 바뀌어 글자 폭이 달라진다
     workbox: {
-      globPatterns: ['**/*.{js,css,html}'],
+      globPatterns: ['**/*.{js,css,html,woff2}'],
       cleanupOutdatedCaches: true,
     },
   }

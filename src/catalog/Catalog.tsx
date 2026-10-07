@@ -1,15 +1,26 @@
 import { useState, type ReactNode } from 'react'
+import { itemIcon } from '../domain/itemIcon'
+import type { EntryType } from '../domain/types'
 import { InstallBannerView } from '../features/install/InstallBanner'
 import { CarryoverField } from '../features/ledger/CarryoverField'
+import { AmountDisplay } from '../ui/AmountDisplay'
 import { AmountText } from '../ui/AmountText'
+import { AnswerChip } from '../ui/AnswerChip'
 import { BalanceCard } from '../ui/BalanceCard'
 import { BottomActionBar } from '../ui/BottomActionBar'
+import { BottomSheet } from '../ui/BottomSheet'
 import { Button } from '../ui/Button'
 import { ChoiceChip } from '../ui/ChoiceChip'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
+import { Icon, type IconName } from '../ui/Icon'
+import { IconButton } from '../ui/IconButton'
+import { ListRow } from '../ui/ListRow'
 import { MoneyInput } from '../ui/MoneyInput'
+import { MonthPicker } from '../ui/MonthPicker'
 import { MonthStepper } from '../ui/MonthStepper'
 import { NoticeBar } from '../ui/NoticeBar'
+import { PickRow } from '../ui/PickRow'
+import { SegmentedControl, type SegmentOptions } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
 import { Toast } from '../ui/Toast'
 import { TopTextButton } from '../ui/TopTextButton'
@@ -28,33 +39,64 @@ const COLOR_TOKENS = [
   '--surface',
   '--fill',
   '--line',
+  '--line-strong',
+  '--strong',
   '--ink',
   '--muted',
   '--faint',
   '--primary',
-  '--primary-soft',
   '--on-accent',
+  '--primary-soft',
+  '--accent-ink',
   '--income-amount',
   '--expense-amount',
   '--danger',
   '--on-danger',
   '--warn-bg',
   '--scrim',
+  '--knob',
   '--pressed',
   '--primary-pressed',
   '--primary-soft-pressed',
   '--danger-pressed',
 ]
 
-const SIZE_TOKENS = ['--size-small', '--size-body', '--size-large', '--size-title', '--size-amount', '--size-balance']
+// 자리 크기 (개편 2·3·4 에서 역할 토큰으로 옮긴 뒤 지운다)
+const SIZE_TOKENS = ['--size-small', '--size-body', '--size-large', '--size-amount']
 
-// 글자 역할 (docs/design.md 타이포 위계): 화면 제목 > 질문·카드 제목 > 보조 이름·본문·보조 설명
+// 글자 역할 (docs/design.md 타이포 위계): 큰 숫자·화면 제목 > 질문·카드 제목 > 줄 이름·보조 이름·본문 > 보조 설명
 const TEXT_ROLES: { role: string; sample: string; muted?: boolean }[] = [
+  { role: 'display', sample: '1,166,193원' },
   { role: 'title', sample: '내역 적기' },
   { role: 'heading', sample: '몇 월인가요?' },
+  { role: 'row', sample: '대관료' },
   { role: 'label', sample: '직접 적기', muted: true },
   { role: 'body', sample: '회비 140,000원' },
   { role: 'caption', sample: '모르면 0으로 두세요', muted: true },
+]
+
+// 항목 아이콘 (SPEC-001 AC-18): 이름 → itemIcon() → 아이콘
+const ITEM_NAMES = ['회비', '대관료', '간식비', '행사지원금', '예금 이자', '꽃값', '행사비']
+
+// 화면 동작 아이콘 (아이콘 옆에는 늘 글자)
+const ACTION_ICONS: { icon: IconName; label: string }[] = [
+  { icon: 'income', label: '수입' },
+  { icon: 'expense', label: '지출' },
+  { icon: 'calendar', label: '달' },
+  { icon: 'pen', label: '직접 적기' },
+  { icon: 'download', label: '사진 저장' },
+  { icon: 'share', label: '보내기' },
+  { icon: 'folder', label: '불러오기' },
+  { icon: 'chart', label: '결산' },
+  { icon: 'settings', label: '설정' },
+  { icon: 'plus', label: '적기' },
+  { icon: 'check', label: '저장' },
+  { icon: 'left', label: '장부로' },
+]
+
+const ENTRY_TYPES: SegmentOptions<EntryType> = [
+  { value: 'income', label: '수입', icon: 'income' },
+  { value: 'expense', label: '지출', icon: 'expense' },
 ]
 
 // 여백 역할: 묶음 안(좁게) < 묶음 사이(넓게) < 큰 구획
@@ -76,6 +118,10 @@ export function Catalog() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [installGuideOpen, setInstallGuideOpen] = useState(false)
+  const [entryType, setEntryType] = useState<EntryType | null>('expense')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [pickedMonth, setPickedMonth] = useState(10)
+  const [quickAmount, setQuickAmount] = useState(40000)
 
   return (
     <div className="catalog" data-theme={theme === 'system' ? undefined : theme} data-testid="design-catalog">
@@ -103,7 +149,7 @@ export function Catalog() {
           </div>
         </Section>
 
-        <Section title="글자 크기">
+        <Section title="자리 크기 (옛 토큰)">
           <div className="catalog__sizes">
             {SIZE_TOKENS.map((token) => (
               <span key={token} style={{ fontSize: `var(${token})`, lineHeight: 'var(--line-tight)' }}>
@@ -142,12 +188,190 @@ export function Catalog() {
           </div>
         </Section>
 
+        <Section title="아이콘">
+          <State label="항목 아이콘: 이름으로 자동 (itemIcon) — 모르는 이름은 영수증">
+            <div className="catalog__icons">
+              {ITEM_NAMES.map((name) => (
+                <div key={name} className="catalog__icon">
+                  <span className="catalog__icon-circle">
+                    <Icon name={itemIcon(name)} />
+                  </span>
+                  {name}
+                </div>
+              ))}
+            </div>
+          </State>
+          <State label="화면 동작 아이콘 (Lucide)">
+            <div className="catalog__icons">
+              {ACTION_ICONS.map(({ icon, label }) => (
+                <div key={icon} className="catalog__icon">
+                  <span className="catalog__icon-circle">
+                    <Icon name={icon} />
+                  </span>
+                  {label}
+                </div>
+              ))}
+            </div>
+          </State>
+        </Section>
+
+        <Section title="ListRow">
+          <State label="장부 내역: 수입(청록 원) / 지출(회색 원) + 금액">
+            <div className="catalog__card">
+              <ListRow
+                icon={itemIcon('회비')}
+                tone="income"
+                title="회비"
+                description="10월 · 수입"
+                end={<AmountText type="income" amount={140000} />}
+              />
+              <ListRow
+                icon={itemIcon('대관료')}
+                title="대관료"
+                description="10월 · 지출"
+                end={<AmountText type="expense" amount={40000} />}
+              />
+              <ListRow icon={itemIcon('간식비')} title="간식비" description="지출" end={<AmountText type="expense" amount={58280} />} />
+            </div>
+          </State>
+          <State label="누르는 줄 (눌러 보기) · 보조 줄 없음 · 긴 이름">
+            <div className="catalog__card">
+              <ListRow
+                icon={itemIcon('행사비')}
+                title="행사비"
+                onClick={noop}
+                end={<AmountText type="expense" amount={1200000} />}
+              />
+              <ListRow
+                icon={itemIcon('꽃값')}
+                title="스승의 날 선생님 꽃다발과 카드 값"
+                description="5월 · 지출"
+                onClick={noop}
+                end={<AmountText type="expense" amount={58000} />}
+              />
+            </div>
+          </State>
+          <State label="눌림">
+            <div className="catalog__card" data-preview-pressed="">
+              <ListRow
+                icon={itemIcon('대관료')}
+                title="대관료"
+                description="10월 · 지출"
+                onClick={noop}
+                end={<AmountText type="expense" amount={40000} />}
+              />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="SegmentedControl">
+          <State label={`둘 중 하나 (눌러 보기) · ${entryType === 'income' ? '수입' : entryType === 'expense' ? '지출' : '안 고름'}`}>
+            <SegmentedControl label="수입인가요, 지출인가요?" options={ENTRY_TYPES} value={entryType} onChange={setEntryType} />
+          </State>
+          <State label="아직 안 고름">
+            <SegmentedControl label="수입인가요, 지출인가요?" options={ENTRY_TYPES} value={null} onChange={noop} />
+          </State>
+        </Section>
+
+        <Section title="PickRow">
+          <State label="정해진 값 + 바꾸기 (누르면 열두 달 선택 창)">
+            <PickRow icon="calendar" value={`${pickedMonth}월`} onClick={() => setSheetOpen(true)} />
+          </State>
+          <State label="아이콘 없음 · 눌림">
+            <div data-preview-pressed="">
+              <PickRow value="2026년" onClick={noop} />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="MonthPicker">
+          <State label={`고른 달 칠함 · 이번 달(10월) 테두리 (눌러 보기) · ${pickedMonth}월`}>
+            <div className="catalog__card catalog__card--pad">
+              <MonthPicker value={pickedMonth} currentMonth={10} onChange={setPickedMonth} />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="BottomSheet">
+          <State label="아래에서 올라오는 선택 창 + MonthPicker (바깥 누르기·Esc 로 닫힘)">
+            <div className="catalog__frame catalog__frame--sheet">
+              <BottomSheet open title="몇 월인가요?" onClose={noop}>
+                <MonthPicker value={9} currentMonth={10} onChange={noop} />
+              </BottomSheet>
+            </div>
+          </State>
+          <Button variant="secondary" onClick={() => setSheetOpen(true)}>
+            선택 창 실제로 열어 보기
+          </Button>
+        </Section>
+
+        <Section title="AnswerChip">
+          <State label="하나씩 채우기: 답한 것이 위에 쌓인다 (누르면 고치기)">
+            <div className="catalog__row">
+              <AnswerChip icon="calendar" onClick={noop}>
+                10월
+              </AnswerChip>
+              <AnswerChip icon="expense" onClick={noop}>
+                지출
+              </AnswerChip>
+              <AnswerChip icon={itemIcon('대관료')} onClick={noop}>
+                대관료
+              </AnswerChip>
+            </div>
+          </State>
+        </Section>
+
+        <Section title="AmountDisplay">
+          <State label={`큰 금액 + 빠른 더하기 (눌러 보기) · ${quickAmount.toLocaleString('ko-KR')}`}>
+            <AmountDisplay label="얼마인가요?" value={quickAmount} onChange={setQuickAmount} />
+          </State>
+          <State label="빈칸 (자리표시 0)">
+            <AmountDisplay label="얼마인가요?" value={0} onChange={noop} />
+          </State>
+          <State label="가장 큰 금액 (999,999,999)">
+            <AmountDisplay label="얼마인가요?" value={999_999_999} onChange={noop} />
+          </State>
+        </Section>
+
+        <Section title="IconButton">
+          <State label="면 없는 글자 버튼 (위쪽 [결산] [설정] + 점 표시)">
+            <div className="catalog__top">
+              <IconButton icon="chart" onClick={noop}>
+                결산
+              </IconButton>
+              <IconButton icon="settings" dotLabel="백업 필요" onClick={noop}>
+                설정
+              </IconButton>
+            </div>
+          </State>
+          <State label="돌아가기">
+            <div>
+              <IconButton icon="left" onClick={noop}>
+                장부로
+              </IconButton>
+            </div>
+          </State>
+          <State label="회색 면 (카드 안 [10월 정리 보기]) · 기본 / 눌림">
+            <IconButton icon="receipt" variant="fill" onClick={noop}>
+              10월 정리 보기
+            </IconButton>
+            <div data-preview-pressed="">
+              <IconButton icon="receipt" variant="fill" onClick={noop}>
+                10월 정리 보기
+              </IconButton>
+            </div>
+          </State>
+        </Section>
+
         <Section title="Button">
           <State label="주 · 기본 / 비활성">
             <div className="catalog__pair">
               <Button>저장</Button>
               <Button disabled>저장</Button>
             </div>
+          </State>
+          <State label="주 · 아이콘 + 글자">
+            <Button icon="plus">내역 적기</Button>
           </State>
           <State label="보조 · 기본 / 비활성">
             <div className="catalog__pair">
@@ -279,6 +503,16 @@ export function Catalog() {
           <State label="1월 (이전 달 비활성)">
             <MonthStepper month={1} onPrevious={noop} onNext={noop} previousDisabled />
           </State>
+          <State label="가운데 달 ▾ 누르기 → 열두 달 선택 창 (눌러 보기)">
+            <MonthStepper
+              month={pickedMonth}
+              onPrevious={() => setPickedMonth((value) => value - 1)}
+              onNext={() => setPickedMonth((value) => value + 1)}
+              previousDisabled={pickedMonth === 1}
+              nextDisabled={pickedMonth === 12}
+              onPickMonth={() => setSheetOpen(true)}
+            />
+          </State>
         </Section>
 
         <Section title="TopTextButton">
@@ -308,7 +542,7 @@ export function Catalog() {
         <Section title="BottomActionBar">
           <State label="기본 / 비활성">
             <div className="catalog__frame catalog__frame--short">
-              <BottomActionBar label="+ 내역 적기" onClick={noop} />
+              <BottomActionBar icon="plus" label="내역 적기" onClick={noop} />
             </div>
             <div className="catalog__frame catalog__frame--short">
               <BottomActionBar label="사진으로 저장" onClick={noop} disabled />
@@ -332,7 +566,7 @@ export function Catalog() {
             <NoticeBar message="저장하지 못했어요. 백업 파일을 보내 두세요" action={{ label: '백업 파일 보내기', onClick: noop }} />
           </State>
           <State label="30일 백업 안내 → 백업 파일 보내기 (#9)">
-            <NoticeBar message="한 달 넘게 백업하지 않았어요" action={{ label: '백업 파일 보내기', onClick: noop }} />
+            <NoticeBar message="한 달 넘게 백업하지 않았어요" action={{ label: '백업 파일 보내기', icon: 'share', onClick: noop }} />
           </State>
           <State label="버튼 눌림">
             <div data-preview-pressed="">
@@ -456,6 +690,16 @@ export function Catalog() {
         onCancel={() => setDialogOpen(false)}
       />
       <Toast message={toast} onDone={() => setToast(null)} />
+      <BottomSheet open={sheetOpen} title="몇 월인가요?" onClose={() => setSheetOpen(false)}>
+        <MonthPicker
+          value={pickedMonth}
+          currentMonth={10}
+          onChange={(value) => {
+            setPickedMonth(value)
+            setSheetOpen(false)
+          }}
+        />
+      </BottomSheet>
     </div>
   )
 }

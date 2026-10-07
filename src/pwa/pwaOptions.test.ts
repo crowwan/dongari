@@ -59,8 +59,9 @@ describe('SPEC-002 홈 화면 추가 (PWA) 설정', () => {
     expect(options.injectRegister).toBe('script')
   })
 
-  it('오프라인에서도 열리도록 화면 파일과 아이콘을 모두 미리 저장한다', () => {
-    expect(options.workbox?.globPatterns).toEqual(['**/*.{js,css,html}'])
+  it('오프라인에서도 열리도록 화면 파일·글꼴과 아이콘을 모두 미리 저장한다', () => {
+    // 글꼴(Pretendard woff2)이 빠지면 오프라인에서 기기 글꼴로 바뀌어 글자 폭·줄바꿈이 달라진다
+    expect(options.workbox?.globPatterns).toEqual(['**/*.{js,css,html,woff2}'])
     expect(options.includeAssets).toEqual(['icons/favicon.svg'])
     // manifest 와 그 아이콘은 플러그인이 기본으로 미리 저장한다
     expect(options.includeManifestIcons).not.toBe(false)

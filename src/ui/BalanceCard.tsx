@@ -10,13 +10,14 @@ type BalanceCardProps = {
   note?: string
 }
 
-// 첫 화면 맨 위 잔액 카드: 이름 → 가장 큰 숫자 → 보조 줄
+// 첫 화면 맨 위 잔액 카드: 이름 → 가장 큰 숫자("원"은 작게) → 보조 줄
 export function BalanceCard({ label, amount, note }: BalanceCardProps) {
   return (
     <section className="ui-balance" data-testid="balance-card">
       <p className="ui-balance__label">{label}</p>
       <p className="ui-balance__amount" data-testid="balance-card-amount">
-        {formatAmount(amount)}원
+        {formatAmount(amount)}
+        <span className="ui-unit">원</span>
       </p>
       {note && (
         <p className="ui-balance__note" data-testid="balance-card-note">

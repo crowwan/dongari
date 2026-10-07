@@ -24,4 +24,11 @@ describe('NoticeBar', () => {
     await userEvent.click(screen.getByRole('button', { name: '백업 파일 보내기' }))
     expect(handleClick).toHaveBeenCalledOnce()
   })
+
+  it('버튼에 아이콘을 붙일 수 있고 이름은 글자로만 읽힌다', () => {
+    render(<NoticeBar message="한 달 넘게 백업하지 않았어요" action={{ label: '백업 파일 보내기', icon: 'share', onClick: () => {} }} />)
+
+    const button = screen.getByRole('button', { name: '백업 파일 보내기' })
+    expect(button.querySelector('[data-icon="share"]')).toHaveAttribute('aria-hidden', 'true')
+  })
 })

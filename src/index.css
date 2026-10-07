@@ -2,6 +2,7 @@
  * 문서 바탕. 화면별 모양은 각 컴포넌트 CSS 에 있고, 값은 tokens.css 변수만 쓴다.
  * (v1 의 Tailwind 를 걷어내면서 그 기본 초기화 중 화면에 영향을 주던 것만 남겼다)
  */
+@import './styles/font.css';
 @import './styles/tokens.css';
 
 *,

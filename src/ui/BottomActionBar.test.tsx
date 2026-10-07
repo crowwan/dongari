@@ -49,4 +49,11 @@ describe('BottomActionBar', () => {
     expect(screen.queryByTestId('bottom-action-bar-note')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '저장' })).not.toHaveAttribute('aria-describedby')
   })
+
+  it('주 버튼에 아이콘을 붙일 수 있다 ([+ 내역 적기] → 더하기 아이콘 + "내역 적기")', () => {
+    render(<BottomActionBar icon="plus" label="내역 적기" onClick={() => {}} />)
+
+    const button = screen.getByRole('button', { name: '내역 적기' })
+    expect(button.querySelector('[data-icon="plus"]')).toBeInTheDocument()
+  })
 })

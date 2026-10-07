@@ -12,7 +12,7 @@
 .entry {
   gap: var(--group-gap);
   padding-bottom: calc(
-    var(--space-3) + var(--size-small) * var(--line-tight) + var(--space-2) + var(--touch-primary) + var(--space-4) +
+    var(--space-3) + var(--text-body-size) * var(--line-tight) + var(--space-2) + var(--touch-primary) + var(--space-4) +
       var(--hairline) + env(safe-area-inset-bottom, 0px)
   );
 }

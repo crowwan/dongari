@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ENTRY_AMOUNT_MAX } from '../domain/types'
-import { formatAmount, formatMoney, parseMoney } from './money'
+import { addAmount, formatAmount, formatMoney, parseMoney } from './money'
 
 describe('금액 글자 변환', () => {
   it('숫자가 아닌 글자를 버리고 숫자로 읽는다', () => {
@@ -33,5 +33,13 @@ describe('금액 보여주기', () => {
 
   it('음수는 글자 빼기표(−)를 앞에 붙인다', () => {
     expect(formatAmount(-50_000)).toBe('−50,000')
+  })
+})
+
+describe('SPEC-001 빠른 더하기', () => {
+  it('AC-17 [+1만] [+5만] [+10만] 은 지금 금액에 더한다(상한 999,999,999)', () => {
+    expect(addAmount(40_000, 10_000)).toBe(50_000)
+    expect(addAmount(0, 50_000)).toBe(50_000)
+    expect(addAmount(999_990_000, 100_000)).toBe(ENTRY_AMOUNT_MAX)
   })
 })

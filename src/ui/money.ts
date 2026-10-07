@@ -12,6 +12,11 @@ export function formatMoney(value: number): string {
   return value === 0 ? '' : value.toLocaleString('ko-KR')
 }
 
+// 빠른 더하기 [+1만] [+5만] [+10만]: 지금 금액에 더하되 상한을 넘지 않는다 (SPEC-001 AC-17)
+export function addAmount(current: number, step: number): number {
+  return Math.min(current + step, ENTRY_AMOUNT_MAX)
+}
+
 // 보여주기용 금액 글자 (잔액·합계·목록). 0 도 보여주고, 음수는 하이픈 대신 글자 빼기표(−)를 쓴다
 export function formatAmount(value: number): string {
   const digits = Math.abs(value).toLocaleString('ko-KR')
