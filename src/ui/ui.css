@@ -1047,6 +1047,9 @@ button.ui-row {
 }
 
 .ui-amount-display__number {
+  /* 포커스 링이 숫자 + 단위를 함께 감싸도록 상자에 반경·안쪽 여백 (#80) */
+  padding: 0 var(--space-2);
+  border-radius: var(--corner-sm);
   display: flex;
   align-items: baseline;
   justify-content: flex-end;
@@ -1072,7 +1075,12 @@ button.ui-row {
   text-align: right;
 }
 
-.ui-amount-display__field:focus-visible {
+/* 포커스 링은 칸(input)이 아니라 숫자 + 단위("원"/"일") 상자 전체에. 칸에만 그리면 단위가 링 밖으로 밀려 둘레선에 겹친다 (#80) */
+.ui-amount-display__field:focus {
+  outline: none;
+}
+
+.ui-amount-display__number:focus-within {
   outline: var(--focus-ring) solid var(--accent-ink);
   outline-offset: var(--stroke);
 }
