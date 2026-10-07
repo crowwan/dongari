@@ -5,15 +5,24 @@ import { AmountDisplay } from '../../ui/AmountDisplay'
 import { BottomActionBar } from '../../ui/BottomActionBar'
 import { Button } from '../../ui/Button'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
+import { DayInput } from '../../ui/DayInput'
+import { MonthButton } from '../../ui/MonthButton'
 import { OptionList } from '../../ui/OptionList'
-import { PickRow } from '../../ui/PickRow'
 import { SegmentedControl } from '../../ui/SegmentedControl'
 import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
 import type { SheetHistory } from '../useScreenHistory'
-import { EntryDateSheet, ENTRY_DATE_SHEET } from './EntryDateSheet'
-import { checkDraft, isDraftChanged, type EntryDraft } from './entryDraft'
-import { itemOptions, TYPE_SEGMENTS } from './entryOptions'
+import { EntryMonthSheet } from './EntryMonthSheet'
+import {
+  checkDayText,
+  checkDraft,
+  dayTextForMonth,
+  isDraftChanged,
+  tidyDayText,
+  type DraftCheck,
+  type EntryDraft,
+} from './entryDraft'
+import { ENTRY_MONTH_SHEET, itemOptions, TYPE_SEGMENTS } from './entryOptions'
 import './entry.css'
 
 type EditEntryFormProps = {
@@ -21,9 +30,8 @@ type EditEntryFormProps = {
   year: number
   // 고칠 기록의 처음 값. 날짜 없는 예전 기록이면 day 가 undefined
   initial: EntryDraft
-  // 이번 달·오늘 (날짜 선택 창 테두리). 올해 장부가 아니면 주지 않는다
+  // 이번 달 (달 선택 창 테두리). 올해 장부가 아니면 주지 않는다
   currentMonth?: number
-  currentDay?: number
   // 자주 쓴 항목 목록. 고른 종류의 항목만
   frequentChoices: (type?: EntryType) => FrequentChoice[]
   sheets: SheetHistory
@@ -35,19 +43,13 @@ type EditEntryFormProps = {
   onDelete: () => void
 }
 
-// 날짜 줄 값: "10월 7일", 날짜 없는 예전 기록은 "10월 · 날짜 없음"
-function dateLabel({ month, day }: EntryDraft): string {
-  return day === undefined ? `${month}월 · 날짜 없음` : `${month}월 ${day}일`
-}
-
-// 내역 고치기 (SPEC-001): 값을 한눈에 봐야 해서 펼친 모양 — 날짜(한 줄 + 바꾸기 → 날짜 선택 창) / 수입·지출 스위치 /
+// 내역 고치기 (SPEC-001): 값을 한눈에 봐야 해서 펼친 모양 — 날짜(제목 옆 [10월 ▾] + 날 숫자 칸, #80) / 수입·지출 스위치 /
 // 항목 목록(지금 이름 체크) + 직접 적기 칸 / 금액, 질문 사이 넓은 간격, 맨 아래 [이 내역 지우기], 아래 고정 [저장].
-// 날짜 없는 예전 기록은 날짜 없이 그대로 저장할 수 있다 (AC-25)
+// 날짜 없는 예전 기록은 날 칸을 비운 채 그대로 저장할 수 있다. 날짜가 있던 기록은 날짜를 떼지 않는다 (AC-25)
 export function EditEntryForm({
   year,
   initial,
   currentMonth,
-  currentDay,
   frequentChoices,
   sheets,
   onSave,
@@ -55,10 +57,17 @@ export function EditEntryForm({
   onDirtyChange,
   onDelete,
 }: EditEntryFormProps) {
+  // draft.day 는 처음 값 그대로 두고, 고친 날은 날 숫자 칸 글자(dayText)로 든다 (빈칸·없는 날도 칸에는 남는다)
   const [draft, setDraft] = useState(initial)
+  const initialDayText = initial.day === undefined ? '' : String(initial.day)
+  const [dayText, setDayText] = useState(initialDayText)
   const [askingDelete, setAskingDelete] = useState(false)
-  const check = checkDraft(draft)
-  const dirty = isDraftChanged(initial, draft)
+  const dayCheck = checkDayText(year, draft.month, dayText)
+  // 날짜 없는 예전 기록을 날 칸을 비운 채 저장 (AC-25)
+  const keepsUndated = initial.day === undefined && dayText === ''
+  const check: DraftCheck =
+    dayCheck.ok || keepsUndated ? checkDraft({ ...draft, day: dayCheck.ok ? dayCheck.day : undefined }) : dayCheck
+  const dirty = isDraftChanged(initial, draft) || dayText !== initialDayText
   const choices = frequentChoices(draft.type)
   const pickedName = draft.name.trim()
 
@@ -76,8 +85,12 @@ export function EditEntryForm({
       <h1 className="screen__title">내역 고치기</h1>
 
       <section className="entry__part">
-        <h2 className="entry__question">며칠인가요?</h2>
-        <PickRow icon="calendar" value={dateLabel(draft)} onClick={() => sheets.openSheet(ENTRY_DATE_SHEET)} />
+        <div className="entry__question-row">
+          <h2 className="entry__question">며칠인가요?</h2>
+          <MonthButton month={draft.month} onClick={() => sheets.openSheet(ENTRY_MONTH_SHEET)} />
+        </div>
+        <DayInput label="며칠인가요?" value={dayText} onChange={(text) => setDayText(tidyDayText(text))} />
+        {initial.day === undefined && <p className="screen__note">날짜 없이 적은 예전 내역이에요. 비워 둬도 저장돼요</p>}
       </section>
 
       <section className="entry__part">
@@ -147,14 +160,15 @@ export function EditEntryForm({
         }}
       />
 
-      <EntryDateSheet
+      <EntryMonthSheet
         sheets={sheets}
-        year={year}
         month={draft.month}
-        day={draft.day}
         currentMonth={currentMonth}
-        currentDay={currentDay}
-        onChange={change}
+        onChange={(month) => {
+          change({ month })
+          // 칸의 날이 바꾼 달에 없으면(31일 → 2월) 비워 다시 적게 한다
+          setDayText(dayTextForMonth(year, month, dayText))
+        }}
       />
     </div>
   )

@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react'
-import { daysInMonth } from '../domain/entryDate'
 import { itemIcon } from '../domain/itemIcon'
 import type { EntryType } from '../domain/types'
 import { InstallGuide } from '../features/install/InstallGuide'
 import { CarryoverField } from '../features/ledger/CarryoverField'
+import { tidyDayText } from '../features/ledger/entryDraft'
 import { SavePictureBar } from '../features/report/SavePictureBar'
 import { AmountDisplay } from '../ui/AmountDisplay'
 import { AmountText } from '../ui/AmountText'
@@ -12,7 +12,7 @@ import { BottomActionBar } from '../ui/BottomActionBar'
 import { BottomSheet } from '../ui/BottomSheet'
 import { Button } from '../ui/Button'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
-import { DayPicker } from '../ui/DayPicker'
+import { DayInput } from '../ui/DayInput'
 import { EntryCard } from '../ui/EntryCard'
 import { Icon, type IconName } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
@@ -23,7 +23,6 @@ import { MonthPicker } from '../ui/MonthPicker'
 import { MonthStepper } from '../ui/MonthStepper'
 import { NoticeBar } from '../ui/NoticeBar'
 import { OptionList, type Option } from '../ui/OptionList'
-import { PickRow } from '../ui/PickRow'
 import { SavedEntries, type SavedEntry } from '../ui/SavedEntries'
 import { SegmentedControl, type SegmentOptions } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
@@ -136,8 +135,7 @@ export function Catalog() {
   const [quickAmount, setQuickAmount] = useState(40000)
   const [pickedYear, setPickedYear] = useState('2026')
   const [pickedItem, setPickedItem] = useState('대관료')
-  const [pickedDay, setPickedDay] = useState<number | null>(null)
-  const [sheetMonth, setSheetMonth] = useState(10)
+  const [dayText, setDayText] = useState('')
 
   return (
     <div className="catalog" data-theme={theme === 'system' ? undefined : theme} data-testid="design-catalog">
@@ -283,20 +281,6 @@ export function Catalog() {
           </State>
         </Section>
 
-        <Section title="PickRow">
-          <State label="정해진 값 + 바꾸기 (누르면 열두 달 선택 창)">
-            <PickRow icon="calendar" value={`${pickedMonth}월`} onClick={() => setSheetOpen(true)} />
-          </State>
-          <State label="고치기 날짜 줄: 날짜 없는 예전 기록 (v2.2)">
-            <PickRow icon="calendar" value="10월 · 날짜 없음" onClick={noop} />
-          </State>
-          <State label="아이콘 없음 · 눌림">
-            <div data-preview-pressed="">
-              <PickRow value="2026년" onClick={noop} />
-            </div>
-          </State>
-        </Section>
-
         <Section title="MonthPicker">
           <State label={`고른 달 칠함 · 이번 달(10월) 테두리 (눌러 보기) · ${pickedMonth}월`}>
             <div className="catalog__card catalog__card--pad">
@@ -305,53 +289,48 @@ export function Catalog() {
           </State>
         </Section>
 
-        <Section title="DayPicker (날 격자, v2.2)">
-          <State label={`카드 질문 칸 위 흰 칸 · 5칸씩 · 오늘(7일) 테두리 · 고른 날 칠함 (눌러 보기) · ${pickedDay ?? '안 고름'}`}>
+        <Section title="DayInput (날 숫자 칸, v2.2 #80)">
+          <State label={`카드 질문 칸 위: 빈칸 + [오늘 7일] 칩 (쳐 보기, 숫자만 두 자리) · ${dayText === '' ? '빈칸' : dayText}`}>
             <div className="catalog__wash">
-              <DayPicker label="10월 날짜" days={31} value={pickedDay} today={7} onChange={setPickedDay} />
+              <DayInput
+                label="며칠인가요?"
+                value={dayText}
+                onChange={(text) => setDayText(tidyDayText(text))}
+                chips={[{ tag: '오늘', day: 7 }]}
+                onPick={(day) => setDayText(String(day))}
+              />
             </div>
           </State>
-          <State label='연달아 적기: 방금 저장한 날(5일) 옅은 청록 + "방금" — 미리 고르지 않음'>
+          <State label="연달아 적기: [오늘 7일] [방금 5일] / 방금 저장한 날이 오늘이면 [방금 7일] 하나">
             <div className="catalog__wash">
-              <DayPicker label="10월 날짜" days={31} value={null} today={7} recent={5} onChange={noop} />
-            </div>
-          </State>
-          <State label="날짜 바꾸기로 돌아왔을 때: 고른 날(5일)이 방금 저장한 날과 같음">
-            <div className="catalog__wash">
-              <DayPicker label="10월 날짜" days={31} value={5} recent={5} onChange={noop} />
-            </div>
-          </State>
-          <State label="2026년 2월 (28일까지) / 2028년 2월 (윤년, 29일까지)">
-            <div className="catalog__wash">
-              <DayPicker label="2026년 2월 날짜" days={28} value={null} onChange={noop} />
+              <DayInput
+                label="며칠인가요?"
+                value=""
+                onChange={noop}
+                chips={[
+                  { tag: '오늘', day: 7 },
+                  { tag: '방금', day: 5 },
+                ]}
+              />
             </div>
             <div className="catalog__wash">
-              <DayPicker label="2028년 2월 날짜" days={29} value={29} onChange={noop} />
+              <DayInput label="며칠인가요?" value="" onChange={noop} chips={[{ tag: '방금', day: 7 }]} />
             </div>
           </State>
-          <State label="선택 창 안: 회색 칸 + [‹ 10월 ›] (고치기 날짜 선택 창, 달 넘겨 보기)">
-            <div className="catalog__frame catalog__frame--sheet">
-              <BottomSheet open title="며칠인가요?" onClose={noop}>
-                <MonthStepper
-                  month={sheetMonth}
-                  onPrevious={() => setSheetMonth((value) => value - 1)}
-                  onNext={() => setSheetMonth((value) => value + 1)}
-                  previousDisabled={sheetMonth === 1}
-                  nextDisabled={sheetMonth === 12}
-                />
-                <DayPicker
-                  label={`${sheetMonth}월 날짜`}
-                  days={daysInMonth(2026, sheetMonth)}
-                  value={sheetMonth === 10 ? 7 : null}
-                  today={sheetMonth === 10 ? 3 : undefined}
-                  onChange={noop}
-                />
-              </BottomSheet>
+          <State label="지난 연도 장부·다른 달: 칩 줄 없음 / 날짜 바꾸기로 돌아왔을 때 지금 날(7)">
+            <div className="catalog__wash">
+              <DayInput label="며칠인가요?" value="" onChange={noop} />
+            </div>
+            <div className="catalog__wash">
+              <DayInput label="며칠인가요?" value="7" onChange={noop} />
             </div>
           </State>
-          <State label="눌림 (안 고른 칸 / 고른 칸)">
+          <State label="고치기 화면 (화면 바탕 위, 칩 없음)">
+            <DayInput label="며칠인가요?" value="31" onChange={noop} />
+          </State>
+          <State label="칩 눌림">
             <div className="catalog__wash" data-preview-pressed="">
-              <DayPicker label="눌림" days={5} value={2} onChange={noop} />
+              <DayInput label="눌림" value="" onChange={noop} chips={[{ tag: '오늘', day: 7 }]} />
             </div>
           </State>
         </Section>
@@ -424,15 +403,22 @@ export function Catalog() {
         </Section>
 
         <Section title="EntryCard (지금 적는 내역 카드)">
-          <State label="며칠인가요? 단계 (v2.2): 날짜 줄은 달만, [바꾸기] 없음 → 제목 + [10월 ▾] + 날 격자">
+          <State label="며칠인가요? 단계 (v2.2 #80): 날짜 줄은 달만, [바꾸기] 없음 → 제목 + [10월 ▾] + 날 숫자 칸 + 칩">
             <EntryCard rows={[{ label: '날짜', icon: 'calendar', value: '10월' }]}>
               <div className="catalog__stack">
                 <div className="catalog__question-row">
                   <h2 className="catalog__question">며칠인가요?</h2>
                   <MonthButton month={10} onClick={() => setSheetOpen(true)} />
                 </div>
-                <DayPicker label="10월 날짜" days={31} value={null} today={7} recent={5} onChange={noop} />
-                <p className="catalog__state">누르면 바로 다음으로 넘어가요</p>
+                <DayInput
+                  label="며칠인가요?"
+                  value=""
+                  onChange={noop}
+                  chips={[
+                    { tag: '오늘', day: 7 },
+                    { tag: '방금', day: 5 },
+                  ]}
+                />
               </div>
             </EntryCard>
           </State>

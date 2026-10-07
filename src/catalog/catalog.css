@@ -185,7 +185,7 @@
 }
 
 /* EntryCard 상태 안 지금 질문 제목 (화면의 내역 적기 질문과 같은 Heading) */
-/* "지금 적는 내역" 카드 질문 칸과 같은 옅은 청록 면 (날 격자·달 버튼이 놓이는 자리) */
+/* "지금 적는 내역" 카드 질문 칸과 같은 옅은 청록 면 (날 숫자 칸·달 버튼이 놓이는 자리) */
 .catalog__wash {
   padding: var(--space-4);
   border-radius: var(--corner-lg);

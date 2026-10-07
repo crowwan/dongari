@@ -61,21 +61,9 @@
   margin-left: calc(var(--space-3) * -1);
 }
 
-/* 고치기 날짜 선택 창 안: [‹ 10월 ›] → 날 격자 (선택 창 안 요소 사이 간격) */
-.entry__date-sheet {
-  display: flex;
-  flex-direction: column;
-  gap: var(--stack);
-}
-
 /* 고치기 화면의 [이 내역 지우기]: 적는 흐름과 다른 큰 구획이라 질문 묶음 사이보다 더 띄운다 */
 .entry__danger-zone {
   margin-top: calc(var(--section-gap) - var(--group-gap));
   display: flex;
   flex-direction: column;
-}
-
-/* 이어서 적을 때 초점을 받는 질문 제목: 누르는 곳이 아니라 링은 그리지 않는다 (화면 읽기만 따라온다) */
-.entry__question:focus {
-  outline: none;
 }

@@ -1,11 +1,10 @@
-import { useEffect, useReducer, useRef, type Ref } from 'react'
-import { daysInMonth } from '../../domain/entryDate'
+import { useEffect, useReducer } from 'react'
 import { itemIcon } from '../../domain/itemIcon'
 import type { EntryInput, FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
 import { AmountDisplay } from '../../ui/AmountDisplay'
 import { BottomActionBar } from '../../ui/BottomActionBar'
-import { DayPicker } from '../../ui/DayPicker'
+import { DayInput } from '../../ui/DayInput'
 import { EntryCard, type EntryCardRow } from '../../ui/EntryCard'
 import { IconButton } from '../../ui/IconButton'
 import { MonthButton } from '../../ui/MonthButton'
@@ -20,11 +19,14 @@ import { ENTRY_MONTH_SHEET, itemOptions, TYPE_LABELS, TYPE_SEGMENTS } from './en
 import {
   answerRows,
   isStepDirty,
+  offersFinish,
+  quickDays,
   startSteps,
   stepButton,
   stepInput,
   stepReducer,
   type AnswerRow,
+  type QuickDay,
   type StepAction,
   type StepState,
 } from './entrySteps'
@@ -37,7 +39,7 @@ type AddEntryFormProps = {
   month: number
   // 이번에 내역 적기 화면에 들어와 저장한 내역 (연달아 적기, AC-20). 저장할 때마다 App 이 이 화면을 처음 상태로 다시 그린다
   saved: EntryInput[]
-  // 이번 달 (달 선택 창 테두리)과 오늘 (날 격자 테두리). 올해 장부가 아니면 주지 않는다
+  // 이번 달 (달 선택 창 테두리)과 오늘 ([오늘 7일] 칩). 올해 장부가 아니면 주지 않는다
   currentMonth?: number
   currentDay?: number
   // 자주 쓴 항목. 종류를 고르기 전이라 두 종류를 섞어서 받는다
@@ -53,8 +55,8 @@ type AddEntryFormProps = {
 
 // 내역 적기 (SPEC-001 기록 입력, ADR 004): 적는 내역 하나는 "지금 적는 내역" 카드 하나 — 답한 것은 카드 안 한 줄로 접히고,
 // 지금 할 질문 하나만 같은 카드 맨 아래에 펼쳐진다(AC-23).
-// 며칠인가요?(날 격자, v2.2) → 무엇인가요?(항목 목록 / 직접 적기 → 처음 쓰는 이름이면 수입·지출) → 얼마인가요? → [저장]. 단계 상태는 entrySteps 순수 함수
-// 저장하면 장부로 가지 않고 "며칠인가요?" 부터 다음 내역을 묻는다(연달아 적기 v2.1, 날은 매번 묻는다). 맨 위 "장부에 넣었어요 · N건" 목록 + 아래 [다 적었어요]
+// 며칠인가요?(날 숫자 칸 + 빠른 칩, v2.2 #80) → 무엇인가요?(항목 목록 / 직접 적기 → 처음 쓰는 이름이면 수입·지출) → 얼마인가요? → [저장]. 단계 상태는 entrySteps 순수 함수
+// 저장하면 장부로 가지 않고 "며칠인가요?" 부터 다음 내역을 묻는다(연달아 적기 v2.1, 날은 매번 빈칸에서 묻는다). 맨 위 "장부에 넣었어요 · N건" 목록 + 아래 [다 적었어요]
 export function AddEntryForm({
   year,
   month,
@@ -72,21 +74,20 @@ export function AddEntryForm({
   const { draft } = state
   const lastSaved = saved.at(-1)
   const dirty = isStepDirty(state, month)
-  const button = stepButton(state)
   const continuing = saved.length > 0
-  const questionRef = useRef<HTMLHeadingElement>(null)
+  // 연달아 적는 중이면 아래 버튼이 없는 자리(날 칸이 빈 "며칠인가요?"·항목 고르기)에 [다 적었어요] (AC-21)
+  const finishing = continuing && offersFinish(state)
+  const button = finishing ? null : stepButton(state)
 
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
 
-  // 이어서 적을 때는 화면 읽기 초점을 새 질문 제목으로 (금액 칸이 사라져 키패드도 닫힌다)
-  useEffect(() => {
-    if (continuing) questionRef.current?.focus()
-  }, [continuing])
-
   function pressButton() {
     switch (state.step) {
+      case 'day':
+        dispatch({ kind: 'submit-day' })
+        return
       case 'custom-name':
         dispatch({ kind: 'submit-custom-name', knownType: lastUsedType(state.customName) })
         return
@@ -98,7 +99,6 @@ export function AddEntryForm({
         if (check.ok) onSave(check.input)
         return
       }
-      case 'day':
       case 'item':
         return
     }
@@ -132,7 +132,7 @@ export function AddEntryForm({
       <div className="entry__now">
         {continuing && <SavedEntries entries={saved} />}
         <EntryCard rows={answerRows(state).map(cardRow)}>
-          {/* 질문이 바뀔 때마다 새로 그려 autoFocus 칸이 포커스를 받는다 */}
+          {/* 질문이 바뀔 때마다 새로 그려 autoFocus 칸이 포커스를 받는다 (이어서 적을 때도 날 숫자 칸 → 숫자 키패드) */}
           <div className="entry__part" key={state.step}>
             <StepQuestion
               state={state}
@@ -140,9 +140,13 @@ export function AddEntryForm({
               dispatch={dispatch}
               onSubmit={pressButton}
               onPickMonth={() => sheets.openSheet(ENTRY_MONTH_SHEET)}
-              today={draft.month === currentMonth ? currentDay : undefined}
-              recentDay={lastSaved?.month === draft.month ? lastSaved.day : undefined}
-              questionRef={questionRef}
+              quickDays={quickDays(
+                { year, month: draft.month },
+                {
+                  today: currentMonth === undefined ? undefined : { month: currentMonth, day: currentDay },
+                  recent: lastSaved,
+                },
+              )}
             />
           </div>
         </EntryCard>
@@ -157,8 +161,8 @@ export function AddEntryForm({
           onClick={pressButton}
         />
       )}
-      {/* 날·항목 고르기 단계(버튼 없음)에서만. 끝내기도 [← 장부로] 와 같은 길이라 적던 내용이 있으면 묻는다 (AC-21) */}
-      {!button && continuing && <BottomActionBar variant="secondary" label="다 적었어요" onClick={onBack} />}
+      {/* 끝내기도 [← 장부로] 와 같은 길이라 적던 내용이 있으면 묻는다 (AC-21) */}
+      {finishing && <BottomActionBar variant="secondary" label="다 적었어요" onClick={onBack} />}
 
       <EntryMonthSheet
         sheets={sheets}
@@ -177,44 +181,47 @@ type StepQuestionProps = {
   onSubmit: () => void
   // "며칠인가요?" 제목 옆 [10월 ▾] → 열두 달 선택 창
   onPickMonth: () => void
-  // 날 격자의 오늘(테두리)과 방금 저장한 날("방금"). 지금 달에 없으면 undefined
-  today: number | undefined
-  recentDay: number | undefined
-  // 처음 질문 제목 (이어서 적을 때 초점을 옮긴다)
-  questionRef: Ref<HTMLHeadingElement>
+  // "며칠인가요?" 빠른 칩 ([오늘 7일]·[방금 5일]). 없으면 칩 줄을 숨긴다
+  quickDays: QuickDay[]
 }
 
+const QUICK_DAY_TAGS = { today: '오늘', recent: '방금' } as const
+
 // 지금 단계의 질문 하나와 답하는 자리
-function StepQuestion({ state, frequentChoices, dispatch, onSubmit, onPickMonth, today, recentDay, questionRef }: StepQuestionProps) {
+function StepQuestion({ state, frequentChoices, dispatch, onSubmit, onPickMonth, quickDays }: StepQuestionProps) {
   const { draft } = state
   switch (state.step) {
     case 'day':
       return (
         <>
           <div className="entry__question-row">
-            <h2 className="entry__question" ref={questionRef} tabIndex={-1}>
-              며칠인가요?
-            </h2>
+            <h2 className="entry__question">며칠인가요?</h2>
             <MonthButton month={draft.month} onClick={onPickMonth} />
           </div>
-          <DayPicker
-            label={`${draft.month}월 날짜`}
-            days={daysInMonth(state.year, draft.month)}
-            value={draft.day ?? null}
-            today={today}
-            recent={recentDay}
-            onChange={(day) => dispatch({ kind: 'pick-day', day })}
-          />
-          <p className="screen__note">누르면 바로 다음으로 넘어가요</p>
+          {/* 키패드 [완료](Enter) 로도 [다음] 과 같이 넘어간다. 칩은 칸 바로 아래라 키패드가 떠도 칸 → 칩 → [다음] 순서로 보인다 (#70) */}
+          <form
+            className="entry__answer"
+            onSubmit={(event) => {
+              event.preventDefault()
+              onSubmit()
+            }}
+          >
+            <DayInput
+              label="며칠인가요?"
+              value={state.dayText}
+              autoFocus
+              onChange={(text) => dispatch({ kind: 'type-day', text })}
+              chips={quickDays.map((quick) => ({ tag: QUICK_DAY_TAGS[quick.kind], day: quick.day }))}
+              onPick={(day) => dispatch({ kind: 'pick-day', day })}
+            />
+          </form>
         </>
       )
     case 'item': {
       const choices = frequentChoices()
       return (
         <>
-          <h2 className="entry__question" ref={questionRef} tabIndex={-1}>
-            무엇인가요?
-          </h2>
+          <h2 className="entry__question">무엇인가요?</h2>
           <OptionList
             label="자주 쓴 항목"
             options={itemOptions(choices)}
