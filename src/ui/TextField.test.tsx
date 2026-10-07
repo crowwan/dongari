@@ -51,4 +51,10 @@ describe('TextField', () => {
     expect(screen.getByTestId('text-field')).toHaveAttribute('data-label-role', 'label')
     expect(screen.getByLabelText('직접 적기')).toBeInTheDocument()
   })
+
+  it('autoFocus 면 나타나자마자 포커스를 받는다', () => {
+    render(<TextField label="직접 적기" value="" onChange={() => {}} autoFocus />)
+
+    expect(screen.getByLabelText('직접 적기')).toHaveFocus()
+  })
 })

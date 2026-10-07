@@ -8,6 +8,7 @@ import {
   frequentChoices,
   firstVisibleMonth,
   InvalidLedgerInputError,
+  lastUsedType,
   monthGroup,
   newLedgerDefaults,
   updateEntry,
@@ -298,6 +299,23 @@ describe('SPEC-001 장부 계산', () => {
 
     it('개수를 따로 정할 수 있다', () => {
       expect(frequentChoices([], 'expense', 1)).toEqual([{ name: '대관료', type: 'expense' }])
+    })
+  })
+
+  describe('예전에 쓴 이름의 종류 (직접 적기)', () => {
+    it('AC-15 예전에 쓴 이름이면 그 이름을 마지막으로 쓴 기록의 종류를 돌려준다', () => {
+      const entries = [entry({ id: '1', type: 'expense', name: '꽃값' }), entry({ id: '2', type: 'income', name: '꽃값' })]
+
+      expect(lastUsedType(entries, '꽃값')).toBe('income')
+    })
+
+    it('AC-15 처음 쓰는 이름이면 종류가 없다 (기본 항목도 써 본 적이 없으면 처음이다)', () => {
+      expect(lastUsedType([entry({ id: '1', name: '간식비' })], '찬조금')).toBeUndefined()
+      expect(lastUsedType([], '회비')).toBeUndefined()
+    })
+
+    it('앞뒤 공백은 지우고 비교한다', () => {
+      expect(lastUsedType([entry({ id: '1', type: 'expense', name: '꽃값' })], ' 꽃값 ')).toBe('expense')
     })
   })
 

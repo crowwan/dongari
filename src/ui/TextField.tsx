@@ -12,10 +12,21 @@ type TextFieldProps = {
   // 있으면 오류 상태로 보이고 입력칸 아래에 문장으로 알려준다
   error?: string
   disabled?: boolean
+  // 나타나자마자 포커스 (하나씩 채우기의 "직접 적기" — 키패드가 바로 뜬다)
+  autoFocus?: boolean
 }
 
 // 글자 입력칸 (동아리 이름, 항목 직접 적기). 큰 제목 + 큰 글자, 오류는 색과 문장으로 함께 알린다
-export function TextField({ label, labelRole = 'heading', value, onChange, placeholder, error, disabled }: TextFieldProps) {
+export function TextField({
+  label,
+  labelRole = 'heading',
+  value,
+  onChange,
+  placeholder,
+  error,
+  disabled,
+  autoFocus,
+}: TextFieldProps) {
   const inputId = useId()
   const errorId = useId()
 
@@ -29,6 +40,7 @@ export function TextField({ label, labelRole = 'heading', value, onChange, place
         className="ui-field__input"
         type="text"
         autoComplete="off"
+        autoFocus={autoFocus}
         placeholder={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}

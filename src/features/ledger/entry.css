@@ -1,12 +1,11 @@
 /*
- * 내역 적기 화면 (기록 입력). 값은 tokens.css 변수만 쓴다.
- * 위에서 아래로 질문 네 개, 묶음 사이는 선 대신 여백.
- * 여백: 질문 제목 ↔ 답 --stack-tight < 답 안 요소 사이 --stack < 질문 묶음 사이 --group-gap < [이 내역 지우기] 앞 --section-gap
+ * 내역 적기(하나씩 채우기)·내역 고치기(펼친 모양). 값은 tokens.css 변수만 쓴다.
+ * 묶음은 선 대신 여백: 질문 제목 ↔ 답 --stack-tight < 답 안 요소 사이 --stack < 질문 묶음 사이 --group-gap < [이 내역 지우기] 앞 --section-gap
  */
 @import '../screens.css';
 
 /*
- * 아래 고정 [저장] 영역(BottomActionBar)만큼 끝을 띄워 금액 칸이 가리지 않게 한다.
+ * 아래 고정 [저장]/[다음] 영역(BottomActionBar)만큼 끝을 띄워 마지막 칸이 가리지 않게 한다.
  * 고정 영역 높이 = 위 여백 + 안내 한 줄 + 간격 + 주 버튼 + 아래 여백 + 위쪽 선 (ui.css .ui-bottom-bar)
  */
 .entry {
@@ -17,14 +16,22 @@
   );
 }
 
-/* 질문 하나: 질문 → 고르는 버튼(→ 입력칸) */
+/* 하나씩 채우기에서 답한 것: 화면 제목 바로 아래 알약 줄 (제목과는 묶음 안 간격, 넘치면 다음 줄) */
+.entry__answers {
+  margin-top: calc(var(--stack) - var(--group-gap));
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* 질문 하나: 질문 제목 → 답 */
 .entry__part {
   display: flex;
   flex-direction: column;
   gap: var(--stack-tight);
 }
 
-/* 질문 제목: Heading. 금액 칸 이름 "얼마인가요?"(ui-money__label 기본)와 같은 크기·두께 */
+/* 질문 제목: Heading */
 .entry__question {
   margin: 0;
   font-size: var(--text-heading-size);
@@ -32,11 +39,17 @@
   line-height: var(--line-tight);
 }
 
-/* "무엇인가요?" 의 답: 자주 쓴 항목 버튼 → "직접 적기" 칸 (질문 제목 ↔ 답보다 한 단계 넓게) */
+/* 답 안 요소가 여럿일 때(고치기의 항목 목록 → 직접 적기 칸): 질문 제목 ↔ 답보다 한 단계 넓게 */
 .entry__answer {
   display: flex;
   flex-direction: column;
   gap: var(--stack);
+}
+
+/* 답 아래 조용한 글자 버튼 ([‹ 목록에서 고르기]): 화살표가 화면 좌우 여백 선에 오게 */
+.entry__aside {
+  display: flex;
+  margin-left: calc(var(--space-3) * -1);
 }
 
 /* 고치기 화면의 [이 내역 지우기]: 적는 흐름과 다른 큰 구획이라 질문 묶음 사이보다 더 띄운다 */
@@ -44,25 +57,4 @@
   margin-top: calc(var(--section-gap) - var(--group-gap));
   display: flex;
   flex-direction: column;
-}
-
-/* 1~12월: 4열 × 3행 */
-.entry__months {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-2);
-}
-
-/* [수입] [지출]: 반씩 나눈 큰 버튼 두 개 */
-.entry__types {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
-}
-
-/* 자주 쓴 항목: 글자 폭만큼, 넘치면 다음 줄 */
-.entry__choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }

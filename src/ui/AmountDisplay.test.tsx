@@ -55,4 +55,21 @@ describe('AmountDisplay', () => {
 
     expect(handleChange).toHaveBeenCalledWith(999_999_999)
   })
+
+  it('autoFocus 면 나타나자마자 금액 칸에 포커스가 가 숫자 키패드가 바로 뜬다', () => {
+    render(<AmountDisplay label="얼마인가요?" value={0} onChange={vi.fn()} autoFocus />)
+
+    expect(screen.getByRole('textbox', { name: '얼마인가요?' })).toHaveFocus()
+  })
+
+  it('빠른 더하기를 눌러도 금액 칸 포커스가 그대로라 키패드가 닫히지 않는다', async () => {
+    const user = userEvent.setup()
+    render(<Controlled initial={0} />)
+    await user.click(screen.getByRole('textbox', { name: '얼마인가요?' }))
+
+    await user.click(screen.getByRole('button', { name: '1만 원 더하기' }))
+
+    expect(screen.getByRole('textbox', { name: '얼마인가요?' })).toHaveFocus()
+    expect(screen.getByRole('textbox', { name: '얼마인가요?' })).toHaveValue('10,000')
+  })
 })

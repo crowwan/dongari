@@ -10,7 +10,6 @@ import { BalanceCard } from '../ui/BalanceCard'
 import { BottomActionBar } from '../ui/BottomActionBar'
 import { BottomSheet } from '../ui/BottomSheet'
 import { Button } from '../ui/Button'
-import { ChoiceChip } from '../ui/ChoiceChip'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { Icon, type IconName } from '../ui/Icon'
 import { IconButton } from '../ui/IconButton'
@@ -19,7 +18,7 @@ import { MoneyInput } from '../ui/MoneyInput'
 import { MonthPicker } from '../ui/MonthPicker'
 import { MonthStepper } from '../ui/MonthStepper'
 import { NoticeBar } from '../ui/NoticeBar'
-import { OptionList } from '../ui/OptionList'
+import { OptionList, type Option } from '../ui/OptionList'
 import { PickRow } from '../ui/PickRow'
 import { SegmentedControl, type SegmentOptions } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
@@ -28,10 +27,10 @@ import './catalog.css'
 
 type ThemeChoice = 'system' | 'light' | 'dark'
 
-const THEME_CHOICES: { id: ThemeChoice; label: string }[] = [
-  { id: 'system', label: '시스템' },
-  { id: 'light', label: '라이트' },
-  { id: 'dark', label: '다크' },
+const THEME_CHOICES: Option<ThemeChoice>[] = [
+  { value: 'system', label: '시스템' },
+  { value: 'light', label: '라이트' },
+  { value: 'dark', label: '다크' },
 ]
 
 const COLOR_TOKENS = [
@@ -102,15 +101,11 @@ const ENTRY_TYPES: SegmentOptions<EntryType> = [
 // 여백 역할: 묶음 안(좁게) < 묶음 사이(넓게) < 큰 구획
 const SPACE_ROLES = ['--stack-tight', '--stack', '--group-gap', '--section-gap']
 
-const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
-
 const noop = () => {}
 
 // 개발 모드 전용 디자인 카탈로그: 모든 기본 컴포넌트를 모든 상태로 한 화면에서 본다
 export function Catalog() {
   const [theme, setTheme] = useState<ThemeChoice>('system')
-  const [month, setMonth] = useState(3)
-  const [item, setItem] = useState('간식비')
   const [amount, setAmount] = useState(28340)
   const [clubName, setClubName] = useState('한랑드림')
   const [carryover, setCarryover] = useState(370482)
@@ -123,6 +118,7 @@ export function Catalog() {
   const [pickedMonth, setPickedMonth] = useState(10)
   const [quickAmount, setQuickAmount] = useState(40000)
   const [pickedYear, setPickedYear] = useState('2026')
+  const [pickedItem, setPickedItem] = useState('대관료')
 
   return (
     <div className="catalog" data-theme={theme === 'system' ? undefined : theme} data-testid="design-catalog">
@@ -130,13 +126,7 @@ export function Catalog() {
         <header className="catalog__section">
           <h1 className="catalog__title">디자인 카탈로그</h1>
           <p className="catalog__state">개발 모드 전용. 값은 src/styles/tokens.css, 의도는 docs/design.md.</p>
-          <div className="catalog__row" role="group" aria-label="테마">
-            {THEME_CHOICES.map((choice) => (
-              <ChoiceChip key={choice.id} selected={theme === choice.id} onClick={() => setTheme(choice.id)}>
-                {choice.label}
-              </ChoiceChip>
-            ))}
-          </div>
+          <OptionList label="테마" options={THEME_CHOICES} value={theme} onChange={setTheme} />
         </header>
 
         <Section title="색">
@@ -294,31 +284,44 @@ export function Catalog() {
         </Section>
 
         <Section title="OptionList">
-          <State label="여럿 중 하나 · 고른 줄 옅은 청록 + 체크 (눌러 보기, 설정 장부 연도)">
-            <div className="catalog__card catalog__card--pad">
+          <State label="화면 바탕 위: 흰 면 + 회색 원 · 오른쪽 수입/지출, 수입 청록 원, 맨 아래 [직접 적기] (눌러 보기, 내역 적기 항목 목록)">
+            <OptionList
+              label="자주 쓴 항목"
+              options={[
+                { value: '대관료', label: '대관료', icon: itemIcon('대관료'), note: '지출' },
+                { value: '간식비', label: '간식비', icon: itemIcon('간식비'), note: '지출' },
+                { value: '회비', label: '회비', icon: itemIcon('회비'), note: '수입', tone: 'income' },
+              ]}
+              value={pickedItem}
+              onChange={setPickedItem}
+              action={{ label: '직접 적기', icon: 'pen', onClick: noop }}
+            />
+          </State>
+          <State label="안 고른 줄·직접 적기 눌림">
+            <div data-preview-pressed="">
               <OptionList
-                label="장부 연도"
-                options={[
-                  { value: '2026', label: '2026년' },
-                  { value: '2025', label: '2025년' },
-                  { value: '2024', label: '2024년' },
-                ]}
-                value={pickedYear}
-                onChange={setPickedYear}
+                label="항목"
+                options={[{ value: '회비', label: '회비', icon: itemIcon('회비'), note: '수입', tone: 'income' }]}
+                value={null}
+                onChange={noop}
+                action={{ label: '직접 적기', icon: 'pen', onClick: noop }}
               />
             </div>
           </State>
-          <State label="아이콘 붙음 · 안 고른 줄 눌림">
-            <div className="catalog__card catalog__card--pad" data-preview-pressed="">
-              <OptionList
-                label="항목"
-                options={[
-                  { value: '대관료', label: '대관료', icon: itemIcon('대관료') },
-                  { value: '회비', label: '회비', icon: itemIcon('회비') },
-                ]}
-                value={null}
-                onChange={noop}
-              />
+          <State label="선택 창 안: 회색 면 + 흰 원 · 고른 줄 옅은 청록 + 체크 (설정 장부 연도)">
+            <div className="catalog__frame catalog__frame--sheet">
+              <BottomSheet open title="어느 해 장부를 볼까요?" onClose={noop}>
+                <OptionList
+                  label="장부 연도"
+                  options={[
+                    { value: '2026', label: '2026년' },
+                    { value: '2025', label: '2025년' },
+                    { value: '2024', label: '2024년' },
+                  ]}
+                  value={pickedYear}
+                  onChange={setPickedYear}
+                />
+              </BottomSheet>
             </div>
           </State>
         </Section>
@@ -426,30 +429,6 @@ export function Catalog() {
               <Button variant="danger-text" disabled>
                 이 기록 지우기
               </Button>
-            </div>
-          </State>
-        </Section>
-
-        <Section title="ChoiceChip">
-          <State label="월 선택 · 선택됨 / 안됨 (눌러 보기)">
-            <div className="catalog__months">
-              {MONTHS.map((value) => (
-                <ChoiceChip key={value} selected={month === value} onClick={() => setMonth(value)}>
-                  {value}월
-                </ChoiceChip>
-              ))}
-            </div>
-          </State>
-          <State label="항목 선택 · 마지막은 비활성">
-            <div className="catalog__row">
-              {['대관료', '간식비', '꽃다발'].map((name) => (
-                <ChoiceChip key={name} selected={item === name} onClick={() => setItem(name)}>
-                  {name}
-                </ChoiceChip>
-              ))}
-              <ChoiceChip selected={false} disabled>
-                행사비
-              </ChoiceChip>
             </div>
           </State>
         </Section>
@@ -616,8 +595,6 @@ export function Catalog() {
               <Button variant="danger-text">이 기록 지우기</Button>
             </div>
             <div className="catalog__row">
-              <ChoiceChip selected>간식비</ChoiceChip>
-              <ChoiceChip selected={false}>대관료</ChoiceChip>
               <IconButton icon="settings" onClick={noop}>
                 설정
               </IconButton>

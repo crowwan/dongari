@@ -7,6 +7,7 @@ import {
   deleteEntry as deleteEntryFrom,
   firstVisibleMonth,
   frequentChoices as pickFrequentChoices,
+  lastUsedType as findLastUsedType,
   newLedgerDefaults as defaultsFor,
   updateEntry as updateEntryIn,
   updateLedgerInfo,
@@ -46,6 +47,8 @@ export interface LedgerState {
   data: StoredData // 지금 기록 전체 (백업 파일 내용)
   // 자주 쓴 항목 버튼: 종류를 고르기 전(type 없음)엔 두 종류를 섞어서
   frequentChoices: (type?: EntryType) => FrequentChoice[]
+  // 직접 적은 이름을 예전에 쓴 종류. 처음 쓰는 이름이면 undefined (AC-15)
+  lastUsedType: (name: string) => EntryType | undefined
   startLedger: (info: LedgerInfo) => void
   addEntry: (input: EntryInput) => boolean // 저장에 성공했는지 (성공일 때만 "저장했어요" 를 띄운다)
   updateEntry: (id: string, input: EntryInput) => boolean // 저장에 성공했는지 (성공일 때만 "고쳤어요")
@@ -130,6 +133,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     saveFailure,
     data,
     frequentChoices: (type) => pickFrequentChoices(allEntriesOldestFirst(data), type),
+    lastUsedType: (name) => findLastUsedType(allEntriesOldestFirst(data), name),
     startLedger: (info) =>
       commit((current) => {
         if (current.ledgers[String(year)]) throw new Error(`${year}년 장부가 이미 있다`)
