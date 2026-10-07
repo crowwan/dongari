@@ -38,6 +38,11 @@ function storedWith(...ledgers: Ledger[]): StoredData {
   }
 }
 
+// 백업 파일에 담기는 데이터: 마지막 백업 시각만 파일을 만든 시각으로 바뀐다
+function backedUpAt(data: StoredData, now: Date): StoredData {
+  return { ...data, settings: { ...data.settings, lastBackupAt: now.toISOString() } }
+}
+
 function renderApp(repository: LedgerRepository = new MemoryRepository(), loaded: LoadResult = repository.load()) {
   let seq = 0
   render(<App repository={repository} loaded={loaded} options={{ now: () => TODAY, createId: () => `id-${++seq}` }} />)
@@ -94,7 +99,8 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
 
       expect(shareMock).toHaveBeenCalledOnce()
       expect(sharedFiles.map((file) => file.name)).toEqual(['동아리회계-백업-2026-10-03.txt'])
-      expect(JSON.parse(await sharedFiles[0].text())).toEqual(storedWith(LEDGER_2026))
+      // 파일 안 마지막 백업 시각은 그 파일을 만든 시각 (#38)
+      expect(JSON.parse(await sharedFiles[0].text())).toEqual(backedUpAt(storedWith(LEDGER_2026), TODAY))
       expect(await screen.findByText('백업 파일을 보냈어요')).toBeInTheDocument()
       expect(repository.load().data.settings).toEqual({
         lastChangedAt: '2026-10-01T00:00:00.000Z',
@@ -170,7 +176,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('꽃동산')
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('210,000원')
       expect(screen.getByRole('status')).toHaveTextContent('불러왔어요')
-      expect(fresh.load().data).toEqual(original)
+      expect(fresh.load().data).toEqual(backedUpAt(original, TODAY))
     })
 
     it('지금 기록이 있으면 바뀐다고 알리는 위험 확인 창을 띄우고, [아니요] 면 아무것도 바꾸지 않는다', async () => {

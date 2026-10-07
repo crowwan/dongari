@@ -30,6 +30,11 @@ function storedWith(...ledgers: Ledger[]): StoredData {
 // 폰의 현지 시각 2026-10-06 오전 (실행 환경 시간대와 상관없이 현지 날짜로 만든다)
 const NOW = new Date(2026, 9, 6, 8, 30)
 
+// 파일에 담기는 데이터: 마지막 백업 시각만 파일을 만든 시각으로 바뀐다
+function withBackupAt(data: StoredData, now: Date): StoredData {
+  return { ...data, settings: { ...data.settings, lastBackupAt: now.toISOString() } }
+}
+
 describe('SPEC-002 백업 파일 만들기', () => {
   it('파일 이름은 오늘 날짜가 붙은 동아리회계-백업-YYYY-MM-DD.txt 이다', () => {
     expect(createBackup(storedWith(ledger(2026, 1)), NOW).fileName).toBe('동아리회계-백업-2026-10-06.txt')
@@ -43,8 +48,22 @@ describe('SPEC-002 백업 파일 만들기', () => {
     const data = storedWith(ledger(2025, 2), ledger(2026, 1))
     const { text } = createBackup(data, NOW)
 
-    expect(JSON.parse(text)).toEqual(data)
+    expect(JSON.parse(text)).toEqual(withBackupAt(data, NOW))
     expect(text).toContain('\n  "schemaVersion": 2')
+  })
+
+  it('파일의 마지막 백업 시각은 그 파일을 만든 시각이다', () => {
+    const { text } = createBackup(storedWith(ledger(2026, 1)), NOW)
+
+    expect(JSON.parse(text).settings.lastBackupAt).toBe(NOW.toISOString())
+  })
+
+  it('파일을 만들어도 기기 데이터의 마지막 백업 시각은 바꾸지 않는다', () => {
+    const data = storedWith(ledger(2026, 1))
+
+    createBackup(data, NOW)
+
+    expect(data.settings.lastBackupAt).toBe('2026-09-01T00:00:00.000Z')
   })
 })
 
@@ -56,7 +75,7 @@ describe('SPEC-002 백업 파일 읽기', () => {
 
     expect(result).toEqual({
       ok: true,
-      data,
+      data: withBackupAt(data, NOW),
       summary: { years: [2025, 2026], entryCount: 5 },
     })
   })
@@ -64,7 +83,7 @@ describe('SPEC-002 백업 파일 읽기', () => {
   it('장부가 없는 백업 파일도 읽는다 (요약은 비어 있음)', () => {
     expect(readBackup(createBackup(createEmptyData(), NOW).text)).toEqual({
       ok: true,
-      data: createEmptyData(),
+      data: withBackupAt(createEmptyData(), NOW),
       summary: { years: [], entryCount: 0 },
     })
   })
