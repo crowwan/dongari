@@ -6,7 +6,7 @@
 //                       │                           ▲
 //                       └─ 처음 쓰는 이름 → custom-type ─ 고르고 [다음]
 //
-// 달은 처음부터 정해져 있고(보던 달) 어느 단계에서든 바꿀 수 있다. "적은 내용" 카드 항목 줄 [바꾸기] 를 누르면 item 으로 돌아간다(금액 유지)
+// 달은 처음부터 정해져 있고(보던 달) 어느 단계에서든 바꿀 수 있다. "지금 적는 내역" 카드 항목 줄 [바꾸기] 를 누르면 item 으로 돌아간다(금액 유지)
 import type { FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
 import { checkDraft, emptyDraft, isDraftChanged, type EntryDraft } from './entryDraft'
@@ -32,7 +32,7 @@ export type StepAction =
   | { kind: 'change-amount'; amount: number }
   | { kind: 'revisit-item' }
 
-// 위쪽 "적은 내용" 카드 줄 (위에서부터 달 / 항목). 항목 줄은 이름과 수입/지출을 한 줄에 ("대관료 · 지출")
+// "지금 적는 내역" 카드 답한 줄 (위에서부터 달 / 항목). 항목 줄은 이름과 수입/지출을 한 줄에 ("대관료 · 지출")
 export type AnswerRow = { kind: 'month'; month: number } | { kind: 'item'; name: string; type: EntryType | undefined }
 
 // 지금 단계의 아래 고정 버튼. missing 이 있으면 비활성 + 버튼 위 안내 (AC-5)

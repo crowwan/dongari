@@ -60,7 +60,7 @@ export function EditEntryForm({
   }
 
   return (
-    <div className="screen entry" data-testid="edit-entry-form">
+    <div className="screen screen--groups entry" data-testid="edit-entry-form">
       <BackToLedger onBack={onBack} />
       <h1 className="screen__title">내역 고치기</h1>
 

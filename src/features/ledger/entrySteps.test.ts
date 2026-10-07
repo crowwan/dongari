@@ -23,7 +23,7 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
 
     expect(state.step).toBe('amount')
     expect(state.draft).toMatchObject({ name: '대관료', type: 'expense' })
-    // "적은 내용" 카드: 달 줄 + 항목 줄(이름과 종류를 한 줄에)
+    // "지금 적는 내역" 카드: 달 줄 + 항목 줄(이름과 종류를 한 줄에)
     expect(answerRows(state)).toEqual([
       { kind: 'month', month: 10 },
       { kind: 'item', name: '대관료', type: 'expense' },

@@ -183,3 +183,11 @@
   border-radius: var(--corner-sm);
   background: var(--primary);
 }
+
+/* EntryCard 상태 안 지금 질문 제목 (화면의 내역 적기 질문과 같은 Heading) */
+.catalog__question {
+  margin: 0;
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
+  line-height: var(--line-tight);
+}
