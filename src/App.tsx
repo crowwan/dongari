@@ -51,7 +51,7 @@ export default function App({ repository, loaded, options }: AppProps) {
 
   const month = viewedMonth ?? ledger.firstMonth
   const today = now()
-  // 이번 달·오늘 (달 선택 창·날 격자 테두리). 지난 연도 장부에는 없다
+  // 이번 달·오늘 (달 선택 창 테두리·[오늘 7일] 칩). 지난 연도 장부에는 없다
   const isThisYear = ledger.year === today.getFullYear()
   const currentMonth = isThisYear ? today.getMonth() + 1 : undefined
   const currentDay = isThisYear ? today.getDate() : undefined
@@ -193,7 +193,6 @@ export default function App({ repository, loaded, options }: AppProps) {
             year={ledger.year}
             initial={{ month: entryMonth, day, type, name, amount }}
             currentMonth={currentMonth}
-            currentDay={currentDay}
             frequentChoices={ledger.frequentChoices}
             sheets={navigation}
             onSave={(input) => returnToLedger(ledger.updateEntry(id, input), '고쳤어요', input.month)}

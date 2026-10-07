@@ -489,7 +489,7 @@ describe('SPEC-001 앱 뼈대', () => {
   })
 
   describe('연달아 적기 (v2.1)', () => {
-    it('AC-19 AC-24 [저장] 하면 장부에 저장되고, 장부로 돌아가지 않고 "며칠인가요?" 로 돌아가며 달은 방금 저장한 달이 이어진다 (방금 저장한 날에 "방금")', async () => {
+    it('AC-19 AC-24 [저장] 하면 장부에 저장되고, 장부로 돌아가지 않고 "며칠인가요?" 빈칸으로 돌아가며 달은 방금 저장한 달이 이어진다 ([방금 12일] 칩)', async () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openEntryForm()
       await pickEntryMonth('10월', '4월')
@@ -498,10 +498,12 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(repository.load().data.ledgers['2026']?.entries.at(-1)).toMatchObject({ month: 4, day: 12, name: '간식비', amount: 5_000 })
       expect(screen.queryByTestId('ledger-screen')).not.toBeInTheDocument()
-      expect(screen.getByRole('heading', { level: 2, name: '며칠인가요?' })).toHaveFocus()
-      // 날·항목·금액은 비우고 달만 이어 쓴다. 날은 미리 고르지 않고 방금 저장한 날에 "방금" 만 붙인다
+      expect(dayField()).toHaveFocus()
+      // 날·항목·금액은 비우고 달만 이어 쓴다. 날은 미리 채우지 않고 방금 저장한 날을 칩으로만 낸다
       expect(screen.getAllByTestId('entry-card-value').map((value) => value.textContent)).toEqual(['4월'])
-      expect(within(screen.getByTestId('day-picker')).getByRole('button', { name: '12일 방금' })).toHaveAttribute('aria-pressed', 'false')
+      expect(dayField()).toHaveValue('')
+      await userEvent.click(screen.getByRole('button', { name: '방금 12일' }))
+      expect(screen.getAllByTestId('entry-card-value').map((value) => value.textContent)).toEqual(['4월 12일'])
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
     })
 
@@ -628,7 +630,8 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(screen.getByRole('heading', { level: 1, name: '내역 고치기' })).toBeInTheDocument()
       // 날짜 없는 예전 기록
-      expect(screen.getByRole('button', { name: '4월 · 날짜 없음 바꾸기' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '4월 달 바꾸기' })).toBeInTheDocument()
+      expect(dayField()).toHaveValue('')
       expect(within(typeGroup()).getByRole('button', { name: '지출' })).toHaveAttribute('aria-pressed', 'true')
       expect(within(itemList()).getByRole('button', { name: '대관료 지출' })).toHaveAttribute('aria-pressed', 'true')
       expect(screen.getByLabelText('직접 적기')).toHaveValue('대관료')
@@ -661,7 +664,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await stepBack(6)
       await openEditForm('대관료')
 
-      await pickEditDate('4월 · 날짜 없음', '이전 달', 9)
+      await pickEditDate('4월', '3월', 9)
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
@@ -687,7 +690,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await stepBack(6)
       await openEditForm('대관료')
 
-      await pickEditDate('4월 · 날짜 없음', '이전 달', 9)
+      await pickEditDate('4월', '3월', 9)
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
@@ -817,7 +820,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await stepBack(6)
       await openEditForm('대관료')
 
-      await pickEditDate('4월 · 날짜 없음', '다음 달', 1)
+      await pickEditDate('4월', '5월', 1)
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
       expect(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).toBeInTheDocument()
@@ -916,9 +919,13 @@ async function openEntryForm() {
 const typeGroup = () => screen.getByRole('group', { name: '수입인가요, 지출인가요?' })
 const itemList = () => screen.getByRole('group', { name: '자주 쓴 항목' })
 
-// "며칠인가요?" 날 격자에서 날을 누른다 ("방금" 이 붙은 칸도)
+const dayField = () => screen.getByRole('textbox', { name: '며칠인가요?' })
+
+// "며칠인가요?" 날 숫자 칸에 날을 치고 [다음] 을 누른다
 async function pickDay(day: number) {
-  await userEvent.click(within(screen.getByTestId('day-picker')).getByRole('button', { name: new RegExp(`^${day}일`) }))
+  await userEvent.clear(dayField())
+  await userEvent.type(dayField(), String(day))
+  await userEvent.click(screen.getByRole('button', { name: '다음' }))
 }
 
 // 보고 있던 달 그대로, 처음 쓰는 이름의 지출 하나를 하나씩 채운다 (날 → 직접 적기 → 지출 → 금액)
@@ -952,12 +959,12 @@ async function pickEntryMonth(current: string, next: string) {
   await userEvent.click(within(screen.getByRole('dialog', { name: '몇 월인가요?' })).getByRole('button', { name: next }))
 }
 
-// 내역 고치기: 날짜 줄 [바꾸기] → 날짜 선택 창에서 [‹]/[›] 한 번 넘기고 날을 고른다
-async function pickEditDate(current: string, step: '이전 달' | '다음 달', day: number) {
-  await userEvent.click(screen.getByRole('button', { name: `${current} 바꾸기` }))
-  const sheet = screen.getByRole('dialog', { name: '며칠인가요?' })
-  await userEvent.click(within(sheet).getByRole('button', { name: step }))
-  await userEvent.click(within(sheet).getByRole('button', { name: `${day}일` }))
+// 내역 고치기: "며칠인가요?" 제목 옆 [4월 ▾] → 달 선택 창에서 달을 고르고 날 숫자 칸에 날을 친다
+async function pickEditDate(current: string, next: string, day: number) {
+  await userEvent.click(screen.getByRole('button', { name: `${current} 달 바꾸기` }))
+  await userEvent.click(within(screen.getByRole('dialog', { name: '몇 월인가요?' })).getByRole('button', { name: next }))
+  await userEvent.clear(dayField())
+  await userEvent.type(dayField(), String(day))
 }
 
 // 장부 → 설정 → 동아리 이름 편집 화면에서 이름 뒤에 글자를 붙여 저장한다 (설정 목록으로 돌아온다)

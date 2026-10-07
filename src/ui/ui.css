@@ -16,9 +16,7 @@
 .ui-options__option,
 .ui-segment__option,
 .ui-months__month,
-.ui-days__day,
 .ui-month-button,
-.ui-pick,
 .ui-entry-card__change,
 .ui-amount-display__field,
 .ui-amount-display__add {
@@ -34,9 +32,7 @@
 .ui-stepper__pick:focus-visible,
 .ui-segment__option:focus-visible,
 .ui-months__month:focus-visible,
-.ui-days__day:focus-visible,
 .ui-month-button:focus-visible,
-.ui-pick:focus-visible,
 .ui-entry-card__change:focus-visible,
 .ui-amount-display__add:focus-visible,
 .ui-sheet:focus-visible {
@@ -752,61 +748,13 @@ button.ui-row {
 }
 
 /*
- * 날 격자 (SPEC-001 v2.2 "며칠인가요?"): 5칸씩 줄. 열두 달과 같은 모양 규칙 — 고른 날 청록 채움 + 굵게, 오늘 청록 테두리.
- * 칸 사이는 열두 달(--space-2)보다 좁게(--space-1): 390px 폰의 "지금 적는 내역" 카드 질문 칸(폭 약 306) 안에서도 칸 폭이 56 이상 (306 − 4 × 4) ÷ 5 = 58.
- * 면은 놓인 바탕과 다르게: 지금 질문 칸(옅은 청록 면) 위 흰 칸, 선택 창(흰 면) 안 회색 칸
+ * 날 숫자 칸 (SPEC-001 v2.2 "며칠인가요?", #80): 금액 칸(.ui-amount-display)과 같은 흰 카드·큰 숫자·작은 단위를 그대로 쓰고,
+ * 빠른 칩 줄만 두 칸 (칩이 하나면 반 폭 — [+1만] 과 같은 크기 느낌)
  */
-.ui-days {
+.ui-day-input__quick {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: var(--space-1);
-}
-
-.ui-days__day {
-  min-height: var(--touch-min);
-  padding: var(--space-1) 0;
-  border: 0;
-  border-radius: var(--corner-sm);
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink);
-  font-size: var(--size-large);
-  font-weight: var(--weight-medium);
-  line-height: var(--line-tight);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-
-.ui-sheet .ui-days__day {
-  background: var(--fill);
-}
-
-.ui-days__day[data-current='true'] {
-  box-shadow: inset 0 0 0 var(--stroke) var(--accent-ink);
-}
-
-/* 방금 저장한 날: 옅은 청록 면 + 작은 "방금" (고른 것은 아니다 — 매번 누른다) */
-.ui-days__day[data-recent='true'] {
-  background: var(--primary-soft);
-}
-
-.ui-days__recent {
-  color: var(--accent-ink);
-  font-size: var(--text-caption-size);
-  font-weight: var(--weight-bold);
-}
-
-.ui-days__day[aria-pressed='true'] {
-  background: var(--primary);
-  color: var(--on-accent);
-  font-weight: var(--weight-bold);
-}
-
-.ui-days__day[aria-pressed='true'] .ui-days__recent {
-  color: var(--on-accent);
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
 }
 
 /* 질문 제목 옆 달 버튼 [10월 ▾]: 흰 면 + 달 글자 + ▾ (누르면 열두 달 선택 창) */
@@ -832,11 +780,6 @@ button.ui-row {
   width: var(--icon-sm);
   height: var(--icon-sm);
   color: var(--muted);
-}
-
-/* 선택 창 안 월 넘기기 [‹ 10월 ›]: 흰 면 위라 화살표 칸을 회색 면으로 */
-.ui-sheet .ui-stepper__arrow {
-  background: var(--fill);
 }
 
 /*
@@ -930,63 +873,6 @@ button.ui-row {
   color: var(--accent-ink);
 }
 
-/* 정해진 값 바꾸기: 흰 면 한 줄 — [아이콘] 값 ··· 바꾸기 › */
-.ui-pick {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: var(--touch-field);
-  padding: 0 var(--space-4);
-  border: 0;
-  border-radius: var(--corner-md);
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  text-align: left;
-  cursor: pointer;
-}
-
-.ui-pick__icon {
-  flex: none;
-  width: var(--icon-circle-sm);
-  height: var(--icon-circle-sm);
-  border-radius: var(--corner-pill);
-  background: var(--fill);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-}
-
-.ui-pick__icon .ui-icon {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-}
-
-.ui-pick__value {
-  flex: 1;
-  min-width: 0;
-  color: var(--strong);
-  font-size: var(--size-large);
-  font-weight: var(--weight-bold);
-  line-height: var(--line-tight);
-}
-
-.ui-pick__action {
-  flex: none;
-  display: flex;
-  align-items: center;
-  color: var(--accent-ink);
-  font-size: var(--text-label-size);
-  font-weight: var(--weight-semibold);
-  line-height: var(--line-tight);
-}
-
-.ui-pick__action .ui-icon {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-}
-
 /*
  * 지금 적는 내역 카드 (하나씩 채우기에서 적는 내역 하나): 흰 면 + 청록 둘레 → 머리 "지금 적는 내역"(Caption Bold 청록)
  * → 답한 줄(이름표 + 굵은 값 + [바꾸기], 줄 위 가는 선) → 맨 아래 옅은 청록 면에 지금 질문.
@@ -1038,7 +924,7 @@ button.ui-row {
   line-height: var(--line-tight);
 }
 
-/* 굵은 값: 고치기 화면 "몇 월" 줄(PickRow)의 값과 같은 크기 */
+/* 굵은 값: 18 Bold (작은 이름표보다 한눈에) */
 .ui-entry-card__value {
   flex: 1;
   min-width: 0;
@@ -1161,6 +1047,9 @@ button.ui-row {
 }
 
 .ui-amount-display__number {
+  /* 포커스 링이 숫자 + 단위를 함께 감싸도록 상자에 반경·안쪽 여백 (#80) */
+  padding: 0 var(--space-2);
+  border-radius: var(--corner-sm);
   display: flex;
   align-items: baseline;
   justify-content: flex-end;
@@ -1186,7 +1075,12 @@ button.ui-row {
   text-align: right;
 }
 
-.ui-amount-display__field:focus-visible {
+/* 포커스 링은 칸(input)이 아니라 숫자 + 단위("원"/"일") 상자 전체에. 칸에만 그리면 단위가 링 밖으로 밀려 둘레선에 겹친다 (#80) */
+.ui-amount-display__field:focus {
+  outline: none;
+}
+
+.ui-amount-display__number:focus-within {
   outline: var(--focus-ring) solid var(--accent-ink);
   outline-offset: var(--stroke);
 }
@@ -1224,9 +1118,7 @@ button.ui-row {
 .ui-button[data-variant='primary']:active:not(:disabled),
 [data-preview-pressed] .ui-button[data-variant='primary']:not(:disabled),
 .ui-months__month[aria-pressed='true']:active,
-[data-preview-pressed] .ui-months__month[aria-pressed='true'],
-.ui-days__day[aria-pressed='true']:active,
-[data-preview-pressed] .ui-days__day[aria-pressed='true'] {
+[data-preview-pressed] .ui-months__month[aria-pressed='true'] {
   border-color: var(--primary-pressed);
   background: var(--primary-pressed);
 }
@@ -1261,12 +1153,8 @@ button.ui-row:active,
 [data-preview-pressed] .ui-segment__option[aria-pressed='false'],
 .ui-months__month[aria-pressed='false']:active,
 [data-preview-pressed] .ui-months__month[aria-pressed='false'],
-.ui-days__day[aria-pressed='false']:active,
-[data-preview-pressed] .ui-days__day[aria-pressed='false'],
 .ui-month-button:active,
 [data-preview-pressed] .ui-month-button,
-.ui-pick:active,
-[data-preview-pressed] .ui-pick,
 .ui-entry-card__change:active,
 [data-preview-pressed] .ui-entry-card__change,
 .ui-amount-display__add:active,
@@ -1297,9 +1185,7 @@ button.ui-row:active,
   .ui-options__option,
   .ui-segment__option,
   .ui-months__month,
-  .ui-days__day,
-  .ui-month-button,
-  .ui-pick,
+    .ui-month-button,
   .ui-entry-card__change,
   .ui-amount-display__add {
     transition:

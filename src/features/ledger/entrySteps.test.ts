@@ -3,6 +3,8 @@ import type { FrequentChoice } from '../../domain/ledger'
 import {
   answerRows,
   isStepDirty,
+  offersFinish,
+  quickDays,
   startSteps,
   stepButton,
   stepInput,
@@ -32,36 +34,106 @@ const RENT: FrequentChoice = { name: '대관료', type: 'expense' }
 
 describe('SPEC-001 하나씩 채우기 단계', () => {
   describe('AC-24 며칠인가요? (0단계)', () => {
-    it('AC-3 처음에는 보던 달만 정해져 있고(날은 아직 없음) "며칠인가요?" 단계다. 버튼은 없다', () => {
+    it('AC-3 처음에는 보던 달만 정해져 있고(날은 아직 없음) "며칠인가요?" 단계다. 날 숫자 칸은 빈칸, [다음] 은 "며칠인지 적어 주세요"', () => {
       expect(START.step).toBe('day')
       expect(START.draft).toEqual({ month: 10, day: undefined, type: undefined, name: '', amount: 0 })
+      expect(START.dayText).toBe('')
       expect(answerRows(START)).toEqual([{ kind: 'date', month: 10, day: undefined }])
-      expect(stepButton(START)).toBeNull()
+      expect(stepButton(START)).toEqual({ label: '다음', missing: '며칠인지 적어 주세요' })
     })
 
-    it('날을 고르면 날짜 줄이 "10월 7일" 이 되고 "무엇인가요?" 로 넘어간다', () => {
-      const state = run({ kind: 'pick-day', day: 7 })
+    it('날을 치면 숫자만 두 자리까지 칸에 남고, 날짜 줄은 [다음] 을 누르기 전까지 달만 보인다', () => {
+      const state = run({ kind: 'type-day', text: '7일' })
+
+      expect(state.dayText).toBe('7')
+      expect(state.step).toBe('day')
+      expect(answerRows(state)).toEqual([{ kind: 'date', month: 10, day: undefined }])
+      expect(stepButton(state)).toEqual({ label: '다음', missing: undefined })
+      expect(run({ kind: 'type-day', text: '123' }).dayText).toBe('12')
+    })
+
+    it('[다음] 을 누르면 날짜 줄이 "10월 7일" 이 되고 "무엇인가요?" 로 넘어간다', () => {
+      const state = run({ kind: 'type-day', text: '7' }, { kind: 'submit-day' })
 
       expect(state.step).toBe('item')
       expect(state.draft.day).toBe(7)
       expect(answerRows(state)).toEqual([{ kind: 'date', month: 10, day: 7 }])
     })
 
-    it('그 달에 없는 날은 고를 수 없다 (2026년 2월 29일, 4월 31일)', () => {
-      const february = startSteps({ year: 2026, month: 2 })
-      expect(stepReducer(february, { kind: 'pick-day', day: 29 })).toBe(february)
-      expect(from(startSteps({ year: 2028, month: 2 }), { kind: 'pick-day', day: 29 }).draft.day).toBe(29)
-      const april = startSteps({ year: 2026, month: 4 })
-      expect(stepReducer(april, { kind: 'pick-day', day: 31 })).toBe(april)
+    it.each([
+      ['', '며칠인지 적어 주세요'],
+      ['0', '10월은 31일까지 있어요'],
+      ['32', '10월은 31일까지 있어요'],
+    ])('"%s" 이면 [다음] 비활성 + "%s", 눌러도 넘어가지 않는다', (text, missing) => {
+      const state = run({ kind: 'type-day', text })
+
+      expect(stepButton(state)).toEqual({ label: '다음', missing })
+      expect(stepReducer(state, { kind: 'submit-day' })).toBe(state)
     })
 
-    it('날을 고르기 전에는 저장할 내역이 아니다 (날짜는 꼭 적는다)', () => {
-      expect(stepInput(START)).toEqual({ ok: false, missing: '며칠인지 골라 주세요' })
+    it('그 달에 없는 날은 넘어가지 않는다: 2026년 2월 29·30일, 4월 31일 (윤년 2028년 2월 29일은 된다)', () => {
+      const february = from(startSteps({ year: 2026, month: 2 }), { kind: 'type-day', text: '29' })
+      expect(stepButton(february)).toEqual({ label: '다음', missing: '2월은 28일까지 있어요' })
+      expect(stepReducer(february, { kind: 'submit-day' })).toBe(february)
+      expect(stepReducer(february, { kind: 'pick-day', day: 30 })).toBe(february)
+      expect(from(startSteps({ year: 2028, month: 2 }), { kind: 'type-day', text: '29' }, { kind: 'submit-day' }).draft.day).toBe(29)
+      const april = from(startSteps({ year: 2026, month: 4 }), { kind: 'type-day', text: '31' })
+      expect(stepButton(april)).toEqual({ label: '다음', missing: '4월은 30일까지 있어요' })
+    })
+
+    it('빠른 칩([오늘 7일]·[방금 5일])을 누르면 그 날로 정해지고 바로 "무엇인가요?" 로 넘어간다', () => {
+      const state = run({ kind: 'pick-day', day: 5 })
+
+      expect(state.step).toBe('item')
+      expect(state.draft.day).toBe(5)
+    })
+
+    it('날을 정하기 전에는 저장할 내역이 아니다 (날짜는 꼭 적는다)', () => {
+      expect(stepInput(START)).toEqual({ ok: false, missing: '며칠인지 적어 주세요' })
+    })
+  })
+
+  describe('AC-24 빠른 칩', () => {
+    const OCTOBER = { year: 2026, month: 10 }
+
+    it('올해 장부의 이번 달이면 [오늘 N일]', () => {
+      expect(quickDays(OCTOBER, { today: { month: 10, day: 7 } })).toEqual([{ kind: 'today', day: 7 }])
+    })
+
+    it('방금 저장한 내역이 같은 달이면 [방금 N일] (오늘 다음)', () => {
+      expect(quickDays(OCTOBER, { today: { month: 10, day: 7 }, recent: { month: 10, day: 5 } })).toEqual([
+        { kind: 'today', day: 7 },
+        { kind: 'recent', day: 5 },
+      ])
+    })
+
+    it('두 날이 같으면 [방금 N일] 하나만', () => {
+      expect(quickDays(OCTOBER, { today: { month: 10, day: 7 }, recent: { month: 10, day: 7 } })).toEqual([{ kind: 'recent', day: 7 }])
+    })
+
+    it('다른 달이거나 날짜 없는 내역이면 칩이 없다', () => {
+      expect(quickDays({ year: 2026, month: 9 }, { today: { month: 10, day: 7 }, recent: { month: 10, day: 5 } })).toEqual([])
+      expect(quickDays(OCTOBER, { recent: { month: 10, day: undefined } })).toEqual([])
+      expect(quickDays(OCTOBER, {})).toEqual([])
+    })
+
+    it('지금 달에 없는 날은 칩으로 내지 않는다', () => {
+      expect(quickDays({ year: 2026, month: 2 }, { recent: { month: 2, day: 30 } })).toEqual([])
+    })
+  })
+
+  describe('AC-21 [다 적었어요] 자리', () => {
+    it('항목 고르기, 또는 날 숫자 칸이 빈 "며칠인가요?" 에서만 둘 수 있다 (날을 치면 [다음])', () => {
+      expect(offersFinish(START)).toBe(true)
+      expect(offersFinish(run({ kind: 'type-day', text: '3' }))).toBe(false)
+      expect(offersFinish(afterDay())).toBe(true)
+      expect(offersFinish(afterDay({ kind: 'pick-item', choice: RENT }))).toBe(false)
+      expect(offersFinish(afterDay({ kind: 'start-custom' }))).toBe(false)
     })
   })
 
   describe('AC-25 날짜 바꾸기', () => {
-    it('날짜 줄 [바꾸기] 를 누르면 "며칠인가요?" 로 돌아가고 항목·금액은 그대로, 날을 다시 고르면 하던 질문으로 돌아온다', () => {
+    it('날짜 줄 [바꾸기] 를 누르면 "며칠인가요?" 로 돌아가고(칸에 지금 날) 항목·금액은 그대로, 날을 고쳐 [다음] 을 누르면 하던 질문으로 돌아온다', () => {
       const state = afterDay(
         { kind: 'pick-item', choice: RENT },
         { kind: 'change-amount', amount: 40_000 },
@@ -69,14 +141,15 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
       )
 
       expect(state.step).toBe('day')
+      expect(state.dayText).toBe('7')
       expect(state.draft).toEqual({ month: 10, day: 7, type: 'expense', name: '대관료', amount: 40_000 })
 
-      const changed = stepReducer(state, { kind: 'pick-day', day: 9 })
+      const changed = from(state, { kind: 'type-day', text: '9' }, { kind: 'submit-day' })
       expect(changed.step).toBe('amount')
       expect(changed.draft).toEqual({ month: 10, day: 9, type: 'expense', name: '대관료', amount: 40_000 })
     })
 
-    it('직접 적기 중에 날짜를 바꾸러 가도 날을 고르면 적던 이름 칸으로 돌아온다', () => {
+    it('직접 적기 중에 날짜를 바꾸러 가도 날을 정하면 적던 이름 칸으로 돌아온다', () => {
       const state = afterDay(
         { kind: 'start-custom' },
         { kind: 'type-custom-name', name: '꽃' },
@@ -88,25 +161,35 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
       expect(state.customName).toBe('꽃')
     })
 
-    it('"며칠인가요?" 에서 달을 바꾸면 그 달의 날 격자로, 고른 날이 그 달에도 있으면 그대로 둔다', () => {
+    it('"며칠인가요?" 에서 달을 바꿔도 그 달에 있는 날이면 칸과 날짜 줄에 그대로 둔다', () => {
       const state = afterDay({ kind: 'revisit-day' }, { kind: 'change-month', month: 11 })
 
       expect(state.step).toBe('day')
+      expect(state.dayText).toBe('7')
       expect(answerRows(state)).toEqual([{ kind: 'date', month: 11, day: 7 }])
     })
 
-    it('달을 바꿔 고른 날이 그 달에 없으면(31일 → 2월) 날을 비우고 다시 묻는다', () => {
+    it('달을 바꿔 그 날이 그 달에 없으면(31일 → 2월) 칸과 날을 비우고 다시 묻는다', () => {
       const state = run({ kind: 'pick-day', day: 31 }, { kind: 'revisit-day' }, { kind: 'change-month', month: 2 })
 
       expect(state.step).toBe('day')
+      expect(state.dayText).toBe('')
       expect(state.draft.day).toBeUndefined()
       expect(answerRows(state)).toEqual([{ kind: 'date', month: 2, day: undefined }])
+    })
+
+    it('[다음] 을 누르기 전 친 날도 바꾼 달에 없으면 비운다', () => {
+      const state = run({ kind: 'type-day', text: '30' }, { kind: 'change-month', month: 2 })
+
+      expect(state.dayText).toBe('')
     })
 
     it('2월 29일은 장부 연도가 윤년이면 달을 바꿔도 남는다', () => {
       const leap = from(startSteps({ year: 2028, month: 1 }), { kind: 'pick-day', day: 29 }, { kind: 'revisit-day' })
 
-      expect(stepReducer(leap, { kind: 'change-month', month: 2 }).draft.day).toBe(29)
+      const changed = stepReducer(leap, { kind: 'change-month', month: 2 })
+      expect(changed.draft.day).toBe(29)
+      expect(changed.dayText).toBe('29')
     })
   })
 
@@ -250,6 +333,12 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
 
     it('날만 골라도 적던 내용이 있다 (연달아 적기에서 다음 내역의 날을 고른 뒤 나가면 묻는다)', () => {
       expect(isStepDirty(run({ kind: 'pick-day', day: 7 }), 10)).toBe(true)
+    })
+
+    it('날 숫자 칸에 글자만 쳐도 적던 내용이 있다 ([다음] 을 누르기 전, 없는 날이어도)', () => {
+      expect(isStepDirty(run({ kind: 'type-day', text: '3' }), 10)).toBe(true)
+      expect(isStepDirty(run({ kind: 'type-day', text: '45' }), 10)).toBe(true)
+      expect(isStepDirty(run({ kind: 'type-day', text: '3' }, { kind: 'type-day', text: '' }), 10)).toBe(false)
     })
 
     it('답한 것이 하나라도 있으면 적던 내용이 있다', () => {

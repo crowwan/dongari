@@ -38,7 +38,6 @@ function Harness({ initial, handlers }: { initial: EntryDraft; handlers: Handler
       year={2026}
       initial={initial}
       currentMonth={10}
-      currentDay={3}
       frequentChoices={(type?: EntryType) => frequentChoices(HISTORY, type)}
       sheets={sheets}
       onSave={handlers.onSave}
@@ -56,22 +55,38 @@ function renderForm(initial: EntryDraft = SAVED) {
 }
 
 const saveButton = () => screen.getByRole('button', { name: '저장' })
-const dateSheet = () => screen.getByRole('dialog', { name: '며칠인가요?' })
+const dayField = () => screen.getByRole('textbox', { name: '며칠인가요?' })
 const typeGroup = () => screen.getByRole('group', { name: '수입인가요, 지출인가요?' })
 const itemList = () => screen.getByRole('group', { name: '자주 쓴 항목' })
+// 날짜 질문 제목 옆 [4월 ▾] → 열두 달 선택 창에서 고른다
+async function pickMonth(current: number, next: number) {
+  await userEvent.click(screen.getByRole('button', { name: `${current}월 달 바꾸기` }))
+  await userEvent.click(within(screen.getByRole('dialog', { name: '몇 월인가요?' })).getByRole('button', { name: `${next}월` }))
+}
+
+// 날 숫자 칸을 지우고 새로 친다
+async function typeDay(text: string) {
+  await userEvent.clear(dayField())
+  if (text !== '') await userEvent.type(dayField(), text)
+}
+
 const itemNames = () =>
   within(itemList())
     .getAllByRole('button')
     .map((button) => button.textContent)
 
 describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
-  it('위에서부터 날짜(한 줄 "4월 7일" + 바꾸기) → 수입/지출 스위치 → 무엇(항목 목록 + 직접 적기 칸) → 얼마, 맨 아래 [이 내역 지우기], 아래 고정 [저장]', () => {
+  it('위에서부터 날짜([4월 ▾] + 날 숫자 칸 "7") → 수입/지출 스위치 → 무엇(항목 목록 + 직접 적기 칸) → 얼마, 맨 아래 [이 내역 지우기], 아래 고정 [저장]', () => {
     renderForm()
 
     expect(screen.getByRole('heading', { level: 1, name: '내역 고치기' })).toBeInTheDocument()
     const questions = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
     expect(questions).toEqual(['며칠인가요?', '수입인가요, 지출인가요?', '무엇인가요?', '얼마인가요?'])
-    expect(screen.getByRole('button', { name: '4월 7일 바꾸기' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '4월 달 바꾸기' })).toBeInTheDocument()
+    expect(dayField()).toHaveValue('7')
+    expect(dayField()).toHaveAttribute('inputmode', 'numeric')
+    // 고치기는 값을 한눈에 보는 화면이라 칸에 저절로 포커스를 주지 않는다
+    expect(dayField()).not.toHaveFocus()
     expect(screen.getByTestId('segmented-control')).toBeInTheDocument()
     expect(screen.getByTestId('amount-display')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '이 내역 지우기' })).toBeInTheDocument()
@@ -97,50 +112,73 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
   })
 
   describe('AC-25 날짜', () => {
-    it('[바꾸기] 를 누르면 날짜 선택 창([‹ 4월 ›] + 날 격자, 고른 날 표시)이 열리고, 날을 누르면 창이 닫히며 그 날로 바뀐다', async () => {
-      renderForm()
+    it('날 숫자 칸을 고치면 그 날로 저장된다 (빠른 칩은 없다)', async () => {
+      const { onSave } = renderForm()
 
-      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
-      expect(within(dateSheet()).getByTestId('month-stepper-label')).toHaveTextContent('4월')
-      expect(within(dateSheet()).getAllByRole('button', { name: /일$/ })).toHaveLength(30)
-      expect(within(dateSheet()).getByRole('button', { name: '7일' })).toHaveAttribute('aria-pressed', 'true')
-      await userEvent.click(within(dateSheet()).getByRole('button', { name: '12일' }))
+      await typeDay('12')
+      await userEvent.click(saveButton())
 
+      expect(screen.queryByRole('group', { name: '빠른 날짜' })).not.toBeInTheDocument()
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 12, type: 'income', name: '회비', amount: 140_000 })
+    })
+
+    it('[4월 ▾] 로 달을 바꾸면 그 달로, 그 날이 그 달에 있으면 칸은 그대로다', async () => {
+      const { onSave } = renderForm()
+
+      await pickMonth(4, 10)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: '4월 12일 바꾸기' })).toBeInTheDocument()
+      expect(dayField()).toHaveValue('7')
+      await userEvent.click(saveButton())
+
+      expect(onSave).toHaveBeenCalledWith({ month: 10, day: 7, type: 'income', name: '회비', amount: 140_000 })
     })
 
-    it('창의 [‹] [›] 로 달을 넘겨 다른 달의 날을 고를 수 있고, 이번 달이면 오늘에 테두리', async () => {
+    it('달 선택 창은 지금 달에 체크, 올해 장부의 이번 달에 테두리', async () => {
       renderForm()
-      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
 
-      for (let step = 0; step < 6; step += 1) {
-        await userEvent.click(within(dateSheet()).getByRole('button', { name: '다음 달' }))
-      }
-      expect(within(dateSheet()).getByTestId('month-stepper-label')).toHaveTextContent('10월')
-      expect(within(dateSheet()).getByRole('button', { name: '3일' })).toHaveAttribute('aria-current', 'date')
-      // 다른 달에서는 고른 날 표시가 없다
-      expect(dateSheet().querySelector('[aria-pressed="true"]')).not.toBeInTheDocument()
-      await userEvent.click(within(dateSheet()).getByRole('button', { name: '31일' }))
+      await userEvent.click(screen.getByRole('button', { name: '4월 달 바꾸기' }))
 
-      expect(screen.getByRole('button', { name: '10월 31일 바꾸기' })).toBeInTheDocument()
+      const sheet = screen.getByRole('dialog', { name: '몇 월인가요?' })
+      expect(within(sheet).getByRole('button', { name: '4월' })).toHaveAttribute('aria-pressed', 'true')
+      expect(within(sheet).getByRole('button', { name: '10월' })).toHaveAttribute('aria-current', 'date')
     })
 
-    it('날을 고르지 않고 창을 닫으면 날짜는 그대로다', async () => {
+    it('달을 바꿔 그 날이 그 달에 없으면(31일 → 2월) 칸을 비우고 [저장] 비활성 + "며칠인지 적어 주세요"', async () => {
+      renderForm({ ...SAVED, month: 5, day: 31 })
+
+      await pickMonth(5, 2)
+
+      expect(dayField()).toHaveValue('')
+      expect(saveButton()).toBeDisabled()
+      expect(saveButton()).toHaveAccessibleDescription('며칠인지 적어 주세요')
+    })
+
+    it.each([
+      ['0', '4월은 30일까지 있어요'],
+      ['31', '4월은 30일까지 있어요'],
+    ])('그 달에 없는 날 "%s" 이면 [저장] 비활성 + "%s"', async (text, missing) => {
       renderForm()
-      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
-      await userEvent.click(within(dateSheet()).getByRole('button', { name: '이전 달' }))
 
-      await userEvent.keyboard('{Escape}')
+      await typeDay(text)
 
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: '4월 7일 바꾸기' })).toBeInTheDocument()
+      expect(saveButton()).toBeDisabled()
+      expect(saveButton()).toHaveAccessibleDescription(missing)
     })
 
-    it('날짜 없는 예전 내역은 "4월 · 날짜 없음" 으로 보이고, 그대로 저장할 수 있다', async () => {
+    it('날짜가 있던 내역의 날을 지우면 [저장] 비활성 + "며칠인지 적어 주세요" (날짜를 떼지 않는다)', async () => {
+      renderForm()
+
+      await typeDay('')
+
+      expect(saveButton()).toBeDisabled()
+      expect(saveButton()).toHaveAccessibleDescription('며칠인지 적어 주세요')
+    })
+
+    it('날짜 없는 예전 내역은 날 칸이 빈칸 + 안내로 보이고, 그대로 저장할 수 있다', async () => {
       const { onSave } = renderForm(OLD_SAVED)
 
-      expect(screen.getByRole('button', { name: '4월 · 날짜 없음 바꾸기' })).toBeInTheDocument()
+      expect(dayField()).toHaveValue('')
+      expect(screen.getByText('날짜 없이 적은 예전 내역이에요. 비워 둬도 저장돼요')).toBeInTheDocument()
       expect(saveButton()).toBeEnabled()
       await userEvent.click(screen.getByRole('button', { name: '1만 원 더하기' }))
       await userEvent.click(saveButton())
@@ -148,20 +186,28 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       expect(onSave).toHaveBeenCalledWith({ month: 4, type: 'income', name: '회비', amount: 150_000 })
     })
 
-    it('날짜 없는 예전 내역도 날짜를 골라 붙일 수 있다 (고른 날 없이 그 달 격자가 열린다)', async () => {
+    it('날짜 없는 예전 내역도 날을 적어 날짜를 붙일 수 있다 (없는 날이면 안내)', async () => {
       const { onSave } = renderForm(OLD_SAVED)
 
-      await userEvent.click(screen.getByRole('button', { name: '4월 · 날짜 없음 바꾸기' }))
-      expect(dateSheet().querySelector('[aria-pressed="true"]')).not.toBeInTheDocument()
-      await userEvent.click(within(dateSheet()).getByRole('button', { name: '20일' }))
+      await typeDay('31')
+      expect(saveButton()).toHaveAccessibleDescription('4월은 30일까지 있어요')
+      await typeDay('20')
       await userEvent.click(saveButton())
 
       expect(onSave).toHaveBeenCalledWith({ month: 4, day: 20, type: 'income', name: '회비', amount: 140_000 })
     })
 
+    it('숫자만 두 자리까지 쳐진다', async () => {
+      renderForm(OLD_SAVED)
+
+      await userEvent.type(dayField(), '1a23')
+
+      expect(dayField()).toHaveValue('12')
+    })
+
     it('선택 창이 열려 있을 때 뒤로 버튼은 선택 창만 닫는다', async () => {
       const { onBack } = renderForm()
-      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
+      await userEvent.click(screen.getByRole('button', { name: '4월 달 바꾸기' }))
 
       act(() => {
         window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
@@ -216,9 +262,8 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
   it('AC-6 고쳐서 [저장] 을 누르면 고친 달·날짜·종류·이름·금액을 넘긴다', async () => {
     const { onSave } = renderForm()
 
-    await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
-    await userEvent.click(within(dateSheet()).getByRole('button', { name: '다음 달' }))
-    await userEvent.click(within(dateSheet()).getByRole('button', { name: '31일' }))
+    await pickMonth(4, 5)
+    await typeDay('31')
     await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
     await userEvent.click(within(itemList()).getByRole('button', { name: '꽃값 지출' }))
     await userEvent.click(screen.getByRole('button', { name: '1만 원 더하기' }))
@@ -240,13 +285,29 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
     it('날짜만 바꿔도 바뀌었다고 알리고, 같은 날로 되돌리면 다시 바뀐 것이 없다고 알린다', async () => {
       const { onDirtyChange } = renderForm()
 
-      await userEvent.click(screen.getByRole('button', { name: '4월 7일 바꾸기' }))
-      await userEvent.click(within(dateSheet()).getByRole('button', { name: '8일' }))
+      await typeDay('8')
       expect(onDirtyChange).toHaveBeenLastCalledWith(true)
 
-      await userEvent.click(screen.getByRole('button', { name: '4월 8일 바꾸기' }))
-      await userEvent.click(within(dateSheet()).getByRole('button', { name: '7일' }))
+      await typeDay('7')
       expect(onDirtyChange).toHaveBeenLastCalledWith(false)
+    })
+
+    it('날 칸을 비우거나 없는 날을 쳐도 바뀌었다고 알린다', async () => {
+      const { onDirtyChange } = renderForm()
+
+      await typeDay('')
+      expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+
+      await typeDay('0')
+      expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+    })
+
+    it('날짜 없는 예전 내역에 날을 적으면 바뀌었다고 알린다', async () => {
+      const { onDirtyChange } = renderForm(OLD_SAVED)
+
+      await typeDay('3')
+
+      expect(onDirtyChange).toHaveBeenLastCalledWith(true)
     })
 
     it('바꾼 값을 처음 값으로 되돌리면 다시 바뀐 것이 없다고 알린다', async () => {
