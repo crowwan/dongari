@@ -1,9 +1,12 @@
 import { useId } from 'react'
 import { formatMoney, parseMoney } from './money'
+import type { FieldLabelRole } from './fieldLabel'
 import './ui.css'
 
 type MoneyInputProps = {
   label: string
+  // 이름 글자 역할. 기본은 질문 제목 급, 질문 아래 딸린 칸·카드 안 칸은 보조 이름(label)으로 낮춘다
+  labelRole?: FieldLabelRole
   // 원 단위 금액. 0 이면 빈칸으로 보인다
   value: number
   onChange: (value: number) => void
@@ -13,12 +16,12 @@ type MoneyInputProps = {
 }
 
 // 금액 입력칸: 숫자 키패드, 천 단위 콤마 자동, "원" 표기, 상한 999,999,999
-export function MoneyInput({ label, value, onChange, error, disabled }: MoneyInputProps) {
+export function MoneyInput({ label, labelRole = 'heading', value, onChange, error, disabled }: MoneyInputProps) {
   const inputId = useId()
   const errorId = useId()
 
   return (
-    <div className="ui-money" data-testid="money-input" data-state={error ? 'error' : 'default'}>
+    <div className="ui-money" data-testid="money-input" data-label-role={labelRole} data-state={error ? 'error' : 'default'}>
       <label className="ui-money__label" htmlFor={inputId}>
         {label}
       </label>

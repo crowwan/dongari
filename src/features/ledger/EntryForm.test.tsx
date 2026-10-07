@@ -50,6 +50,15 @@ describe('SPEC-001 내역 적기', () => {
     expect(within(screen.getByTestId('bottom-action-bar')).getByRole('button', { name: '저장' })).toBeInTheDocument()
   })
 
+  it('"직접 적기" 는 질문이 아니라 입력칸 보조 이름이고, "얼마인가요?" 는 다른 질문과 같은 질문 제목 급이다', () => {
+    renderForm()
+
+    const nameField = screen.getByLabelText('직접 적기').closest('[data-testid="text-field"]')
+    expect(nameField).toHaveAttribute('data-label-role', 'label')
+    expect(screen.getByTestId('money-input')).toHaveAttribute('data-label-role', 'heading')
+    expect(screen.queryByRole('heading', { name: '직접 적기' })).not.toBeInTheDocument()
+  })
+
   it('AC-3 월 기본값은 장부에서 보고 있던 달이고, 1~12월 중 하나를 고른다', async () => {
     renderForm(emptyDraft(9))
 

@@ -3,10 +3,11 @@
  */
 @import '../screens.css';
 
+/* 카드 안 입력칸 사이: 이름 ↔ 칸(--stack-tight)보다 넓고, 카드 사이(--group-gap)보다 좁게 */
 .settings__form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--stack);
 }
 
 /* 연도 고르기: 큰 선택 버튼 두 칸씩 */
@@ -20,7 +21,7 @@
 .settings__last-backup {
   margin: 0;
   font-size: var(--size-body);
-  font-weight: var(--weight-strong);
+  font-weight: var(--text-label-weight);
   line-height: var(--line-tight);
   color: var(--ink);
 }
@@ -29,5 +30,5 @@
 .settings__actions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--stack-tight);
 }

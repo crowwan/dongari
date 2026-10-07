@@ -56,4 +56,11 @@ describe('SPEC-001 이월금 입력', () => {
     expect(screen.getByRole('button', { name: '적자였어요' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText(LABEL)).toHaveValue('30,000')
   })
+
+  it('설정 카드 안에서는 금액 칸 이름을 보조 이름(label)으로 낮출 수 있다', () => {
+    render(<CarryoverField value={0} onChange={() => {}} labelRole="label" />)
+
+    expect(screen.getByTestId('money-input')).toHaveAttribute('data-label-role', 'label')
+    expect(screen.getByLabelText(LABEL)).toBeInTheDocument()
+  })
 })

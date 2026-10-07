@@ -100,12 +100,28 @@
   --size-amount: 24px;
   --size-balance: 34px;
   --weight-regular: 400;
-  --weight-strong: 600;
+  --weight-medium: 500;
   --weight-bold: 700;
   --line-body: 1.5;
   --line-tight: 1.25;
   --letter-body: -0.01em;
   --letter-number: -0.02em;
+
+  /*
+   * 글자 역할 — 개인 디자인 시스템(design-system/CONCEPT.md §4-2) 의미 계층: 강 Title / 중 Heading·Label / 약 Body·Caption.
+   * 크기는 DS 표(24/18/16/16/14)에서 큰 글씨 사용자용으로 한 단계씩 올렸다 (docs/design.md "DS 대비 오버라이드").
+   * 화면 제목 > 질문 제목 > 보조 이름·안내 세 단계가 크기와 두께만으로 구분된다
+   */
+  --text-title-size: 28px; /* 화면 제목 ("내역 적기") */
+  --text-title-weight: var(--weight-bold);
+  --text-heading-size: 22px; /* 질문 제목, 카드 제목 ("몇 월인가요?", "동아리 정보", "수입") */
+  --text-heading-weight: var(--weight-bold);
+  --text-label-size: var(--size-body); /* 보조 이름·강조 문구 ("직접 적기", 설정 카드 안 입력칸 이름) */
+  --text-label-weight: var(--weight-medium);
+  --text-body-size: var(--size-body); /* 본문 */
+  --text-body-weight: var(--weight-regular);
+  --text-caption-size: var(--size-small); /* 보조 설명 (가장 작은 글자) */
+  --text-caption-weight: var(--weight-regular);
 
   /* 간격 */
   --space-1: 4px;
@@ -115,6 +131,16 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+  --space-16: 64px;
+
+  /*
+   * 여백 역할 — 개인 디자인 시스템(CONCEPT.md §4-3) 의미 토큰. "연관은 좁게, 다른 묶음은 넓게" (선 대신 여백)
+   * 묶음 안(stack-tight·stack) < 묶음 사이(group-gap) < 큰 구획(section-gap)
+   */
+  --stack-tight: var(--space-2); /* 연관 요소 사이: 질문 제목 ↔ 답, 입력칸 이름 ↔ 칸 */
+  --stack: var(--space-4); /* 한 묶음 안의 요소 사이: 항목 버튼 ↔ "직접 적기" 칸, 카드 제목 ↔ 내용 */
+  --group-gap: var(--space-8); /* 다른 묶음 사이: 질문 묶음, 설정 카드, 월 정리 카드 */
+  --section-gap: var(--space-16); /* 큰 구획 사이: 적는 흐름 ↔ [이 내역 지우기] */
   --gutter: 16px;
   --card-pad-block: 16px;
   --card-pad-inline: 20px;

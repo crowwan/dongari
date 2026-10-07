@@ -34,7 +34,7 @@ export function SettingsScreen({
   onBack,
 }: SettingsScreenProps) {
   return (
-    <div className="screen" data-testid="settings-screen">
+    <div className="screen screen--groups" data-testid="settings-screen">
       <BackToLedger onBack={onBack} />
       <h1 className="screen__title">설정</h1>
 
@@ -103,11 +103,12 @@ function ClubInfoForm({ ledger, onSave }: { ledger: Ledger; onSave: (info: Ledge
     >
       <TextField
         label="동아리 이름"
+        labelRole="label"
         value={clubName}
         onChange={setClubName}
         error={missingName ? '동아리 이름을 적어주세요' : undefined}
       />
-      <CarryoverField value={carryover} onChange={setCarryover} />
+      <CarryoverField value={carryover} onChange={setCarryover} labelRole="label" />
       <Button type="submit" disabled={missingName || !changed}>
         바꾼 내용 저장
       </Button>

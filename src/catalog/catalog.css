@@ -136,3 +136,11 @@
 .catalog__frame--note {
   height: 160px;
 }
+
+/* 여백 역할 토큰: 폭으로 크기를 보여주는 막대 */
+.catalog__space-bar {
+  flex: none;
+  height: var(--space-4);
+  border-radius: var(--corner-sm);
+  background: var(--primary);
+}

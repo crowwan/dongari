@@ -61,7 +61,7 @@
   background: none;
   color: var(--danger);
   font-size: var(--size-body);
-  font-weight: var(--weight-strong);
+  font-weight: var(--text-label-weight);
   text-decoration: underline;
   text-underline-offset: var(--space-1);
 }
@@ -114,7 +114,7 @@
   background: var(--surface);
   color: var(--muted);
   font-size: var(--size-body);
-  font-weight: var(--weight-strong);
+  font-weight: var(--text-label-weight);
   line-height: var(--line-tight);
   white-space: nowrap;
   cursor: pointer;
@@ -215,7 +215,7 @@
   margin: 0;
   font-family: var(--typeface);
   font-size: var(--size-small);
-  font-weight: var(--weight-strong);
+  font-weight: var(--text-label-weight);
   line-height: var(--line-tight);
   color: var(--muted);
   text-align: center;
@@ -223,7 +223,7 @@
 
 /* 수입/지출 금액 글자: 크기는 놓인 자리를 따른다 */
 .ui-amount {
-  font-weight: var(--weight-strong);
+  font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -273,15 +273,27 @@
 .ui-money {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--stack-tight);
   font-family: var(--typeface);
   color: var(--ink);
 }
 
-.ui-money__label {
-  font-size: var(--size-large);
-  font-weight: var(--weight-bold);
+/*
+ * 입력칸 이름(금액·글자 칸 공통). 기본은 질문 제목 급(내역 적기 .entry__question 과 같은 Heading 역할),
+ * data-label-role="label" 이면 보조 이름: 한 단계 작고 보통 두께에 보조 글자색 (질문처럼 보이지 않게, #42)
+ */
+.ui-money__label,
+.ui-field__label {
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
   line-height: var(--line-tight);
+}
+
+[data-label-role='label'] > .ui-money__label,
+[data-label-role='label'] > .ui-field__label {
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  color: var(--muted);
 }
 
 .ui-money__box {
@@ -347,7 +359,7 @@
 .ui-field__error {
   margin: 0;
   font-size: var(--size-small);
-  font-weight: var(--weight-strong);
+  font-weight: var(--text-label-weight);
   color: var(--danger);
 }
 
@@ -355,15 +367,9 @@
 .ui-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--stack-tight);
   font-family: var(--typeface);
   color: var(--ink);
-}
-
-.ui-field__label {
-  font-size: var(--size-large);
-  font-weight: var(--weight-bold);
-  line-height: var(--line-tight);
 }
 
 .ui-field__input {
@@ -383,7 +389,7 @@
   color: var(--ink);
   font-family: var(--typeface);
   font-size: var(--size-body);
-  font-weight: var(--weight-strong);
+  font-weight: var(--text-label-weight);
   line-height: var(--line-body);
 }
 
@@ -433,7 +439,7 @@
 .ui-dialog__title {
   margin: 0;
   font-size: var(--size-large);
-  font-weight: var(--weight-strong);
+  font-weight: var(--weight-bold);
   line-height: var(--line-body);
   text-align: center;
   text-wrap: balance;
@@ -488,7 +494,7 @@
   color: var(--bg);
   font-family: var(--typeface);
   font-size: var(--size-body);
-  font-weight: var(--weight-strong);
+  font-weight: var(--text-label-weight);
   line-height: var(--line-body);
   text-align: center;
   /* 긴 알림이 두 줄이 될 때 낱말 중간("앨/범")에서 꺾이지 않게 */
