@@ -38,6 +38,11 @@
   gap: var(--group-gap);
 }
 
+/* 요소가 묶음 안처럼 이어지는 화면(장부): 요소 사이를 --stack 으로. 다른 묶음이 시작되는 요소는 그 요소가 margin-top 으로 더 띄운다 */
+.screen--stack {
+  gap: var(--stack);
+}
+
 /* 장부 외 화면 맨 위 [‹ 장부로]: 글자 폭만큼만, 화살표가 화면 좌우 여백 선에 오게 버튼 안쪽 여백만큼 바깥으로 */
 .screen__back {
   display: flex;

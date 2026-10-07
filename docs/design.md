@@ -129,7 +129,7 @@ updated: 2026-10-07
 - 입력칸 이름(`TextField`·`MoneyInput` `label`)은 기본이 2단계, 질문 아래 딸린 칸·카드 안 칸은 `labelRole="label"` 로 3단계.
 - "직접 적기"는 placeholder 로 옮기지 않고 보이는 보조 이름으로 남긴다(큰 글씨 사용자는 사라지는 placeholder 를 놓치기 쉽다).
 
-**간격 — 묶음 사이 > 묶음 안** (선은 쓰지 않는다): `--stack-tight` < `--stack` < `--group-gap` < `--section-gap`. 묶음이 여럿인 화면은 `.screen--groups`.
+**간격 — 묶음 사이 > 묶음 안** (선은 쓰지 않는다): `--stack-tight` < `--stack` < `--group-gap` < `--section-gap`. 묶음이 여럿인 화면은 `.screen--groups`, 요소가 묶음 안처럼 이어지는 화면(장부)은 `.screen--stack`. 화면 간격은 화면 요소의 변형 클래스로만 바꾼다 — 화면 css 에서 `gap` 을 다시 쓰면 같은 우선순위의 `.screen` 과 불러오기 순서로 승부가 갈린다(#66, #72).
 
 ### DS 대비 오버라이드
 
@@ -219,7 +219,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 
 | 화면 | 부품 |
 |---|---|
-| 장부 | 위쪽 이름(Heading)·연도(Caption) + `IconButton` [결산][설정•] → `BalanceCard` → (묶음 간격) `MonthStepper`(`onPickMonth` → `BottomSheet`+`MonthPicker`) → 그 달 카드(소계 두 칸 + `ListRow` 줄 + `IconButton fill` [N월 정리 보기]) → `BottomActionBar` [+ 내역 적기]. 안내 띠(저장 > 백업)는 맨 위 하나 |
+| 장부 | 위쪽 이름(Heading)·연도(Caption) + `IconButton` [결산][설정•] → (`--stack`) `BalanceCard` → (묶음 간격 `--group-gap`) `MonthStepper`(`onPickMonth` → `BottomSheet`+`MonthPicker`) → 그 달 카드(소계 두 칸 + `ListRow` 줄 + `IconButton fill` [N월 정리 보기]) → `BottomActionBar` [+ 내역 적기]. 안내 띠(저장 > 백업)는 맨 위 하나. 화면 요소는 `screen screen--stack ledger`, 달 넘기기 묶음은 `margin-top: --group-gap − --stack` (#72) |
 | 설정 | [‹ 장부로] → 제목 → (백업 안내 띠) → 묶음 제목(Label 16 SemiBold, `--muted`) + 흰 카드 안 `ListRow` 줄(값 `--muted` + › `--faint`). 이름·이월금 줄 → 편집 화면([‹ 설정] → 제목 → 입력칸 → [✓ 저장], 키패드에 가리지 않게 주 버튼은 입력칸 바로 아래), 연도 줄 → `BottomSheet`+`OptionList`. 맨 아래 "앱" 묶음 [📱 홈 화면에 추가](보조 줄 "기록이 더 안전해요", 홈 화면 앱이면 묶음째 없음) → 브라우저 설치 창 또는 `BottomSheet`+`InstallGuide` (#56) |
 | 내역 적기 (#47, #56, #68) | [‹ 장부로] → 제목 → (제목과 `--stack` 간격) `EntryCard` "지금 적는 내역"(답한 줄 달 / 항목 "대관료 · 지출") 안 맨 아래 지금 질문 하나(질문 제목 ↔ 답 `--stack-tight`): 1 "무엇인가요?" `OptionList`(최대 6 + [✎ 직접 적기]) + Caption "누르면 바로 다음으로 넘어가요" / 직접 적기 `TextField`(보조 이름) + [‹ 목록에서 고르기] / "수입인가요, 지출인가요?" `SegmentedControl` + Caption / 2 "얼마인가요?" `AmountDisplay` → `BottomActionBar` [다음]·[✓ 저장](1단계엔 없음). [달 바꾸기] → `BottomSheet`+`MonthPicker`, [항목 바꾸기] → 1. 연달아 적기(#64): 한 건이라도 저장했으면 제목 아래 `SavedEntries`(→ `--stack` → 카드), 질문 제목에 초점, 1단계 아래 고정 보조 [다 적었어요]. 화면 요소는 `screen screen--groups entry` — 묶음 간격을 `.entry` 에 다시 쓰면 `.screen` 공통 간격에 덮인다(#66) |
 | 내역 고치기 (#47) | [‹ 장부로] → 제목 → 질문 넷(묶음 간격 `--group-gap`): 몇 월 `PickRow` [바꾸기] → 달 선택 창 / `SegmentedControl` / `OptionList`(고른 종류만, 지금 이름 체크) + `TextField` "직접 적기" / `AmountDisplay` → (`--section-gap`) [이 내역 지우기] → `BottomActionBar` [✓ 저장] |
@@ -286,3 +286,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-07 | 연달아 적기: `SavedEntriesCard`(흰 카드 "저장한 내역 N건", 방금 줄 옅은 청록 + "방금", 4줄 넘으면 최근 3줄), `BottomActionBar` 보조 버튼, 내역 적기 조립. 카탈로그 상태 추가 (#64) | |
 | 2026-10-07 | "적은 내용" 카드(`AnswersCard`)와 지금 질문을 "지금 적는 내역" 카드 `EntryCard`(흰 면 + 청록 둘레, 답한 줄 + 옅은 면 지금 질문 칸)로 합침, "지금/이어서 적을 것" 표시 지움. `SavedEntriesCard` → 면 없는 회색 글자 `SavedEntries`("✓ 장부에 넣었어요 · N건", 최근 2줄, 금액 회색 예외). 새 색 토큰 `--primary-wash`. 내역 적기·고치기 화면 묶음 간격이 `.screen` 공통 간격(20)에 덮이던 것을 `screen--groups` 로 고침(내역 적기 제목 ↔ 카드 4 → 16, 고치기 질문 묶음 사이 20 → 32, #66). 카탈로그 상태 갱신 (#68) | |
 | 2026-10-07 | `BottomActionBar` 아이폰 키패드: `--keyboard-inset` 으로 고정 영역을 올리던 것을 지우고, 키패드가 떠 있는 동안은 지금 질문 바로 아래 흐름에 두고 키패드 바로 위로 스크롤(면·위쪽 선 없음). 갤럭시는 그대로 고정 (#70) | |
+| 2026-10-07 | 장부 화면 요소 간격이 `.screen` 공통 간격(20)에 덮이던 것을 화면 변형 클래스 `screen--stack`(`--stack` 16)으로 고침, `.ledger` 의 `gap`(`--stack-tight`, 덮여 있던 값) 지움. 위쪽 ↔ 잔액 카드 20 → 16, 잔액 카드 ↔ 달 넘기기 묶음 44 → 32(`--group-gap`). 다른 화면 간격은 그대로 (#72) | |
