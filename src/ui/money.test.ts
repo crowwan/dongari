@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ENTRY_AMOUNT_MAX } from '../domain/types'
-import { addAmount, formatAmount, formatMoney, parseMoney } from './money'
+import { addAmount, formatAmount, formatMoney, parseMoney, tidyMoneyText } from './money'
 
 describe('금액 글자 변환', () => {
   it('숫자가 아닌 글자를 버리고 숫자로 읽는다', () => {
@@ -20,8 +20,28 @@ describe('금액 글자 변환', () => {
     expect(formatMoney(1234567)).toBe('1,234,567')
   })
 
-  it('0 은 빈칸으로 보여준다', () => {
+  it('0 은 빈칸으로 보여준다 (내역 금액 칸: 0원 내역은 없다)', () => {
     expect(formatMoney(0)).toBe('')
+  })
+})
+
+describe('친 글자 정리 (이월금 칸)', () => {
+  it('직접 친 0 은 0 으로 남는다', () => {
+    expect(tidyMoneyText('0')).toBe('0')
+  })
+
+  it('다 지우면 빈칸이다', () => {
+    expect(tidyMoneyText('')).toBe('')
+  })
+
+  it('앞자리 0 은 정리한다 (00 → 0, 05 → 5)', () => {
+    expect(tidyMoneyText('00')).toBe('0')
+    expect(tidyMoneyText('05')).toBe('5')
+  })
+
+  it('숫자만 남기고 천 단위 콤마를 붙이며 상한에서 자른다', () => {
+    expect(tidyMoneyText('1,2345원')).toBe('12,345')
+    expect(tidyMoneyText('1234567890')).toBe('999,999,999')
   })
 })
 

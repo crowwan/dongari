@@ -54,6 +54,61 @@ describe('MoneyInput', () => {
     expect(handleChange).toHaveBeenLastCalledWith(999_999_999)
   })
 
+  it('처음 값이 0 이면 0 이 보인다 (이월금 "모르면 0으로 두고")', () => {
+    render(<MoneyInput label="얼마인가요?" value={0} onChange={() => {}} />)
+
+    expect(screen.getByLabelText('얼마인가요?')).toHaveValue('0')
+  })
+
+  it('다 지우면 빈칸(자리 글자 0)이 되고 금액은 0 이다', async () => {
+    const user = userEvent.setup()
+    const handleChange = vi.fn()
+    render(<Harness onChange={handleChange} />)
+    const input = screen.getByLabelText('얼마인가요?')
+
+    await user.clear(input)
+
+    expect(input).toHaveValue('')
+    expect(input).toHaveAttribute('placeholder', '0')
+    expect(handleChange).toHaveBeenLastCalledWith(0)
+  })
+
+  it('빈칸에서 0 을 치면 0 이 보인다', async () => {
+    const user = userEvent.setup()
+    const handleChange = vi.fn()
+    render(<Harness onChange={handleChange} />)
+    const input = screen.getByLabelText('얼마인가요?')
+
+    await user.clear(input)
+    await user.type(input, '0')
+
+    expect(input).toHaveValue('0')
+    expect(handleChange).toHaveBeenLastCalledWith(0)
+  })
+
+  it('00 은 0 으로, 05 는 5 로 앞자리 0 을 정리한다', async () => {
+    const user = userEvent.setup()
+    const handleChange = vi.fn()
+    render(<Harness onChange={handleChange} />)
+    const input = screen.getByLabelText('얼마인가요?')
+
+    await user.clear(input)
+    await user.type(input, '00')
+    expect(input).toHaveValue('0')
+
+    await user.type(input, '5')
+    expect(input).toHaveValue('5')
+    expect(handleChange).toHaveBeenLastCalledWith(5)
+  })
+
+  it('부모가 값을 바꾸면 바꾼 값이 보인다', () => {
+    const { rerender } = render(<MoneyInput label="얼마인가요?" value={0} onChange={() => {}} />)
+
+    rerender(<MoneyInput label="얼마인가요?" value={30_000} onChange={() => {}} />)
+
+    expect(screen.getByLabelText('얼마인가요?')).toHaveValue('30,000')
+  })
+
   it('오류 상태면 aria-invalid 와 안내 문장을 보여준다', () => {
     render(<MoneyInput label="얼마인가요?" value={0} onChange={() => {}} error="얼마인지 적어주세요" />)
 

@@ -174,6 +174,29 @@ describe('SPEC-001·002 설정 화면', () => {
       expect(onSaveClubInfo).toHaveBeenCalledWith({ clubName: '한랑드림', carryover: -370_482 })
     })
 
+    it('이월금을 지우고 0 을 적으면 0 이 보이고 0원으로 저장할 수 있다', async () => {
+      const onSaveClubInfo = vi.fn()
+      render(<Harness handlers={{ onSaveClubInfo }} />)
+      await userEvent.click(screen.getByRole('button', { name: /작년 이월금/ }))
+
+      const amount = screen.getByLabelText('작년 이월금')
+      await userEvent.clear(amount)
+      await userEvent.type(amount, '0')
+      expect(amount).toHaveValue('0')
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+      expect(onSaveClubInfo).toHaveBeenCalledWith({ clubName: '한랑드림', carryover: 0 })
+    })
+
+    it('이월금이 0원이면 편집 화면 금액 칸에 0 이 보인다', async () => {
+      render(<Harness ledger={{ ...LEDGER, carryover: 0 }} />)
+      await userEvent.click(screen.getByRole('button', { name: /작년 이월금/ }))
+
+      expect(screen.getByLabelText('작년 이월금')).toHaveValue('0')
+      // 바꾼 것이 없으면 [저장] 을 누를 수 없다
+      expect(screen.getByRole('button', { name: '저장' })).toBeDisabled()
+    })
+
     it('[‹ 설정] 을 누르면 저장하지 않고 설정 목록으로 돌아온다', async () => {
       const onSaveClubInfo = vi.fn()
       render(<Harness handlers={{ onSaveClubInfo }} />)

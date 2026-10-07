@@ -57,6 +57,29 @@ describe('SPEC-001 이월금 입력', () => {
     expect(screen.getByLabelText(LABEL)).toHaveValue('30,000')
   })
 
+  it('이월금 0원은 금액 칸에 0 으로 보이고, 스위치를 바꿔도 0 이 남는다', async () => {
+    const onChange = vi.fn()
+    render(<Harness initial={0} onChange={onChange} />)
+
+    expect(screen.getByLabelText(LABEL)).toHaveValue('0')
+    await userEvent.click(screen.getByRole('button', { name: '적자였어요' }))
+    await userEvent.click(screen.getByRole('button', { name: '남았어요' }))
+
+    expect(screen.getByLabelText(LABEL)).toHaveValue('0')
+    expect(onChange).toHaveBeenLastCalledWith(0)
+  })
+
+  it('금액을 지우고 0 을 치면 0 이 보이고 이월금은 0 이다', async () => {
+    const onChange = vi.fn()
+    render(<Harness initial={50_000} onChange={onChange} />)
+
+    await userEvent.clear(screen.getByLabelText(LABEL))
+    await userEvent.type(screen.getByLabelText(LABEL), '0')
+
+    expect(screen.getByLabelText(LABEL)).toHaveValue('0')
+    expect(onChange).toHaveBeenLastCalledWith(0)
+  })
+
   it('남았어요/적자였어요는 한 몸통 스위치(세그먼트)다', () => {
     render(<Harness initial={0} onChange={() => {}} />)
 
