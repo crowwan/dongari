@@ -1,6 +1,7 @@
-import { useId } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { Button, type ButtonVariant } from './Button'
 import type { IconName } from './Icon'
+import { shouldRevealBar, useKeyboardOpen } from './keyboard'
 import './ui.css'
 
 type BottomActionBarProps = {
@@ -16,12 +17,35 @@ type BottomActionBarProps = {
 }
 
 // 화면 아래 고정 영역 + 버튼 하나 ([+ 내역 적기], [저장], [사진으로 저장], 보조 [다 적었어요]).
-// 목록을 내려도 사라지지 않고 엄지가 닿는 자리 (ADR 003). 홈 표시줄(safe-area) 만큼 띄운다
+// 목록을 내려도 사라지지 않고 엄지가 닿는 자리 (ADR 003). 홈 표시줄(safe-area) 만큼 띄운다.
+// 키패드가 레이아웃을 줄이지 않는 브라우저(아이폰)에서 키패드가 뜨면 고정을 풀고 지금 질문 바로 아래 흐름에 둔 뒤
+// 키패드 바로 위로 스크롤한다 (keyboard.ts, #70). 갤럭시는 레이아웃이 줄어 늘 고정
 export function BottomActionBar({ label, icon, onClick, disabled, note, variant }: BottomActionBarProps) {
   const noteId = useId()
+  const barRef = useRef<HTMLDivElement>(null)
+  const keyboardOpen = useKeyboardOpen()
+
+  // 키패드가 뜨면, 또 뜬 채 보이는 영역이 바뀌면(사파리 애니메이션 중 여러 번) 다시 맞춘다. 이미 보이면 움직이지 않는다
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!keyboardOpen || !viewport) return
+    const reveal = () => {
+      const bar = barRef.current
+      if (!bar) return
+      const barRect = bar.getBoundingClientRect()
+      const focused = document.activeElement
+      const focusTop = focused instanceof HTMLElement && focused !== document.body ? focused.getBoundingClientRect().top : barRect.top
+      if (shouldRevealBar({ focusTop, barBottom: barRect.bottom, visibleHeight: viewport.height })) {
+        bar.scrollIntoView({ block: 'nearest' })
+      }
+    }
+    reveal()
+    viewport.addEventListener('resize', reveal)
+    return () => viewport.removeEventListener('resize', reveal)
+  }, [keyboardOpen])
 
   return (
-    <div className="ui-bottom-bar" data-testid="bottom-action-bar">
+    <div className="ui-bottom-bar" data-testid="bottom-action-bar" data-keyboard={keyboardOpen ? 'open' : 'closed'} ref={barRef}>
       <div className="ui-bottom-bar__inner">
         {note && (
           <p className="ui-bottom-bar__note" id={noteId} data-testid="bottom-action-bar-note">

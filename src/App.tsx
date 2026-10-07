@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
-import { useKeyboardInset } from './features/keyboard/keyboardInset'
 import { AddEntryForm } from './features/ledger/AddEntryForm'
 import { EditEntryForm } from './features/ledger/EditEntryForm'
 import { LedgerScreen } from './features/ledger/LedgerScreen'
@@ -49,9 +48,6 @@ export default function App({ repository, loaded, options }: AppProps) {
     },
     onSent: setToast,
   })
-
-  // 폰 키패드가 아래 고정 [저장] 을 가리지 않게 (#47)
-  useKeyboardInset()
 
   const month = viewedMonth ?? ledger.firstMonth
   const today = now()
