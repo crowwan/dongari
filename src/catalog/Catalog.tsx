@@ -21,6 +21,7 @@ import { MonthStepper } from '../ui/MonthStepper'
 import { NoticeBar } from '../ui/NoticeBar'
 import { OptionList, type Option } from '../ui/OptionList'
 import { PickRow } from '../ui/PickRow'
+import { SavedEntriesCard, type SavedEntry } from '../ui/SavedEntriesCard'
 import { SegmentedControl, type SegmentOptions } from '../ui/SegmentedControl'
 import { TextField } from '../ui/TextField'
 import { Toast } from '../ui/Toast'
@@ -102,6 +103,15 @@ const ENTRY_TYPES: SegmentOptions<EntryType> = [
 
 // 여백 역할: 묶음 안(좁게) < 묶음 사이(넓게) < 큰 구획
 const SPACE_ROLES = ['--stack-tight', '--stack', '--group-gap', '--section-gap']
+
+// 연달아 적기에서 저장한 순서 (마지막이 방금 저장한 줄)
+const SAVED_ENTRIES: SavedEntry[] = [
+  { name: '대관료', type: 'expense', amount: 40_000 },
+  { name: '회비', type: 'income', amount: 140_000 },
+  { name: '스승의 날 선생님 꽃다발과 카드 값', type: 'expense', amount: 58_000 },
+  { name: '간식비', type: 'expense', amount: 28_340 },
+  { name: '행사지원금', type: 'income', amount: 300_000 },
+]
 
 const noop = () => {}
 
@@ -369,6 +379,18 @@ export function Catalog() {
           </State>
         </Section>
 
+        <Section title="SavedEntriesCard (저장한 내역 카드, 연달아 적기)">
+          <State label='한 건: 방금 저장한 줄 옅은 청록 바탕 + "방금"'>
+            <SavedEntriesCard entries={SAVED_ENTRIES.slice(0, 1)} />
+          </State>
+          <State label="수입·지출 섞임: 장부와 같은 금액 색·부호 · 긴 이름">
+            <SavedEntriesCard entries={SAVED_ENTRIES.slice(0, 4)} />
+          </State>
+          <State label="4줄을 넘으면 최근 3줄만 (제목은 전체 5건)">
+            <SavedEntriesCard entries={SAVED_ENTRIES} />
+          </State>
+        </Section>
+
         <Section title="AmountDisplay">
           <State label={`큰 금액 + 빠른 더하기 (눌러 보기) · ${quickAmount.toLocaleString('ko-KR')}`}>
             <AmountDisplay label="얼마인가요?" value={quickAmount} onChange={setQuickAmount} />
@@ -549,6 +571,11 @@ export function Catalog() {
             </div>
             <div className="catalog__frame catalog__frame--short">
               <BottomActionBar label="사진으로 저장" onClick={noop} disabled />
+            </div>
+          </State>
+          <State label="보조 (연달아 적기 항목 고르기 단계 [다 적었어요])">
+            <div className="catalog__frame catalog__frame--short">
+              <BottomActionBar variant="secondary" label="다 적었어요" onClick={noop} />
             </div>
           </State>
           <State label="비활성 + 안내 (누를 수 없는 이유, 내역 적기 [저장])">

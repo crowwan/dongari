@@ -359,7 +359,7 @@ describe('SPEC-001 앱 뼈대', () => {
   })
 
   describe('내역 적기', () => {
-    it('AC-1 [+ 내역 적기] → 항목 고르기 → 금액 → [저장] 하면 장부가 그 달을 보여 주고 기록이 추가돼 있다', async () => {
+    it('AC-1 [+ 내역 적기] → 항목 고르기 → 금액 → [저장] → [다 적었어요] 하면 장부가 그 달을 보여 주고 기록이 추가돼 있다', async () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
 
       await openEntryForm()
@@ -368,6 +368,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(within(itemList()).getByRole('button', { name: '간식비 지출' }))
       await userEvent.type(screen.getByLabelText('얼마인가요?'), '58280')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
+      await userEvent.click(screen.getByRole('button', { name: '다 적었어요' }))
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('4월')
@@ -377,7 +378,7 @@ describe('SPEC-001 앱 뼈대', () => {
       ])
       // 300,000 − 58,280
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('241,720원')
-      expect(screen.getByRole('status')).toHaveTextContent('저장했어요')
+      expect(screen.getByRole('status')).toHaveTextContent('1건을 저장했어요')
       expect(repository.load().data.ledgers['2026']?.entries.at(-1)).toEqual({
         id: 'id-1',
         month: 4,
@@ -388,15 +389,16 @@ describe('SPEC-001 앱 뼈대', () => {
       })
     })
 
-    it('"저장했어요" 알림은 2초 뒤 사라진다', async () => {
+    it('"N건을 저장했어요" 알림은 2초 뒤 사라진다', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openEntryForm()
       await fillExpense('간식비', '5000')
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
       vi.useFakeTimers({ shouldAdvanceTime: true })
 
       try {
-        await userEvent.click(screen.getByRole('button', { name: '저장' }))
-        expect(await screen.findByText('저장했어요')).toBeInTheDocument()
+        await userEvent.click(screen.getByRole('button', { name: '다 적었어요' }))
+        expect(await screen.findByText('1건을 저장했어요')).toBeInTheDocument()
 
         act(() => {
           vi.advanceTimersByTime(2000)
@@ -445,7 +447,7 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(screen.getAllByTestId('answers-card-value').map((value) => value.textContent)).toEqual(['10월', '대관료 · 지출'])
     })
 
-    it('저장에 실패하면 "저장했어요" 알림 없이 위쪽 실패 안내만 보인다', async () => {
+    it('저장에 실패하면 장부로 돌아가 알림 없이 위쪽 실패 안내만 보인다', async () => {
       renderApp(alwaysFailing(storedWith(LEDGER_2026)))
       await openEntryForm()
       await fillExpense('간식비', '5000')
@@ -478,6 +480,139 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    })
+  })
+
+  describe('연달아 적기 (v2.1)', () => {
+    it('AC-19 [저장] 하면 장부에 저장되고, 장부로 돌아가지 않고 "무엇인가요?" 로 돌아가며 달은 방금 저장한 달이 이어진다', async () => {
+      const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await pickEntryMonth('10월', '4월')
+
+      await saveItem('간식비 지출', '5000')
+
+      expect(repository.load().data.ledgers['2026']?.entries.at(-1)).toMatchObject({ month: 4, name: '간식비', amount: 5_000 })
+      expect(screen.queryByTestId('ledger-screen')).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: '무엇인가요?' })).toHaveFocus()
+      expect(screen.getByTestId('entry-now')).toHaveTextContent('이어서 적을 것')
+      // 항목·금액은 비우고 달만 이어 쓴다
+      expect(screen.getAllByTestId('answers-card-value').map((value) => value.textContent)).toEqual(['4월'])
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    })
+
+    it('AC-20 저장할 때마다 "저장한 내역 N건" 카드에 줄이 쌓이고 방금 저장한 줄에 "방금" 이 붙는다. 4줄을 넘으면 최근 3줄만 보인다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+
+      await saveItem('대관료 지출', '40000')
+      await saveItem('회비 수입', '140000')
+
+      expect(savedRows()).toEqual(['대관료 −40,000원', '회비 방금 +140,000원'])
+
+      await saveItem('간식비 지출', '1000')
+      await saveItem('간식비 지출', '2000')
+      await saveItem('간식비 지출', '3000')
+
+      expect(screen.getByRole('region', { name: '저장한 내역 5건' })).toBeInTheDocument()
+      expect(savedRows()).toEqual(['간식비 −1,000원', '간식비 −2,000원', '간식비 방금 −3,000원'])
+    })
+
+    it('AC-21 [다 적었어요] 를 누르면 장부로 돌아가 마지막에 저장한 달을 보여 주고 "N건을 저장했어요" 알림이 뜬다', async () => {
+      const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await saveItem('대관료 지출', '40000')
+      await pickEntryMonth('10월', '5월')
+      await saveItem('간식비 지출', '5000')
+
+      await userEvent.click(screen.getByRole('button', { name: '다 적었어요' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('5월')
+      expect(screen.getByRole('status')).toHaveTextContent('2건을 저장했어요')
+      expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(4)
+    })
+
+    it('AC-21 뒤로 버튼이나 [← 장부로] 도 [다 적었어요] 와 같이 장부로 돌아가 알린다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await pickEntryMonth('10월', '6월')
+      await saveItem('대관료 지출', '40000')
+
+      pressBackButton()
+
+      expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('6월')
+      expect(screen.getByRole('status')).toHaveTextContent('1건을 저장했어요')
+
+      await openEntryForm()
+      await saveItem('대관료 지출', '40000')
+      await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent('1건을 저장했어요')
+    })
+
+    it('AC-21 다음 내역을 적던 중이면 버릴지 묻고, [버리기] 면 적던 한 건만 버리고 저장한 내역은 남는다', async () => {
+      const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await saveItem('대관료 지출', '40000')
+      await userEvent.click(within(itemList()).getByRole('button', { name: '간식비 지출' }))
+      await userEvent.type(screen.getByLabelText('얼마인가요?'), '5000')
+
+      pressBackButton()
+      await userEvent.click(within(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).getByRole('button', { name: '버리기' }))
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent('1건을 저장했어요')
+      expect(repository.load().data.ledgers['2026']?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '대관료'])
+    })
+
+    it('이어서 적는 중 달만 바꿔도 [다 적었어요] 에서 버릴지 묻는다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await saveItem('대관료 지출', '40000')
+
+      await pickEntryMonth('10월', '3월')
+      await userEvent.click(screen.getByRole('button', { name: '다 적었어요' }))
+
+      expect(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).toBeInTheDocument()
+    })
+
+    it('"저장한 내역" 카드는 이번에 들어와 저장한 것만 보인다 (다시 들어오면 빈 상태로 시작)', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await saveItem('대관료 지출', '40000')
+      await userEvent.click(screen.getByRole('button', { name: '다 적었어요' }))
+      await screen.findByTestId('ledger-screen')
+
+      await openEntryForm()
+
+      expect(screen.queryByTestId('saved-entries-card')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: '다 적었어요' })).not.toBeInTheDocument()
+      expect(screen.getByTestId('entry-now')).toHaveTextContent('지금 적을 것')
+    })
+
+    it('연달아 적는 중 저장에 실패하면 장부로 돌아가 저장 실패 안내를 보인다', async () => {
+      const repository = new MemoryRepository(storedWith(LEDGER_2026))
+      let failing = false
+      renderApp({
+        load: () => repository.load(),
+        save: (data) => (failing ? { ok: false, reason: 'quota-exceeded' } : repository.save(data)),
+        restore: (data) => repository.restore(data),
+      })
+      await openEntryForm()
+      await saveItem('대관료 지출', '40000')
+      await pickEntryMonth('10월', '8월')
+      failing = true
+
+      await saveItem('간식비 지출', '5000')
+
+      expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('8월')
+      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+      // 그 전에 저장한 내역은 그대로다
+      expect(repository.load().data.ledgers['2026']?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '대관료'])
     })
   })
 
@@ -770,6 +905,18 @@ async function fillExpense(name: string, amount: string) {
   await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
   await userEvent.click(screen.getByRole('button', { name: '다음' }))
   await userEvent.type(screen.getByLabelText('얼마인가요?'), amount)
+}
+
+// 내역 적기: 목록에서 항목을 골라 금액을 적고 [저장] 한다 (연달아 적기라 내역 적기 화면에 남는다)
+async function saveItem(item: string, amount: string) {
+  await userEvent.click(within(itemList()).getByRole('button', { name: item }))
+  await userEvent.type(screen.getByLabelText('얼마인가요?'), amount)
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+}
+
+// "저장한 내역" 카드에 보이는 줄
+function savedRows() {
+  return screen.getAllByTestId('saved-entries-card-row').map((row) => row.textContent)
 }
 
 // 내역 적기: "적은 내용" 카드 달 줄(지금 달 확인) [달 바꾸기] → 달 선택 창에서 고른다

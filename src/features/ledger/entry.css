@@ -16,9 +16,12 @@
   );
 }
 
-/* 하나씩 채우기에서 적은 것: 화면 제목 바로 아래 "적은 내용" 카드 (제목과는 묶음 안 간격) */
+/* 하나씩 채우기에서 적은 것: 화면 제목 바로 아래 ("저장한 내역" 카드 →) "적은 내용" 카드 (제목·카드 사이는 묶음 안 간격) */
 .entry__answers {
   margin-top: calc(var(--stack) - var(--group-gap));
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
 }
 
 /* 지금 질문 위 작은 표시 "지금 적을 것": 위 카드의 "적은 내용" 과 짝 (Caption Bold, 청록 글자) */
@@ -63,4 +66,9 @@
   margin-top: calc(var(--section-gap) - var(--group-gap));
   display: flex;
   flex-direction: column;
+}
+
+/* 이어서 적을 때 초점을 받는 질문 제목: 누르는 곳이 아니라 링은 그리지 않는다 (화면 읽기만 따라온다) */
+.entry__question:focus {
+  outline: none;
 }
