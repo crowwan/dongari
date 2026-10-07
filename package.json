@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist",
-    "deploy:preview": "npm run build:preview && gh-pages -d dist --dest preview --add",
+    "deploy:preview": "npm run build:preview && gh-pages -d dist --dest preview",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest"
