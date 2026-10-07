@@ -345,14 +345,13 @@ describe('SPEC-001 앱 뼈대', () => {
   })
 
   describe('내역 적기', () => {
-    it('AC-1 [+ 내역 적기] → 월·수입/지출·항목·금액 → [저장] 하면 장부가 그 달을 보여 주고 기록이 추가돼 있다', async () => {
+    it('AC-1 [+ 내역 적기] → 항목 고르기 → 금액 → [저장] 하면 장부가 그 달을 보여 주고 기록이 추가돼 있다', async () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
 
       await openEntryForm()
       expect(screen.queryByTestId('ledger-screen')).not.toBeInTheDocument()
-      await userEvent.click(screen.getByRole('button', { name: '4월' }))
-      await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
-      await userEvent.type(screen.getByLabelText('직접 적기'), '간식비')
+      await pickEntryMonth('10월', '4월')
+      await userEvent.click(within(itemList()).getByRole('button', { name: '간식비 지출' }))
       await userEvent.type(screen.getByLabelText('얼마인가요?'), '58280')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
@@ -395,29 +394,45 @@ describe('SPEC-001 앱 뼈대', () => {
       }
     })
 
-    it('AC-3 입력 화면의 월 기본값은 장부에서 보고 있던 달이다', async () => {
+    it('AC-3 내역 적기의 달 알약 기본값은 장부에서 보고 있던 달이다', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await stepBack(7)
 
       await openEntryForm()
 
-      expect(within(screen.getByRole('group', { name: '몇 월인가요?' })).getByRole('button', { name: '3월' })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      )
+      expect(screen.getAllByTestId('answer-chip').map((chip) => chip.textContent)).toEqual(['3월 고치기'])
     })
 
-    it('AC-4 한 번 이상 쓴 항목이 버튼으로 보이고, 누르면 이름과 그 항목의 수입/지출이 채워진다', async () => {
+    it('AC-4 한 번 이상 쓴 항목이 목록에 보이고, 누르면 이름과 그 항목의 수입/지출이 알약으로 쌓이고 금액 질문으로 넘어간다', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openEntryForm()
 
-      const choices = screen.getByRole('group', { name: '자주 쓴 항목' })
-      expect(within(choices).getAllByRole('button').map((button) => button.textContent)).toEqual(['대관료', '회비', '간식비'])
+      expect(
+        within(itemList())
+          .getAllByRole('button')
+          .map((button) => button.textContent),
+      ).toEqual(['대관료 지출', '회비 수입', '간식비 지출', '직접 적기'])
 
-      await userEvent.click(within(choices).getByRole('button', { name: '회비' }))
+      await userEvent.click(within(itemList()).getByRole('button', { name: '회비 수입' }))
 
-      expect(screen.getByLabelText('직접 적기')).toHaveValue('회비')
-      expect(within(typeGroup()).getByRole('button', { name: '수입' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getAllByTestId('answer-chip').map((chip) => chip.textContent)).toEqual([
+        '10월 고치기',
+        '수입 고치기',
+        '회비 고치기',
+      ])
+      expect(screen.getByRole('heading', { level: 2, name: '얼마인가요?' })).toBeInTheDocument()
+    })
+
+    it('AC-15 지난 연도에 쓴 이름도 예전에 쓴 이름이라 직접 적어도 수입/지출을 묻지 않는다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2025, { ...LEDGER_2026, entries: [] })))
+      await openEntryForm()
+
+      await userEvent.click(within(itemList()).getByRole('button', { name: '직접 적기' }))
+      await userEvent.type(screen.getByLabelText('직접 적기'), '대관료')
+      await userEvent.click(screen.getByRole('button', { name: '다음' }))
+
+      expect(screen.getByRole('heading', { level: 2, name: '얼마인가요?' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '지출 고치기' })).toBeInTheDocument()
     })
 
     it('저장에 실패하면 "저장했어요" 알림 없이 위쪽 실패 안내만 보인다', async () => {
@@ -464,8 +479,9 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(screen.getByRole('button', { name: /^대관료/ }))
 
       expect(screen.getByRole('heading', { level: 1, name: '내역 고치기' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: '4월' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: '4월 바꾸기' })).toBeInTheDocument()
       expect(within(typeGroup()).getByRole('button', { name: '지출' })).toHaveAttribute('aria-pressed', 'true')
+      expect(within(itemList()).getByRole('button', { name: '대관료 지출' })).toHaveAttribute('aria-pressed', 'true')
       expect(screen.getByLabelText('직접 적기')).toHaveValue('대관료')
       expect(screen.getByLabelText('얼마인가요?')).toHaveValue('40,000')
       expect(window.history.state).toEqual({ screen: 'edit-entry' })
@@ -496,7 +512,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await stepBack(6)
       await openEditForm('대관료')
 
-      await userEvent.click(screen.getByRole('button', { name: '3월' }))
+      await pickEditMonth('4월', '3월')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
@@ -509,7 +525,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await stepBack(6)
       await openEditForm('대관료')
 
-      await userEvent.click(screen.getByRole('button', { name: '3월' }))
+      await pickEditMonth('4월', '3월')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
@@ -585,7 +601,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: '아니요' }))
 
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-      expect(screen.getByLabelText('직접 적기')).toHaveValue('간식비')
+      expect(screen.getByLabelText('얼마인가요?')).toHaveValue('5,000')
 
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
       await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '버리기' }))
@@ -594,12 +610,50 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(2)
     })
 
+    it('내역 적기에서 처음 상태(달만 있음)면 뒤로 버튼에 묻지 않고 바로 닫는다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+
+      pressBackButton()
+
+      expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+
+    it('내역 적기에서 항목 하나만 골라도 [← 장부로] 에서 묻는다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+
+      await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
+      await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+
+      expect(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).toBeInTheDocument()
+    })
+
+    it('AC-12 달 선택 창이 열려 있으면 뒤로 버튼은 창만 닫고, 한 번 더 누르면 그때 버릴까요를 묻는다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
+      await userEvent.click(screen.getByRole('button', { name: '10월 고치기' }))
+      expect(window.history.state).toEqual({ screen: 'add-entry', sheet: 'entry-month' })
+
+      pressBackButton()
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: '내역 적기' })).toBeInTheDocument()
+
+      pressBackButton()
+
+      expect(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).toBeInTheDocument()
+    })
+
     it('고치기 화면에서 바꾼 것이 있어도 묻는다', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await stepBack(6)
       await openEditForm('대관료')
 
-      await userEvent.click(screen.getByRole('button', { name: '5월' }))
+      await pickEditMonth('4월', '5월')
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
       expect(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).toBeInTheDocument()
@@ -615,7 +669,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(screen.getByRole('heading', { level: 1, name: '내역 적기' })).toBeInTheDocument()
       await userEvent.click(within(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).getByRole('button', { name: '아니요' }))
-      expect(screen.getByLabelText('직접 적기')).toHaveValue('간식비')
+      expect(screen.getByLabelText('얼마인가요?')).toHaveValue('5,000')
 
       pressBackButton()
 
@@ -696,12 +750,28 @@ async function openEntryForm() {
 }
 
 const typeGroup = () => screen.getByRole('group', { name: '수입인가요, 지출인가요?' })
+const itemList = () => screen.getByRole('group', { name: '자주 쓴 항목' })
 
-// 보고 있던 달 그대로 지출 하나를 채운다
+// 보고 있던 달 그대로, 처음 쓰는 이름의 지출 하나를 하나씩 채운다 (직접 적기 → 지출 → 금액)
 async function fillExpense(name: string, amount: string) {
-  await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
+  await userEvent.click(within(itemList()).getByRole('button', { name: '직접 적기' }))
   await userEvent.type(screen.getByLabelText('직접 적기'), name)
+  await userEvent.click(screen.getByRole('button', { name: '다음' }))
+  await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
+  await userEvent.click(screen.getByRole('button', { name: '다음' }))
   await userEvent.type(screen.getByLabelText('얼마인가요?'), amount)
+}
+
+// 내역 적기: 달 알약 → 달 선택 창에서 고른다
+async function pickEntryMonth(current: string, next: string) {
+  await userEvent.click(screen.getByRole('button', { name: `${current} 고치기` }))
+  await userEvent.click(within(screen.getByRole('dialog', { name: '몇 월인가요?' })).getByRole('button', { name: next }))
+}
+
+// 내역 고치기: 몇 월 줄 [바꾸기] → 달 선택 창에서 고른다
+async function pickEditMonth(current: string, next: string) {
+  await userEvent.click(screen.getByRole('button', { name: `${current} 바꾸기` }))
+  await userEvent.click(within(screen.getByRole('dialog', { name: '몇 월인가요?' })).getByRole('button', { name: next }))
 }
 
 // 장부 → 설정 → 동아리 이름 편집 화면에서 이름 뒤에 글자를 붙여 저장한다 (설정 목록으로 돌아온다)

@@ -3,8 +3,9 @@ import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
 import { InstallBanner } from './features/install/InstallBanner'
-import { EntryForm } from './features/ledger/EntryForm'
-import { emptyDraft } from './features/ledger/entryDraft'
+import { useKeyboardInset } from './features/keyboard/keyboardInset'
+import { AddEntryForm } from './features/ledger/AddEntryForm'
+import { EditEntryForm } from './features/ledger/EditEntryForm'
 import { LedgerScreen } from './features/ledger/LedgerScreen'
 import { StartLedgerScreen } from './features/ledger/StartLedgerScreen'
 import { useLedger, type UseLedgerOptions } from './features/ledger/useLedger'
@@ -47,7 +48,13 @@ export default function App({ repository, loaded, options }: AppProps) {
     onSent: setToast,
   })
 
+  // 폰 키패드가 아래 고정 [저장] 을 가리지 않게 (#47)
+  useKeyboardInset()
+
   const month = viewedMonth ?? ledger.firstMonth
+  const today = now()
+  // 이번 달 (달 선택 창 테두리). 지난 연도 장부에는 없다
+  const currentMonth = ledger.year === today.getFullYear() ? today.getMonth() + 1 : undefined
   const { screen } = navigation
   // 고치는 기록. 다른 경로로 지워졌으면 undefined
   const editingEntry = screen.name === 'edit-entry' ? ledger.ledger?.entries.find((entry) => entry.id === screen.id) : undefined
@@ -143,10 +150,12 @@ export default function App({ repository, loaded, options }: AppProps) {
         )
       case 'add-entry':
         return (
-          <EntryForm
-            title="내역 적기"
-            initial={emptyDraft(screen.month)}
+          <AddEntryForm
+            month={screen.month}
+            currentMonth={currentMonth}
             frequentChoices={ledger.frequentChoices}
+            lastUsedType={ledger.lastUsedType}
+            sheets={navigation}
             onSave={(input) => returnToLedger(ledger.addEntry(input), '저장했어요', input.month)}
             onBack={navigation.requestBack}
             onDirtyChange={navigation.confirmBeforeLeave}
@@ -156,12 +165,13 @@ export default function App({ repository, loaded, options }: AppProps) {
         if (!editingEntry) return null
         const { id, month: entryMonth, type, name, amount } = editingEntry
         return (
-          <EntryForm
+          <EditEntryForm
             // 다른 기록을 고치러 오면 처음 값부터 다시
             key={id}
-            title="내역 고치기"
             initial={{ month: entryMonth, type, name, amount }}
+            currentMonth={currentMonth}
             frequentChoices={ledger.frequentChoices}
+            sheets={navigation}
             onSave={(input) => returnToLedger(ledger.updateEntry(id, input), '고쳤어요', input.month)}
             onBack={navigation.requestBack}
             onDirtyChange={navigation.confirmBeforeLeave}
@@ -176,7 +186,6 @@ export default function App({ repository, loaded, options }: AppProps) {
 
   function ledgerScreen(): ReactNode {
     const { year, totals } = ledger
-    const today = now()
     if (!ledger.ledger || !totals) {
       // 고른 연도 장부가 아직 없다. 연도를 바꿀 때마다 그 해 기본값으로 입력칸을 새로 채우고, 위쪽 [설정] 으로 지난 장부를 고를 수 있다
       return (
@@ -210,7 +219,7 @@ export default function App({ repository, loaded, options }: AppProps) {
           ledger={ledger.ledger}
           totals={totals}
           month={month}
-          currentMonth={year === today.getFullYear() ? today.getMonth() + 1 : undefined}
+          currentMonth={currentMonth}
           onChangeMonth={setViewedMonth}
           sheets={navigation}
           onOpenMonthSummary={(summaryMonth) => navigation.open({ name: 'month-summary', month: summaryMonth })}

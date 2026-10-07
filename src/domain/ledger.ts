@@ -131,6 +131,13 @@ export function frequentChoices(
   return [...byName.values()].slice(0, limit)
 }
 
+// 직접 적은 이름을 예전에 썼으면 그 이름을 마지막으로 쓴 기록의 종류, 처음 쓰는 이름이면 undefined (AC-15)
+// entries 는 오래된 것부터 입력 순
+export function lastUsedType(entries: readonly Entry[], name: string): EntryType | undefined {
+  const trimmed = name.trim()
+  return [...entries].reverse().find((entry) => entry.name === trimmed)?.type
+}
+
 function normalizeLedgerInfo(info: LedgerInfo): LedgerInfo {
   if (!Number.isInteger(info.carryover) || Math.abs(info.carryover) > ENTRY_AMOUNT_MAX) {
     throw new InvalidLedgerInputError(`이월금은 ±${ENTRY_AMOUNT_MAX} 이내 정수여야 한다: ${info.carryover}`)

@@ -15,11 +15,13 @@ type AmountDisplayProps = {
   // 원 단위 금액. 0 이면 빈칸
   value: number
   onChange: (value: number) => void
+  // 나타나자마자 금액 칸에 포커스 (하나씩 채우기의 "얼마인가요?" — 숫자 키패드가 바로 뜬다)
+  autoFocus?: boolean
 }
 
 // 금액 크게 보기 + 빠른 더하기: 흰 카드에 오른쪽 정렬 큰 숫자(잔액과 같은 Display) + 작은 "원", 아래 [+1만] [+5만] [+10만].
 // 숫자는 폰 숫자 키패드로 적고(inputmode numeric) 콤마는 저절로, 상한 999,999,999
-export function AmountDisplay({ label, value, onChange }: AmountDisplayProps) {
+export function AmountDisplay({ label, value, onChange, autoFocus }: AmountDisplayProps) {
   const inputId = useId()
 
   return (
@@ -34,6 +36,7 @@ export function AmountDisplay({ label, value, onChange }: AmountDisplayProps) {
           type="text"
           inputMode="numeric"
           autoComplete="off"
+          autoFocus={autoFocus}
           placeholder="0"
           value={formatMoney(value)}
           onChange={(event) => onChange(parseMoney(event.target.value))}
@@ -49,6 +52,8 @@ export function AmountDisplay({ label, value, onChange }: AmountDisplayProps) {
             type="button"
             className="ui-amount-display__add"
             aria-label={step.name}
+            // 눌러도 금액 칸 포커스를 뺏지 않는다: 키패드가 닫혔다 열리며 화면이 흔들리지 않게
+            onMouseDown={(event) => event.preventDefault()}
             onClick={() => onChange(addAmount(value, step.amount))}
           >
             {step.label}
