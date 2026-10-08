@@ -1,10 +1,14 @@
 import { useState, type ReactNode } from 'react'
 import { itemIcon } from '../domain/itemIcon'
+import { yearReport } from '../domain/report'
 import type { EntryType } from '../domain/types'
 import { InstallGuide } from '../features/install/InstallGuide'
 import { CarryoverField } from '../features/ledger/CarryoverField'
 import { tidyDayText } from '../features/ledger/entryDraft'
+import { ItemTotalsCards } from '../features/report/ItemTotalsCards'
 import { SavePictureBar } from '../features/report/SavePictureBar'
+import { ItemTotalsTable } from '../features/report/sheet/ItemTotalsTable'
+import { sheetPaper } from '../features/report/sheet/sheetStyles'
 import { AmountDisplay } from '../ui/AmountDisplay'
 import { AmountText } from '../ui/AmountText'
 import { BalanceCard } from '../ui/BalanceCard'
@@ -54,6 +58,8 @@ const COLOR_TOKENS = [
   '--accent-ink',
   '--income-amount',
   '--expense-amount',
+  '--income-bar',
+  '--expense-bar',
   '--danger',
   '--on-danger',
   '--warn-bg',
@@ -115,6 +121,40 @@ const SAVED_ENTRIES: SavedEntry[] = [
   { name: '간식비', type: 'expense', amount: 28_340 },
   { name: '행사지원금', type: 'income', amount: 300_000 },
 ]
+
+// 올해 결산 항목별 합계 (#84): [월, 종류, 이름, 금액] 기록에서 yearReport 로 계산
+type ItemSpec = readonly [number, EntryType, string, number]
+
+function itemReport(specs: readonly ItemSpec[]) {
+  const entries = specs.map(([month, type, name, amount], index) => ({
+    id: `c${index}`,
+    month,
+    type,
+    name,
+    amount,
+    createdAt: `2026-01-01T00:00:${String(index).padStart(2, '0')}.000Z`,
+  }))
+  return yearReport({ year: 2026, clubName: '한랑드림', carryover: 370_482, entries })
+}
+
+const ITEM_REPORT = itemReport([
+  [1, 'income', '회비(14인)', 1_490_000],
+  [2, 'income', '회비(14인)', 140_000],
+  [5, 'income', '행사지원금', 145_050],
+  [6, 'income', '예금이자', 2_153],
+  [1, 'expense', '대관료', 360_000],
+  [12, 'expense', '대관료', 40_000],
+  [3, 'expense', '간식비', 60_240],
+  [10, 'expense', '야유회', 627_230],
+  [11, 'expense', '행사비', 400_000],
+  [12, 'expense', '송년회', 410_600],
+  [9, 'expense', '스승의 날 선생님 꽃다발과 카드 값', 58_000],
+])
+
+const EXPENSE_ONLY_REPORT = itemReport([
+  [1, 'expense', '대관료', 40_000],
+  [2, 'expense', '간식비', 28_340],
+])
 
 const noop = () => {}
 
@@ -695,6 +735,25 @@ export function Catalog() {
           <State label="사진 준비됨 → 한 번 더 누르기">
             <div className="catalog__frame catalog__frame--note">
               <SavePictureBar saving={false} ready sharesToPhotos onSave={noop} />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="ItemTotalsCards (올해 결산 [항목별 합계], #84)">
+          <State label="수입·지출 카드 (금액 큰 순, 긴 이름 줄바꿈, 아주 작은 비율도 최소 막대)">
+            <ItemTotalsCards report={ITEM_REPORT} />
+          </State>
+          <State label="수입 없음 → 올해 적은 수입이 없어요">
+            <ItemTotalsCards report={EXPENSE_ONLY_REPORT} />
+          </State>
+          <State label="결산표 항목별 합계 표 (인라인 hex 양식, 360px)">
+            <div style={sheetPaper}>
+              <ItemTotalsTable
+                incomeItems={ITEM_REPORT.incomeItems}
+                expenseItems={ITEM_REPORT.expenseItems}
+                income={ITEM_REPORT.totals.income}
+                expense={ITEM_REPORT.totals.expense}
+              />
             </div>
           </State>
         </Section>

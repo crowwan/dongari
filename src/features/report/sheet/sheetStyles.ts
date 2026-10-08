@@ -19,6 +19,18 @@ export const SHEET_WIDTH = 360
 
 export const SHEET_LINE = `1px solid ${SHEET_COLOR.line}`
 
+// 양식 종이: 흰 바탕·검정 글자, 글자 크기·여백은 v1 양식 그대로 (디자인 카탈로그도 표를 이 종이 위에 놓고 본다)
+export const sheetPaper: CSSProperties = {
+  boxSizing: 'border-box',
+  width: `${SHEET_WIDTH}px`,
+  padding: '16px',
+  backgroundColor: SHEET_COLOR.paper,
+  color: SHEET_COLOR.ink,
+  fontFamily: 'system-ui, -apple-system, sans-serif',
+  lineHeight: 1.5,
+  letterSpacing: 'normal',
+}
+
 // 표는 칸마다 오른쪽·아래 선만 긋고 표가 위·왼쪽 선을 긋는다.
 // (border-collapse 를 쓰면 html2canvas 가 이웃 칸 선을 겹쳐 두 겹으로 그려서 v1 사진의 선이 굵고 어긋났다)
 export const sheetTable: CSSProperties = {

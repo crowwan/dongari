@@ -14,6 +14,11 @@
   );
 }
 
+/* 올해 결산 [항목별 합계] 는 아래 고정 버튼이 없어 그만큼 띄우지 않는다 (앱 내용 칸 아래 여백만) */
+.report[data-view='items'] {
+  padding-bottom: 0;
+}
+
 /* 화면 제목("2026년 9월 정리", "2026년 결산"): 가장 강한 글자색 */
 .report .screen__title {
   color: var(--strong);
@@ -150,4 +155,120 @@
 /* 사진은 늘 원래 크기로 그린다 */
 .year-fit__target[data-capturing] {
   transform: none;
+}
+
+/* ---------- 올해 결산 [항목별 합계]: 수입 카드·지출 카드 (v2.3, 사진으로 저장하지 않는다) ---------- */
+
+.item-totals-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
+}
+
+.item-totals {
+  padding: var(--card-pad-block) var(--card-pad-inline);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 카드 머리: "수입"/"지출"(카드 제목 Heading) ··· 그해 합계(같은 크기 Bold, 수입은 수입 금액색) */
+.item-totals__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.item-totals__title {
+  margin: 0;
+  color: var(--strong);
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
+  line-height: var(--line-tight);
+}
+
+.item-totals__total {
+  white-space: nowrap;
+  color: var(--expense-amount);
+  font-size: var(--text-heading-size);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+  letter-spacing: var(--letter-number);
+}
+
+.item-totals[data-kind='income'] .item-totals__total {
+  color: var(--income-amount);
+}
+
+.item-totals__empty {
+  margin: 0;
+  padding: var(--space-2) 0;
+  color: var(--muted);
+}
+
+.item-totals__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item-totals__row {
+  padding: var(--space-3) 0;
+}
+
+.item-totals__row:last-child {
+  padding-bottom: 0;
+}
+
+/* 이름(줄 이름 SemiBold) + 작은 "N건"(Caption) ··· 금액(Bold). 긴 이름은 줄을 바꾸고 금액은 한 줄 */
+.item-totals__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  line-height: var(--line-tight);
+}
+
+.item-totals__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--strong);
+  font-size: var(--text-row-size);
+  font-weight: var(--text-row-weight);
+}
+
+.item-totals__count {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+}
+
+.item-totals__amount {
+  flex: none;
+  margin-left: auto;
+  padding-left: var(--space-2);
+  white-space: nowrap;
+  color: var(--strong);
+  font-weight: var(--weight-bold);
+}
+
+/* 비율 막대: 회색 홈 안에 그해 합계 대비 길이. 아주 작은 비율도 보이게 최소 굵기만큼 */
+.item-totals__track {
+  height: var(--bar-thickness);
+  margin-top: var(--space-2);
+  border-radius: var(--corner-pill);
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.item-totals__bar {
+  min-width: var(--bar-thickness);
+  height: 100%;
+  border-radius: var(--corner-pill);
+  background: var(--expense-bar);
+}
+
+.item-totals[data-kind='income'] .item-totals__bar {
+  background: var(--income-bar);
 }

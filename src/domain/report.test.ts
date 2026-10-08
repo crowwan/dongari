@@ -69,31 +69,80 @@ describe('SPEC-003 올해 결산 계산', () => {
     })
   })
 
-  describe('수입내역 (AC-2)', () => {
-    it('같은 이름의 수입 기록은 한 줄로 합치고, 처음 등장한 순서대로 둔다', () => {
+  describe('항목별 합계 (AC-2)', () => {
+    it('수입·지출 각각 이름이 똑같은 기록끼리 한 줄로 합치고 건수를 센다', () => {
       const report = yearReport(
         ledger([
-          [3, 'income', '행사지원금', 30_000],
           [1, 'income', '회비', 100_000],
           [2, 'expense', '회비', 999],
-          [4, 'income', '행사지원금', 15_050],
-          [5, 'income', '예금이자', 2_153],
-          [6, 'income', '회비', 40_000],
+          [3, 'income', '행사지원금', 30_000],
+          [4, 'income', '회비', 40_000],
+          [5, 'expense', '대관료', 40_000],
+          [6, 'expense', '대관료', 40_000],
         ]),
       )
 
       expect(report.incomeItems).toEqual([
-        { name: '행사지원금', amount: 45_050 },
-        { name: '회비', amount: 140_000 },
-        { name: '예금이자', amount: 2_153 },
+        { name: '회비', amount: 140_000, count: 2 },
+        { name: '행사지원금', amount: 30_000, count: 1 },
+      ])
+      expect(report.expenseItems).toEqual([
+        { name: '대관료', amount: 80_000, count: 2 },
+        { name: '회비', amount: 999, count: 1 },
       ])
     })
 
-    it('수입내역 합계는 연간 수입 합계와 같다', () => {
+    it('띄어쓰기·괄호까지 똑같아야 합친다 ("간식비(8월)" 과 "간식비", "간식 비" 는 다른 줄)', () => {
+      const report = yearReport(
+        ledger([
+          [1, 'expense', '간식비', 30_000],
+          [2, 'expense', '간식비(8월)', 20_000],
+          [3, 'expense', '간식 비', 10_000],
+          [4, 'expense', '간식비', 5_000],
+        ]),
+      )
+
+      expect(report.expenseItems).toEqual([
+        { name: '간식비', amount: 35_000, count: 2 },
+        { name: '간식비(8월)', amount: 20_000, count: 1 },
+        { name: '간식 비', amount: 10_000, count: 1 },
+      ])
+    })
+
+    it('합친 금액이 큰 순으로 둔다', () => {
+      const report = yearReport(
+        ledger([
+          [1, 'income', '예금이자', 2_000],
+          [2, 'income', '회비', 50_000],
+          [3, 'income', '행사지원금', 30_000],
+          [4, 'income', '예금이자', 100_000],
+        ]),
+      )
+
+      expect(report.incomeItems.map((item) => item.name)).toEqual(['예금이자', '회비', '행사지원금'])
+    })
+
+    it('금액이 같으면 그해 먼저 나온(이른 달·날) 항목이 앞이다. 적은 순서가 아니라 날짜로 본다', () => {
+      const dated = withDays(
+        ledger([
+          [5, 'expense', '행사비', 40_000],
+          [2, 'expense', '대관료', 40_000],
+          [5, 'expense', '꽃값', 40_000],
+          [5, 'expense', '회식', 40_000],
+        ]),
+        [20, 3, 10, undefined],
+      )
+
+      // 2월 대관료 → 5월 10일 꽃값 → 5월 20일 행사비 → 날짜 없는 5월 회식
+      expect(yearReport(dated).expenseItems.map((item) => item.name)).toEqual(['대관료', '꽃값', '행사비', '회식'])
+    })
+
+    it('수입·지출 각 쪽 합이 연간 수입·지출 합계와 같다', () => {
       const report = yearReport(ledger(V1_EXAMPLE_YEAR))
 
-      const itemsTotal = report.incomeItems.reduce((sum, item) => sum + item.amount, 0)
-      expect(itemsTotal).toBe(report.totals.income)
+      const sum = (items: readonly { amount: number }[]) => items.reduce((total, item) => total + item.amount, 0)
+      expect(sum(report.incomeItems)).toBe(report.totals.income)
+      expect(sum(report.expenseItems)).toBe(report.totals.expense)
     })
   })
 
@@ -116,9 +165,19 @@ describe('SPEC-003 올해 결산 계산', () => {
       expect(report.months[1]).toEqual({ month: 2, income: 390_000, expense: 71_900 })
       expect(report.months[11]).toEqual({ month: 12, income: 160_021, expense: 450_600 })
       expect(report.incomeItems).toEqual([
-        { name: '회비(14인)', amount: 1_630_000 },
-        { name: '행사지원금', amount: 145_050 },
-        { name: '예금이자', amount: 2_153 },
+        { name: '회비(14인)', amount: 1_630_000, count: 10 },
+        { name: '행사지원금', amount: 145_050, count: 2 },
+        { name: '예금이자', amount: 2_153, count: 2 },
+      ])
+      // 대관료(1월)와 행사비(11월)는 400,000 으로 같아 그해 먼저 나온 대관료가 앞
+      expect(report.expenseItems).toEqual([
+        { name: '야유회', amount: 627_230, count: 1 },
+        { name: '송년회', amount: 410_600, count: 1 },
+        { name: '대관료', amount: 400_000, count: 10 },
+        { name: '행사비', amount: 400_000, count: 1 },
+        { name: '간식비', amount: 60_240, count: 2 },
+        { name: '간식비(2건)', amount: 58_280, count: 1 },
+        { name: '간식비(8월)', amount: 38_430, count: 1 },
       ])
       expect(rightSide(report.expenseRows).slice(0, 3)).toEqual([
         '7월|대관료|40000',
@@ -243,12 +302,13 @@ describe('SPEC-003 올해 결산 계산', () => {
   })
 
   describe('경계', () => {
-    it('기록이 없는 장부는 모든 달이 0 이고, 지출표는 달마다 빈 한 줄씩 6줄, 수입내역은 비어 있고 잔액은 이월금이다', () => {
+    it('기록이 없는 장부는 모든 달이 0 이고, 지출표는 달마다 빈 한 줄씩 6줄, 항목별 합계는 비어 있고 잔액은 이월금이다', () => {
       const report = yearReport(ledger([]))
 
       expect(report.months.every((month) => month.income === 0 && month.expense === 0)).toBe(true)
       expect(report.totals).toEqual({ income: 0, expense: 0, balance: 370_482 })
       expect(report.incomeItems).toEqual([])
+      expect(report.expenseItems).toEqual([])
       expect(leftSide(report.expenseRows)).toEqual(['1월||', '2월||', '3월||', '4월||', '5월||', '6월||'])
       expect(rightSide(report.expenseRows)).toEqual(['7월||', '8월||', '9월||', '10월||', '11월||', '12월||'])
     })
