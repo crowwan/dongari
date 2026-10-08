@@ -11,11 +11,11 @@ import {
   lastUsedType,
   monthGroup,
   newLedgerDefaults,
+  updateCarryover,
   updateEntry,
-  updateLedgerInfo,
   type EntryInput,
 } from './ledger'
-import type { Entry, Ledger } from './types'
+import type { Book, Entry, Ledger } from './types'
 
 const NOW = new Date('2026-10-03T09:00:00.000Z')
 
@@ -31,7 +31,17 @@ function entry(overrides: Partial<Entry> & Pick<Entry, 'id'>): Entry {
 }
 
 function ledger(overrides: Partial<Ledger> = {}): Ledger {
-  return { year: 2026, clubName: '꽃동산 동아리', carryover: 100_000, entries: [], ...overrides }
+  return { year: 2026, carryover: 100_000, entries: [], ...overrides }
+}
+
+function bookWith(name: string, ...ledgers: Ledger[]): Book {
+  return {
+    id: 'book-1',
+    name,
+    kind: 'club',
+    ledgers: Object.fromEntries(ledgers.map((item) => [String(item.year), item])),
+    createdAt: '2025-01-01T00:00:00.000Z',
+  }
 }
 
 // id·시각을 고정해 결과를 예측할 수 있게 한다
@@ -372,38 +382,32 @@ describe('SPEC-001 장부 계산', () => {
   })
 
   describe('장부 만들기', () => {
-    it('동아리 이름과 이월금으로 빈 장부를 만든다', () => {
-      expect(createLedger(2026, { clubName: ' 꽃동산 ', carryover: -3_000 })).toEqual({
-        year: 2026,
-        clubName: '꽃동산',
-        carryover: -3_000,
-        entries: [],
-      })
+    it('이월금으로 그 해 빈 장부를 만든다', () => {
+      expect(createLedger(2026, -3_000)).toEqual({ year: 2026, carryover: -3_000, entries: [] })
     })
 
     it.each([
-      ['이월금 소수', { clubName: '꽃동산', carryover: 0.5 }],
-      ['이월금 숫자 아님', { clubName: '꽃동산', carryover: Number.NaN }],
-      ['이월금 상한 초과', { clubName: '꽃동산', carryover: 1_000_000_000 }],
-      ['이월금 하한 초과', { clubName: '꽃동산', carryover: -1_000_000_000 }],
-    ])('%s 이면 거부한다', (_label, info) => {
-      expect(() => createLedger(2026, info)).toThrow(InvalidLedgerInputError)
-      expect(() => updateLedgerInfo(ledger(), info)).toThrow(InvalidLedgerInputError)
+      ['이월금 소수', 0.5],
+      ['이월금 숫자 아님', Number.NaN],
+      ['이월금 상한 초과', 1_000_000_000],
+      ['이월금 하한 초과', -1_000_000_000],
+    ])('%s 이면 거부한다', (_label, carryover) => {
+      expect(() => createLedger(2026, carryover)).toThrow(InvalidLedgerInputError)
+      expect(() => updateCarryover(ledger(), carryover)).toThrow(InvalidLedgerInputError)
     })
 
-    it('동아리 정보를 고치면 기록은 그대로 두고 이름·이월금만 바뀐다', () => {
+    it('이월금을 고치면 기록은 그대로 두고 이월금만 바뀐다', () => {
       const before = ledger({ entries: [entry({ id: 'a' })] })
 
-      const next = updateLedgerInfo(before, { clubName: '한랑드림', carryover: 5_000 })
+      const next = updateCarryover(before, 5_000)
 
-      expect(next).toEqual({ ...before, clubName: '한랑드림', carryover: 5_000 })
-      expect(before.clubName).toBe('꽃동산 동아리')
+      expect(next).toEqual({ ...before, carryover: 5_000 })
+      expect(before.carryover).toBe(100_000)
     })
 
-    it('AC-8 새 연도 장부의 이월금 기본값은 전년도 잔액이고 동아리 이름도 이어받는다', () => {
+    it('AC-8 새 연도 장부의 이월금 기본값은 전년도 잔액이고 장부 이름도 이어받는다', () => {
       const lastYear = ledger({
         year: 2025,
-        clubName: '한랑드림',
         carryover: 10_000,
         entries: [
           entry({ id: 'a', type: 'income', name: '회비', amount: 200_000 }),
@@ -411,17 +415,17 @@ describe('SPEC-001 장부 계산', () => {
         ],
       })
 
-      expect(newLedgerDefaults({ '2025': lastYear }, 2026)).toEqual({ clubName: '한랑드림', carryover: 152_905 })
+      expect(newLedgerDefaults(bookWith('한랑드림', lastYear), 2026)).toEqual({ name: '한랑드림', carryover: 152_905 })
     })
 
-    it('전년도 장부가 없으면 이월금은 0, 이름은 가장 가까운 연도 장부에서 가져온다', () => {
-      const ledgers = { '2023': ledger({ year: 2023, clubName: '옛이름' }), '2024': ledger({ year: 2024, clubName: '한랑드림' }) }
+    it('전년도 장부가 없으면 이월금은 0 이다', () => {
+      const book = bookWith('한랑드림', ledger({ year: 2023 }), ledger({ year: 2024 }))
 
-      expect(newLedgerDefaults(ledgers, 2026)).toEqual({ clubName: '한랑드림', carryover: 0 })
+      expect(newLedgerDefaults(book, 2026)).toEqual({ name: '한랑드림', carryover: 0 })
     })
 
     it('장부가 하나도 없으면 빈 이름과 이월금 0 이다', () => {
-      expect(newLedgerDefaults({}, 2026)).toEqual({ clubName: '', carryover: 0 })
+      expect(newLedgerDefaults(undefined, 2026)).toEqual({ name: '', carryover: 0 })
     })
   })
 })

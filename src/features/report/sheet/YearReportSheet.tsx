@@ -19,14 +19,15 @@ const styles = {
   expenseTotal: { textAlign: 'right', fontSize: '11px', fontWeight: 'bold', marginTop: '8px' },
 } satisfies Record<string, CSSProperties>
 
-// 올해 결산 양식 한 장 (v1 연말 양식, PLANS.md 6장. v1 수입내역 목록 자리는 항목별 합계 표, v2.3). 값은 domain/report.ts yearReport 가 다 계산해 온다
-export function YearReportSheet({ report }: { report: YearReport }) {
-  const { year, clubName, carryover, months, totals, expenseRows, incomeItems, expenseItems } = report
+// 올해 결산 양식 한 장 (v1 연말 양식, PLANS.md 6장. v1 수입내역 목록 자리는 항목별 합계 표, v2.3). 값은 domain/report.ts yearReport 가 다 계산해 온다.
+// 제목의 이름은 장부 이름 (SPEC-005)
+export function YearReportSheet({ report, bookName }: { report: YearReport; bookName: string }) {
+  const { year, carryover, months, totals, expenseRows, incomeItems, expenseItems } = report
   return (
     <div style={styles.paper} data-testid="year-report-sheet">
       <section style={styles.section}>
         <h2 style={styles.title}>
-          &lt;{year}년 {clubName} 수입 지출 내역&gt;
+          &lt;{year}년 {bookName} 수입 지출 내역&gt;
         </h2>
         <div style={styles.top}>
           <div style={styles.monthTable}>
@@ -40,7 +41,7 @@ export function YearReportSheet({ report }: { report: YearReport }) {
 
       <section style={styles.section}>
         <h2 style={styles.title}>
-          &lt;{year}년 {clubName} 지출내역&gt;
+          &lt;{year}년 {bookName} 지출내역&gt;
         </h2>
         <ExpenseDetailTable rows={expenseRows} />
         <div style={styles.expenseTotal} data-testid="year-expense-total">
@@ -50,7 +51,7 @@ export function YearReportSheet({ report }: { report: YearReport }) {
 
       <section>
         <h2 style={styles.title}>
-          &lt;{year}년 {clubName} 항목별 합계&gt;
+          &lt;{year}년 {bookName} 항목별 합계&gt;
         </h2>
         <ItemTotalsTable incomeItems={incomeItems} expenseItems={expenseItems} income={totals.income} expense={totals.expense} />
       </section>

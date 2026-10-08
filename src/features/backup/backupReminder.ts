@@ -37,10 +37,10 @@ export function needsBackupReminder({ lastBackupAt, lastChangedAt, firstRecorded
   return now.getTime() - since >= REMINDER_MS
 }
 
-// 모든 장부 기록 중 가장 이른 입력 시각 (깨진 시각은 건너뛴다). 기록이 없으면 undefined
+// 모든 장부(SPEC-005 장부 여러 개 포함) 기록 중 가장 이른 입력 시각 (깨진 시각은 건너뛴다). 기록이 없으면 undefined
 export function firstRecordedAt(data: StoredData): string | undefined {
   let first: { at: string; time: number } | undefined
-  for (const ledger of Object.values(data.ledgers)) {
+  for (const ledger of data.books.flatMap((book) => Object.values(book.ledgers))) {
     for (const entry of ledger.entries) {
       const time = toTime(entry.createdAt)
       if (time !== undefined && (first === undefined || time < first.time)) first = { at: entry.createdAt, time }

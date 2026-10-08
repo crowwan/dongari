@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { StoredData } from '../../domain/types'
+import type { Ledger, StoredData } from '../../domain/types'
 import { createBackup, readBackup } from '../../storage/backup'
 import { createEmptyData } from '../../storage/schema'
+import { book, storedWith } from '../../test/ledgerFixtures'
 import { BACKUP_REMINDER_DAYS, backupReminderFor, firstRecordedAt, lastBackupText, needsBackupReminder } from './backupReminder'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -61,35 +62,29 @@ describe('SPEC-002 백업 안내 규칙 (needsBackupReminder)', () => {
 
 describe('SPEC-002 저장 데이터로 백업 안내 판단', () => {
   function dataWith(settings: StoredData['settings'], createdAts: string[]): StoredData {
-    return {
-      ...createEmptyData(),
-      settings,
-      ledgers: {
-        '2026': {
-          year: 2026,
-          clubName: '꽃동산',
-          carryover: 0,
-          entries: createdAts.map((createdAt, index) => ({
-            id: String(index),
-            month: 9,
-            type: 'income',
-            name: '회비',
-            amount: 1000,
-            createdAt,
-          })),
-        },
-      },
+    const ledger: Ledger = {
+      year: 2026,
+      carryover: 0,
+      entries: createdAts.map((createdAt, index) => ({
+        id: String(index),
+        month: 9,
+        type: 'income',
+        name: '회비',
+        amount: 1000,
+        createdAt,
+      })),
     }
+    return { ...storedWith(ledger), settings }
   }
 
-  it('처음 기록한 시각은 모든 장부 기록 중 가장 이른 입력 시각이다 (깨진 시각은 건너뛴다)', () => {
+  it('처음 기록한 시각은 모든 장부(SPEC-005 다른 장부 포함)의 기록 중 가장 이른 입력 시각이다 (깨진 시각은 건너뛴다)', () => {
     const data = dataWith({}, ['2026-09-05T00:00:00.000Z', '깨짐', '2026-09-02T00:00:00.000Z'])
-    data.ledgers['2025'] = {
+    const lastYear: Ledger = {
       year: 2025,
-      clubName: '꽃동산',
       carryover: 0,
       entries: [{ id: 'old', month: 1, type: 'expense', name: '간식비', amount: 1, createdAt: '2025-01-03T00:00:00.000Z' }],
     }
+    data.books.push(book([lastYear], { id: 'home', kind: 'household' }))
     expect(firstRecordedAt(data)).toBe('2025-01-03T00:00:00.000Z')
     expect(firstRecordedAt(createEmptyData())).toBeUndefined()
   })

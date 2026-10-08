@@ -12,6 +12,7 @@ import { useSavePicture } from './useSavePicture'
 import './report.css'
 
 type YearSummaryScreenProps = {
+  bookName: string // 결산표 제목의 장부 이름 (SPEC-005)
   year: number
   // 고른 연도 장부. 아직 없으면 기록 없음과 같다
   ledger: Ledger | undefined
@@ -66,7 +67,7 @@ function FitToWidth({ targetRef, children }: { targetRef: RefObject<HTMLDivEleme
 // 결산표 = v1 연말 양식 한 장을 화면 폭에 맞춰 보이고 아래 고정 [사진으로 저장], 항목별 합계 = 수입·지출 카드(저장 버튼 없음, AC-10).
 // 전환은 화면 안 상태라 방문 기록에 쌓지 않는다 — 안드로이드 뒤로 버튼은 어느 쪽에서든 바로 장부로.
 // 기록이 없으면 전환 없이 안내만, 저장 비활성 (AC-5)
-export function YearSummaryScreen({ year, ledger, onBack, onNotify, saver = pictureSaver }: YearSummaryScreenProps) {
+export function YearSummaryScreen({ bookName, year, ledger, onBack, onNotify, saver = pictureSaver }: YearSummaryScreenProps) {
   const { targetRef, saving, ready, sharesToPhotos, save } = useSavePicture({ fileName: yearPictureName(year), saver, onNotify })
   const [view, setView] = useState<YearView>('sheet')
   // 기록이 하나라도 있어야 결산을 만든다
@@ -84,7 +85,7 @@ export function YearSummaryScreen({ year, ledger, onBack, onNotify, saver = pict
             <>
               <p className="screen__note">두 손가락으로 벌리면 크게 볼 수 있어요</p>
               <FitToWidth targetRef={targetRef}>
-                <YearReportSheet report={report} />
+                <YearReportSheet report={report} bookName={bookName} />
               </FitToWidth>
             </>
           ) : (

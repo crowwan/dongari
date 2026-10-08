@@ -25,6 +25,7 @@ const YEAR_SHEET = 'settings-year'
 const INSTALL_GUIDE_SHEET = 'settings-install-guide'
 
 type SettingsScreenProps = {
+  bookName: string // 지금 장부 이름 (SPEC-005, 화면 글자는 #88 전까지 "동아리 이름")
   year: number
   yearChoices: number[] // 장부가 있는 연도 + 올해, 최신 순
   ledger: Ledger | undefined // 고른 연도 장부. 아직 없으면 undefined
@@ -50,6 +51,7 @@ function carryoverText(carryover: number): string {
 // 설정 (SPEC-001 화면 구성, SPEC-002 백업): 묶음 제목 + 아이콘·이름·값·화살표 줄 목록.
 // 이름·이월금 줄은 그 값 하나만 고치는 편집 화면을, 연도 줄은 선택 창을 연다
 export function SettingsScreen({
+  bookName,
   year,
   yearChoices,
   ledger,
@@ -68,9 +70,9 @@ export function SettingsScreen({
   if (ledger && sheets.sheet === CLUB_NAME_PAGE) {
     return (
       <ClubNameEdit
-        ledger={ledger}
-        onSave={(clubName) => {
-          onSaveClubInfo({ clubName, carryover: ledger.carryover })
+        name={bookName}
+        onSave={(name) => {
+          onSaveClubInfo({ name, carryover: ledger.carryover })
           sheets.closeSheet()
         }}
         onBack={sheets.closeSheet}
@@ -82,7 +84,7 @@ export function SettingsScreen({
       <CarryoverEdit
         ledger={ledger}
         onSave={(carryover) => {
-          onSaveClubInfo({ clubName: ledger.clubName, carryover })
+          onSaveClubInfo({ name: bookName, carryover })
           sheets.closeSheet()
         }}
         onBack={sheets.closeSheet}
@@ -101,7 +103,7 @@ export function SettingsScreen({
       <SettingsGroup title="동아리">
         {ledger ? (
           <>
-            <SettingRow icon="users" title="동아리 이름" value={ledger.clubName} onClick={() => sheets.openSheet(CLUB_NAME_PAGE)} />
+            <SettingRow icon="users" title="동아리 이름" value={bookName} onClick={() => sheets.openSheet(CLUB_NAME_PAGE)} />
             <SettingRow
               icon="bank"
               title="작년 이월금"
@@ -223,10 +225,10 @@ function EditPage({ title, canSave, onSave, onBack, children }: EditPageProps) {
   )
 }
 
-function ClubNameEdit({ ledger, onSave, onBack }: { ledger: Ledger; onSave: (clubName: string) => void; onBack: () => void }) {
-  const [clubName, setClubName] = useState(ledger.clubName)
+function ClubNameEdit({ name, onSave, onBack }: { name: string; onSave: (name: string) => void; onBack: () => void }) {
+  const [clubName, setClubName] = useState(name)
   const missingName = clubName.trim() === ''
-  const changed = clubName.trim() !== ledger.clubName
+  const changed = clubName.trim() !== name
 
   return (
     <EditPage title="동아리 이름 바꾸기" canSave={!missingName && changed} onSave={() => onSave(clubName)} onBack={onBack}>

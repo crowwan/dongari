@@ -8,7 +8,7 @@ import { createInstallPromptStore, type InstallPromptStore } from '../install/in
 import { useScreenHistory } from '../useScreenHistory'
 import { SettingsScreen } from './SettingsScreen'
 
-const LEDGER: Ledger = { year: 2026, clubName: '한랑드림', carryover: 370_482, entries: [] }
+const LEDGER: Ledger = { year: 2026, carryover: 370_482, entries: [] }
 
 type Handlers = {
   onChangeYear?: (year: number) => void
@@ -40,6 +40,7 @@ function Harness({ ledger = LEDGER, needsBackup = false, lastBackupAt, handlers 
   const [installPrompt] = useState(() => install.installPrompt ?? createInstallPromptStore(new EventTarget()))
   return (
     <SettingsScreen
+      bookName="한랑드림"
       year={2026}
       yearChoices={[2026, 2025]}
       ledger={ledger ?? undefined}
@@ -147,7 +148,7 @@ describe('SPEC-001·002 설정 화면', () => {
       await userEvent.type(name, '꽃동산')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
-      expect(onSaveClubInfo).toHaveBeenCalledWith({ clubName: '꽃동산', carryover: 370_482 })
+      expect(onSaveClubInfo).toHaveBeenCalledWith({ name: '꽃동산', carryover: 370_482 })
       expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
     })
 
@@ -171,7 +172,7 @@ describe('SPEC-001·002 설정 화면', () => {
       await userEvent.click(screen.getByRole('button', { name: '적자였어요' }))
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
-      expect(onSaveClubInfo).toHaveBeenCalledWith({ clubName: '한랑드림', carryover: -370_482 })
+      expect(onSaveClubInfo).toHaveBeenCalledWith({ name: '한랑드림', carryover: -370_482 })
     })
 
     it('이월금을 지우고 0 을 적으면 0 이 보이고 0원으로 저장할 수 있다', async () => {
@@ -185,7 +186,7 @@ describe('SPEC-001·002 설정 화면', () => {
       expect(amount).toHaveValue('0')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
-      expect(onSaveClubInfo).toHaveBeenCalledWith({ clubName: '한랑드림', carryover: 0 })
+      expect(onSaveClubInfo).toHaveBeenCalledWith({ name: '한랑드림', carryover: 0 })
     })
 
     it('이월금이 0원이면 편집 화면 금액 칸에 0 이 보인다', async () => {

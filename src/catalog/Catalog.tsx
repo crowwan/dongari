@@ -134,7 +134,7 @@ function itemReport(specs: readonly ItemSpec[]) {
     amount,
     createdAt: `2026-01-01T00:00:${String(index).padStart(2, '0')}.000Z`,
   }))
-  return yearReport({ year: 2026, clubName: '한랑드림', carryover: 370_482, entries })
+  return yearReport({ year: 2026, carryover: 370_482, entries })
 }
 
 const ITEM_REPORT = itemReport([

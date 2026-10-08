@@ -4,18 +4,25 @@ import type { StoredData } from '../domain/types'
 // - quota-exceeded: 저장 공간 부족
 // - newer-version: 저장소에 더 새 버전 데이터가 있어 덮어쓰지 않음 (앱을 다시 열어 새 버전으로 바꿔야 함)
 // - unreadable-original: 읽을 수 없는 원본을 따로 보존하지 못해 덮어쓰지 않음
+// - old-version-unpreserved: 이전 버전 원본을 새 형식으로 옮기기 전에 따로 보관하지 못해 덮어쓰지 않음 (SPEC-005)
 // - unknown: 그 밖의 오류 (error 에 원인)
-export type SaveFailureReason = 'quota-exceeded' | 'newer-version' | 'unreadable-original' | 'unknown'
+export type SaveFailureReason =
+  | 'quota-exceeded'
+  | 'newer-version'
+  | 'unreadable-original'
+  | 'old-version-unpreserved'
+  | 'unknown'
 
 export type SaveResult = { ok: true } | { ok: false; reason: SaveFailureReason; error?: unknown }
 
 // 시작 시점에 저장소를 그대로 쓸 수 없어 막아 둔 저장 (이후 save 가 이 이유로 실패한다)
-export type ReadOnlyReason = Extract<SaveFailureReason, 'newer-version' | 'unreadable-original'>
+export type ReadOnlyReason = Extract<SaveFailureReason, 'newer-version' | 'unreadable-original' | 'old-version-unpreserved'>
 
 // 읽은 데이터와 시작 상태. 화면은 status 로 시작 안내를 띄운다 (SPEC-002)
 // - ok: 정상 (저장된 데이터가 없어 빈 초기값인 경우 포함)
 // - recovered: 깨진 원본을 따로 옮겨 두고 빈 초기값으로 시작했다. 저장은 된다
-// - read-only: 빈 초기값으로 보여 주지만 원본을 지키려고 저장을 막았다
+// - read-only: 원본을 지키려고 저장을 막았다. 보여 주는 데이터는 빈 초기값,
+//   이전 버전 원본을 보관하지 못한 경우(old-version-unpreserved)만 새 형식으로 옮긴 기록
 export type LoadResult =
   | { status: 'ok'; data: StoredData }
   | { status: 'recovered'; data: StoredData }
@@ -28,7 +35,7 @@ export interface LedgerRepository {
   // 실패는 예외 대신 결과로 알린다. 호출자는 ok 를 확인해 안내를 띄운다
   save(data: StoredData): SaveResult
   // 사용자가 백업 파일로 기록을 통째로 바꾼다 (SPEC-002 백업). 저장 결과는 save 와 같다.
-  // 읽을 수 없던 원본 때문에 막아 둔 저장(unreadable-original)은 사용자가 바꾸기로 했으므로 성공하면 풀고,
+  // 읽을 수 없던·보관하지 못한 원본 때문에 막아 둔 저장(unreadable-original, old-version-unpreserved)은 사용자가 바꾸기로 했으므로 성공하면 풀고,
   // 상위 버전 원본(newer-version)은 새 앱이 다시 읽어야 하므로 계속 막는다
   restore(data: StoredData): SaveResult
 }

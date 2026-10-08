@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { Entry, Ledger, StoredData } from '../domain/types'
+import type { Book, Entry, Ledger, StoredData } from '../domain/types'
+import { book } from '../test/ledgerFixtures'
 import { createBackup, readBackup } from './backup'
+import { FIRST_BOOK_ID } from './migrate'
 import { createEmptyData } from './schema'
 
 function ledger(year: number, entryCount: number): Ledger {
   return {
     year,
-    clubName: '한랑드림',
     carryover: 100_000,
     entries: Array.from({ length: entryCount }, (_, index): Entry => ({
       id: `${year}-${index}`,
@@ -19,12 +20,16 @@ function ledger(year: number, entryCount: number): Ledger {
   }
 }
 
-function storedWith(...ledgers: Ledger[]): StoredData {
+function storedWithBooks(...books: Book[]): StoredData {
   return {
     ...createEmptyData(),
-    ledgers: Object.fromEntries(ledgers.map((item) => [String(item.year), item])),
-    settings: { lastChangedAt: '2026-10-01T00:00:00.000Z', lastBackupAt: '2026-09-01T00:00:00.000Z' },
+    books,
+    settings: { lastChangedAt: '2026-10-01T00:00:00.000Z', lastBackupAt: '2026-09-01T00:00:00.000Z', lastBookId: books[0]?.id },
   }
+}
+
+function storedWith(...ledgers: Ledger[]): StoredData {
+  return storedWithBooks(book(ledgers))
 }
 
 // 폰의 현지 시각 2026-10-06 오전 (실행 환경 시간대와 상관없이 현지 날짜로 만든다)
@@ -35,7 +40,7 @@ function withBackupAt(data: StoredData, now: Date): StoredData {
   return { ...data, settings: { ...data.settings, lastBackupAt: now.toISOString() } }
 }
 
-describe('SPEC-002 백업 파일 만들기', () => {
+describe('SPEC-002·SPEC-005 백업 파일 만들기', () => {
   it('파일 이름은 오늘 날짜가 붙은 동아리회계-백업-YYYY-MM-DD.txt 이다', () => {
     expect(createBackup(storedWith(ledger(2026, 1)), NOW).fileName).toBe('동아리회계-백업-2026-10-06.txt')
   })
@@ -44,12 +49,12 @@ describe('SPEC-002 백업 파일 만들기', () => {
     expect(createBackup(createEmptyData(), new Date(2026, 0, 5)).fileName).toBe('동아리회계-백업-2026-01-05.txt')
   })
 
-  it('내용은 전체 저장 데이터이고 사람이 열어도 읽히게 줄을 나눈다', () => {
+  it('내용은 전체 저장 데이터(모든 장부)이고 사람이 열어도 읽히게 줄을 나눈다 (AC-8)', () => {
     const data = storedWith(ledger(2025, 2), ledger(2026, 1))
     const { text } = createBackup(data, NOW)
 
     expect(JSON.parse(text)).toEqual(withBackupAt(data, NOW))
-    expect(text).toContain('\n  "schemaVersion": 2')
+    expect(text).toContain('\n  "schemaVersion": 3')
   })
 
   it('파일의 마지막 백업 시각은 그 파일을 만든 시각이다', () => {
@@ -67,7 +72,7 @@ describe('SPEC-002 백업 파일 만들기', () => {
   })
 })
 
-describe('SPEC-002 백업 파일 읽기', () => {
+describe('SPEC-002·SPEC-005 백업 파일 읽기', () => {
   it('AC-3 만든 백업 파일을 다시 읽으면 같은 데이터가 된다', () => {
     const data = storedWith(ledger(2025, 2), ledger(2026, 3))
 
@@ -86,10 +91,21 @@ describe('SPEC-002 백업 파일 읽기', () => {
 
     const result = readBackup(createBackup(data, NOW).text)
 
-    expect(result.ok && result.data.ledgers['2026']?.entries.map((entry) => entry.day)).toEqual([7, undefined])
+    expect(result.ok && result.data.books[0]?.ledgers['2026']?.entries.map((entry) => entry.day)).toEqual([7, undefined])
   })
 
-  it('날짜(일) 칸이 생기기 전(v2.1) 앱이 만든 백업 파일을 그대로 읽는다 (버전을 올리지 않아 마이그레이션도 없다)', () => {
+  it('SPEC-005 AC-8 장부 여러 개가 든 백업 파일을 다시 읽으면 모든 장부가 그대로 돌아온다', () => {
+    const data = storedWithBooks(
+      book([ledger(2025, 2), ledger(2026, 3)]),
+      book([ledger(2026, 4)], { id: 'book-2', name: '우리집 가계부', kind: 'household' }),
+    )
+
+    const result = readBackup(createBackup(data, NOW).text)
+
+    expect(result).toEqual({ ok: true, data: withBackupAt(data, NOW), summary: { years: [2025, 2026], entryCount: 9 } })
+  })
+
+  it('SPEC-005 AC-8 날짜(일) 칸이 생기기 전(v2.1) 앱이 만든 백업 파일을 장부 하나(동아리·모임)로 읽는다', () => {
     // v2.1.0 이 만든 파일 내용 그대로 (기록에 day 가 없다)
     const v21File = `{
   "schemaVersion": 2,
@@ -108,7 +124,29 @@ describe('SPEC-002 백업 파일 읽기', () => {
 
     const result = readBackup(v21File)
 
-    expect(result).toEqual({ ok: true, data: JSON.parse(v21File), summary: { years: [2026], entryCount: 1 } })
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        schemaVersion: 3,
+        books: [
+          {
+            id: FIRST_BOOK_ID,
+            name: '한랑드림',
+            kind: 'club',
+            ledgers: {
+              '2026': {
+                year: 2026,
+                carryover: 370482,
+                entries: [{ id: 'a', month: 10, type: 'expense', name: '대관료', amount: 40000, createdAt: '2026-10-02T01:00:00.000Z' }],
+              },
+            },
+            createdAt: expect.any(String),
+          },
+        ],
+        settings: { lastBackupAt: '2026-10-06T00:00:00.000Z', lastBookId: FIRST_BOOK_ID },
+      },
+      summary: { years: [2026], entryCount: 1 },
+    })
   })
 
   it('장부가 없는 백업 파일도 읽는다 (요약은 비어 있음)', () => {
@@ -129,8 +167,9 @@ describe('SPEC-002 백업 파일 읽기', () => {
 
   it.each([
     ['다른 앱의 JSON', JSON.stringify({ name: '가계부', items: [] })],
-    ['schemaVersion 이 없음', JSON.stringify({ ledgers: {}, settings: {} })],
-    ['현재 버전인데 형식이 틀림', JSON.stringify({ schemaVersion: 2, ledgers: [], settings: {} })],
+    ['schemaVersion 이 없음', JSON.stringify({ books: [], settings: {} })],
+    ['현재 버전인데 형식이 틀림', JSON.stringify({ schemaVersion: 3, books: {}, settings: {} })],
+    ['이전 버전(v2)인데 형식이 틀림', JSON.stringify({ schemaVersion: 2, ledgers: [], settings: {} })],
     ['금액 범위를 벗어난 기록', JSON.stringify(storedWith({ ...ledger(2026, 1), entries: [{ ...ledger(2026, 1).entries[0], amount: 0 }] }))],
     ['그 달에 없는 날짜의 기록 (3월 32일)', JSON.stringify(storedWith({ ...ledger(2026, 1), entries: [{ ...ledger(2026, 1).entries[0], day: 32 }] }))],
     ['JSON 배열', '[]'],
@@ -139,7 +178,7 @@ describe('SPEC-002 백업 파일 읽기', () => {
   })
 
   it('AC-4 앱보다 높은 버전 파일은 newer-version 으로 거부한다', () => {
-    const newer = JSON.stringify({ schemaVersion: 3, ledgers: {}, settings: {} })
+    const newer = JSON.stringify({ schemaVersion: 4, books: [], settings: {} })
 
     expect(readBackup(newer)).toEqual({ ok: false, reason: 'newer-version' })
   })

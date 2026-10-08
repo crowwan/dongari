@@ -28,9 +28,11 @@ type AppProps = {
   options?: UseLedgerOptions
 }
 
-// 앱 뼈대 (SPEC-001 화면 구성, 탭 없음): 장부(첫 화면) / 내역 적기·고치기 / 설정 / 월 정리 / 올해 결산. 장부가 하나도 없으면 시작 화면만
+// 앱 뼈대 (SPEC-001 화면 구성, 탭 없음): 장부(첫 화면) / 내역 적기·고치기 / 설정 / 월 정리 / 올해 결산. 장부가 하나도 없으면 시작 화면만.
+// 화면은 모두 지금 장부(SPEC-005, 마지막에 본 장부) 하나를 보여 준다. 장부를 바꾸면 useLedger 가 지금 장부를 바꾼다
 export default function App({ repository, loaded, options }: AppProps) {
   const ledger = useLedger(repository, loaded, options)
+  const bookName = ledger.book?.name ?? ''
   const navigation = useScreenHistory()
   // 장부 화면에서 넘겨 본 달. 다른 화면에 다녀와도 그대로이고, 연도를 바꾸면 비워서 그 해의 처음 달(올해면 이번 달, 지난 연도면 12월)로
   const [viewedMonth, setViewedMonth] = useState<number | undefined>()
@@ -116,6 +118,7 @@ export default function App({ repository, loaded, options }: AppProps) {
       case 'settings':
         return (
           <SettingsScreen
+            bookName={bookName}
             year={ledger.year}
             yearChoices={ledger.yearChoices}
             ledger={ledger.ledger}
@@ -150,6 +153,7 @@ export default function App({ repository, loaded, options }: AppProps) {
       case 'year-summary':
         return (
           <YearSummaryScreen
+            bookName={bookName}
             year={ledger.year}
             ledger={ledger.ledger}
             onBack={navigation.backToLedger}
@@ -237,6 +241,7 @@ export default function App({ repository, loaded, options }: AppProps) {
       <>
         {showBackupReminder && <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={noticeActions['send-backup']} />}
         <LedgerScreen
+          bookName={bookName}
           year={year}
           ledger={ledger.ledger}
           totals={totals}

@@ -1,5 +1,6 @@
 // 여러 테스트가 같이 쓰는 장부 기록 만들기와 v1 예시 데이터
-import type { Entry, EntryType, Ledger } from '../domain/types'
+import { CURRENT_SCHEMA_VERSION, type Book, type Entry, type EntryType, type Ledger, type StoredData } from '../domain/types'
+import type { LedgerRepository } from '../storage/LedgerRepository'
 
 // [월, 종류, 이름, 금액] 목록을 입력 순 기록으로 바꾼다
 export type EntrySpec = readonly [month: number, type: EntryType, name: string, amount: number]
@@ -16,7 +17,29 @@ export function entries(specs: readonly EntrySpec[]): Entry[] {
 }
 
 export function ledger(specs: readonly EntrySpec[], overrides: Partial<Omit<Ledger, 'entries'>> = {}): Ledger {
-  return { year: 2025, clubName: '한랑드림', carryover: 370_482, entries: entries(specs), ...overrides }
+  return { year: 2025, carryover: 370_482, entries: entries(specs), ...overrides }
+}
+
+// 연도별 장부들을 담은 장부 하나 (기본: 지금 기록을 옮긴 첫 장부 모양 — 동아리·모임 "한랑드림")
+export function book(ledgers: readonly Ledger[], overrides: Partial<Omit<Book, 'ledgers'>> = {}): Book {
+  return {
+    id: 'book-1',
+    name: '한랑드림',
+    kind: 'club',
+    ledgers: Object.fromEntries(ledgers.map((item) => [String(item.year), item])),
+    createdAt: '2025-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+// 장부 하나(book 기본값)에 연도별 장부들을 담은 저장 데이터
+export function storedWith(...ledgers: Ledger[]): StoredData {
+  return { schemaVersion: CURRENT_SCHEMA_VERSION, books: [book(ledgers)], settings: {} }
+}
+
+// 저장소에 저장된 첫 장부의 그 해 장부
+export function savedLedger(repository: LedgerRepository, year: number): Ledger | undefined {
+  return repository.load().data.books[0]?.ledgers[String(year)]
 }
 
 // PLANS.md 6장 예시 숫자(수입 1,777,203 / 지출 1,994,780 / 잔액 152,905)를 재현하도록 만든 1년치 기록.

@@ -12,7 +12,7 @@ function fakeSaver(): PictureSaver {
 
 function renderYear(data: Ledger | undefined, saver: PictureSaver = fakeSaver()) {
   const onNotify = vi.fn()
-  render(<YearSummaryScreen year={data?.year ?? 2026} ledger={data} onBack={() => {}} onNotify={onNotify} saver={saver} />)
+  render(<YearSummaryScreen bookName="한랑드림" year={data?.year ?? 2026} ledger={data} onBack={() => {}} onNotify={onNotify} saver={saver} />)
   return { onNotify, saver }
 }
 

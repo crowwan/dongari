@@ -3,14 +3,16 @@ import { isDayInMonth } from '../domain/entryDate'
 import {
   CURRENT_SCHEMA_VERSION,
   ENTRY_AMOUNT_MAX,
+  type Book,
   type Entry,
   type Ledger,
   type Settings,
   type StoredData,
 } from '../domain/types'
 
+// 장부가 하나도 없는 처음 상태 (첫 실행 화면)
 export function createEmptyData(): StoredData {
-  return { schemaVersion: CURRENT_SCHEMA_VERSION, ledgers: {}, settings: {} }
+  return { schemaVersion: CURRENT_SCHEMA_VERSION, books: [], settings: {} }
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -56,11 +58,10 @@ function isEntryOfYear(year: number) {
 
 export function isLedger(value: unknown): value is Ledger {
   if (!isRecord(value)) return false
-  const { year, clubName, carryover, entries } = value
+  const { year, carryover, entries } = value
   return (
     typeof year === 'number' &&
     Number.isInteger(year) &&
-    typeof clubName === 'string' &&
     typeof carryover === 'number' &&
     Number.isFinite(carryover) &&
     Array.isArray(entries) &&
@@ -68,20 +69,46 @@ export function isLedger(value: unknown): value is Ledger {
   )
 }
 
+// 마지막에 본 장부 id 는 없는 장부를 가리켜도 된다 (그때는 첫 장부를 연다, domain/book.currentBook)
 export function isSettings(value: unknown): value is Settings {
-  return isRecord(value) && isOptionalString(value.lastBackupAt) && isOptionalString(value.lastChangedAt)
+  return (
+    isRecord(value) &&
+    isOptionalString(value.lastBackupAt) &&
+    isOptionalString(value.lastChangedAt) &&
+    isOptionalString(value.lastBookId)
+  )
 }
 
 // 장부 키는 연도 문자열이고, 안의 year 와 같아야 한다
-function isLedgerMap(value: unknown): value is Record<string, Ledger> {
+export function isLedgerMap(value: unknown): value is Record<string, Ledger> {
   return isRecord(value) && Object.entries(value).every(([key, ledger]) => isLedger(ledger) && key === String(ledger.year))
+}
+
+export function isBook(value: unknown): value is Book {
+  if (!isRecord(value)) return false
+  const { id, name, kind, ledgers, createdAt } = value
+  return (
+    typeof id === 'string' &&
+    id.length > 0 &&
+    typeof name === 'string' &&
+    (kind === 'club' || kind === 'household') &&
+    isLedgerMap(ledgers) &&
+    typeof createdAt === 'string'
+  )
+}
+
+// 장부 id 는 겹치지 않아야 한다 (지금 장부를 id 로 고른다)
+function isBookList(value: unknown): value is Book[] {
+  if (!Array.isArray(value)) return false
+  const items: unknown[] = value
+  return items.every(isBook) && new Set(items.map((book) => book.id)).size === items.length
 }
 
 export function isStoredData(value: unknown): value is StoredData {
   return (
     isRecord(value) &&
     value.schemaVersion === CURRENT_SCHEMA_VERSION &&
-    isLedgerMap(value.ledgers) &&
+    isBookList(value.books) &&
     isSettings(value.settings)
   )
 }

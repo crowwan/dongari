@@ -7,12 +7,12 @@ import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { LocalStorageRepository, STORAGE_KEY } from './storage/LocalStorageRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
 import { createEmptyData } from './storage/schema'
+import { book, savedLedger } from './test/ledgerFixtures'
 
 const TODAY = new Date('2026-10-03T09:00:00.000+09:00')
 
 const LEDGER_2025: Ledger = {
   year: 2025,
-  clubName: '한랑드림',
   carryover: 100_000,
   entries: [
     { id: 'a', month: 3, type: 'income', name: '회비', amount: 140_000, createdAt: '2025-03-01T00:00:00.000Z' },
@@ -21,7 +21,6 @@ const LEDGER_2025: Ledger = {
 
 const LEDGER_2026: Ledger = {
   year: 2026,
-  clubName: '꽃동산',
   carryover: 200_000,
   entries: [
     { id: 'b', month: 9, type: 'income', name: '회비', amount: 50_000, createdAt: '2026-09-01T00:00:00.000Z' },
@@ -32,7 +31,7 @@ const LEDGER_2026: Ledger = {
 function storedWith(...ledgers: Ledger[]): StoredData {
   return {
     ...createEmptyData(),
-    ledgers: Object.fromEntries(ledgers.map((item) => [String(item.year), item])),
+    books: [book(ledgers, { name: '꽃동산' })],
     // 마지막 변경까지 백업해 둔 상태 (30일 백업 안내 #9 가 끼지 않게)
     settings: { lastChangedAt: '2026-10-01T00:00:00.000Z', lastBackupAt: '2026-10-01T00:00:00.000Z' },
   }
@@ -214,7 +213,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
     it.each([
       ['깨진 JSON', '{"schemaVersion": 2,', '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
       ['다른 형식', JSON.stringify({ name: '가계부' }), '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
-      ['상위 버전', JSON.stringify({ schemaVersion: 3, ledgers: {}, settings: {} }), '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
+      ['상위 버전', JSON.stringify({ schemaVersion: 4, books: [], settings: {} }), '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
     ])('AC-4 %s 파일은 불러오지 않고 "이 파일은 열 수 없어요" 를 알리며 기존 데이터를 유지한다', async (_label, text, description) => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openSettings()
@@ -279,7 +278,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       expect(screen.queryByTestId('notice-bar')).not.toBeInTheDocument()
-      expect(new LocalStorageRepository().load().data.ledgers['2026']?.entries).toHaveLength(3)
+      expect(savedLedger(new LocalStorageRepository(), 2026)?.entries).toHaveLength(3)
     })
 
     it('새 버전 기록이 있어 저장을 막았으면 안내 띠에 불러오기 버튼이 없다', () => {

@@ -60,11 +60,10 @@ describe('SPEC-003 올해 결산 계산', () => {
       expect(report.totals).toEqual({ income: 200_000, expense: 168_340, balance: 131_660 })
     })
 
-    it('양식 제목과 이월금 칸에 쓸 연도·동아리 이름·이월금을 담는다', () => {
-      const report = yearReport(ledger([], { year: 2026, clubName: '꽃동산', carryover: -5_000 }))
+    it('양식 제목과 이월금 칸에 쓸 연도·이월금을 담는다 (장부 이름은 장부에서, SPEC-005)', () => {
+      const report = yearReport(ledger([], { year: 2026, carryover: -5_000 }))
 
       expect(report.year).toBe(2026)
-      expect(report.clubName).toBe('꽃동산')
       expect(report.carryover).toBe(-5_000)
     })
   })
