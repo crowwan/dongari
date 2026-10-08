@@ -51,6 +51,7 @@ updated: 2026-10-07
 | `--accent-ink` | #2f5d57 / #8cc7bc | 고른 것 글자·체크, "바꾸기", 보조 버튼 글자, 이번 달·오늘 테두리, "지금 적는 내역" 카드 둘레·머리 글자, "방금", 포커스 링, 입력칸 포커스 테두리 | 시안의 `brand-ink`. 다크에서는 밝게 뒤집어 어두운 바탕에서 보인다 |
 | `--income-amount` | #1b705b / #5cc49e | 수입 금액 글자 | 시안의 `plus`(#1F7A63) 를 눌린 줄 위에서도 AA 가 되게 한 단계 진하게 |
 | `--expense-amount` | = `--strong` | 지출 금액 글자 | 지출은 일상이라 경고처럼 보이지 않게, 부호 `−` 로 구분 |
+| `--income-bar` / `--expense-bar` | #8cc7bc / #4a8f82, #b5b5b5 / #6b6b6b | 올해 결산 [항목별 합계] 비율 막대 채움(홈은 `--fill`) (#84) | 수입은 옅은 청록, 지출은 회색 — 금액 글자색(수입 청록·지출 제목색)과 같은 짝. 막대는 옆 숫자를 눈으로 비교하는 보조라 글자 대비 기준 대상이 아니고, 홈(`--fill`)과는 라이트·다크 모두 밝기로 구분된다. `--accent-ink`(다크 #8cc7bc)를 쓰지 않은 건 "고른 것" 색과 섞이지 않게 |
 | `--danger` / `--on-danger` | #b83232 / #ff8b8b, #ffffff / #2a0f0b | 위험 버튼 채움과 그 글자, 위험 글자형, 오류 문장·테두리, 점 표시 | 시안 #C93838 을 눌린 면 위 AA 가 되게 진하게. 금액에는 쓰지 않는다 |
 | `--warn-bg` | #fff4d8 / #3a3218 | 안내 띠 바탕 | 노란 면으로 "알아 둘 것", 글자는 `--strong` |
 | `--scrim` | 검정 60% / 70% | 확인 창·선택 창 뒤 가리기 | DS 규칙: 모달 스크림만 60~70% 투명도 허용 |
@@ -104,6 +105,7 @@ updated: 2026-10-07
 | `--icon-xs` / `--icon-sm` / `--icon-md` | 16 / 20 / 24 | 작은 머리 글자 옆("✓ 장부에 넣었어요") / 글자 옆 작은 아이콘 / 버튼·줄 아이콘 |
 | `--icon-circle` / `--icon-circle-sm` | 44 / 36 | 줄 앞 원형 아이콘 바탕 / 줄 선택 앞 |
 | `--dot` / `--grab-w` / `--grab-h` | 8 / 40 / 4 | 할 일 점 / 선택 창 손잡이 |
+| `--bar-thickness` | 6 | 비율 막대 굵기 (올해 결산 항목별 합계, #84) |
 | `--content-max` / `--dialog-max` | 480 / 400 | 화면 내용 / 확인 창 최대 폭 |
 
 ### 모션
@@ -214,7 +216,8 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 한 몸통 스위치 [남았어요 \| 적자였어요] 로 부호를 고른다 (#46) |
 | `InstallGuide` (`features/install`) | 홈 화면에 추가 방법: 브라우저 이름(Body Bold `--accent-ink`) + 번호 순서(Body). 설정 "앱" 묶음 [📱 홈 화면에 추가] 줄 → 설치 제안이 없을 때 `BottomSheet` "홈 화면에 추가하는 방법" 안 + [확인] (#10, #56. 장부 위 `InstallBanner` 띠는 #56 에서 지움) |
 | `AddEntryForm` / `EditEntryForm` (`features/ledger`) | 아래 "화면 조립" (#47) |
-| 월 정리 / 올해 결산 (`features/report`) | 카드 셋(수입·지출 카드 제목 Heading, 줄은 이름 본문 ··· 금액 제목색, 합계 줄만 구분선 + Bold, 수입 합계 수입 금액색, 잔액 카드 월말 잔액만 Heading 크기) + [⬇ 사진으로 저장] / v1 양식 한 장, 화면 틀(제목 제목색·안내 Caption·아래 버튼)만 토큰 (#16, #48) |
+| 월 정리 / 올해 결산 (`features/report`) | 카드 셋(수입·지출 카드 제목 Heading, 줄은 이름 본문 ··· 금액 제목색, 합계 줄만 구분선 + Bold, 수입 합계 수입 금액색, 잔액 카드 월말 잔액만 Heading 크기) + [⬇ 사진으로 저장] / 제목 아래 `SegmentedControl` [결산표 \| 항목별 합계](처음 결산표, 기록 없으면 없음) → v1 양식 한 장(화면 틀만 토큰) + [⬇ 사진으로 저장], 또는 `ItemTotalsCards` (#16, #48, #84) |
+| `ItemTotalsCards` (`features/report`, #84) | 올해 결산 [항목별 합계]: 흰 카드 둘(수입·지출, 사이 `--stack`). 머리 = 제목 Heading ··· 그해 합계(Heading 크기 Bold, 수입 `--income-amount`·지출 `--expense-amount`). 줄 = 이름(Row SemiBold, 긴 이름은 낱말 단위 줄바꿈) + "N건"(Caption `--muted`) ··· 금액(Bold `--strong`) → 아래 `--space-2` 비율 막대(`--bar-thickness`, 홈 `--fill`, 채움 `--income-bar`/`--expense-bar`, 아주 작은 비율도 막대 굵기만큼은 보임, `aria-hidden`). 줄 사이 선 없이 여백(`--space-3`). 누르는 곳 없음. 기록 없는 쪽은 "올해 적은 수입(지출)이 없어요"(`--muted`). 사진으로 저장하지 않아 아래 고정 버튼 자리를 비우지 않는다 |
 
 ### 화면 조립 (#46)
 
@@ -249,7 +252,7 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 
 ### 토큰 예외: 올해 결산 양식
 
-`src/features/report/sheet/*` 는 색·글자 크기를 토큰 대신 **인라인 hex·px** 로 쓴다 (`sheetStyles.ts`). 앱 화면이 아니라 사진으로 저장해 단톡방에 올리는 v1 종이 양식이라 테마·토큰이 바뀌어도 v1 과 똑같이 흰 종이·검정 글자·회색 선이어야 하고(SPEC-003 AC-7), 사진을 만드는 html2canvas 1.4 가 oklch() 같은 최신 색 문법을 읽지 못해 평범한 hex 로 그렸다. 글자(11~14px)도 v1 양식 크기라 14px 미만 금지 기준의 예외이고, 대신 화면에서는 두 손가락으로 확대해 본다.
+`src/features/report/sheet/*`(항목별 합계 표 `ItemTotalsTable` 포함, #84) 는 색·글자 크기를 토큰 대신 **인라인 hex·px** 로 쓴다 (`sheetStyles.ts`). 앱 화면이 아니라 사진으로 저장해 단톡방에 올리는 v1 종이 양식이라 테마·토큰이 바뀌어도 v1 과 똑같이 흰 종이·검정 글자·회색 선이어야 하고(SPEC-003 AC-7), 사진을 만드는 html2canvas 1.4 가 oklch() 같은 최신 색 문법을 읽지 못해 평범한 hex 로 그렸다. 글자(11~14px)도 v1 양식 크기라 14px 미만 금지 기준의 예외이고, 대신 화면에서는 두 손가락으로 확대해 본다.
 
 ### 사진으로 저장할 때의 모양
 
@@ -291,3 +294,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-07 | 날짜(일): 새 부품 `DayPicker`(날 격자 5칸씩, 칸 사이 `--space-1` 로 390px 카드 안 칸 58, 고른 날 채움·오늘 테두리·방금 옅은 청록 + "방금", 놓인 바탕 따라 면 색)·`MonthButton`([10월 ▾]). `EntryCard` 줄 [바꾸기] 선택(지금 묻는 줄은 없음), 선택 창 안 `MonthStepper` 화살표 회색 면. 내역 적기 0단계 "며칠인가요?"·고치기 날짜 선택 창·장부 줄 "7일 · 지출" 조립. 카탈로그 DayPicker·MonthButton·EntryCard 날짜 상태 (#77) | |
 | 2026-10-07 | 날짜 입력: 날 격자 `DayPicker` → 날 숫자 칸 `DayInput`(`AmountDisplay` 모양 + 빠른 칩 줄). 고치기 날짜는 `PickRow` + 날짜 선택 창(`EntryDateSheet`) 대신 제목 옆 `MonthButton` + `DayInput` 을 바로 둠. 안 쓰게 된 `DayPicker`·`PickRow`·선택 창 안 `MonthStepper` 회색 화살표·`--primary-soft` 방금 날 쓰임 지움. 카탈로그 DayInput·EntryCard 며칠인가요? 상태 갱신 (#80) | |
 | 2026-10-07 | `AmountDisplay`·`DayInput` 포커스 링을 칸(input)에서 숫자 + 단위 상자 전체(`:focus-within`, 상자 반경 `--corner-sm`·좌우 `--space-2`)로 옮김. 칸에만 그리면 "원"/"일" 이 링 밖 둘레선에 겹쳤다 (#80) | |
+| 2026-10-08 | 올해 결산 [결산표 \| 항목별 합계] 전환, `ItemTotalsCards`(수입·지출 카드, 이름·N건·금액·비율 막대), 색 토큰 `--income-bar`·`--expense-bar`·크기 토큰 `--bar-thickness`. 결산 양식 수입내역 목록 → 항목별 합계 표(`ItemTotalsTable`, 인라인 hex), 양식 종이 스타일 `sheetPaper` 로 묶음. 카탈로그 상태 추가 (#84) | |

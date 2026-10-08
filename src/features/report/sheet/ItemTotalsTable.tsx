@@ -3,9 +3,12 @@ import type { ItemTotal } from '../../../domain/report'
 import { formatAmount } from '../../../ui/money'
 import { SHEET_COLOR, sheetCell, sheetHeadCell, sheetTable } from './sheetStyles'
 
+// 금액 칸 폭: "999,999,999" 까지 한 줄. 남은 폭은 수입·지출 이름 칸이 반씩 (한쪽 긴 이름이 다른 쪽 이름 칸을 줄이지 않게)
+const AMOUNT_WIDTH = '76px'
+
 // 인라인 hex 이유는 sheetStyles.ts. 선·머리 칸은 위쪽 월별 수입·지출 표(IncomeExpenseTable)와 같다
 const styles = {
-  table: { ...sheetTable, fontSize: '12px' },
+  table: { ...sheetTable, fontSize: '12px', tableLayout: 'fixed' },
   headCell: { ...sheetHeadCell, padding: '4px 8px' },
   // 360px 양식 폭 안에서 긴 이름은 낱말 단위로 줄을 바꾸고, 띄어쓰기 없이 길면 아무 데서나 끊는다
   nameCell: { ...sheetCell, padding: '4px 6px', wordBreak: 'keep-all', overflowWrap: 'anywhere' },
@@ -35,6 +38,12 @@ export function ItemTotalsTable({ incomeItems, expenseItems, income, expense }: 
   const rowCount = Math.max(incomeItems.length, expenseItems.length)
   return (
     <table style={styles.table} data-testid="year-item-table">
+      <colgroup>
+        <col />
+        <col style={{ width: AMOUNT_WIDTH }} />
+        <col />
+        <col style={{ width: AMOUNT_WIDTH }} />
+      </colgroup>
       <thead>
         <tr>
           <th style={styles.headCell} colSpan={2}>

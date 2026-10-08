@@ -232,6 +232,7 @@
 
 .item-totals__name {
   min-width: 0;
+  word-break: keep-all;
   overflow-wrap: anywhere;
   color: var(--strong);
   font-size: var(--text-row-size);
