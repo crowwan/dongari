@@ -1,7 +1,7 @@
 ---
 id: SPEC-005
 title: 여러 장부
-status: in-progress
+status: done
 milestone: v2.4
 issue: "#86"
 prototype: https://claude.ai/artifact/8S8y4GuLU5xkVkHTRPxt7M
