@@ -24,6 +24,12 @@ describe('SPEC-002 시작 안내·저장 실패 안내', () => {
     ])
   })
 
+  it('SPEC-005 이전 버전 기록을 따로 보관하지 못해 저장을 막았으면 그렇게 알리고 [백업 파일 보내기] 를 붙인다 (옮긴 기록은 보인다)', () => {
+    expect(storageNotices({ status: 'read-only', reason: 'old-version-unpreserved' }, 'old-version-unpreserved')).toEqual([
+      { message: '기록을 새 버전으로 옮기지 못했어요. 지금 적는 내용은 저장되지 않아요', action: 'send-backup' },
+    ])
+  })
+
   it('저장에 실패하면 백업 파일을 보내 두라고 알리고 [백업 파일 보내기] 를 붙인다', () => {
     expect(storageNotices({ status: 'ok' }, 'quota-exceeded')).toEqual([
       { message: STORAGE_NOTICE.saveFailed, action: 'send-backup' },

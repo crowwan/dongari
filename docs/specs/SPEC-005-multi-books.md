@@ -1,9 +1,9 @@
 ---
 id: SPEC-005
 title: 여러 장부
-status: approved
+status: in-progress
 milestone: v2.4
-issue:
+issue: "#86"
 prototype: https://claude.ai/artifact/8S8y4GuLU5xkVkHTRPxt7M
 updated: 2026-10-08
 ---
@@ -118,8 +118,13 @@ updated: 2026-10-08
 
 ## 기술 메모
 
-- 저장 형식: `StoredData.ledgers`(연도 → Ledger) → `books: Book[]`(`Book = { id, name, kind: 'club' | 'household', ledgers: Record<연도, Ledger>, createdAt }`) + `settings.lastBookId`. 동아리 이름(`Ledger.clubName`)은 장부 이름으로 올라간다 — 구체 형태와 schemaVersion 올림(3)·마이그레이션은 ADR 001 규칙에 따라 구현 PR 에서 정하고 ADR 에 적는다.
-- `useLedger` 는 "지금 장부"를 받아 지금처럼 동작하게 하고, 장부 고르기·만들기·지우기는 위층(App) 에서.
+- 저장 형식(#87): `StoredData.ledgers`(연도 → Ledger) → `books: Book[]`(`Book = { id, name, kind: 'club' | 'household', ledgers: Record<연도, Ledger>, createdAt }`, 만든 순) + `settings.lastBookId`. `schemaVersion` 3, localStorage 키는 `dongari:v2` 그대로. 근거는 [ADR 001](../decisions/001-storage.md) "v3: 장부 여러 개".
+  - 이름은 장부에 하나: `Ledger.clubName` 을 없애고 `Book.name` 으로 올렸다. 연도마다 이름이 달랐으면 가장 최근 연도의 이름을 쓴다(지난 연도 결산표 제목도 장부 이름). `Ledger` 는 `{ year, carryover, entries }`.
+  - v2 → v3 마이그레이션(`storage/migrate.ts`): 연도별 장부들 → 동아리·모임 장부 하나(id `book-1`, 이름 = 가장 최근 연도의 동아리 이름) + `lastBookId`. 장부가 없던 v2(첫 실행 전)는 장부 없이.
+  - 옛 데이터 보관: 이전 버전 원본을 옮겨 읽을 때 `dongari:v2:schema-<버전>` 키에 그대로 둔다(같은 원본이면 다시 쓰지 않음). 보관하지 못하면 옮긴 기록은 보여 주되 저장을 막는다(`read-only`, `old-version-unpreserved`, SPEC-002 시작 상태 표). 형식이 틀린 v2 는 깨진 데이터와 같이(원본 옮기고 새로 시작).
+- 지금 장부: `domain/book.currentBook(data)` = `settings.lastBookId` 장부, 없거나 지워졌으면 첫 장부. `useLedger` 는 지금 장부의 연도·기록·이월금·자주 쓴 이름만 다룬다(AC-6). 장부를 바꾸는 길은 `lastBookId` 를 바꿔 저장하는 것 하나 — 장부 고르기·만들기·지우기(#88)는 이 값을 바꾸고 App 은 보고 있는 달을 비운다.
+- 첫 실행(장부 없음)의 [시작하기] 는 동아리·모임 장부 하나를 만든다(새 장부 만들기 화면은 #88).
+- 백업 파일은 `StoredData` 그대로라 모든 장부가 들어간다. 이전(v2) 백업 파일은 같은 마이그레이션으로 장부 하나로 읽는다(AC-8). 불러오기 확인 문구의 연도는 모든 장부의 연도를 합친 것 — 장부 수 문구와 파일 이름은 #88.
 - 앱 이름 변경은 `pwaOptions`·`index.html`·백업 파일 이름. 서비스 워커·manifest `id` 는 그대로(설치 앱 유지).
 
 ## 열린 질문
@@ -131,3 +136,5 @@ updated: 2026-10-08
 | 날짜 | 내용 |
 |---|---|
 | 2026-10-08 | 초안·승인: 사용자 요청 "개인 가계부로도", 시안 A + 새 장부 만들기, 추천안(백업 파일 하나, 지금 기록 첫 장부로, 앱 이름 "우리 장부", 설정에서 장부 지우기) 그대로 |
+| 2026-10-08 | 이슈 분해(#86), in-progress |
+| 2026-10-08 | 기술 메모: 저장 형식 v3 확정 — 이름은 장부에 하나(`Ledger.clubName` 삭제, 가장 최근 연도 이름), 옛 데이터 보관 키·보관 실패 시 읽기 전용, 지금 장부 = `lastBookId` (#87) |

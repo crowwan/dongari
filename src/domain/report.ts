@@ -40,7 +40,6 @@ export interface ItemTotal {
 // v1 연말 양식(PLANS.md 6장) 한 장에 들어가는 값 전부
 export interface YearReport {
   year: number
-  clubName: string
   carryover: number
   months: MonthTotal[] // 1~12월 순서, 항상 12개
   totals: LedgerTotals // 연간 수입·지출 합계와 잔액. 항목별 합계 각 쪽의 합 = totals.income / totals.expense
@@ -122,7 +121,6 @@ export function yearReport(ledger: Ledger): YearReport {
   const { entries } = ledger
   return {
     year: ledger.year,
-    clubName: ledger.clubName,
     carryover: ledger.carryover,
     months: MONTHS.map((month) => ({
       month,

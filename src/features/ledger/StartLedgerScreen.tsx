@@ -16,7 +16,7 @@ type StartLedgerScreenProps = {
 
 // 장부 시작 화면 (SPEC-001 첫 실행): 동아리 이름과 이월금 두 칸만 묻는다
 export function StartLedgerScreen({ kind, year, defaults, onStart }: StartLedgerScreenProps) {
-  const [clubName, setClubName] = useState(defaults.clubName)
+  const [clubName, setClubName] = useState(defaults.name)
   const [carryover, setCarryover] = useState(defaults.carryover)
   const missingName = clubName.trim() === ''
 
@@ -27,7 +27,7 @@ export function StartLedgerScreen({ kind, year, defaults, onStart }: StartLedger
       data-kind={kind}
       onSubmit={(event) => {
         event.preventDefault()
-        if (!missingName) onStart({ clubName, carryover })
+        if (!missingName) onStart({ name: clubName, carryover })
       }}
     >
       {kind === 'first' ? (

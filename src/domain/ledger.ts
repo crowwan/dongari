@@ -1,12 +1,15 @@
 // 장부 계산·변경 순수 함수 (SPEC-001). 화면·저장소와 무관하게 Ledger 만 다룬다
 import { byDate, isDayInMonth } from './entryDate'
-import { ENTRY_AMOUNT_MAX, type Entry, type EntryType, type Ledger } from './types'
+import { ENTRY_AMOUNT_MAX, type Book, type Entry, type EntryType, type Ledger } from './types'
 
 // 사용자가 입력하는 기록 내용. id·createdAt 은 앱이 붙인다. 날짜(일)는 새로 적을 때 꼭 있고, 날짜 없는 예전 기록을 고칠 때만 빠진다
 export type EntryInput = Pick<Entry, 'month' | 'day' | 'type' | 'name' | 'amount' | 'batchId'>
 
-// 장부를 시작하거나 고칠 때 입력하는 동아리 정보
-export type LedgerInfo = Pick<Ledger, 'clubName' | 'carryover'>
+// 장부를 시작하거나 고칠 때 입력하는 장부 이름(Book)과 그 해 이월금(Ledger)
+export interface LedgerInfo {
+  name: string
+  carryover: number
+}
 
 // 기록을 만들 때 바깥에서 받는 것 (테스트에서 고정값을 넣을 수 있게)
 export interface EntryDeps {
@@ -148,30 +151,28 @@ export function lastUsedType(entries: readonly Entry[], name: string): EntryType
   return [...entries].reverse().find((entry) => entry.name === trimmed)?.type
 }
 
-function normalizeLedgerInfo(info: LedgerInfo): LedgerInfo {
-  if (!Number.isInteger(info.carryover) || Math.abs(info.carryover) > ENTRY_AMOUNT_MAX) {
-    throw new InvalidLedgerInputError(`이월금은 ±${ENTRY_AMOUNT_MAX} 이내 정수여야 한다: ${info.carryover}`)
+function checkCarryover(carryover: number): number {
+  if (!Number.isInteger(carryover) || Math.abs(carryover) > ENTRY_AMOUNT_MAX) {
+    throw new InvalidLedgerInputError(`이월금은 ±${ENTRY_AMOUNT_MAX} 이내 정수여야 한다: ${carryover}`)
   }
-  return { clubName: info.clubName.trim(), carryover: info.carryover }
+  return carryover
 }
 
-export function createLedger(year: number, info: LedgerInfo): Ledger {
-  return { year, ...normalizeLedgerInfo(info), entries: [] }
+export function createLedger(year: number, carryover: number): Ledger {
+  return { year, carryover: checkCarryover(carryover), entries: [] }
 }
 
-export function updateLedgerInfo(ledger: Ledger, info: LedgerInfo): Ledger {
-  return { ...ledger, ...normalizeLedgerInfo(info) }
+export function updateCarryover(ledger: Ledger, carryover: number): Ledger {
+  return { ...ledger, carryover: checkCarryover(carryover) }
 }
 
 // 새 연도 장부의 입력 기본값 (AC-8)
-// - 이월금: 전년도 장부가 있으면 그 잔액, 없으면 0
-// - 동아리 이름: 그 해보다 앞선 가장 가까운 장부, 없으면 가장 최근 장부에서 이어받는다
-export function newLedgerDefaults(ledgers: Readonly<Record<string, Ledger>>, year: number): LedgerInfo {
-  const previous = ledgers[String(year - 1)]
-  const byYearDesc = Object.values(ledgers).sort((a, b) => b.year - a.year)
-  const nameSource = byYearDesc.find((item) => item.year < year) ?? byYearDesc[0]
+// - 이월금: 그 장부의 전년도 장부가 있으면 그 잔액, 없으면 0
+// - 이름: 장부 이름 그대로 (장부가 아직 없으면 빈 이름)
+export function newLedgerDefaults(book: Book | undefined, year: number): LedgerInfo {
+  const previous = book?.ledgers[String(year - 1)]
   return {
-    clubName: nameSource?.clubName ?? '',
+    name: book?.name ?? '',
     carryover: previous ? calculateTotals(previous).balance : 0,
   }
 }

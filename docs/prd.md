@@ -57,16 +57,21 @@ updated: 2026-10-03
 ## 데이터 모델 (개요)
 
 ```
-Ledger (연도별 장부 1개)
-├─ year, clubName, carryover(전년도 이월금)
-└─ entries: Entry[]
-     Entry { id, month(1~12), day?(1~그 달 마지막 날, v2.2 — 예전 기록엔 없음), type('income'|'expense'), name, amount, createdAt, batchId? }  // batchId: 사진으로 함께 넣은 묶음 (되돌리기용)
+StoredData { schemaVersion: 3, books: Book[], settings }   // v2.4 여러 장부 (SPEC-005)
+Book (장부 1개: 동아리·모임 / 개인 가계부)
+├─ id, name(장부 이름), kind('club'|'household'), createdAt
+└─ ledgers: { [연도]: Ledger }
+     Ledger (연도별 장부 1개)
+     ├─ year, carryover(전년도 이월금)
+     └─ entries: Entry[]
+          Entry { id, month(1~12), day?(1~그 달 마지막 날, v2.2 — 예전 기록엔 없음), type('income'|'expense'), name, amount, createdAt, batchId? }  // batchId: 사진으로 함께 넣은 묶음 (되돌리기용)
 
-Settings { lastBackupAt?, lastChangedAt? }
+Settings { lastBackupAt?, lastChangedAt?, lastBookId?(마지막에 본 장부) }
 ```
 
 - 월별 수입·지출, 지출 상세표, 수입내역(항목별 합)은 전부 `entries` 에서 **계산**한다. 저장하지 않는다.
-- 자주 쓰는 항목도 저장하지 않고 전체 연도 `entries` 에서 최근 사용 순으로 계산한다 (SPEC-001 결정, #11).
+- 자주 쓰는 항목도 저장하지 않고 그 장부의 전체 연도 `entries` 에서 최근 사용 순으로 계산한다 (SPEC-001 결정, #11. 장부끼리는 섞지 않는다, SPEC-005).
+- 장부 이름은 장부(`Book.name`)에 하나다. v2.3 까지는 연도별 장부마다 `clubName` 이 있었다 (#87).
 - 저장 형식에 `schemaVersion` 을 둔다. 상세는 [ADR 001](decisions/001-storage.md).
 
 ## 기술 스택

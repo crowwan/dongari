@@ -12,7 +12,7 @@ function entry(id: string, month: number, type: Entry['type'], name: string, amo
 }
 
 function ledgerWith(entries: Entry[], carryover = 370_482): Ledger {
-  return { year: 2026, clubName: '한랑드림', carryover, entries }
+  return { year: 2026, carryover, entries }
 }
 
 type Handlers = {
@@ -30,6 +30,7 @@ function Harness({ ledger, initialMonth, handlers }: { ledger: Ledger; initialMo
   const sheets = useScreenHistory()
   return (
     <LedgerScreen
+      bookName="한랑드림"
       year={ledger.year}
       currentMonth={10}
       sheets={sheets}

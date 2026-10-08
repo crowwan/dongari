@@ -26,6 +26,7 @@ function rowDescription({ day, type }: Entry): string {
 }
 
 type LedgerScreenProps = {
+  bookName: string // 위쪽 제목 (장부 이름, SPEC-005)
   year: number
   ledger: Ledger
   totals: LedgerTotals
@@ -56,6 +57,7 @@ function carryoverNote(carryover: number): string | undefined {
 
 // 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 [결산][설정] → 잔액 카드 → ‹ N월 ▾ › → 그 달 카드 → 아래 고정 [+ 내역 적기]
 export function LedgerScreen({
+  bookName,
   year,
   ledger,
   totals,
@@ -74,7 +76,7 @@ export function LedgerScreen({
     <div className="screen screen--stack ledger" data-testid="ledger-screen">
       <header className="ledger__top">
         <div className="ledger__title">
-          <h1 className="ledger__club">{ledger.clubName}</h1>
+          <h1 className="ledger__club">{bookName}</h1>
           <p className="ledger__year" data-testid="ledger-year">
             {year}년
           </p>

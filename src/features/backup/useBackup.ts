@@ -37,7 +37,7 @@ export function useBackup(
   const [pending, setPending] = useState<Pending | undefined>()
   const [notice, setNotice] = useState<{ title: string; description: string } | undefined>()
 
-  const hasRecords = Object.keys(ledger.data.ledgers).length > 0
+  const hasRecords = ledger.data.books.length > 0
 
   async function readChosenFile(file: File) {
     let text: string

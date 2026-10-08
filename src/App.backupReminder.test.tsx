@@ -5,7 +5,7 @@ import App from './App'
 import type { Ledger, Settings, StoredData } from './domain/types'
 import type { LedgerRepository } from './storage/LedgerRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
-import { createEmptyData } from './storage/schema'
+import { storedWith as storedWithLedgers } from './test/ledgerFixtures'
 
 // 오늘: 2026-10-06. 마지막 백업 2026-09-01 → 35일 지남
 const TODAY = new Date('2026-10-06T09:00:00.000+09:00')
@@ -13,13 +13,12 @@ const REMINDER = '한 달 넘게 백업하지 않았어요'
 
 const LEDGER: Ledger = {
   year: 2026,
-  clubName: '꽃동산',
   carryover: 0,
   entries: [{ id: 'a', month: 8, type: 'income', name: '회비', amount: 50_000, createdAt: '2026-08-01T00:00:00.000Z' }],
 }
 
 function storedWith(settings: Settings): StoredData {
-  return { ...createEmptyData(), ledgers: { '2026': LEDGER }, settings }
+  return { ...storedWithLedgers(LEDGER), settings }
 }
 
 // 백업 뒤 기록이 바뀌었고 35일 지났다

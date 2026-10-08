@@ -18,25 +18,37 @@ export interface Entry {
   batchId?: string // 사진으로 함께 넣은 묶음 (되돌리기용)
 }
 
-// 연도별 장부 1개
+// 연도별 장부 1개. 이름은 장부(Book)에 하나만 둔다 (v3, SPEC-005)
 export interface Ledger {
   year: number
-  clubName: string
   carryover: number // 전년도 이월금 (적자면 음수)
   entries: Entry[]
+}
+
+// 장부 종류 (SPEC-005): 동아리·모임 / 개인 가계부. 처음 보여 줄 기본 항목과 몇몇 문구만 다르다
+export type BookKind = 'club' | 'household'
+
+// 장부 하나 = 이름 + 종류 + 연도별 기록 (SPEC-005)
+export interface Book {
+  id: string
+  name: string
+  kind: BookKind
+  ledgers: Record<string, Ledger> // 키: 연도 문자열 ("2026")
+  createdAt: string // ISO 8601
 }
 
 // 앱 설정. 필요한 항목은 이후 이슈에서 선택 필드로 늘린다
 export interface Settings {
   lastBackupAt?: string // ISO 8601
   lastChangedAt?: string // ISO 8601
+  lastBookId?: string // 마지막에 본 장부. 앱을 열면 이 장부가 열린다 (SPEC-005 AC-2)
 }
 
-export const CURRENT_SCHEMA_VERSION = 2
+export const CURRENT_SCHEMA_VERSION = 3
 
-// 저장소 키 `dongari:v2` 에 들어가는 전체 데이터
+// 저장소 키 `dongari:v2` 에 들어가는 전체 데이터 (키 이름은 v3 에서도 그대로, ADR 001)
 export interface StoredData {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION
-  ledgers: Record<string, Ledger> // 키: 연도 문자열 ("2026")
+  books: Book[] // 만든 순
   settings: Settings
 }

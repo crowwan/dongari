@@ -6,16 +6,12 @@ import type { Ledger, StoredData } from './domain/types'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
 import { createEmptyData } from './storage/schema'
+import { savedLedger, storedWith } from './test/ledgerFixtures'
 
 const TODAY = new Date('2026-10-03T09:00:00.000+09:00')
 
-function storedWith(...ledgers: Ledger[]): StoredData {
-  return { ...createEmptyData(), ledgers: Object.fromEntries(ledgers.map((item) => [String(item.year), item])) }
-}
-
 const LEDGER_2025: Ledger = {
   year: 2025,
-  clubName: '한랑드림',
   carryover: 100_000,
   entries: [
     { id: 'a', month: 3, type: 'income', name: '회비', amount: 140_000, createdAt: '2025-03-01T00:00:00.000Z' },
@@ -62,12 +58,17 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('370,482원')
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('10월')
       expect(screen.getByText('10월에 적은 내역이 없어요. 아래 [+ 내역 적기] 로 적어 보세요')).toBeInTheDocument()
-      expect(repository.load().data.ledgers['2026']).toEqual({
-        year: 2026,
-        clubName: '한랑드림',
-        carryover: 370_482,
-        entries: [],
-      })
+      // 첫 실행에 만들어지는 장부는 동아리·모임 장부 하나 (SPEC-005)
+      expect(repository.load().data.books).toEqual([
+        {
+          id: 'id-1',
+          name: '한랑드림',
+          kind: 'club',
+          ledgers: { '2026': { year: 2026, carryover: 370_482, entries: [] } },
+          createdAt: TODAY.toISOString(),
+        },
+      ])
+      expect(repository.load().data.settings.lastBookId).toBe('id-1')
     })
 
     it('이월금을 0 으로 두고 [시작하기] 를 누르면 이월금 0원 장부로 시작한다', async () => {
@@ -80,7 +81,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(screen.getByRole('button', { name: '시작하기' }))
 
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('0원')
-      expect(repository.load().data.ledgers['2026']?.carryover).toBe(0)
+      expect(savedLedger(repository, 2026)?.carryover).toBe(0)
     })
 
     it('작년이 적자였으면 "적자였어요"를 골라 음수 이월금으로 시작한다', async () => {
@@ -92,7 +93,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(screen.getByRole('button', { name: '시작하기' }))
 
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('−50,000원')
-      expect(repository.load().data.ledgers['2026']?.carryover).toBe(-50_000)
+      expect(savedLedger(repository, 2026)?.carryover).toBe(-50_000)
     })
   })
 
@@ -109,7 +110,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('한랑드림')
       expect(screen.getByTestId('ledger-year')).toHaveTextContent('2026년')
-      expect(repository.load().data.ledgers['2026']?.carryover).toBe(200_000)
+      expect(savedLedger(repository, 2026)?.carryover).toBe(200_000)
     })
 
     it('새 연도 시작 화면에서도 위쪽 [설정] 으로 지난 장부를 골라 볼 수 있다', async () => {
@@ -288,7 +289,8 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(screen.getByRole('button', { name: '적자였어요' }))
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
-      expect(repository.load().data.ledgers['2026']).toMatchObject({ clubName: '꽃동산', carryover: -200_000 })
+      expect(repository.load().data.books[0]?.name).toBe('꽃동산')
+      expect(savedLedger(repository, 2026)?.carryover).toBe(-200_000)
       expect(screen.getByRole('button', { name: /^작년 이월금/ })).toHaveTextContent('적자 200,000원')
 
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
@@ -321,7 +323,7 @@ describe('SPEC-001 앱 뼈대', () => {
     })
 
     it('연도는 장부가 있는 연도와 올해 중에서 선택 창으로 고르고, 고르면 선택 창·설정 방문 기록을 한 번에 되돌려 장부 화면에서 그 해 12월을 보여준다', async () => {
-      renderApp(new MemoryRepository(storedWith({ ...LEDGER_2025, year: 2024, clubName: '옛이름' }, LEDGER_2026)))
+      renderApp(new MemoryRepository(storedWith({ ...LEDGER_2025, year: 2024 }, LEDGER_2026)))
 
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
       await userEvent.click(screen.getByRole('button', { name: /^장부 연도/ }))
@@ -337,7 +339,8 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(go).toHaveBeenCalledWith(-2)
       go.mockRestore()
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('옛이름')
+      // 이름은 장부에 하나라 지난 연도도 같은 이름 (SPEC-005)
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('한랑드림')
       expect(screen.getByTestId('ledger-year')).toHaveTextContent('2024년')
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('12월')
     })
@@ -381,7 +384,7 @@ describe('SPEC-001 앱 뼈대', () => {
       // 300,000 − 58,280
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('241,720원')
       expect(screen.getByRole('status')).toHaveTextContent('1건을 저장했어요')
-      expect(repository.load().data.ledgers['2026']?.entries.at(-1)).toEqual({
+      expect(savedLedger(repository, 2026)?.entries.at(-1)).toEqual({
         id: 'id-1',
         month: 4,
         day: 3,
@@ -474,7 +477,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('3월')
-      expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(2)
+      expect(savedLedger(repository, 2026)?.entries).toHaveLength(2)
     })
 
     it('[← 장부로] 로 저장하지 않고 닫는다', async () => {
@@ -496,7 +499,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       await saveItem('간식비 지출', '5000', 12)
 
-      expect(repository.load().data.ledgers['2026']?.entries.at(-1)).toMatchObject({ month: 4, day: 12, name: '간식비', amount: 5_000 })
+      expect(savedLedger(repository, 2026)?.entries.at(-1)).toMatchObject({ month: 4, day: 12, name: '간식비', amount: 5_000 })
       expect(screen.queryByTestId('ledger-screen')).not.toBeInTheDocument()
       expect(dayField()).toHaveFocus()
       // 날·항목·금액은 비우고 달만 이어 쓴다. 날은 미리 채우지 않고 방금 저장한 날을 칩으로만 낸다
@@ -534,7 +537,7 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('5월')
       expect(screen.getByRole('status')).toHaveTextContent('2건을 저장했어요')
-      expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(4)
+      expect(savedLedger(repository, 2026)?.entries).toHaveLength(4)
     })
 
     it('AC-21 뒤로 버튼이나 [← 장부로] 도 [다 적었어요] 와 같이 장부로 돌아가 알린다', async () => {
@@ -570,7 +573,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByRole('status')).toHaveTextContent('1건을 저장했어요')
-      expect(repository.load().data.ledgers['2026']?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '대관료'])
+      expect(savedLedger(repository, 2026)?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '대관료'])
     })
 
     it('이어서 적는 중 달만 바꿔도 [다 적었어요] 에서 버릴지 묻는다', async () => {
@@ -617,7 +620,7 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
       // 그 전에 저장한 내역은 그대로다
-      expect(repository.load().data.ledgers['2026']?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '대관료'])
+      expect(savedLedger(repository, 2026)?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '대관료'])
     })
   })
 
@@ -656,7 +659,7 @@ describe('SPEC-001 앱 뼈대', () => {
       // 200,000 + 140,000 − 45,000
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('295,000원')
       expect(screen.getByRole('status')).toHaveTextContent('고쳤어요')
-      expect(repository.load().data.ledgers['2026']?.entries[1]).toEqual({ ...LEDGER_2026.entries[1], amount: 45_000 })
+      expect(savedLedger(repository, 2026)?.entries[1]).toEqual({ ...LEDGER_2026.entries[1], amount: 45_000 })
     })
 
     it('AC-6 AC-25 날짜를 다른 달로 바꿔 저장하면 장부가 바뀐 달을 날짜순으로 보여 준다', async () => {
@@ -670,7 +673,7 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('3월')
       expect(entryRows().map((row) => row.textContent)).toEqual(['대관료 9일 · 지출 −40,000원', '회비 수입 +140,000원'])
-      expect(repository.load().data.ledgers['2026']?.entries[1]).toMatchObject({ month: 3, day: 9 })
+      expect(savedLedger(repository, 2026)?.entries[1]).toMatchObject({ month: 3, day: 9 })
     })
 
     it('AC-25 날짜 없는 예전 내역은 날짜 없이 그대로 고쳐 저장된다', async () => {
@@ -682,7 +685,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
-      expect(repository.load().data.ledgers['2026']?.entries[1]).toEqual({ ...LEDGER_2026.entries[1], amount: 50_000 })
+      expect(savedLedger(repository, 2026)?.entries[1]).toEqual({ ...LEDGER_2026.entries[1], amount: 50_000 })
     })
 
     it('고친 내용을 저장하지 못하면 "고쳤어요" 알림 없이 위쪽 실패 안내만 보인다', async () => {
@@ -707,7 +710,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(within(screen.getByRole('alertdialog', { name: '이 내역을 정말 지울까요?' })).getByRole('button', { name: '아니요' }))
 
       expect(screen.getByRole('heading', { level: 1, name: '내역 고치기' })).toBeInTheDocument()
-      expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(2)
+      expect(savedLedger(repository, 2026)?.entries).toHaveLength(2)
     })
 
     it('AC-7 확인 창에서 [지우기] 를 누르면 지우고 장부로 돌아가 "지웠어요" 알림이 뜬다 (방문 기록은 한 번만 되돌린다)', async () => {
@@ -727,7 +730,7 @@ describe('SPEC-001 앱 뼈대', () => {
       // 200,000 + 140,000
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('340,000원')
       expect(screen.getByRole('status')).toHaveTextContent('지웠어요')
-      expect(repository.load().data.ledgers['2026']?.entries.map((item) => item.id)).toEqual(['a'])
+      expect(savedLedger(repository, 2026)?.entries.map((item) => item.id)).toEqual(['a'])
     })
 
     it('지운 내용을 저장하지 못하면 "지웠어요" 알림 없이 위쪽 실패 안내만 보인다', async () => {
@@ -772,7 +775,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '버리기' }))
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
-      expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(2)
+      expect(savedLedger(repository, 2026)?.entries).toHaveLength(2)
     })
 
     it('내역 적기에서 처음 상태(달만 있음)면 뒤로 버튼에 묻지 않고 바로 닫는다', async () => {
@@ -843,7 +846,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(within(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).getByRole('button', { name: '버리기' }))
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('3월')
-      expect(repository.load().data.ledgers['2026']?.entries).toHaveLength(2)
+      expect(savedLedger(repository, 2026)?.entries).toHaveLength(2)
     })
   })
 
