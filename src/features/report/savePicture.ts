@@ -68,9 +68,9 @@ export const pictureSaver: PictureSaver = {
 }
 
 export function monthPictureName(year: number, month: number): string {
-  return `동아리회계-${year}년-${month}월-정리.png`
+  return `우리장부-${year}년-${month}월-정리.png`
 }
 
 export function yearPictureName(year: number): string {
-  return `동아리회계-${year}년-결산.png`
+  return `우리장부-${year}년-결산.png`
 }

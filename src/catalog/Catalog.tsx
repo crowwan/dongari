@@ -1,10 +1,13 @@
 import { useState, type ReactNode } from 'react'
+import { carryoverWords } from '../domain/book'
 import { itemIcon } from '../domain/itemIcon'
 import { yearReport } from '../domain/report'
 import type { EntryType } from '../domain/types'
+import { BookPicker } from '../features/books/BookPicker'
 import { InstallGuide } from '../features/install/InstallGuide'
 import { CarryoverField } from '../features/ledger/CarryoverField'
 import { tidyDayText } from '../features/ledger/entryDraft'
+import type { BookChoice } from '../features/ledger/useLedger'
 import { ItemTotalsCards } from '../features/report/ItemTotalsCards'
 import { SavePictureBar } from '../features/report/SavePictureBar'
 import { ItemTotalsTable } from '../features/report/sheet/ItemTotalsTable'
@@ -85,8 +88,8 @@ const TEXT_ROLES: { role: string; sample: string; muted?: boolean }[] = [
   { role: 'caption', sample: '모르면 0으로 두세요', muted: true },
 ]
 
-// 항목 아이콘 (SPEC-001 AC-18): 이름 → itemIcon() → 아이콘
-const ITEM_NAMES = ['회비', '대관료', '간식비', '행사지원금', '예금 이자', '꽃값', '행사비']
+// 항목 아이콘 (SPEC-001 AC-18, 가계부 기본 항목 SPEC-005): 이름 → itemIcon() → 아이콘
+const ITEM_NAMES = ['회비', '대관료', '간식비', '행사지원금', '예금 이자', '꽃값', '장보기', '관리비', '병원비', '연금', '행사비']
 
 // 화면 동작 아이콘 (아이콘 옆에는 늘 글자)
 const ACTION_ICONS: { icon: IconName; label: string }[] = [
@@ -103,6 +106,15 @@ const ACTION_ICONS: { icon: IconName; label: string }[] = [
   { icon: 'plus', label: '적기' },
   { icon: 'check', label: '저장' },
   { icon: 'left', label: '장부로' },
+  { icon: 'users', label: '동아리·모임 장부' },
+  { icon: 'home', label: '개인 가계부 장부' },
+]
+
+// 장부 고르기 창 (SPEC-005): 만든 순, 이름이 긴 장부는 두 줄까지
+const BOOK_CHOICES: BookChoice[] = [
+  { id: 'club', name: '한랑드림', kind: 'club', balance: 537_142 },
+  { id: 'home', name: '우리집 가계부', kind: 'household', balance: 2_340_500 },
+  { id: 'long', name: '동네 어르신 노래교실 친목회 회비 장부 (2026년부터)', kind: 'club', balance: -12_000 },
 ]
 
 const ENTRY_TYPES: SegmentOptions<EntryType> = [
@@ -162,7 +174,8 @@ const noop = () => {}
 export function Catalog() {
   const [theme, setTheme] = useState<ThemeChoice>('system')
   const [amount, setAmount] = useState(28340)
-  const [clubName, setClubName] = useState('한랑드림')
+  const [bookName, setBookName] = useState('한랑드림')
+  const [pickedBook, setPickedBook] = useState('club')
   const [carryover, setCarryover] = useState(370482)
   const [viewMonth, setViewMonth] = useState(9)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -429,6 +442,16 @@ export function Catalog() {
           </State>
         </Section>
 
+        <Section title="BookPicker (장부 고르기 창, SPEC-005)">
+          <State label="지금 장부 청록 둘레 + ✓, 맨 아래 점선 [+ 새 장부 만들기] (눌러 보기)">
+            <div className="catalog__frame catalog__frame--sheet">
+              <BottomSheet open title="어느 장부를 볼까요?" onClose={noop}>
+                <BookPicker books={BOOK_CHOICES} currentId={pickedBook} onPick={setPickedBook} onNew={noop} />
+              </BottomSheet>
+            </div>
+          </State>
+        </Section>
+
         <Section title="BottomSheet">
           <State label="아래에서 올라오는 선택 창 + MonthPicker (바깥 누르기·Esc 로 닫힘)">
             <div className="catalog__frame catalog__frame--sheet">
@@ -630,16 +653,16 @@ export function Catalog() {
 
         <Section title="TextField">
           <State label="입력 (눌러 보기)">
-            <TextField label="동아리 이름" value={clubName} placeholder="예: 한랑드림" onChange={setClubName} />
+            <TextField label="장부 이름" value={bookName} placeholder="예: 한랑드림" onChange={setBookName} />
           </State>
           <State label="빈칸">
-            <TextField label="동아리 이름" value="" placeholder="예: 한랑드림" onChange={noop} />
+            <TextField label="장부 이름" value="" placeholder="예: 한랑드림" onChange={noop} />
           </State>
           <State label="오류">
-            <TextField label="동아리 이름" value="" onChange={noop} error="동아리 이름을 적어주세요" />
+            <TextField label="장부 이름" value="" onChange={noop} error="장부 이름을 적어 주세요" />
           </State>
           <State label="비활성">
-            <TextField label="동아리 이름" value="한랑드림" onChange={noop} disabled />
+            <TextField label="장부 이름" value="한랑드림" onChange={noop} disabled />
           </State>
           <State label="보조 이름 (labelRole=label, 내역 적기 직접 적기)">
             <TextField label="직접 적기" labelRole="label" value="" placeholder="예: 꽃값" onChange={noop} />
@@ -656,11 +679,17 @@ export function Catalog() {
           <State label={'0원 (시작 화면 "모르면 0으로 두고…")'}>
             <CarryoverField value={0} onChange={noop} />
           </State>
+          <State label="가계부 첫 해 칸 이름 (label, SPEC-005)">
+            <CarryoverField label={carryoverWords('household', true).label} value={0} onChange={noop} />
+          </State>
         </Section>
 
         <Section title="BalanceCard">
           <State label="잔액 + 보조 줄">
-            <BalanceCard label="지금 잔액" amount={1166193} note="작년 이월금 370,482원 포함" />
+            <BalanceCard label="지금 잔액" amount={1166193} note="작년 이월 370,482원 포함" />
+          </State>
+          <State label="가계부 첫 해 보조 줄 (SPEC-005)">
+            <BalanceCard label="지금 잔액" amount={2340500} note="처음 남은 돈 500,000원 포함" />
           </State>
           <State label="적자 (보조 줄 없음)">
             <BalanceCard label="지금 잔액" amount={-50000} />
@@ -844,12 +873,25 @@ export function Catalog() {
               />
             </div>
           </State>
+          <State label="장부 지우기 (설정 맨 아래, SPEC-005)">
+            <div className="catalog__frame">
+              <ConfirmDialog
+                open
+                danger
+                title="‘우리집 가계부’ 장부와 기록을 모두 지울까요?"
+                description="되돌릴 수 없어요"
+                confirmLabel="지우기"
+                onConfirm={noop}
+                onCancel={noop}
+              />
+            </div>
+          </State>
           <State label="설명 붙음 + 위험 (백업 불러오기)">
             <div className="catalog__frame">
               <ConfirmDialog
                 open
                 danger
-                title="2026년 장부(기록 12건)를 불러올까요?"
+                title="장부 2개, 기록 128건으로 바꿀까요?"
                 description="지금 기록은 불러온 기록으로 바뀌어요"
                 confirmLabel="불러오기"
                 onConfirm={noop}
@@ -862,7 +904,7 @@ export function Catalog() {
               <ConfirmDialog
                 open
                 title="이 파일은 열 수 없어요"
-                description="동아리 회계에서 보낸 백업 파일인지 확인해 주세요"
+                description="우리 장부에서 보낸 백업 파일인지 확인해 주세요"
                 cancelLabel={null}
                 onConfirm={noop}
                 onCancel={noop}

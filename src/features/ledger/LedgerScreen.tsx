@@ -1,3 +1,4 @@
+import type { CarryoverWords } from '../../domain/book'
 import { monthGroup, type LedgerTotals, type MonthGroup } from '../../domain/ledger'
 import { itemIcon } from '../../domain/itemIcon'
 import type { Entry, EntryType, Ledger } from '../../domain/types'
@@ -5,17 +6,21 @@ import { AmountText } from '../../ui/AmountText'
 import { BalanceCard } from '../../ui/BalanceCard'
 import { BottomActionBar } from '../../ui/BottomActionBar'
 import { BottomSheet } from '../../ui/BottomSheet'
+import { Icon } from '../../ui/Icon'
 import { IconButton } from '../../ui/IconButton'
 import { ListRow } from '../../ui/ListRow'
 import { formatAmount } from '../../ui/money'
 import { MonthPicker } from '../../ui/MonthPicker'
 import { MonthStepper } from '../../ui/MonthStepper'
 import { BACKUP_DOT_LABEL } from '../backup/backupReminder'
+import { BookPicker } from '../books/BookPicker'
 import type { SheetHistory } from '../useScreenHistory'
+import type { BookChoice } from './useLedger'
 import './ledger.css'
 
 // 장부 화면의 선택 창 이름
 const MONTH_SHEET = 'ledger-month'
+const BOOK_SHEET = 'ledger-books'
 
 // 줄 보조 줄: 색만으로 구분하지 않게 수입/지출을 글자로도
 const TYPE_LABEL: Record<EntryType, string> = { income: '수입', expense: '지출' }
@@ -27,6 +32,11 @@ function rowDescription({ day, type }: Entry): string {
 
 type LedgerScreenProps = {
   bookName: string // 위쪽 제목 (장부 이름, SPEC-005)
+  bookId: string // 지금 장부 (장부 고르기 창의 ✓)
+  books: readonly BookChoice[] // 장부 고르기 창 목록 (만든 순)
+  carryoverWords: CarryoverWords // 잔액 카드 보조 줄의 이월금 이름 (장부 종류별)
+  onPickBook: (id: string) => void // 창에서 장부를 골랐다 (창은 이 화면이 닫는다)
+  onNewBook: () => void // 창의 [+ 새 장부 만들기] (창의 방문 기록 칸은 새 장부 만들기 화면이 이어 쓴다)
   year: number
   ledger: Ledger
   totals: LedgerTotals
@@ -48,16 +58,23 @@ type LedgerScreenProps = {
   onEditEntry?: (id: string) => void
 }
 
-// 잔액 카드 보조 줄: 작년 이월금이 잔액에 들어 있다는 것. 적자면 빼기표 대신 "적자", 0원이면 숨긴다
-function carryoverNote(carryover: number): string | undefined {
-  if (carryover > 0) return `작년 이월 ${formatAmount(carryover)}원 포함`
-  if (carryover < 0) return `작년 적자 ${formatAmount(-carryover)}원 포함`
+// 잔액 카드 보조 줄: 작년 이월금이 잔액에 들어 있다는 것. 적자면 빼기표 대신 "적자", 0원이면 숨긴다.
+// 이름은 장부 종류를 따른다 (동아리 "작년 이월 N원 포함", 가계부 첫 해 "처음 남은 돈 N원 포함", SPEC-005)
+function carryoverNote(carryover: number, words: CarryoverWords): string | undefined {
+  if (carryover > 0) return `${words.surplus} ${formatAmount(carryover)}원 포함`
+  if (carryover < 0) return `${words.deficit} ${formatAmount(-carryover)}원 포함`
   return undefined
 }
 
-// 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 [결산][설정] → 잔액 카드 → ‹ N월 ▾ › → 그 달 카드 → 아래 고정 [+ 내역 적기]
+// 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 [결산][설정] → 잔액 카드 → ‹ N월 ▾ › → 그 달 카드 → 아래 고정 [+ 내역 적기].
+// 위쪽 이름·연도는 한 버튼이라 누르면 장부 고르기 창이 열린다 (SPEC-005 A)
 export function LedgerScreen({
   bookName,
+  bookId,
+  books,
+  carryoverWords,
+  onPickBook,
+  onNewBook,
   year,
   ledger,
   totals,
@@ -75,12 +92,24 @@ export function LedgerScreen({
   return (
     <div className="screen screen--stack ledger" data-testid="ledger-screen">
       <header className="ledger__top">
-        <div className="ledger__title">
-          <h1 className="ledger__club">{bookName}</h1>
-          <p className="ledger__year" data-testid="ledger-year">
-            {year}년
-          </p>
-        </div>
+        <h1 className="ledger__title">
+          <button
+            type="button"
+            className="ledger__book"
+            aria-haspopup="dialog"
+            data-testid="book-button"
+            onClick={() => sheets.openSheet(BOOK_SHEET)}
+          >
+            <span className="ledger__book-text">
+              <span className="ledger__book-name">{bookName}</span>{' '}
+              <span className="ledger__year" data-testid="ledger-year">
+                {year}년
+              </span>
+            </span>
+            <Icon name="down" />
+            <span className="ui-visually-hidden"> 장부 바꾸기</span>
+          </button>
+        </h1>
         <div className="ledger__top-actions">
           <IconButton icon="chart" onClick={onOpenYearSummary}>
             결산
@@ -95,7 +124,7 @@ export function LedgerScreen({
         </div>
       </header>
 
-      <BalanceCard label="지금 잔액" amount={totals.balance} note={carryoverNote(ledger.carryover)} />
+      <BalanceCard label="지금 잔액" amount={totals.balance} note={carryoverNote(ledger.carryover, carryoverWords)} />
 
       <div className="ledger__month-group">
         <MonthStepper
@@ -124,6 +153,18 @@ export function LedgerScreen({
             onChangeMonth(picked)
             sheets.closeSheet()
           }}
+        />
+      </BottomSheet>
+
+      <BottomSheet open={sheets.sheet === BOOK_SHEET} title="어느 장부를 볼까요?" onClose={sheets.closeSheet}>
+        <BookPicker
+          books={books}
+          currentId={bookId}
+          onPick={(picked) => {
+            onPickBook(picked)
+            sheets.closeSheet()
+          }}
+          onNew={onNewBook}
         />
       </BottomSheet>
     </div>

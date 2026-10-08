@@ -31,3 +31,16 @@ describe('SPEC-001 항목 아이콘', () => {
     expect(itemIcon('')).toBe('receipt')
   })
 })
+
+describe('SPEC-005 가계부 기본 항목 아이콘', () => {
+  it('장보기 → 장바구니, 관리비 → 번개, 병원비 → 병원, 연금·용돈 → 지갑', () => {
+    expect(itemIcon('장보기')).toBe('cart')
+    expect(itemIcon('마트')).toBe('cart')
+    expect(itemIcon('관리비')).toBe('bolt')
+    expect(itemIcon('전기요금')).toBe('bolt')
+    expect(itemIcon('병원비')).toBe('hospital')
+    expect(itemIcon('약국')).toBe('hospital')
+    expect(itemIcon('연금')).toBe('wallet')
+    expect(itemIcon('용돈')).toBe('wallet')
+  })
+})

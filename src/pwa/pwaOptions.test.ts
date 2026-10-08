@@ -12,8 +12,8 @@ describe('SPEC-002 홈 화면 추가 (PWA) 설정', () => {
 
   it('GitHub Pages 주소(/dongari/)에서 홈 화면 앱으로 열리게 한다', () => {
     expect(manifest).toMatchObject({
-      name: '동아리 회계',
-      short_name: '동아리 회계',
+      name: '우리 장부',
+      short_name: '우리 장부',
       lang: 'ko',
       start_url: '/dongari/',
       scope: '/dongari/',
@@ -122,5 +122,30 @@ describe('tokens.css 라이트 값 읽기', () => {
 
   it('없는 토큰이면 오류를 낸다 (빌드에서 바로 알 수 있게)', () => {
     expect(() => lightToken(':root { --bg: #fff; }', '--primary')).toThrow('--primary')
+  })
+})
+
+// index.html 도 파일 그대로 읽는다 (탭 이름·공유 미리보기 제목)
+const indexHtml = readFileSync('index.html', 'utf8')
+
+describe('SPEC-005 앱 이름 "우리 장부"', () => {
+  it('AC-9 홈 화면 앱 이름(manifest name·short_name)이 "우리 장부" 다', () => {
+    const manifest = pwaOptions(tokensCss, '/dongari/').manifest || undefined
+
+    expect(manifest).toMatchObject({ name: '우리 장부', short_name: '우리 장부' })
+  })
+
+  it('AC-9 탭 이름(title)과 공유 미리보기 제목(og:title)이 "우리 장부" 다', () => {
+    expect(indexHtml).toContain('<title>우리 장부</title>')
+    expect(indexHtml).toContain('<meta property="og:title" content="우리 장부" />')
+    expect(indexHtml).not.toContain('동아리 회계')
+  })
+
+  it('AC-10 설치한 홈 화면 앱이 그대로 열리게 manifest id·시작 주소·범위는 바꾸지 않는다', () => {
+    expect(pwaOptions(tokensCss, '/dongari/').manifest || undefined).toMatchObject({
+      id: '/dongari/',
+      start_url: '/dongari/',
+      scope: '/dongari/',
+    })
   })
 })

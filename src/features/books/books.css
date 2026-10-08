@@ -1,0 +1,157 @@
+/*
+ * 장부 고르기 창 안 목록과 새 장부 만들기 화면 (SPEC-005). 값은 tokens.css 변수만 쓴다.
+ */
+@import '../screens.css';
+
+/* 장부 줄 목록: 선택 창(흰 면) 안이라 줄은 회색 면, 줄 사이는 좁게 */
+.books__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 장부 한 줄: 원형 종류 아이콘 + 이름(두 줄까지)·작은 "동아리 · 잔액" + 지금 장부 ✓ */
+.books__choice {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--row-min);
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--corner-md);
+  background: var(--fill);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--ink);
+  font-family: var(--typeface);
+  letter-spacing: var(--letter-body);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 지금 장부: 옅은 청록 면 + 청록 둘레 + ✓ (색만으로 구분하지 않게 ✓ 도 함께) */
+.books__choice[aria-pressed='true'] {
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 var(--stroke) var(--accent-ink);
+}
+
+.books__choice[aria-pressed='true'] > .ui-icon {
+  color: var(--accent-ink);
+}
+
+.books__choice[aria-pressed='false']:active {
+  background: var(--pressed);
+}
+
+.books__choice:focus-visible,
+.books__new:focus-visible {
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
+
+.books__icon {
+  flex: none;
+  width: var(--icon-circle);
+  height: var(--icon-circle);
+  border-radius: var(--corner-pill);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.books__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* 긴 이름은 두 줄까지 보이고 그 뒤는 말줄임 */
+.books__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--strong);
+  font-size: var(--text-row-size);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+.books__note {
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--line-tight);
+}
+
+/* [+ 새 장부 만들기]: 장부 줄과 다른 일이라 흰 면 + 점선 둘레 + 청록 글자 */
+.books__new {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--touch-primary);
+  border: var(--hairline) dashed var(--line-strong);
+  border-radius: var(--corner-md);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--accent-ink);
+  font-family: var(--typeface);
+  font-size: var(--text-label-size);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--letter-body);
+  line-height: var(--line-tight);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.books__new:active {
+  background: var(--pressed);
+}
+
+/*
+ * 새 장부 만들기 화면: 아래 고정 [만들기] 영역(BottomActionBar)만큼 끝을 띄워 마지막 칸이 가리지 않게 한다.
+ * 고정 영역 높이 = 위 여백 + 안내 한 줄 + 주 버튼 + 아래 여백 + 위쪽 선 (ui.css .ui-bottom-bar)
+ */
+.books-new {
+  padding-bottom: calc(
+    var(--space-3) + var(--text-body-size) * var(--line-tight) + var(--space-2) + var(--touch-primary) + var(--space-4) +
+      var(--hairline) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+/* [‹ 장부로] 와 제목은 한 덩어리 */
+.books-new__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* 첫 실행: 돌아갈 곳이 없어 제목만. 위 [백업 불러오기] 줄과 띄운다 */
+.books-new__first-title {
+  padding-top: var(--space-2);
+}
+
+/* 질문 제목 → 답 → 안내 한 줄 */
+.books-new__question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+/* 질문 제목: 글자 칸 이름(장부 이름)과 같은 Heading */
+.books-new__heading {
+  margin: 0;
+  color: var(--strong);
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
+  line-height: var(--line-tight);
+}

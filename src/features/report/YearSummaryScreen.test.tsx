@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { carryoverWords, type CarryoverWords } from '../../domain/book'
 import type { Ledger } from '../../domain/types'
 import { ledger, V1_EXAMPLE_YEAR } from '../../test/ledgerFixtures'
 import type { PictureSaver } from './savePicture'
@@ -10,9 +11,23 @@ function fakeSaver(): PictureSaver {
   return { make: vi.fn(async () => new Blob(['png'])), download: vi.fn() }
 }
 
-function renderYear(data: Ledger | undefined, saver: PictureSaver = fakeSaver()) {
+function renderYear(
+  data: Ledger | undefined,
+  saver: PictureSaver = fakeSaver(),
+  words: CarryoverWords = carryoverWords('club', true),
+) {
   const onNotify = vi.fn()
-  render(<YearSummaryScreen bookName="한랑드림" year={data?.year ?? 2026} ledger={data} onBack={() => {}} onNotify={onNotify} saver={saver} />)
+  render(
+    <YearSummaryScreen
+      bookName="한랑드림"
+      year={data?.year ?? 2026}
+      ledger={data}
+      carryoverWords={words}
+      onBack={() => {}}
+      onNotify={onNotify}
+      saver={saver}
+    />,
+  )
   return { onNotify, saver }
 }
 
@@ -55,6 +70,13 @@ describe('SPEC-003 올해 결산 화면', () => {
       '지 출 ₩ 1,994,780',
       '잔 액 ₩ 152,905',
     ])
+  })
+
+  it('SPEC-005 가계부 결산표는 제목에 장부 이름, 위쪽 오른쪽 이월금 자리는 종류에 맞는 이름이다', () => {
+    renderYear(V1_EXAMPLE, fakeSaver(), carryoverWords('household', true))
+
+    expect(screen.getByRole('heading', { name: '<2025년 한랑드림 수입 지출 내역>' })).toBeInTheDocument()
+    expect(screen.getByTestId('year-summary-box').children[1]?.textContent).toBe('처음 남은 돈 ₩ 370,482')
   })
 
   it('항목별 합계 표는 머리 [수 입 | 지 출] 이 각각 두 칸이고, 줄마다 왼쪽 수입·오른쪽 지출, 짧은 쪽은 빈 칸, 맨 아래 계 (AC-2, AC-3)', () => {
@@ -161,14 +183,14 @@ describe('SPEC-003 올해 결산 화면', () => {
     expect(button.querySelector('[data-icon="download"]')).toBeInTheDocument()
   })
 
-  it('[사진으로 저장] 은 결산 양식만 사진으로 만들어 "동아리회계-2025년-결산.png" 로 내려받는다', async () => {
+  it('[사진으로 저장] 은 결산 양식만 사진으로 만들어 "우리장부-2025년-결산.png" 로 내려받는다', async () => {
     const { saver, onNotify } = renderYear(V1_EXAMPLE)
 
     await userEvent.click(screen.getByRole('button', { name: '사진으로 저장' }))
 
     expect(saver.make).toHaveBeenCalledWith(screen.getByTestId('year-report-capture'))
     expect(within(screen.getByTestId('year-report-capture')).getByTestId('year-report-sheet')).toBeInTheDocument()
-    expect(saver.download).toHaveBeenCalledWith(expect.any(Blob), '동아리회계-2025년-결산.png')
+    expect(saver.download).toHaveBeenCalledWith(expect.any(Blob), '우리장부-2025년-결산.png')
     expect(onNotify).toHaveBeenCalledWith('사진을 저장했어요. 갤러리의 Download 앨범에서 볼 수 있어요')
   })
 })

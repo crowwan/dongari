@@ -8,6 +8,7 @@
 // - 안드로이드 뒤로 버튼 → 그 칸이 빠지며 선택 창만 닫힌다 (화면·버릴까요 확인보다 먼저)
 // - 화면에서 닫을 때(고르기, 바깥 누르기, Esc, [닫기]) closeSheet() → 쌓은 칸을 back() 으로 되돌린다
 // - 고르자마자 장부로 갈 때(설정의 연도) 는 closeSheet 없이 backToLedger() 하나만 부른다 → 두 칸을 go(-2) 로 한 번에
+// - 창에서 다른 화면을 열 때(장부 고르기 창의 [+ 새 장부 만들기]) 는 closeSheet 없이 open() 하나만 부른다 → 창의 칸을 그 화면 칸으로 바꿔 끼운다
 // 사용 예:
 //   <MonthStepper onPickMonth={() => history.openSheet('month')} ... />
 //   <BottomSheet open={history.sheet === 'month'} title="몇 월인가요?" onClose={history.closeSheet}>
@@ -22,6 +23,7 @@ export type Screen =
   | { name: 'year-summary' }
   | { name: 'add-entry'; month: number } // 내역 적기. month: 장부에서 보던 달 (입력 월 기본값)
   | { name: 'edit-entry'; id: string } // 내역 고치기. id: 고칠 기록
+  | { name: 'new-book' } // 새 장부 만들기 (SPEC-005, 장부 고르기 창에서)
 
 const LEDGER: Screen = { name: 'ledger' }
 
@@ -86,6 +88,17 @@ export function useScreenHistory(): ScreenHistory {
     window.history.pushState(state, '')
   }
 
+  // 화면 칸 쌓기. 선택 창이 열려 있으면 창의 칸을 화면 칸으로 바꿔 끼운다: 창을 닫는 back() 은 늦게 오는 popstate 라
+  // 바로 이어 쌓으면 순서가 꼬이고, 바꿔 끼우면 그 화면에서 뒤로 버튼 한 번에 장부로 온다
+  function enterScreen(name: Screen['name']) {
+    if (sheetRef.current !== null && isSheetEntry(window.history.state)) {
+      const state: HistoryState = { screen: name }
+      window.history.replaceState(state, '')
+    } else {
+      pushEntry(name)
+    }
+  }
+
   function closeSheet() {
     if (sheetRef.current === null) return
     changeSheet(null)
@@ -146,7 +159,7 @@ export function useScreenHistory(): ScreenHistory {
   return {
     screen,
     open: (next) => {
-      pushEntry(next.name)
+      enterScreen(next.name)
       show(next)
       window.scrollTo(0, 0)
     },

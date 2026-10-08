@@ -1,5 +1,5 @@
 /*
- * 동아리 회계 디자인 토큰 — 색, 글꼴, 간격, 반경, 크기, 모션 값의 유일한 기준.
+ * 우리 장부 디자인 토큰 — 색, 글꼴, 간격, 반경, 크기, 모션 값의 유일한 기준.
  * 컴포넌트는 여기 변수만 쓰고 값을 직접 쓰지 않는다. 각 토큰의 역할과 이유는 docs/design.md.
  *
  * 기준: 개인 디자인 시스템(~/Works/personal/design-system/CONCEPT.md) 역할 구조 + 디자인 개편 시안(ADR 004).
@@ -142,7 +142,7 @@
   --text-display-weight: var(--weight-bold);
   --text-title-size: 1.5rem; /* 24 화면 제목 ("내역 적기") */
   --text-title-weight: var(--weight-bold);
-  --text-heading-size: 1.25rem; /* 20 질문·카드 제목 ("몇 월인가요?", "동아리 정보") */
+  --text-heading-size: 1.25rem; /* 20 질문·카드 제목 ("몇 월인가요?", "어떤 장부인가요?") */
   --text-heading-weight: var(--weight-bold);
   --text-row-size: 1rem; /* 16 줄 이름 (내역 줄 "대관료", 고른 값) */
   --text-row-weight: var(--weight-semibold);

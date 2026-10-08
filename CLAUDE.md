@@ -1,6 +1,6 @@
-# 동아리 회계
+# 우리 장부 (옛 이름 동아리 회계)
 
-어머니가 스마트폰으로 동아리 수입·지출을 한 줄씩 적으면 연말 정산 보고서가 만들어지는 모바일 웹앱.
+어머니가 스마트폰으로 동아리 수입·지출(과 개인 가계부, v2.4 여러 장부)을 한 줄씩 적으면 연말 정산 보고서가 만들어지는 모바일 웹앱. 주소(`/dongari/`)·저장 키(`dongari:v2`)는 옛 이름 그대로.
 
 ## 개발 규칙
 
@@ -78,10 +78,10 @@ docs/          기획(prd, specs, decisions, design, qa-checklist)
 dev/active/    이슈별 작업 메모 (머지 후 dev/archive/)
 src/
 ├── main.tsx     진입점: 저장소를 한 번 읽어(LoadResult) App 에 넘김, 개발 모드 카탈로그 분기
-├── App.tsx      앱 뼈대: 첫 실행 화면 / 장부(첫 화면)·내역 적기·고치기·설정·월 정리·올해 결산 화면 전환(탭 없음, features/useScreenHistory: 뒤로 버튼·닫기 전 확인·선택 창 openSheet/closeSheet) + 저장 상태 안내
-├── domain/      v2 데이터 타입과 계산 순수 함수 (Entry, Ledger, Book, StoredData(schemaVersion 3, 장부 여러 개), book.ts 지금 장부, ledger.ts 장부, report.ts 월 정리·올해 결산, entryDate.ts 날짜(일) 검증·날짜순)
+├── App.tsx      앱 뼈대: 첫 실행(새 장부 만들기) / 장부(첫 화면)·내역 적기·고치기·설정·월 정리·올해 결산·새 장부 만들기 화면 전환(탭 없음, features/useScreenHistory: 뒤로 버튼·닫기 전 확인·선택 창 openSheet/closeSheet) + 저장 상태 안내
+├── domain/      v2 데이터 타입과 계산 순수 함수 (Entry, Ledger, Book, StoredData(schemaVersion 3, 장부 여러 개), book.ts 지금 장부·장부 잔액·종류별 이월금 문구, ledger.ts 장부, report.ts 월 정리·올해 결산, entryDate.ts 날짜(일) 검증·날짜순)
 ├── storage/     v2 저장 계층 (LedgerRepository, LocalStorage·Memory 구현, 스키마 가드, 마이그레이션(v2 → v3 장부 하나로, 옛 원본 보관), 백업 파일 만들기·읽기)
-├── features/    화면 단위 (ledger: 장부·시작·내역 적기(하나씩 채우기 entrySteps)·고치기·useLedger, settings, report: 월 정리·올해 결산·사진으로 저장, report/sheet: v1 연말 양식(인라인 hex 예외), storage: 저장 안내 문구, backup: 백업 보내기·불러오기 흐름, install: 설정 [홈 화면에 추가] 줄 규칙·설치 제안·방법 안내, useScreenHistory·BackToLedger)
+├── features/    화면 단위 (books: 장부 고르기 창 목록·새 장부 만들기, ledger: 장부·새 연도 시작·내역 적기(하나씩 채우기 entrySteps)·고치기·useLedger, settings, report: 월 정리·올해 결산·사진으로 저장, report/sheet: v1 연말 양식(인라인 hex 예외), storage: 저장 안내 문구, backup: 백업 보내기·불러오기 흐름, install: 설정 [홈 화면에 추가] 줄 규칙·설치 제안·방법 안내, useScreenHistory·BackToLedger)
 ├── pwa/         홈 화면 추가·오프라인 설정 (vite-plugin-pwa 옵션, manifest 색은 tokens.css 에서)
 ├── ui/          기본 컴포넌트 (Button, Icon, ListRow, OptionList, SegmentedControl, BottomSheet, MonthPicker, DayInput, MonthButton, EntryCard, SavedEntries, AmountDisplay, IconButton, NoticeBar, BalanceCard, MonthStepper, …, keyboard: 아이폰 키패드가 뜬 동안 아래 고정 버튼을 질문 바로 아래로)
 ├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준), font.css + fonts/ (Pretendard 가변 서브셋, scripts/subset-font.py 로 만든다)

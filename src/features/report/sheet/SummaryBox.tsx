@@ -14,15 +14,19 @@ const styles = {
 type SummaryBoxProps = {
   year: number
   carryover: number
+  // 이월금 이름: 동아리 "이월금"(v1 양식 그대로), 가계부 "처음 남은 돈"·"넘어온 돈" (SPEC-005)
+  carryoverLabel: string
   totals: LedgerTotals
 }
 
 // 양식 위쪽 오른쪽: 작년 이월금, 올해 수입·지출·잔액
-export function SummaryBox({ year, carryover, totals }: SummaryBoxProps) {
+export function SummaryBox({ year, carryover, carryoverLabel, totals }: SummaryBoxProps) {
   return (
     <div style={styles.box} data-testid="year-summary-box">
       <div style={styles.year}>{year - 1}년</div>
-      <div style={styles.item}>이월금 ₩ {formatAmount(carryover)}</div>
+      <div style={styles.item}>
+        {carryoverLabel} ₩ {formatAmount(carryover)}
+      </div>
       <div style={styles.nextYear}>{year}년</div>
       <div style={styles.item}>수 입 ₩ {formatAmount(totals.income)}</div>
       <div style={styles.item}>지 출 ₩ {formatAmount(totals.expense)}</div>

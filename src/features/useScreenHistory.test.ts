@@ -285,5 +285,21 @@ describe('SPEC-001 화면 이동과 뒤로가기', () => {
 
       expect(result.current.sheet).toBeNull()
     })
+
+    it('SPEC-005 선택 창에서 다른 화면을 열면(장부 고르기 → 새 장부 만들기) 창의 칸을 그 화면 칸으로 바꿔, 뒤로 버튼 한 번에 장부로 온다', () => {
+      const replace = vi.spyOn(window.history, 'replaceState')
+      const { result } = renderHook(() => useScreenHistory())
+      act(() => result.current.openSheet('books'))
+      push.mockClear()
+
+      act(() => result.current.open({ name: 'new-book' }))
+
+      expect(push).not.toHaveBeenCalled()
+      expect(replace).toHaveBeenCalledWith({ screen: 'new-book' }, '')
+      expect(result.current.screen).toEqual({ name: 'new-book' })
+      expect(result.current.sheet).toBeNull()
+      pressBackButton()
+      expect(result.current.screen).toEqual({ name: 'ledger' })
+    })
   })
 })

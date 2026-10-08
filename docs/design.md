@@ -1,9 +1,9 @@
 ---
-project: 동아리 회계
-updated: 2026-10-07
+project: 우리 장부
+updated: 2026-10-08
 ---
 
-# 동아리 회계 디자인
+# 우리 장부 디자인
 
 디자인 의도를 적는 문서. **값은 토큰 파일에만 둔다** (Web `src/styles/tokens.css`).
 실제 모습은 디자인 카탈로그(개발 모드 `/#/dev/catalog`)에서 확인한다.
@@ -168,16 +168,18 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 
 ## 아이콘
 
-`src/ui/Icon.tsx` 한 곳에서 `lucide-react` 아이콘을 이름(`IconName`)으로 고른다. 쓴 아이콘만 번들에 들어간다(트리셰이킹, 22개). 시안의 SVG 를 직접 옮기지 않고 Lucide 를 고른 이유: 시안 아이콘 대부분이 이미 Lucide 모양이고, 선 두께·모서리가 한 세트로 맞춰져 있으며(DS "fill/line 혼용 금지, 두께 통일"), 새 아이콘이 필요할 때 같은 세트에서 고르면 된다.
+`src/ui/Icon.tsx` 한 곳에서 `lucide-react` 아이콘을 이름(`IconName`)으로 고른다. 쓴 아이콘만 번들에 들어간다(트리셰이킹, 27개). 시안의 SVG 를 직접 옮기지 않고 Lucide 를 고른 이유: 시안 아이콘 대부분이 이미 Lucide 모양이고, 선 두께·모서리가 한 세트로 맞춰져 있으며(DS "fill/line 혼용 금지, 두께 통일"), 새 아이콘이 필요할 때 같은 세트에서 고르면 된다.
 
 | 이름 | 모양 | 쓰는 곳 |
 |---|---|---|
 | `users` / `building` / `cup` / `gift` / `bank` / `flower` / `receipt` | 사람들 / 건물 / 컵 / 선물 / 은행 / 꽃 / 영수증 | 항목 아이콘 — `itemIcon(name)` 이 이름으로 고른다 |
+| `cart` / `bolt` / `hospital` / `wallet` | 장바구니 / 번개 / 병원 / 지갑 | 가계부 기본 항목 아이콘 (SPEC-005, #88) |
+| `home` | 집 | 장부 종류 "개인 가계부"(동아리·모임은 `users`) — 장부 고르기 창·새 장부 만들기·설정 종류 줄 (#88). 홈 화면에 추가는 여전히 `phone` |
 | `income` / `expense` | ⊕ / ⊖ | 수입 / 지출 |
 | `calendar` / `pen` / `download` / `share` / `folder` / `chart` / `settings` / `phone` / `plus` / `check` | 달력 / 연필 / 아래 화살표 / 공유 / 폴더 / 막대그래프 / 톱니 / 스마트폰 / 더하기 / 체크 | 날짜, 직접 적기, 사진 저장, 백업 보내기, 백업 불러오기, 결산, 설정, 홈 화면에 추가(폰 홈 화면 — 집 모양은 "우리 집"으로 읽힐 수 있어 폰 모양), 내역 적기, 저장·장부에 넣었어요 |
 | `left` / `right` / `down` | ‹ / › / ▾ | 장부로·이전 달 / 다음 달·바꾸기 / 달 고르기·[10월 ▾] |
 
-`itemIcon(name)`(`src/domain/itemIcon.ts`, SPEC-001 AC-18): 위에서부터 처음 맞는 말 — 회비·회원 → 사람들, 대관·장소·임대 → 건물, 간식·커피·음료·다과 → 컵, 지원금·후원·선물 → 선물, 이자·예금·은행 → 은행, 꽃 → 꽃, 그 밖 → 영수증. 아이콘은 늘 화면 읽기에서 숨기고(`aria-hidden`), 뜻은 옆 글자가 전한다.
+`itemIcon(name)`(`src/domain/itemIcon.ts`, SPEC-001 AC-18): 위에서부터 처음 맞는 말 — 회비·회원 → 사람들, 대관·장소·임대 → 건물, 간식·커피·음료·다과 → 컵, 지원금·후원·선물 → 선물, 이자·예금·은행 → 은행, 꽃 → 꽃, 장보기·마트·시장 → 장바구니, 관리비·전기·가스·수도 → 번개, 병원·약국·약값 → 병원, 연금·용돈 → 지갑(SPEC-005), 그 밖 → 영수증. 아이콘은 늘 화면 읽기에서 숨기고(`aria-hidden`), 뜻은 옆 글자가 전한다.
 
 ## 컴포넌트
 
@@ -213,7 +215,9 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `AmountText` | 수입 `+` 밝은 청록 / 지출 `−` 제목색. 크기는 놓인 자리를 따른다 |
 | `MonthStepper` | [‹] 달 [›] 화살표 아이콘 56px 흰 면, 끝 달에서 비활성. `onPickMonth` 를 주면 가운데 "10월 ▾" 가 버튼("10월 달 고르기", `aria-haspopup="dialog"`) |
 | `BottomActionBar` | 화면 아래 고정 바탕색 면 + 위쪽 가는 선 + 버튼 하나(`icon` 가능, 기본 주 버튼 / `variant="secondary"` 보조 — 연달아 적기 [다 적었어요], #64) × 기본·비활성·비활성 + 안내(버튼 위 본문 크기 한 줄), safe-area 만큼 띄움. 폰 키패드가 레이아웃을 줄이지 않는 브라우저(아이폰)에서 키패드가 떠 있는 동안은 고정을 풀고 지금 질문 바로 아래 흐름에(면·선 없이 안내 + 버튼, 아래 `--space-4`) 두고 키패드 바로 위로 스크롤 (`data-keyboard="open"`, `ui/keyboard`, #70) |
-| `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 한 몸통 스위치 [남았어요 \| 적자였어요] 로 부호를 고른다 (#46) |
+| `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 한 몸통 스위치 [남았어요 \| 적자였어요] 로 부호를 고른다 (#46). 칸 이름 `label` 은 장부 종류별("작년 이월금" / "지금 남은 돈", SPEC-005) |
+| `BookPicker` (`features/books`, #88) | 장부 고르기 창 안 목록: 장부 줄(회색 면 `--fill`, 반경 16, 높이 72 이상) = 흰 원 44 안 종류 아이콘(동아리 `users` / 가계부 `home`) + 이름(Row 16 Bold, 두 줄까지 말줄임) · 작은 "동아리 · 잔액 N원"(Caption `--muted`). 지금 장부는 옅은 청록 면 + 청록 둘레(`--stroke` 안쪽 그림자 선) + ✓(`aria-pressed`). 맨 아래 [+ 새 장부 만들기]: 흰 면 + 점선 둘레(`--hairline` dashed `--line-strong`) + 청록 글자, 높이 60 — 장부 줄과 다른 일이라 모양을 갈랐다 | 장부 화면 이름 ▾ → `BottomSheet` "어느 장부를 볼까요?" |
+| `NewBookScreen` (`features/books`, #88) | 아래 "화면 조립" 새 장부 만들기 |
 | `InstallGuide` (`features/install`) | 홈 화면에 추가 방법: 브라우저 이름(Body Bold `--accent-ink`) + 번호 순서(Body). 설정 "앱" 묶음 [📱 홈 화면에 추가] 줄 → 설치 제안이 없을 때 `BottomSheet` "홈 화면에 추가하는 방법" 안 + [확인] (#10, #56. 장부 위 `InstallBanner` 띠는 #56 에서 지움) |
 | `AddEntryForm` / `EditEntryForm` (`features/ledger`) | 아래 "화면 조립" (#47) |
 | 월 정리 / 올해 결산 (`features/report`) | 카드 셋(수입·지출 카드 제목 Heading, 줄은 이름 본문 ··· 금액 제목색, 합계 줄만 구분선 + Bold, 수입 합계 수입 금액색, 잔액 카드 월말 잔액만 Heading 크기) + [⬇ 사진으로 저장] / 제목 아래 `SegmentedControl` [결산표 \| 항목별 합계](처음 결산표, 기록 없으면 없음) → v1 양식 한 장(화면 틀만 토큰) + [⬇ 사진으로 저장], 또는 `ItemTotalsCards` (#16, #48, #84) |
@@ -223,11 +227,12 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 
 | 화면 | 부품 |
 |---|---|
-| 장부 | 위쪽 이름(Heading)·연도(Caption) + `IconButton` [결산][설정•] → (`--stack`) `BalanceCard` → (묶음 간격 `--group-gap`) `MonthStepper`(`onPickMonth` → `BottomSheet`+`MonthPicker`) → 그 달 카드(소계 두 칸 + `ListRow` 줄(날짜순, 보조 줄 "7일 · 지출", #77) + `IconButton fill` [N월 정리 보기]) → `BottomActionBar` [+ 내역 적기]. 안내 띠(저장 > 백업)는 맨 위 하나. 화면 요소는 `screen screen--stack ledger`, 달 넘기기 묶음은 `margin-top: --group-gap − --stack` (#72) |
-| 설정 | [‹ 장부로] → 제목 → (백업 안내 띠) → 묶음 제목(Label 16 SemiBold, `--muted`) + 흰 카드 안 `ListRow` 줄(값 `--muted` + › `--faint`). 이름·이월금 줄 → 편집 화면([‹ 설정] → 제목 → 입력칸 → [✓ 저장], 키패드에 가리지 않게 주 버튼은 입력칸 바로 아래), 연도 줄 → `BottomSheet`+`OptionList`. 맨 아래 "앱" 묶음 [📱 홈 화면에 추가](보조 줄 "기록이 더 안전해요", 홈 화면 앱이면 묶음째 없음) → 브라우저 설치 창 또는 `BottomSheet`+`InstallGuide` (#56) |
+| 장부 | 위쪽 이름 ▾ 버튼(흰 면 반경 16, 56 이상, 이름 Heading 한 줄 말줄임 · 연도 Caption + ▾, `aria-haspopup="dialog"`, 남은 폭을 다 쓴다 → `BottomSheet`+`BookPicker`, #88) + `IconButton` [결산][설정•] → (`--stack`) `BalanceCard` → (묶음 간격 `--group-gap`) `MonthStepper`(`onPickMonth` → `BottomSheet`+`MonthPicker`) → 그 달 카드(소계 두 칸 + `ListRow` 줄(날짜순, 보조 줄 "7일 · 지출", #77) + `IconButton fill` [N월 정리 보기]) → `BottomActionBar` [+ 내역 적기]. 안내 띠(저장 > 백업)는 맨 위 하나. 화면 요소는 `screen screen--stack ledger`, 달 넘기기 묶음은 `margin-top: --group-gap − --stack` (#72) |
+| 설정 | (#88: 첫 묶음 "장부 정보" = 장부 이름 ✎ / 종류(종류 아이콘, → `BottomSheet`+`OptionList` "어떤 장부인가요?") / 이월금 / 장부 연도, 맨 아래 `--section-gap` 띄워 가운데 `Button` 위험 글자형 [이 장부 지우기] → `ConfirmDialog` 위험) [‹ 장부로] → 제목 → (백업 안내 띠) → 묶음 제목(Label 16 SemiBold, `--muted`) + 흰 카드 안 `ListRow` 줄(값 `--muted` + › `--faint`). 이름·이월금 줄 → 편집 화면([‹ 설정] → 제목 → 입력칸 → [✓ 저장], 키패드에 가리지 않게 주 버튼은 입력칸 바로 아래), 연도 줄 → `BottomSheet`+`OptionList`. 맨 아래 "앱" 묶음 [📱 홈 화면에 추가](보조 줄 "기록이 더 안전해요", 홈 화면 앱이면 묶음째 없음) → 브라우저 설치 창 또는 `BottomSheet`+`InstallGuide` (#56) |
 | 내역 적기 (#47, #56, #68, #77, #80) | [‹ 장부로] → 제목 → (제목과 `--stack` 간격) `EntryCard` "지금 적는 내역"(답한 줄 날짜 "10월 7일" / 항목 "대관료 · 지출") 안 맨 아래 지금 질문 하나(질문 제목 ↔ 답 `--stack-tight`): 0 "며칠인가요?" + 제목 옆 `MonthButton` [10월 ▾](제목 줄 `entry__question-row`, 양 끝) → `DayInput`(칩 [오늘 7일]·[방금 5일], 키패드 [완료] 로도 넘어가게 `form` 으로 감쌈, 날짜 줄은 [바꾸기] 없음) / 1 "무엇인가요?" `OptionList`(최대 6 + [✎ 직접 적기]) + Caption "누르면 바로 다음으로 넘어가요" / 직접 적기 `TextField`(보조 이름) + [‹ 목록에서 고르기] / "수입인가요, 지출인가요?" `SegmentedControl` + Caption / 2 "얼마인가요?" `AmountDisplay` → `BottomActionBar` [다음]·[✓ 저장](1단계엔 없음). [10월 ▾] → `BottomSheet`+`MonthPicker`, [날짜 바꾸기] → 0, [항목 바꾸기] → 1. 연달아 적기(#64): 한 건이라도 저장했으면 제목 아래 `SavedEntries`(→ `--stack` → 카드), 날 숫자 칸에 초점(키패드), [방금 5일] 칩, 날 칸이 빈 0단계·1단계 아래 고정 보조 [다 적었어요](날을 치면 [다음]). 화면 요소는 `screen screen--groups entry` — 묶음 간격을 `.entry` 에 다시 쓰면 `.screen` 공통 간격에 덮인다(#66) |
 | 내역 고치기 (#47, #77, #80) | [‹ 장부로] → 제목 → 질문 넷(묶음 간격 `--group-gap`): "며칠인가요?" + 제목 옆 `MonthButton` [10월 ▾](→ 열두 달 선택 창) → `DayInput`(칩 없음, 포커스 안 줌, 날짜 없는 예전 내역은 빈칸 + Caption "날짜 없이 적은 예전 내역이에요. 비워 둬도 저장돼요") / `SegmentedControl` / `OptionList`(고른 종류만, 지금 이름 체크) + `TextField` "직접 적기" / `AmountDisplay` → (`--section-gap`) [이 내역 지우기] → `BottomActionBar` [✓ 저장] |
-| 시작(첫 실행·새 연도) | 위쪽 오른쪽 `IconButton`([📁 백업 불러오기] / [⚙ 설정•]) → 제목·안내 → `TextField` → `CarryoverField` → [시작하기] |
+| 새 장부 만들기 (#88) | ([‹ 장부로] →) 제목 "새 장부 만들기" → 질문 셋(묶음 간격 `--group-gap`): "어떤 장부인가요?"(Heading) + `SegmentedControl` [👥 동아리·모임 \| 🏠 개인 가계부](기본값 없음) + Caption / `TextField` "장부 이름"(종류별 자리표시) / `CarryoverField`(이름 종류별) + Caption → `BottomActionBar` [✓ 만들기](빠진 것 안내). 첫 실행은 [‹ 장부로] 대신 위쪽 오른쪽 [📁 백업 불러오기] |
+| 새 연도 시작 | 위쪽 오른쪽 `IconButton` [⚙ 설정•] → 제목·안내 → `TextField` "장부 이름" → `CarryoverField`(이름 종류별) → [시작하기] |
 
 ### 선택 창과 뒤로 버튼 (`useScreenHistory`, #46)
 
@@ -246,6 +251,7 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 - 화면에서 닫기(고르기·바깥·Esc·[‹ 설정]): `closeSheet()` 가 그 칸을 `back()` 으로 되돌린다. 이 popstate 는 화면을 바꾸지 않는다.
 - 고르자마자 장부로 갈 때(설정 연도): `closeSheet()` 를 부르지 말고 `backToLedger()` 하나만 — 창 칸과 화면 칸을 `history.go(-2)` 로 한 번에 되돌린다.
 - 다른 화면을 열거나 장부로 돌아오면 창은 닫힌 상태로 시작한다.
+- 창에서 다른 화면을 열 때(장부 고르기 창 [+ 새 장부 만들기] → 새 장부 만들기, #88): `closeSheet()` 없이 `open(화면)` 하나만 — 창 칸을 화면 칸으로 바꿔 끼워(`replaceState`) 그 화면에서 뒤로 버튼 한 번에 장부로 온다.
 - 내역 적기·고치기(#47, #77, #80): 두 화면의 "며칠인가요?" [10월 ▾] 달 선택 창(`'entry-month'`, `EntryMonthSheet`)도 이 방법으로 연다(#77 의 고치기 날짜 선택 창 `'entry-date'` 는 #80 에서 지웠다). 창이 열린 채 [저장] 할 일은 없지만, 저장 뒤 `backToLedger()` 는 창이 열려 있어도 두 칸을 되돌린다. 하나씩 채우기는 처음 상태(보던 달만)에서 답한 것이 하나라도 있으면 `confirmBeforeLeave(true)`.
 
 공통 규칙: 누르는 곳 `--touch-min` 이상, 포커스 링 보임, 그림자 없음(스위치 손잡이 제외), 컴포넌트는 토큰 변수만 쓰고 `className`·`style` 을 받지 않는다. 루트에 `data-testid`, 상태가 있으면 `data-state`/`data-variant`/`data-kind`/`data-tone`.
@@ -295,3 +301,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-07 | 날짜 입력: 날 격자 `DayPicker` → 날 숫자 칸 `DayInput`(`AmountDisplay` 모양 + 빠른 칩 줄). 고치기 날짜는 `PickRow` + 날짜 선택 창(`EntryDateSheet`) 대신 제목 옆 `MonthButton` + `DayInput` 을 바로 둠. 안 쓰게 된 `DayPicker`·`PickRow`·선택 창 안 `MonthStepper` 회색 화살표·`--primary-soft` 방금 날 쓰임 지움. 카탈로그 DayInput·EntryCard 며칠인가요? 상태 갱신 (#80) | |
 | 2026-10-07 | `AmountDisplay`·`DayInput` 포커스 링을 칸(input)에서 숫자 + 단위 상자 전체(`:focus-within`, 상자 반경 `--corner-sm`·좌우 `--space-2`)로 옮김. 칸에만 그리면 "원"/"일" 이 링 밖 둘레선에 겹쳤다 (#80) | |
 | 2026-10-08 | 올해 결산 [결산표 \| 항목별 합계] 전환, `ItemTotalsCards`(수입·지출 카드, 이름·N건·금액·비율 막대), 색 토큰 `--income-bar`·`--expense-bar`·크기 토큰 `--bar-thickness`. 결산 양식 수입내역 목록 → 항목별 합계 표(`ItemTotalsTable`, 인라인 hex), 양식 종이 스타일 `sheetPaper` 로 묶음. 카탈로그 상태 추가 (#84) | |
+| 2026-10-08 | 여러 장부 화면(#88): 장부 화면 이름 ▾ 버튼, `BookPicker`(장부 줄 + 점선 [+ 새 장부 만들기]), 새 장부 만들기 화면, 설정 "장부 정보"·종류 선택 창·[이 장부 지우기], `CarryoverField` 칸 이름 `label`, 아이콘 `home`(가계부)·가계부 항목 `cart`·`bolt`·`hospital`·`wallet`, 창에서 화면 열기(`open` 이 창 칸 바꿔 끼움). 앱 이름 "우리 장부" | |

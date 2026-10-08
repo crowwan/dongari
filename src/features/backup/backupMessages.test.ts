@@ -3,23 +3,18 @@ import type { BackupReadFailure } from '../../storage/backup'
 import { importConfirmTitle, importFailureMessage, restoreFailureMessage } from './backupMessages'
 
 describe('SPEC-002 백업 불러오기 문구', () => {
-  it('장부 하나면 "YYYY년 장부(기록 N건)를 불러올까요?" 로 묻는다', () => {
-    expect(importConfirmTitle({ years: [2026], entryCount: 12 })).toBe('2026년 장부(기록 12건)를 불러올까요?')
-  })
-
-  it('장부가 여러 개면 연도를 오래된 순으로 잇고 기록 수는 합쳐서 묻는다', () => {
-    expect(importConfirmTitle({ years: [2025, 2026], entryCount: 30 })).toBe(
-      '2025년·2026년 장부(기록 30건)를 불러올까요?',
-    )
+  it('SPEC-005 "장부 N개, 기록 M건으로 바꿀까요?" 로 장부 수와 모든 장부의 기록 수를 묻는다', () => {
+    expect(importConfirmTitle({ bookCount: 1, entryCount: 12 })).toBe('장부 1개, 기록 12건으로 바꿀까요?')
+    expect(importConfirmTitle({ bookCount: 2, entryCount: 128 })).toBe('장부 2개, 기록 128건으로 바꿀까요?')
   })
 
   it('장부가 없는 백업 파일이면 그렇다고 알리고 묻는다', () => {
-    expect(importConfirmTitle({ years: [], entryCount: 0 })).toBe('장부가 없는 백업 파일이에요. 불러올까요?')
+    expect(importConfirmTitle({ bookCount: 0, entryCount: 0 })).toBe('장부가 없는 백업 파일이에요. 불러올까요?')
   })
 
   it.each<[BackupReadFailure, string]>([
-    ['broken', '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
-    ['not-backup', '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
+    ['broken', '우리 장부에서 보낸 백업 파일인지 확인해 주세요'],
+    ['not-backup', '우리 장부에서 보낸 백업 파일인지 확인해 주세요'],
     ['newer-version', '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
   ])('AC-4 %s 파일은 "이 파일은 열 수 없어요" 와 할 일을 알린다', (reason, description) => {
     expect(importFailureMessage(reason)).toEqual({ title: '이 파일은 열 수 없어요', description })
