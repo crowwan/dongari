@@ -13,14 +13,19 @@ import {
   Flower2,
   FolderDown,
   Gift,
+  Hospital,
+  House,
   Landmark,
   Pencil,
   Plus,
   Receipt,
   Settings,
   Share2,
+  ShoppingCart,
   Smartphone,
   Users,
+  Wallet,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import type { ItemIconName } from '../domain/itemIcon'
@@ -44,6 +49,7 @@ export type IconName =
   | 'left'
   | 'right'
   | 'down'
+  | 'home'
 
 const ICONS: Record<IconName, LucideIcon> = {
   // 항목 (domain/itemIcon 이 이름으로 고른다)
@@ -53,6 +59,10 @@ const ICONS: Record<IconName, LucideIcon> = {
   gift: Gift,
   bank: Landmark,
   flower: Flower2,
+  cart: ShoppingCart,
+  bolt: Zap,
+  hospital: Hospital,
+  wallet: Wallet,
   receipt: Receipt,
   // 수입 ⊕ / 지출 ⊖
   income: CirclePlus,
@@ -72,6 +82,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   left: ChevronLeft,
   right: ChevronRight,
   down: ChevronDown,
+  // 장부 종류 (SPEC-005): 동아리·모임은 사람들(users), 개인 가계부는 집
+  home: House,
 }
 
 // 꾸밈 아이콘: 화면 읽기에서 숨기고(뜻은 옆 글자가 전한다), 크기·색은 놓인 자리의 CSS 가 정한다

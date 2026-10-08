@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { downloadFile, sendFile, shareFile, type ShareApi } from './sendFile'
 
 function backupFile(): File {
-  return new File(['{"schemaVersion": 2}'], '동아리회계-백업-2026-10-06.txt', { type: 'text/plain' })
+  return new File(['{"schemaVersion": 2}'], '우리장부-백업-2026-10-06.txt', { type: 'text/plain' })
 }
 
 describe('SPEC-002 백업 파일 보내기 (공유·다운로드)', () => {
@@ -15,7 +15,7 @@ describe('SPEC-002 백업 파일 보내기 (공유·다운로드)', () => {
     await expect(sendFile(file, { canShare, share }, download)).resolves.toBe('shared')
 
     expect(canShare).toHaveBeenCalledWith({ files: [file] })
-    expect(share).toHaveBeenCalledWith({ files: [file], title: '동아리회계-백업-2026-10-06.txt' })
+    expect(share).toHaveBeenCalledWith({ files: [file], title: '우리장부-백업-2026-10-06.txt' })
     expect(download).not.toHaveBeenCalled()
   })
 
@@ -103,7 +103,7 @@ describe('SPEC-002 파일 내려받기 (<a download>)', () => {
     downloadFile(file, urls)
 
     expect(urls.createObjectURL).toHaveBeenCalledWith(file)
-    expect(clicked).toEqual([{ href: 'blob:backup', download: '동아리회계-백업-2026-10-06.txt', attached: true }])
+    expect(clicked).toEqual([{ href: 'blob:backup', download: '우리장부-백업-2026-10-06.txt', attached: true }])
     expect(document.querySelector('a[download]')).toBeNull()
     expect(urls.revokeObjectURL).not.toHaveBeenCalled()
 

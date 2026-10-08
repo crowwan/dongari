@@ -7,10 +7,10 @@ export interface BackupFile {
   text: string
 }
 
-// 불러오기 확인 창에 보여 줄 요약
+// 불러오기 확인 창에 보여 줄 요약 ("장부 2개, 기록 128건으로 바꿀까요?", SPEC-005)
 export interface BackupSummary {
-  years: number[] // 어느 장부든 연도별 장부가 있는 연도, 오래된 순
-  entryCount: number // 모든 장부의 기록 수
+  bookCount: number // 장부 수
+  entryCount: number // 모든 장부·연도의 기록 수
 }
 
 // 읽지 못한 이유
@@ -39,7 +39,8 @@ function localDate(now: Date): string {
 export function createBackup(data: StoredData, now: Date): BackupFile {
   const contents: StoredData = { ...data, settings: { ...data.settings, lastBackupAt: now.toISOString() } }
   return {
-    fileName: `동아리회계-백업-${localDate(now)}.txt`,
+    // 앱 이름 기준 (SPEC-005 "우리 장부"). 파일 이름이라 띄어쓰기 없이
+    fileName: `우리장부-백업-${localDate(now)}.txt`,
     text: JSON.stringify(contents, null, 2),
   }
 }
@@ -47,7 +48,7 @@ export function createBackup(data: StoredData, now: Date): BackupFile {
 function summarize(data: StoredData): BackupSummary {
   const ledgers = data.books.flatMap((book) => Object.values(book.ledgers))
   return {
-    years: [...new Set(ledgers.map((item) => item.year))].sort((a, b) => a - b),
+    bookCount: data.books.length,
     entryCount: ledgers.reduce((sum, item) => sum + item.entries.length, 0),
   }
 }

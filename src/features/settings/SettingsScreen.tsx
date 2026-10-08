@@ -1,8 +1,10 @@
 import { useId, useState, type ReactNode } from 'react'
-import type { LedgerInfo } from '../../domain/ledger'
-import type { Ledger } from '../../domain/types'
+import { BOOK_KIND_LABELS, type CarryoverWords } from '../../domain/book'
+import type { BookSetup } from '../../domain/ledger'
+import type { BookKind, Ledger } from '../../domain/types'
 import { BottomSheet } from '../../ui/BottomSheet'
 import { Button } from '../../ui/Button'
+import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { Icon, type IconName } from '../../ui/Icon'
 import { ListRow } from '../../ui/ListRow'
 import { formatAmount } from '../../ui/money'
@@ -11,6 +13,7 @@ import { OptionList } from '../../ui/OptionList'
 import { TextField } from '../../ui/TextField'
 import { BackButton, BackToLedger } from '../BackToLedger'
 import { BACKUP_REMINDER_MESSAGE, lastBackupText } from '../backup/backupReminder'
+import { bookKindIcon } from '../books/bookKindIcon'
 import { InstallGuide } from '../install/InstallGuide'
 import { browserInstallEnvironment, useInstallPrompt, type InstallEnvironment } from '../install/installPrompt'
 import { browserKind, shouldOfferInstall } from '../install/installRules'
@@ -19,13 +22,21 @@ import type { SheetHistory } from '../useScreenHistory'
 import './settings.css'
 
 // 설정 화면 위에 뜨는 것들 (방문 기록 한 칸씩 — 뒤로 버튼은 이것만 닫는다)
-const CLUB_NAME_PAGE = 'settings-club-name'
+const BOOK_NAME_PAGE = 'settings-book-name'
 const CARRYOVER_PAGE = 'settings-carryover'
+const KIND_SHEET = 'settings-kind'
 const YEAR_SHEET = 'settings-year'
 const INSTALL_GUIDE_SHEET = 'settings-install-guide'
 
+const KIND_QUESTION = '어떤 장부인가요?'
+const KIND_CHOICES: BookKind[] = ['club', 'household']
+
 type SettingsScreenProps = {
-  bookName: string // 지금 장부 이름 (SPEC-005, 화면 글자는 #88 전까지 "동아리 이름")
+  bookName: string // 지금 장부 이름 (SPEC-005)
+  bookKind: BookKind
+  carryoverWords: CarryoverWords // 이월금 줄 이름 (장부 종류·연도별, "작년 이월금" / "지금 남은 돈" …)
+  canDeleteBook: boolean // 장부가 둘 이상일 때만 [이 장부 지우기] (빈 앱이 되지 않게)
+  onDeleteBook: () => void // 확인 창 [지우기]
   year: number
   yearChoices: number[] // 장부가 있는 연도 + 올해, 최신 순
   ledger: Ledger | undefined // 고른 연도 장부. 아직 없으면 undefined
@@ -34,7 +45,7 @@ type SettingsScreenProps = {
   // 한 달 넘게 백업하지 않았으면 제목 아래 안내 띠 (SPEC-002, 장부 화면과 같은 띠)
   needsBackup?: boolean
   onChangeYear: (year: number) => void // 고르면 장부 화면으로 돌아가 그 해를 보여 준다
-  onSaveClubInfo: (info: LedgerInfo) => void
+  onSaveBookInfo: (setup: BookSetup) => void
   lastBackupAt?: string // 마지막으로 백업 파일을 보낸 시각 (백업 보내기 줄에 날짜로)
   onSendBackup: () => void
   onImportBackup: () => void
@@ -48,17 +59,21 @@ function carryoverText(carryover: number): string {
   return carryover < 0 ? `적자 ${formatAmount(-carryover)}원` : `${formatAmount(carryover)}원`
 }
 
-// 설정 (SPEC-001 화면 구성, SPEC-002 백업): 묶음 제목 + 아이콘·이름·값·화살표 줄 목록.
-// 이름·이월금 줄은 그 값 하나만 고치는 편집 화면을, 연도 줄은 선택 창을 연다
+// 설정 (SPEC-001 화면 구성, SPEC-002 백업, SPEC-005 장부 정보): 묶음 제목 + 아이콘·이름·값·화살표 줄 목록.
+// 이름·이월금 줄은 그 값 하나만 고치는 편집 화면을, 종류·연도 줄은 선택 창을 연다. 맨 아래 [이 장부 지우기]
 export function SettingsScreen({
   bookName,
+  bookKind,
+  carryoverWords,
+  canDeleteBook,
+  onDeleteBook,
   year,
   yearChoices,
   ledger,
   sheets,
   needsBackup = false,
   onChangeYear,
-  onSaveClubInfo,
+  onSaveBookInfo,
   lastBackupAt,
   onSendBackup,
   onImportBackup,
@@ -66,13 +81,14 @@ export function SettingsScreen({
   install = browserInstallEnvironment(),
 }: SettingsScreenProps) {
   const installPrompt = useInstallPrompt(install.installPrompt)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
-  if (ledger && sheets.sheet === CLUB_NAME_PAGE) {
+  if (ledger && sheets.sheet === BOOK_NAME_PAGE) {
     return (
-      <ClubNameEdit
+      <BookNameEdit
         name={bookName}
         onSave={(name) => {
-          onSaveClubInfo({ name, carryover: ledger.carryover })
+          onSaveBookInfo({ name, kind: bookKind, carryover: ledger.carryover })
           sheets.closeSheet()
         }}
         onBack={sheets.closeSheet}
@@ -82,9 +98,10 @@ export function SettingsScreen({
   if (ledger && sheets.sheet === CARRYOVER_PAGE) {
     return (
       <CarryoverEdit
+        label={carryoverWords.label}
         ledger={ledger}
         onSave={(carryover) => {
-          onSaveClubInfo({ name: bookName, carryover })
+          onSaveBookInfo({ name: bookName, kind: bookKind, carryover })
           sheets.closeSheet()
         }}
         onBack={sheets.closeSheet}
@@ -100,13 +117,19 @@ export function SettingsScreen({
         <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={{ label: '백업 파일 보내기', icon: 'share', onClick: onSendBackup }} />
       )}
 
-      <SettingsGroup title="동아리">
+      <SettingsGroup title="장부 정보">
         {ledger ? (
           <>
-            <SettingRow icon="users" title="동아리 이름" value={bookName} onClick={() => sheets.openSheet(CLUB_NAME_PAGE)} />
+            <SettingRow icon="pen" title="장부 이름" value={bookName} onClick={() => sheets.openSheet(BOOK_NAME_PAGE)} />
+            <SettingRow
+              icon={bookKindIcon(bookKind)}
+              title="종류"
+              value={BOOK_KIND_LABELS[bookKind]}
+              onClick={() => sheets.openSheet(KIND_SHEET)}
+            />
             <SettingRow
               icon="bank"
-              title="작년 이월금"
+              title={carryoverWords.label}
               value={carryoverText(ledger.carryover)}
               onClick={() => sheets.openSheet(CARRYOVER_PAGE)}
             />
@@ -134,6 +157,29 @@ export function SettingsScreen({
         </SettingsGroup>
       )}
 
+      {/* 장부 지우기 (SPEC-005): 되돌릴 수 없어 맨 아래 위험 글자형으로 따로 두고, 확인을 받는다 */}
+      {canDeleteBook && (
+        <div className="settings__danger">
+          <Button variant="danger-text" onClick={() => setConfirmingDelete(true)}>
+            이 장부 지우기
+          </Button>
+        </div>
+      )}
+
+      {ledger && (
+        <BottomSheet open={sheets.sheet === KIND_SHEET} title={KIND_QUESTION} onClose={sheets.closeSheet}>
+          <OptionList
+            label={KIND_QUESTION}
+            options={KIND_CHOICES.map((kind) => ({ value: kind, label: BOOK_KIND_LABELS[kind], icon: bookKindIcon(kind) }))}
+            value={bookKind}
+            onChange={(picked) => {
+              if (picked !== bookKind) onSaveBookInfo({ name: bookName, kind: picked, carryover: ledger.carryover })
+              sheets.closeSheet()
+            }}
+          />
+        </BottomSheet>
+      )}
+
       <BottomSheet open={sheets.sheet === YEAR_SHEET} title="어느 해 장부를 볼까요?" onClose={sheets.closeSheet}>
         <OptionList
           label="장부 연도"
@@ -147,6 +193,19 @@ export function SettingsScreen({
         <InstallGuide browser={browserKind(install.userAgent)} />
         <Button onClick={sheets.closeSheet}>확인</Button>
       </BottomSheet>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={`‘${bookName}’ 장부와 기록을 모두 지울까요?`}
+        description="되돌릴 수 없어요"
+        confirmLabel="지우기"
+        danger
+        onConfirm={() => {
+          setConfirmingDelete(false)
+          onDeleteBook()
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   )
 }
@@ -174,7 +233,7 @@ type SettingRowProps = {
   onClick: () => void
 }
 
-// 설정 줄: 원형 아이콘 + 이름(+ 보조 줄) + 값 + 화살표. 줄 전체가 버튼이라 "동아리 이름 한랑드림" 으로 읽힌다
+// 설정 줄: 원형 아이콘 + 이름(+ 보조 줄) + 값 + 화살표. 줄 전체가 버튼이라 "장부 이름 한랑드림" 으로 읽힌다
 function SettingRow({ icon, title, value, description, onClick }: SettingRowProps) {
   return (
     <ListRow
@@ -225,35 +284,42 @@ function EditPage({ title, canSave, onSave, onBack, children }: EditPageProps) {
   )
 }
 
-function ClubNameEdit({ name, onSave, onBack }: { name: string; onSave: (name: string) => void; onBack: () => void }) {
-  const [clubName, setClubName] = useState(name)
-  const missingName = clubName.trim() === ''
-  const changed = clubName.trim() !== name
+function BookNameEdit({ name, onSave, onBack }: { name: string; onSave: (name: string) => void; onBack: () => void }) {
+  const [bookName, setBookName] = useState(name)
+  const missingName = bookName.trim() === ''
+  const changed = bookName.trim() !== name
 
   return (
-    <EditPage title="동아리 이름 바꾸기" canSave={!missingName && changed} onSave={() => onSave(clubName)} onBack={onBack}>
+    <EditPage title="장부 이름 바꾸기" canSave={!missingName && changed} onSave={() => onSave(bookName)} onBack={onBack}>
       <TextField
-        label="동아리 이름"
+        label="장부 이름"
         labelRole="label"
-        value={clubName}
-        onChange={setClubName}
-        error={missingName ? '동아리 이름을 적어주세요' : undefined}
+        value={bookName}
+        onChange={setBookName}
+        error={missingName ? '장부 이름을 적어 주세요' : undefined}
       />
     </EditPage>
   )
 }
 
-function CarryoverEdit({ ledger, onSave, onBack }: { ledger: Ledger; onSave: (carryover: number) => void; onBack: () => void }) {
+type CarryoverEditProps = {
+  label: string // 이월금 이름 (장부 종류별)
+  ledger: Ledger
+  onSave: (carryover: number) => void
+  onBack: () => void
+}
+
+function CarryoverEdit({ label, ledger, onSave, onBack }: CarryoverEditProps) {
   const [carryover, setCarryover] = useState(ledger.carryover)
 
   return (
     <EditPage
-      title="작년 이월금 바꾸기"
+      title={`${label} 바꾸기`}
       canSave={carryover !== ledger.carryover}
       onSave={() => onSave(carryover)}
       onBack={onBack}
     >
-      <CarryoverField value={carryover} onChange={setCarryover} labelRole="label" />
+      <CarryoverField label={label} value={carryover} onChange={setCarryover} labelRole="label" />
     </EditPage>
   )
 }

@@ -360,7 +360,26 @@ describe('SPEC-001 장부 계산', () => {
     })
 
     it('개수를 따로 정할 수 있다', () => {
-      expect(frequentChoices([], 'expense', 1)).toEqual([{ name: '대관료', type: 'expense' }])
+      expect(frequentChoices([], 'expense', { limit: 1 })).toEqual([{ name: '대관료', type: 'expense' }])
+    })
+
+    describe('SPEC-005 개인 가계부 장부', () => {
+      it('AC-5 기록이 없으면 가계부 기본 항목(장보기·관리비·병원비 = 지출, 연금·용돈 = 수입)을 보여준다', () => {
+        expect(frequentChoices([], undefined, { kind: 'household' })).toEqual([
+          { name: '장보기', type: 'expense' },
+          { name: '관리비', type: 'expense' },
+          { name: '병원비', type: 'expense' },
+          { name: '연금', type: 'income' },
+          { name: '용돈', type: 'income' },
+        ])
+        expect(names(frequentChoices([], 'income', { kind: 'household' }))).toEqual(['연금', '용돈'])
+      })
+
+      it('쓴 이름 뒤에 가계부 기본 항목을 채우고, 동아리 기본 항목은 넣지 않는다', () => {
+        const entries = [entry({ id: '1', type: 'expense', name: '외식' })]
+
+        expect(names(frequentChoices(entries, 'expense', { kind: 'household' }))).toEqual(['외식', '장보기', '관리비', '병원비'])
+      })
     })
   })
 

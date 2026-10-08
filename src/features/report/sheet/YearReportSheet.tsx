@@ -20,8 +20,10 @@ const styles = {
 } satisfies Record<string, CSSProperties>
 
 // 올해 결산 양식 한 장 (v1 연말 양식, PLANS.md 6장. v1 수입내역 목록 자리는 항목별 합계 표, v2.3). 값은 domain/report.ts yearReport 가 다 계산해 온다.
-// 제목의 이름은 장부 이름 (SPEC-005)
-export function YearReportSheet({ report, bookName }: { report: YearReport; bookName: string }) {
+// 제목의 이름은 장부 이름, 이월금 이름은 장부 종류를 따른다 (SPEC-005)
+type YearReportSheetProps = { report: YearReport; bookName: string; carryoverLabel: string }
+
+export function YearReportSheet({ report, bookName, carryoverLabel }: YearReportSheetProps) {
   const { year, carryover, months, totals, expenseRows, incomeItems, expenseItems } = report
   return (
     <div style={styles.paper} data-testid="year-report-sheet">
@@ -34,7 +36,7 @@ export function YearReportSheet({ report, bookName }: { report: YearReport; book
             <IncomeExpenseTable months={months} totals={totals} />
           </div>
           <div style={styles.summary}>
-            <SummaryBox year={year} carryover={carryover} totals={totals} />
+            <SummaryBox year={year} carryover={carryover} carryoverLabel={carryoverLabel} totals={totals} />
           </div>
         </div>
       </section>

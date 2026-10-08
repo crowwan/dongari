@@ -41,12 +41,12 @@ function withBackupAt(data: StoredData, now: Date): StoredData {
 }
 
 describe('SPEC-002·SPEC-005 백업 파일 만들기', () => {
-  it('파일 이름은 오늘 날짜가 붙은 동아리회계-백업-YYYY-MM-DD.txt 이다', () => {
-    expect(createBackup(storedWith(ledger(2026, 1)), NOW).fileName).toBe('동아리회계-백업-2026-10-06.txt')
+  it('SPEC-005 파일 이름은 앱 이름(우리 장부)과 오늘 날짜가 붙은 우리장부-백업-YYYY-MM-DD.txt 이다', () => {
+    expect(createBackup(storedWith(ledger(2026, 1)), NOW).fileName).toBe('우리장부-백업-2026-10-06.txt')
   })
 
   it('한 자리 월·일은 0 을 붙인다', () => {
-    expect(createBackup(createEmptyData(), new Date(2026, 0, 5)).fileName).toBe('동아리회계-백업-2026-01-05.txt')
+    expect(createBackup(createEmptyData(), new Date(2026, 0, 5)).fileName).toBe('우리장부-백업-2026-01-05.txt')
   })
 
   it('내용은 전체 저장 데이터(모든 장부)이고 사람이 열어도 읽히게 줄을 나눈다 (AC-8)', () => {
@@ -81,7 +81,7 @@ describe('SPEC-002·SPEC-005 백업 파일 읽기', () => {
     expect(result).toEqual({
       ok: true,
       data: withBackupAt(data, NOW),
-      summary: { years: [2025, 2026], entryCount: 5 },
+      summary: { bookCount: 1, entryCount: 5 },
     })
   })
 
@@ -102,7 +102,7 @@ describe('SPEC-002·SPEC-005 백업 파일 읽기', () => {
 
     const result = readBackup(createBackup(data, NOW).text)
 
-    expect(result).toEqual({ ok: true, data: withBackupAt(data, NOW), summary: { years: [2025, 2026], entryCount: 9 } })
+    expect(result).toEqual({ ok: true, data: withBackupAt(data, NOW), summary: { bookCount: 2, entryCount: 9 } })
   })
 
   it('SPEC-005 AC-8 날짜(일) 칸이 생기기 전(v2.1) 앱이 만든 백업 파일을 장부 하나(동아리·모임)로 읽는다', () => {
@@ -145,7 +145,7 @@ describe('SPEC-002·SPEC-005 백업 파일 읽기', () => {
         ],
         settings: { lastBackupAt: '2026-10-06T00:00:00.000Z', lastBookId: FIRST_BOOK_ID },
       },
-      summary: { years: [2026], entryCount: 1 },
+      summary: { bookCount: 1, entryCount: 1 },
     })
   })
 
@@ -153,7 +153,7 @@ describe('SPEC-002·SPEC-005 백업 파일 읽기', () => {
     expect(readBackup(createBackup(createEmptyData(), NOW).text)).toEqual({
       ok: true,
       data: withBackupAt(createEmptyData(), NOW),
-      summary: { years: [], entryCount: 0 },
+      summary: { bookCount: 0, entryCount: 0 },
     })
   })
 

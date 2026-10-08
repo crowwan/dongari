@@ -29,36 +29,41 @@ function renderApp(repository: LedgerRepository = new MemoryRepository(), loaded
 }
 
 describe('SPEC-001 앱 뼈대', () => {
-  describe('첫 실행', () => {
-    it('장부가 하나도 없으면 동아리 이름과 작년 이월금만 묻는 시작 화면을 보이고 다른 화면으로 가는 버튼은 없다', () => {
+  describe('첫 실행 (SPEC-005 새 장부 만들기)', () => {
+    it('장부가 하나도 없으면 새 장부 만들기 화면(종류·이름·이월금)과 위쪽 [백업 불러오기] 만 보이고 다른 화면으로 가는 버튼은 없다', () => {
       renderApp()
 
-      expect(screen.getByRole('heading', { name: '동아리 회계를 시작해 볼까요?' })).toBeInTheDocument()
-      expect(screen.getByLabelText('동아리 이름')).toHaveValue('')
+      expect(screen.getByRole('heading', { level: 1, name: '새 장부 만들기' })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: '어떤 장부인가요?' })).toBeInTheDocument()
+      expect(screen.getByLabelText('장부 이름')).toHaveValue('')
       // 안내 "모르면 0으로 두고…" 와 맞게 이월금 칸은 0 으로 시작한다
       expect(screen.getByLabelText('작년 이월금')).toHaveValue('0')
+      expect(screen.getByRole('button', { name: '백업 불러오기' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: '설정' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: '장부로' })).not.toBeInTheDocument()
     })
 
-    it('동아리 이름이 비어 있으면 [시작하기] 를 누를 수 없다', () => {
+    it('종류·이름이 없으면 [만들기] 를 누를 수 없다', () => {
       renderApp()
 
-      expect(screen.getByRole('button', { name: '시작하기' })).toBeDisabled()
-      expect(screen.getByText('동아리 이름을 적어주세요')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '만들기' })).toBeDisabled()
+      expect(screen.getByText('어떤 장부인지 골라 주세요')).toBeInTheDocument()
     })
 
-    it('이름·이월금을 적고 [시작하기] 를 누르면 올해 장부가 저장되고 이번 달 장부 화면이 열린다', async () => {
+    it('종류·이름·이월금을 적고 [만들기] 를 누르면 그 장부의 올해 장부가 저장되고 이번 달 장부 화면이 열린다', async () => {
       const repository = renderApp()
 
-      await userEvent.type(screen.getByLabelText('동아리 이름'), ' 한랑드림 ')
+      await userEvent.click(screen.getByRole('button', { name: '동아리·모임' }))
+      await userEvent.type(screen.getByLabelText('장부 이름'), ' 한랑드림 ')
+      await userEvent.clear(screen.getByLabelText('작년 이월금'))
       await userEvent.type(screen.getByLabelText('작년 이월금'), '370482')
-      await userEvent.click(screen.getByRole('button', { name: '시작하기' }))
+      await userEvent.click(screen.getByRole('button', { name: '만들기' }))
 
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('한랑드림')
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('370,482원')
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('10월')
       expect(screen.getByText('10월에 적은 내역이 없어요. 아래 [+ 내역 적기] 로 적어 보세요')).toBeInTheDocument()
-      // 첫 실행에 만들어지는 장부는 동아리·모임 장부 하나 (SPEC-005)
+      expect(screen.getByRole('status')).toHaveTextContent('새 장부를 만들었어요')
       expect(repository.load().data.books).toEqual([
         {
           id: 'id-1',
@@ -71,14 +76,15 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(repository.load().data.settings.lastBookId).toBe('id-1')
     })
 
-    it('이월금을 0 으로 두고 [시작하기] 를 누르면 이월금 0원 장부로 시작한다', async () => {
+    it('이월금을 0 으로 두고 만들면 이월금 0원 장부로 시작한다', async () => {
       const repository = renderApp()
 
-      await userEvent.type(screen.getByLabelText('동아리 이름'), '한랑드림')
+      await userEvent.click(screen.getByRole('button', { name: '동아리·모임' }))
+      await userEvent.type(screen.getByLabelText('장부 이름'), '한랑드림')
       await userEvent.clear(screen.getByLabelText('작년 이월금'))
       await userEvent.type(screen.getByLabelText('작년 이월금'), '0')
       expect(screen.getByLabelText('작년 이월금')).toHaveValue('0')
-      await userEvent.click(screen.getByRole('button', { name: '시작하기' }))
+      await userEvent.click(screen.getByRole('button', { name: '만들기' }))
 
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('0원')
       expect(savedLedger(repository, 2026)?.carryover).toBe(0)
@@ -87,10 +93,12 @@ describe('SPEC-001 앱 뼈대', () => {
     it('작년이 적자였으면 "적자였어요"를 골라 음수 이월금으로 시작한다', async () => {
       const repository = renderApp()
 
-      await userEvent.type(screen.getByLabelText('동아리 이름'), '한랑드림')
+      await userEvent.click(screen.getByRole('button', { name: '동아리·모임' }))
+      await userEvent.type(screen.getByLabelText('장부 이름'), '한랑드림')
+      await userEvent.clear(screen.getByLabelText('작년 이월금'))
       await userEvent.type(screen.getByLabelText('작년 이월금'), '50000')
       await userEvent.click(screen.getByRole('button', { name: '적자였어요' }))
-      await userEvent.click(screen.getByRole('button', { name: '시작하기' }))
+      await userEvent.click(screen.getByRole('button', { name: '만들기' }))
 
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('−50,000원')
       expect(savedLedger(repository, 2026)?.carryover).toBe(-50_000)
@@ -102,7 +110,7 @@ describe('SPEC-001 앱 뼈대', () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2025)))
 
       expect(screen.getByRole('heading', { name: '2026년 장부를 시작할까요?' })).toBeInTheDocument()
-      expect(screen.getByLabelText('동아리 이름')).toHaveValue('한랑드림')
+      expect(screen.getByLabelText('장부 이름')).toHaveValue('한랑드림')
       // 100,000 + 140,000 − 40,000
       expect(screen.getByLabelText('작년 이월금')).toHaveValue('200,000')
 
@@ -272,18 +280,18 @@ describe('SPEC-001 앱 뼈대', () => {
   })
 
   describe('설정', () => {
-    it('동아리 이름·이월금을 각 편집 화면에서 고쳐 저장하면 "바꿨어요" 알림이 뜨고 설정 목록·장부 화면과 저장소에 반영된다', async () => {
+    it('장부 이름·이월금을 각 편집 화면에서 고쳐 저장하면 "바꿨어요" 알림이 뜨고 설정 목록·장부 화면과 저장소에 반영된다', async () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
 
-      await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
-      const name = screen.getByLabelText('동아리 이름')
+      await userEvent.click(screen.getByRole('button', { name: /^장부 이름/ }))
+      const name = screen.getByLabelText('장부 이름')
       await userEvent.clear(name)
       await userEvent.type(name, '꽃동산')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       expect(screen.getByRole('status')).toHaveTextContent('바꿨어요')
-      expect(screen.getByRole('button', { name: /^동아리 이름/ })).toHaveTextContent('꽃동산')
+      expect(screen.getByRole('button', { name: /^장부 이름/ })).toHaveTextContent('꽃동산')
 
       await userEvent.click(screen.getByRole('button', { name: /^작년 이월금/ }))
       await userEvent.click(screen.getByRole('button', { name: '적자였어요' }))
@@ -304,7 +312,7 @@ describe('SPEC-001 앱 뼈대', () => {
     it('저장에 실패하면 "바꿨어요" 알림 없이 위쪽 안내만 보인다', async () => {
       renderApp(alwaysFailing(storedWith(LEDGER_2026)))
 
-      await renameClub('2')
+      await renameBook('2')
 
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
       expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
@@ -313,7 +321,7 @@ describe('SPEC-001 앱 뼈대', () => {
     it('편집 화면에서 안드로이드 뒤로 버튼을 누르면 설정 목록으로, 한 번 더 누르면 장부로 돌아온다', async () => {
       renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
-      await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
+      await userEvent.click(screen.getByRole('button', { name: /^장부 이름/ }))
 
       pressBackButton()
       expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
@@ -882,7 +890,7 @@ describe('SPEC-001 앱 뼈대', () => {
       renderApp(alwaysFailing(storedWith(LEDGER_2026)))
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 
-      await renameClub('2')
+      await renameBook('2')
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
       expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
@@ -970,11 +978,11 @@ async function pickEditDate(current: string, next: string, day: number) {
   await userEvent.type(dayField(), String(day))
 }
 
-// 장부 → 설정 → 동아리 이름 편집 화면에서 이름 뒤에 글자를 붙여 저장한다 (설정 목록으로 돌아온다)
-async function renameClub(suffix: string) {
+// 장부 → 설정 → 장부 이름 편집 화면에서 이름 뒤에 글자를 붙여 저장한다 (설정 목록으로 돌아온다)
+async function renameBook(suffix: string) {
   await userEvent.click(screen.getByRole('button', { name: '설정' }))
-  await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
-  await userEvent.type(screen.getByLabelText('동아리 이름'), suffix)
+  await userEvent.click(screen.getByRole('button', { name: /^장부 이름/ }))
+  await userEvent.type(screen.getByLabelText('장부 이름'), suffix)
   await userEvent.click(screen.getByRole('button', { name: '저장' }))
 }
 

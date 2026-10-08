@@ -51,11 +51,13 @@ describe('SPEC-001 useLedger', () => {
       expect(result.current.totals).toBeUndefined()
     })
 
-    it('첫 실행에서 이름·이월금으로 동아리·모임 장부 하나와 올해 장부를 시작하고, 마지막에 본 장부로 저장한다 (SPEC-005)', () => {
+    it('첫 실행에서 새 장부를 만들면 그 장부 하나와 올해 장부를 시작하고, 마지막에 본 장부로 저장한다 (SPEC-005)', () => {
       const repository = new MemoryRepository()
       const { result } = renderLedger(repository)
 
-      act(() => result.current.startLedger({ name: ' 한랑드림 ', carryover: 30_000 }))
+      act(() => {
+        result.current.createBook({ name: ' 한랑드림 ', kind: 'club', carryover: 30_000 })
+      })
 
       const created = { id: 'id-1', name: '한랑드림', kind: 'club', ledgers: { '2026': { year: 2026, carryover: 30_000, entries: [] } }, createdAt: TODAY.toISOString() }
       expect(result.current.isFirstRun).toBe(false)
@@ -150,7 +152,7 @@ describe('SPEC-001 useLedger', () => {
       const repository = new MemoryRepository(storedWith(ledger2026()))
       const { result } = renderLedger(repository)
 
-      act(() => result.current.updateClubInfo({ name: ' 꽃동산 ', carryover: 0 }))
+      act(() => result.current.updateBookInfo({ name: ' 꽃동산 ', kind: 'club', carryover: 0 }))
 
       expect(result.current.book?.name).toBe('꽃동산')
       expect(result.current.totals?.balance).toBe(100_000)
@@ -275,7 +277,9 @@ describe('SPEC-001 useLedger', () => {
 
       expect(result.current.startup).toEqual({ status: 'read-only', reason: 'newer-version' })
 
-      act(() => result.current.startLedger({ name: '한랑드림', carryover: 0 }))
+      act(() => {
+        result.current.createBook({ name: '한랑드림', kind: 'club', carryover: 0 })
+      })
 
       expect(result.current.saveFailure).toBe('newer-version')
     })
@@ -298,14 +302,14 @@ describe('SPEC-001 useLedger', () => {
       // 화면이 성공 알림을 띄울지 고르도록 저장 결과를 돌려준다
       let saved = true
       act(() => {
-        saved = result.current.updateClubInfo({ name: '꽃동산', carryover: 0 })
+        saved = result.current.updateBookInfo({ name: '꽃동산', kind: 'club', carryover: 0 })
       })
       expect(saved).toBe(false)
 
       // 다음 저장이 성공하면 실패 안내를 거둔다
       next = { ok: true }
       act(() => {
-        saved = result.current.updateClubInfo({ name: '한랑드림', carryover: 0 })
+        saved = result.current.updateBookInfo({ name: '한랑드림', kind: 'club', carryover: 0 })
       })
       expect(saved).toBe(true)
 
@@ -498,7 +502,7 @@ describe('SPEC-005 useLedger 지금 장부', () => {
 
     expect(result.current.years).toEqual([2026])
     expect(result.current.yearChoices).toEqual([2026])
-    expect(result.current.frequentChoices().map((choice) => choice.name)).toEqual(['연금', '대관료', '간식비', '회비'])
+    expect(result.current.frequentChoices().map((choice) => choice.name)).toEqual(['연금', '장보기', '관리비', '병원비', '용돈'])
     expect(result.current.lastUsedType('송년회')).toBeUndefined()
     expect(result.current.lastUsedType('연금')).toBe('income')
   })
@@ -518,7 +522,7 @@ describe('SPEC-005 useLedger 지금 장부', () => {
     act(() => {
       result.current.addEntry({ month: 10, day: 3, type: 'expense', name: '장보기', amount: 30_000 })
       result.current.updateEntry('h1', { month: 10, day: 2, type: 'income', name: '연금', amount: 600_000 })
-      result.current.updateClubInfo({ name: '우리집', carryover: 900_000 })
+      result.current.updateBookInfo({ name: '우리집', kind: 'household', carryover: 900_000 })
     })
     act(() => result.current.changeYear(2027))
     act(() => result.current.startLedger({ name: '우리집', carryover: 0 }))
@@ -544,7 +548,7 @@ describe('SPEC-005 useLedger 지금 장부', () => {
     expect(household?.ledgers['2026']?.entries).toEqual([])
   })
 
-  it('장부가 여러 개여도 첫 실행이 아니고, 첫 장부를 만들 때만 장부가 늘어난다', () => {
+  it('장부가 여러 개여도 첫 실행이 아니고, 새 연도를 시작해도 장부는 늘지 않는다', () => {
     const repository = new MemoryRepository(twoBooks('club'))
     const { result } = renderLedger(repository)
 
@@ -554,5 +558,131 @@ describe('SPEC-005 useLedger 지금 장부', () => {
 
     expect(repository.load().data.books).toHaveLength(2)
     expect(repository.load().data.settings.lastBookId).toBe('club')
+  })
+})
+
+describe('SPEC-005 useLedger 장부 바꾸기·만들기·지우기', () => {
+  it('AC-3 장부 고르기 창에 장부마다 이름·종류·잔액(올해, 없으면 마지막 연도)을 만든 순으로 준다', () => {
+    const { result } = renderLedger(new MemoryRepository(twoBooks('home')))
+
+    expect(result.current.bookChoices).toEqual([
+      { id: 'club', name: '한랑드림', kind: 'club', balance: 330_482 },
+      { id: 'home', name: '우리집 가계부', kind: 'household', balance: 1_500_000 },
+    ])
+  })
+
+  it('AC-3 장부를 고르면 마지막에 본 장부로 저장하고 그 장부의 올해 장부를 연다', () => {
+    const repository = new MemoryRepository({ ...twoBooks('home'), settings: { lastBookId: 'home', lastChangedAt: '2026-09-01T00:00:00.000Z' } })
+    const { result } = renderLedger(repository)
+    act(() => result.current.changeYear(2025))
+
+    act(() => result.current.switchBook('club'))
+
+    expect(result.current.book?.id).toBe('club')
+    expect(result.current.year).toBe(2026)
+    expect(result.current.totals?.balance).toBe(330_482)
+    // 장부를 고른 것은 기록 변경이 아니다 (백업 안내의 변경 시각은 그대로)
+    expect(repository.load().data.settings).toEqual({ lastBookId: 'club', lastChangedAt: '2026-09-01T00:00:00.000Z' })
+  })
+
+  it('AC-4 새 장부를 만들면 이름 앞뒤 공백을 지우고 만든 순 맨 뒤에 넣어 지금 장부로 연다', () => {
+    const repository = new MemoryRepository(twoBooks('club'))
+    const { result } = renderLedger(repository)
+    act(() => result.current.changeYear(2025))
+
+    let saved = false
+    act(() => {
+      saved = result.current.createBook({ name: ' 한랑드림 ', kind: 'household', carryover: -5_000 })
+    })
+
+    expect(saved).toBe(true)
+    expect(result.current.year).toBe(2026)
+    expect(result.current.book).toEqual({
+      id: 'id-1',
+      name: '한랑드림',
+      kind: 'household',
+      ledgers: { '2026': { year: 2026, carryover: -5_000, entries: [] } },
+      createdAt: TODAY.toISOString(),
+    })
+    // 같은 이름의 장부가 있어도 따로 만든다 (구분은 id)
+    expect(repository.load().data.books.map((item) => item.id)).toEqual(['club', 'home', 'id-1'])
+    expect(repository.load().data.settings.lastBookId).toBe('id-1')
+  })
+
+  it('AC-5 개인 가계부 장부는 써 본 항목이 없을 때 가계부 기본 항목을, 이월금 이름은 "지금 남은 돈" 을 준다', () => {
+    const { result } = renderLedger(new MemoryRepository(twoBooks('club')))
+
+    act(() => {
+      result.current.createBook({ name: '우리집', kind: 'household', carryover: 0 })
+    })
+
+    expect(result.current.frequentChoices().map((choice) => choice.name)).toEqual(['장보기', '관리비', '병원비', '연금', '용돈'])
+    expect(result.current.carryoverWords.label).toBe('지금 남은 돈')
+
+    act(() => result.current.changeYear(2027))
+    expect(result.current.carryoverWords.label).toBe('작년에서 넘어온 돈')
+  })
+
+  it('동아리 장부의 이월금 이름은 작년 이월금이다', () => {
+    const { result } = renderLedger(new MemoryRepository(twoBooks('club')))
+
+    expect(result.current.carryoverWords.label).toBe('작년 이월금')
+  })
+
+  it('장부 정보에서 종류를 바꾸면 그 장부의 종류만 바뀐다', () => {
+    const repository = new MemoryRepository(twoBooks('club'))
+    const { result } = renderLedger(repository)
+
+    act(() => {
+      result.current.updateBookInfo({ name: '한랑드림', kind: 'household', carryover: 370_482 })
+    })
+
+    expect(repository.load().data.books.map((item) => item.kind)).toEqual(['household', 'household'])
+    expect(result.current.carryoverWords.label).toBe('작년에서 넘어온 돈')
+  })
+
+  it('AC-7 장부를 지우면 그 장부만 지우고 남은 첫 장부의 올해 장부를 연다', () => {
+    const repository = new MemoryRepository(twoBooks('club'))
+    const { result } = renderLedger(repository)
+    act(() => result.current.changeYear(2025))
+
+    let deleted = false
+    act(() => {
+      deleted = result.current.deleteBook('club')
+    })
+
+    expect(deleted).toBe(true)
+    expect(result.current.book?.id).toBe('home')
+    expect(result.current.year).toBe(2026)
+    expect(repository.load().data.books).toEqual([HOUSEHOLD_BOOK])
+    expect(repository.load().data.settings).toEqual({ lastBookId: 'home', lastChangedAt: TODAY.toISOString() })
+  })
+
+  it('장부가 하나뿐이면 지우지 않는다 (빈 앱이 되지 않게)', () => {
+    const { result } = renderLedger(new MemoryRepository({ ...twoBooks('club'), books: [CLUB_BOOK] }))
+
+    expect(() => result.current.deleteBook('club')).toThrow()
+    expect(result.current.book?.id).toBe('club')
+  })
+
+  it('지우는 중 저장에 실패하면 아무것도 지우지 않고 실패 이유를 노출한다', () => {
+    const memory = new MemoryRepository(twoBooks('club'))
+    const failing: LedgerRepository = {
+      load: () => memory.load(),
+      save: () => ({ ok: false, reason: 'quota-exceeded' }),
+      restore: (data) => memory.restore(data),
+    }
+    const { result } = renderLedger(failing)
+
+    let deleted = true
+    act(() => {
+      deleted = result.current.deleteBook('club')
+    })
+
+    expect(deleted).toBe(false)
+    expect(result.current.saveFailure).toBe('quota-exceeded')
+    expect(result.current.book?.id).toBe('club')
+    expect(result.current.bookChoices).toHaveLength(2)
+    expect(memory.load().data.books).toHaveLength(2)
   })
 })

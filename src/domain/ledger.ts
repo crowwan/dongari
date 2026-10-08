@@ -1,14 +1,19 @@
 // 장부 계산·변경 순수 함수 (SPEC-001). 화면·저장소와 무관하게 Ledger 만 다룬다
 import { byDate, isDayInMonth } from './entryDate'
-import { ENTRY_AMOUNT_MAX, type Book, type Entry, type EntryType, type Ledger } from './types'
+import { ENTRY_AMOUNT_MAX, type Book, type BookKind, type Entry, type EntryType, type Ledger } from './types'
 
 // 사용자가 입력하는 기록 내용. id·createdAt 은 앱이 붙인다. 날짜(일)는 새로 적을 때 꼭 있고, 날짜 없는 예전 기록을 고칠 때만 빠진다
 export type EntryInput = Pick<Entry, 'month' | 'day' | 'type' | 'name' | 'amount' | 'batchId'>
 
 // 장부를 시작하거나 고칠 때 입력하는 장부 이름(Book)과 그 해 이월금(Ledger)
-export interface LedgerInfo {
+export interface BookInfo {
   name: string
   carryover: number
+}
+
+// 새 장부 만들기·설정 "장부 정보" 에서 정하는 것: 이름·이월금 + 종류 (SPEC-005)
+export interface BookSetup extends BookInfo {
+  kind: BookKind
 }
 
 // 기록을 만들 때 바깥에서 받는 것 (테스트에서 고정값을 넣을 수 있게)
@@ -39,12 +44,23 @@ export interface FrequentChoice {
 // 자주 쓴 항목 버튼 최대 개수 (SPEC-001 결정)
 export const FREQUENT_CHOICES_LIMIT = 6
 
-// 기록이 적을 때 채워 넣는 기본 항목 (대관료·간식비 = 지출, 회비 = 수입)
-const DEFAULT_CHOICES: readonly FrequentChoice[] = [
-  { name: '대관료', type: 'expense' },
-  { name: '간식비', type: 'expense' },
-  { name: '회비', type: 'income' },
-]
+// 기록이 적을 때 채워 넣는 기본 항목. 장부 종류마다 다르다 (SPEC-005)
+// - 동아리·모임: 대관료·간식비 = 지출, 회비 = 수입
+// - 개인 가계부: 장보기·관리비·병원비 = 지출, 연금·용돈 = 수입
+const DEFAULT_CHOICES: Readonly<Record<BookKind, readonly FrequentChoice[]>> = {
+  club: [
+    { name: '대관료', type: 'expense' },
+    { name: '간식비', type: 'expense' },
+    { name: '회비', type: 'income' },
+  ],
+  household: [
+    { name: '장보기', type: 'expense' },
+    { name: '관리비', type: 'expense' },
+    { name: '병원비', type: 'expense' },
+    { name: '연금', type: 'income' },
+    { name: '용돈', type: 'income' },
+  ],
+}
 
 // 저장 데이터 형식(schema.ts)에 맞지 않는 입력. 화면은 이런 값으로 저장 버튼을 누를 수 없어야 한다
 export class InvalidLedgerInputError extends Error {
@@ -129,16 +145,16 @@ export function deleteEntry(ledger: Ledger, id: string): Ledger {
 // 자주 쓴 항목 버튼 (AC-4). entries 는 오래된 것부터 입력 순
 // - type 을 주면(종류를 고른 뒤) 그 종류로 쓴 이름만, 없으면(고르기 전) 두 종류를 섞는다
 // - 최근에 쓴 이름부터 중복 없이, 각 이름의 종류는 그 이름을 마지막으로 쓴 기록의 종류
-// - 모자라면 기본 항목으로 채운다
+// - 모자라면 장부 종류(kind, 기본 동아리·모임)의 기본 항목으로 채운다
 export function frequentChoices(
   entries: readonly Entry[],
   type?: EntryType,
-  limit: number = FREQUENT_CHOICES_LIMIT,
+  { kind = 'club', limit = FREQUENT_CHOICES_LIMIT }: { kind?: BookKind; limit?: number } = {},
 ): FrequentChoice[] {
   const ofType = (choice: FrequentChoice) => type === undefined || choice.type === type
   const recentFirst = [...entries].reverse().map((entry) => ({ name: entry.name, type: entry.type }))
   const byName = new Map<string, FrequentChoice>()
-  for (const choice of [...recentFirst.filter(ofType), ...DEFAULT_CHOICES.filter(ofType)]) {
+  for (const choice of [...recentFirst.filter(ofType), ...DEFAULT_CHOICES[kind].filter(ofType)]) {
     if (!byName.has(choice.name)) byName.set(choice.name, choice)
   }
   return [...byName.values()].slice(0, limit)
@@ -169,7 +185,7 @@ export function updateCarryover(ledger: Ledger, carryover: number): Ledger {
 // 새 연도 장부의 입력 기본값 (AC-8)
 // - 이월금: 그 장부의 전년도 장부가 있으면 그 잔액, 없으면 0
 // - 이름: 장부 이름 그대로 (장부가 아직 없으면 빈 이름)
-export function newLedgerDefaults(book: Book | undefined, year: number): LedgerInfo {
+export function newLedgerDefaults(book: Book | undefined, year: number): BookInfo {
   const previous = book?.ledgers[String(year - 1)]
   return {
     name: book?.name ?? '',

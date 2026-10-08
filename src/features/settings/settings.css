@@ -71,3 +71,10 @@
   flex-direction: column;
   gap: var(--space-1);
 }
+
+/* [이 장부 지우기]: 설정 목록과 떨어진 큰 구획 맨 아래, 가운데 (내역 고치기의 [이 내역 지우기] 와 같은 자리) */
+.settings__danger {
+  margin-top: calc(var(--section-gap) - var(--stack-tight));
+  display: flex;
+  justify-content: center;
+}

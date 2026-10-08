@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { carryoverWords, type CarryoverWords } from '../../domain/book'
 import { calculateTotals } from '../../domain/ledger'
 import type { Entry, Ledger } from '../../domain/types'
 import { useScreenHistory } from '../useScreenHistory'
 import { LedgerScreen } from './LedgerScreen'
+import type { BookChoice } from './useLedger'
 
 function entry(id: string, month: number, type: Entry['type'], name: string, amount: number): Entry {
   return { id, month, type, name, amount, createdAt: '2026-01-01T00:00:00.000Z' }
@@ -21,16 +23,41 @@ type Handlers = {
   onOpenMonthSummary?: (month: number) => void
   onOpenYearSummary?: () => void
   onOpenSettings?: () => void
+  onPickBook?: (id: string) => void
+  onNewBook?: () => void
 }
+
+// 장부 두 개 (동아리 "한랑드림" 을 보고 있다)
+const BOOKS: BookChoice[] = [
+  { id: 'club', name: '한랑드림', kind: 'club', balance: 517_252 },
+  { id: 'home', name: '우리집 가계부', kind: 'household', balance: -2_000 },
+]
+
+type Options = { books?: BookChoice[]; words?: CarryoverWords }
 
 // 보고 있는 달은 App 이 들고 있으므로, 테스트에서는 같은 역할의 상태를 감싼다
 // 선택 창은 App 처럼 방문 기록 훅이 연다
-function Harness({ ledger, initialMonth, handlers }: { ledger: Ledger; initialMonth: number; handlers: Handlers }) {
+function Harness({
+  ledger,
+  initialMonth,
+  handlers,
+  options,
+}: {
+  ledger: Ledger
+  initialMonth: number
+  handlers: Handlers
+  options: Options
+}) {
   const [month, setMonth] = useState(initialMonth)
   const sheets = useScreenHistory()
   return (
     <LedgerScreen
       bookName="한랑드림"
+      bookId="club"
+      books={options.books ?? BOOKS}
+      carryoverWords={options.words ?? carryoverWords('club', true)}
+      onPickBook={handlers.onPickBook ?? vi.fn()}
+      onNewBook={handlers.onNewBook ?? vi.fn()}
       year={ledger.year}
       currentMonth={10}
       sheets={sheets}
@@ -47,8 +74,8 @@ function Harness({ ledger, initialMonth, handlers }: { ledger: Ledger; initialMo
   )
 }
 
-function renderScreen(ledger: Ledger, month = 9, handlers: Handlers = {}) {
-  return render(<Harness ledger={ledger} initialMonth={month} handlers={handlers} />)
+function renderScreen(ledger: Ledger, month = 9, handlers: Handlers = {}, options: Options = {}) {
+  return render(<Harness ledger={ledger} initialMonth={month} handlers={handlers} options={options} />)
 }
 
 const SAMPLE = ledgerWith([
@@ -65,7 +92,7 @@ function monthCard() {
 
 describe('SPEC-001 장부 화면', () => {
   describe('위쪽과 잔액', () => {
-    it('위쪽에 동아리 이름과 연도, [결산] [설정] 아이콘 + 글자 버튼이 있다', () => {
+    it('위쪽에 장부 이름과 연도, [결산] [설정] 아이콘 + 글자 버튼이 있다', () => {
       renderScreen(SAMPLE)
 
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('한랑드림')
@@ -263,5 +290,97 @@ describe('SPEC-001 장부 화면', () => {
 
       expect(onAddEntry).toHaveBeenCalledWith(10)
     })
+  })
+})
+
+describe('SPEC-005 장부 화면의 장부 바꾸기', () => {
+  function pressBackButton() {
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    })
+  }
+
+  it('AC-3 위쪽 이름·연도가 한 버튼(이름 ▾)이고, 누르면 "어느 장부를 볼까요?" 창이 열린다', async () => {
+    renderScreen(SAMPLE)
+
+    const bookButton = within(screen.getByRole('heading', { level: 1 })).getByRole('button', { name: /^한랑드림 2026년/ })
+    expect(bookButton).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(bookButton.querySelector('[data-icon="down"]')).toBeInTheDocument()
+
+    await userEvent.click(bookButton)
+
+    expect(screen.getByRole('dialog', { name: '어느 장부를 볼까요?' })).toBeInTheDocument()
+  })
+
+  it('AC-3 창에는 장부마다 종류 아이콘 + 이름 + "종류 · 잔액 N원" 이 만든 순으로 있고, 지금 장부는 고른 표시다', async () => {
+    renderScreen(SAMPLE)
+    await userEvent.click(screen.getByRole('button', { name: /^한랑드림 2026년/ }))
+
+    const list = within(screen.getByRole('group', { name: '장부' }))
+    const rows = list.getAllByRole('button')
+    expect(rows.map((row) => row.textContent)).toEqual(['한랑드림동아리 · 잔액 517,252원', '우리집 가계부가계부 · 잔액 −2,000원'])
+    expect(rows[0]).toHaveAttribute('aria-pressed', 'true')
+    expect(rows[0]?.querySelector('[data-icon="users"]')).toBeInTheDocument()
+    expect(rows[0]?.querySelector('[data-icon="check"]')).toBeInTheDocument()
+    expect(rows[1]).toHaveAttribute('aria-pressed', 'false')
+    expect(rows[1]?.querySelector('[data-icon="home"]')).toBeInTheDocument()
+    expect(rows[1]?.querySelector('[data-icon="check"]')).not.toBeInTheDocument()
+  })
+
+  it('AC-3 장부를 누르면 창이 닫히고 그 장부를 열어 달라고 알린다', async () => {
+    const onPickBook = vi.fn()
+    renderScreen(SAMPLE, 9, { onPickBook })
+    await userEvent.click(screen.getByRole('button', { name: /^한랑드림 2026년/ }))
+
+    await userEvent.click(screen.getByRole('button', { name: /^우리집 가계부/ }))
+
+    expect(onPickBook).toHaveBeenCalledWith('home')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('AC-4 창 맨 아래 [+ 새 장부 만들기] 를 누르면 새 장부 만들기를 열어 달라고 알린다', async () => {
+    const onNewBook = vi.fn()
+    renderScreen(SAMPLE, 9, { onNewBook })
+    await userEvent.click(screen.getByRole('button', { name: /^한랑드림 2026년/ }))
+
+    const create = within(screen.getByRole('dialog')).getByRole('button', { name: '새 장부 만들기' })
+    expect(create.querySelector('[data-icon="plus"]')).toBeInTheDocument()
+    await userEvent.click(create)
+
+    expect(onNewBook).toHaveBeenCalledOnce()
+  })
+
+  it('안드로이드 뒤로 버튼을 누르면 창만 닫히고 장부는 그대로다', async () => {
+    const onPickBook = vi.fn()
+    renderScreen(SAMPLE, 9, { onPickBook })
+    await userEvent.click(screen.getByRole('button', { name: /^한랑드림 2026년/ }))
+
+    pressBackButton()
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onPickBook).not.toHaveBeenCalled()
+    expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
+  })
+
+  it('잔액을 모르는 장부(연도별 장부 없음)는 종류만 보인다', async () => {
+    renderScreen(SAMPLE, 9, {}, { books: [{ id: 'club', name: '한랑드림', kind: 'club', balance: undefined }] })
+    await userEvent.click(screen.getByRole('button', { name: /^한랑드림 2026년/ }))
+
+    expect(screen.getByRole('button', { name: /^한랑드림동아리$/ })).toBeInTheDocument()
+  })
+
+  it('AC-5 가계부 첫 해 잔액 카드 보조 줄은 "처음 남은 돈 N원 포함", 적자면 "처음 적자 N원 포함" 이다', () => {
+    const { unmount } = renderScreen(ledgerWith([], 500_000), 9, {}, { words: carryoverWords('household', true) })
+    expect(screen.getByTestId('balance-card-note')).toHaveTextContent('처음 남은 돈 500,000원 포함')
+    unmount()
+
+    renderScreen(ledgerWith([], -3_000), 9, {}, { words: carryoverWords('household', true) })
+    expect(screen.getByTestId('balance-card-note')).toHaveTextContent('처음 적자 3,000원 포함')
+  })
+
+  it('가계부 다음 해 잔액 카드 보조 줄은 "작년에서 넘어온 돈 N원 포함" 이다', () => {
+    renderScreen(ledgerWith([], 500_000), 9, {}, { words: carryoverWords('household', false) })
+
+    expect(screen.getByTestId('balance-card-note')).toHaveTextContent('작년에서 넘어온 돈 500,000원 포함')
   })
 })

@@ -60,7 +60,7 @@ function stubShare(share: (data: ShareData) => Promise<void> = () => Promise.res
   return { shareMock, sharedFiles }
 }
 
-function textFile(text: string, name = '동아리회계-백업-2026-10-03.txt'): File {
+function textFile(text: string, name = '우리장부-백업-2026-10-03.txt'): File {
   return new File([text], name, { type: 'text/plain' })
 }
 
@@ -97,7 +97,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       await userEvent.click(screen.getByRole('button', { name: /^백업 파일 보내기/ }))
 
       expect(shareMock).toHaveBeenCalledOnce()
-      expect(sharedFiles.map((file) => file.name)).toEqual(['동아리회계-백업-2026-10-03.txt'])
+      expect(sharedFiles.map((file) => file.name)).toEqual(['우리장부-백업-2026-10-03.txt'])
       // 파일 안 마지막 백업 시각은 그 파일을 만든 시각 (#38)
       expect(JSON.parse(await sharedFiles[0].text())).toEqual(backedUpAt(storedWith(LEDGER_2026), TODAY))
       expect(await screen.findByText('백업 파일을 보냈어요')).toBeInTheDocument()
@@ -141,8 +141,8 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const memory = new MemoryRepository(storedWith(LEDGER_2026))
       renderApp({ load: () => memory.load(), save: () => ({ ok: false, reason: 'quota-exceeded' }), restore: (data) => memory.restore(data) })
       await openSettings()
-      await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
-      await userEvent.type(screen.getByLabelText('동아리 이름'), '2')
+      await userEvent.click(screen.getByRole('button', { name: /^장부 이름/ }))
+      await userEvent.type(screen.getByLabelText('장부 이름'), '2')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
       await userEvent.click(within(screen.getByTestId('notice-bar')).getByRole('button', { name: '백업 파일 보내기' }))
@@ -167,7 +167,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       await userEvent.click(screen.getByRole('button', { name: '백업 불러오기' }))
       await chooseFile(backupFile)
 
-      const dialog = await screen.findByRole('alertdialog', { name: '2025년·2026년 장부(기록 3건)를 불러올까요?' })
+      const dialog = await screen.findByRole('alertdialog', { name: '장부 1개, 기록 3건으로 바꿀까요?' })
       // 지금 기록이 없으면 바뀐다는 경고 없이 주 버튼
       expect(dialog).not.toHaveAccessibleDescription()
       expect(within(dialog).getByRole('button', { name: '불러오기' })).toHaveAttribute('data-variant', 'primary')
@@ -185,7 +185,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
 
       await chooseFile(textFile(JSON.stringify(storedWith(LEDGER_2025))))
 
-      const dialog = await screen.findByRole('alertdialog', { name: '2025년 장부(기록 1건)를 불러올까요?' })
+      const dialog = await screen.findByRole('alertdialog', { name: '장부 1개, 기록 1건으로 바꿀까요?' })
       expect(dialog).toHaveAccessibleDescription('지금 기록은 불러온 기록으로 바뀌어요')
       expect(within(dialog).getByRole('button', { name: '불러오기' })).toHaveAttribute('data-variant', 'danger')
       await userEvent.click(within(dialog).getByRole('button', { name: '아니요' }))
@@ -211,8 +211,8 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
     })
 
     it.each([
-      ['깨진 JSON', '{"schemaVersion": 2,', '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
-      ['다른 형식', JSON.stringify({ name: '가계부' }), '동아리 회계에서 보낸 백업 파일인지 확인해 주세요'],
+      ['깨진 JSON', '{"schemaVersion": 2,', '우리 장부에서 보낸 백업 파일인지 확인해 주세요'],
+      ['다른 형식', JSON.stringify({ name: '가계부' }), '우리 장부에서 보낸 백업 파일인지 확인해 주세요'],
       ['상위 버전', JSON.stringify({ schemaVersion: 4, books: [], settings: {} }), '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
     ])('AC-4 %s 파일은 불러오지 않고 "이 파일은 열 수 없어요" 를 알리며 기존 데이터를 유지한다', async (_label, text, description) => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))

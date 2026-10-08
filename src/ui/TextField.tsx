@@ -16,7 +16,7 @@ type TextFieldProps = {
   autoFocus?: boolean
 }
 
-// 글자 입력칸 (동아리 이름, 항목 직접 적기). 큰 제목 + 큰 글자, 오류는 색과 문장으로 함께 알린다
+// 글자 입력칸 (장부 이름, 항목 직접 적기). 큰 제목 + 큰 글자, 오류는 색과 문장으로 함께 알린다
 export function TextField({
   label,
   labelRole = 'heading',

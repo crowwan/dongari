@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { carryoverWords, type CarryoverWords } from '../../domain/book'
 import type { Ledger } from '../../domain/types'
 import { ledger } from '../../test/ledgerFixtures'
 import { MonthSummaryScreen } from './MonthSummaryScreen'
@@ -23,9 +24,16 @@ function fakeSaver(): PictureSaver {
   return { make: vi.fn(async () => new Blob(['png'])), download: vi.fn() }
 }
 
-function renderSummary(data: Ledger, month: number, saver: PictureSaver = fakeSaver()) {
+function renderSummary(
+  data: Ledger,
+  month: number,
+  saver: PictureSaver = fakeSaver(),
+  words: CarryoverWords = carryoverWords('club', true),
+) {
   const onNotify = vi.fn()
-  render(<MonthSummaryScreen ledger={data} month={month} onBack={() => {}} onNotify={onNotify} saver={saver} />)
+  render(
+    <MonthSummaryScreen ledger={data} month={month} carryoverWords={words} onBack={() => {}} onNotify={onNotify} saver={saver} />,
+  )
   return { onNotify, saver }
 }
 
@@ -84,6 +92,18 @@ describe('SPEC-003 월 정리 화면', () => {
     expect(linesOf('잔액')).toEqual(['작년 적자10,000원', '1월 수입 − 지출−40,000원', '1월 말 잔액−50,000원'])
   })
 
+  it('SPEC-005 가계부 첫 해 1월 정리의 전달까지 잔액 자리는 "처음 남은 돈" 이다', () => {
+    const household = carryoverWords('household', true)
+    renderSummary(ledger([[1, 'expense', '장보기', 40_000]], { year: 2026, carryover: 370_482 }), 1, fakeSaver(), household)
+    expect(linesOf('잔액')[0]).toBe('처음 남은 돈370,482원')
+  })
+
+  it('SPEC-005 가계부 다음 해 1월 정리의 전달까지 잔액 자리는 "작년에서 넘어온 돈", 적자면 "작년 적자" 다', () => {
+    const household = carryoverWords('household', false)
+    renderSummary(ledger([[1, 'expense', '장보기', 40_000]], { year: 2026, carryover: -10_000 }), 1, fakeSaver(), household)
+    expect(linesOf('잔액')[0]).toBe('작년 적자10,000원')
+  })
+
   it('수입이 없는 달은 수입 묶음에 "없어요" 한 줄만 보인다', () => {
     renderSummary(ledger([[3, 'expense', '대관료', 40_000]], { year: 2026, carryover: 0 }), 3)
 
@@ -116,7 +136,7 @@ describe('SPEC-003 월 정리 화면', () => {
     expect(button.querySelector('[data-icon="download"]')).toBeInTheDocument()
   })
 
-  it('[사진으로 저장] 은 제목과 세 묶음이 든 정리 영역을 사진으로 만들어 "동아리회계-2026년-9월-정리.png" 로 내려받는다', async () => {
+  it('[사진으로 저장] 은 제목과 세 묶음이 든 정리 영역을 사진으로 만들어 "우리장부-2026년-9월-정리.png" 로 내려받는다', async () => {
     const { saver, onNotify } = renderSummary(SEPTEMBER, 9)
 
     await userEvent.click(screen.getByRole('button', { name: '사진으로 저장' }))
@@ -126,7 +146,7 @@ describe('SPEC-003 월 정리 화면', () => {
     const sheet = screen.getByTestId('month-summary-sheet')
     expect(within(sheet).getByRole('heading', { name: '2026년 9월 정리' })).toBeInTheDocument()
     expect(within(sheet).getByRole('region', { name: '잔액' })).toBeInTheDocument()
-    expect(saver.download).toHaveBeenCalledWith(expect.any(Blob), '동아리회계-2026년-9월-정리.png')
+    expect(saver.download).toHaveBeenCalledWith(expect.any(Blob), '우리장부-2026년-9월-정리.png')
     expect(onNotify).toHaveBeenCalledWith('사진을 저장했어요. 갤러리의 Download 앨범에서 볼 수 있어요')
   })
 })

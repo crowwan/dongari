@@ -83,10 +83,17 @@ describe('SPEC-001 이월금 입력', () => {
   it('남았어요/적자였어요는 한 몸통 스위치(세그먼트)다', () => {
     render(<Harness initial={0} onChange={() => {}} />)
 
-    expect(screen.getByRole('group', { name: '작년 장부가 남았나요, 적자였나요?' })).toHaveAttribute(
+    expect(screen.getByRole('group', { name: '남았나요, 적자였나요?' })).toHaveAttribute(
       'data-testid',
       'segmented-control',
     )
+  })
+
+  it('SPEC-005 칸 이름은 장부 종류에 맞게 바꿀 수 있다 (가계부 "지금 남은 돈")', () => {
+    render(<CarryoverField label="지금 남은 돈" value={0} onChange={() => {}} />)
+
+    expect(screen.getByLabelText('지금 남은 돈')).toBeInTheDocument()
+    expect(screen.queryByLabelText(LABEL)).not.toBeInTheDocument()
   })
 
   it('설정 카드 안에서는 금액 칸 이름을 보조 이름(label)으로 낮출 수 있다', () => {

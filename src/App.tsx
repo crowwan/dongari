@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
+import { NewBookScreen } from './features/books/NewBookScreen'
 import { AddEntryForm } from './features/ledger/AddEntryForm'
 import { EditEntryForm } from './features/ledger/EditEntryForm'
 import { LedgerScreen } from './features/ledger/LedgerScreen'
@@ -12,7 +13,7 @@ import { YearSummaryScreen } from './features/report/YearSummaryScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
 import { useScreenHistory } from './features/useScreenHistory'
-import type { EntryInput } from './domain/ledger'
+import type { BookSetup, EntryInput } from './domain/ledger'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import type { IconName } from './ui/Icon'
@@ -28,8 +29,9 @@ type AppProps = {
   options?: UseLedgerOptions
 }
 
-// 앱 뼈대 (SPEC-001 화면 구성, 탭 없음): 장부(첫 화면) / 내역 적기·고치기 / 설정 / 월 정리 / 올해 결산. 장부가 하나도 없으면 시작 화면만.
-// 화면은 모두 지금 장부(SPEC-005, 마지막에 본 장부) 하나를 보여 준다. 장부를 바꾸면 useLedger 가 지금 장부를 바꾼다
+// 앱 뼈대 (SPEC-001 화면 구성, 탭 없음): 장부(첫 화면) / 내역 적기·고치기 / 설정 / 월 정리 / 올해 결산 / 새 장부 만들기.
+// 장부가 하나도 없으면 새 장부 만들기 화면만(첫 실행, SPEC-005).
+// 화면은 모두 지금 장부(마지막에 본 장부) 하나를 보여 준다. 장부를 고르기·만들기·지우기는 useLedger 가 지금 장부를 바꾸고 App 은 보던 달을 비운다
 export default function App({ repository, loaded, options }: AppProps) {
   const ledger = useLedger(repository, loaded, options)
   const bookName = ledger.book?.name ?? ''
@@ -83,6 +85,14 @@ export default function App({ repository, loaded, options }: AppProps) {
     navigation.backToLedger()
   }
 
+  // 새 장부를 만들면 그 장부의 올해 장부 화면(이번 달)으로. 기기에 저장했을 때만 알린다 (SPEC-005 AC-4)
+  function createBook(setup: BookSetup) {
+    if (ledger.createBook(setup)) setToast('새 장부를 만들었어요')
+    setViewedMonth(undefined)
+    // 첫 실행이면 이미 장부 화면 자리라 돌아갈 방문 기록이 없다
+    if (screen.name === 'new-book') navigation.backToLedger()
+  }
+
   // 저장 상태 안내는 어느 화면이든 맨 위에 (SPEC-002). 할 일이 있으면 백업 버튼을 붙인다
   const noticeActions: Record<StorageNoticeAction, { label: string; icon: IconName; onClick: () => void }> = {
     'import-backup': { label: '백업 파일 불러오기', icon: 'folder', onClick: backup.startImport },
@@ -99,7 +109,7 @@ export default function App({ repository, loaded, options }: AppProps) {
 
   function screenContent(): ReactNode {
     if (ledger.isFirstRun) {
-      // 새 폰으로 옮길 때는 장부를 시작하지 않고 백업 파일부터 불러온다 (안내 띠에 같은 버튼이 있으면 하나만)
+      // 첫 실행은 새 장부 만들기 (SPEC-005). 새 폰으로 옮길 때는 장부를 만들지 않고 백업 파일부터 불러온다 (안내 띠에 같은 버튼이 있으면 하나만)
       return (
         <>
           {!noticeOffersImport && (
@@ -109,7 +119,7 @@ export default function App({ repository, loaded, options }: AppProps) {
               </IconButton>
             </div>
           )}
-          <StartLedgerScreen kind="first" year={ledger.year} defaults={ledger.newLedgerDefaults} onStart={ledger.startLedger} />
+          <NewBookScreen onCreate={createBook} />
         </>
       )
     }
@@ -119,6 +129,16 @@ export default function App({ repository, loaded, options }: AppProps) {
         return (
           <SettingsScreen
             bookName={bookName}
+            bookKind={ledger.book?.kind ?? 'club'}
+            carryoverWords={ledger.carryoverWords}
+            canDeleteBook={ledger.bookChoices.length > 1}
+            onDeleteBook={() => {
+              // 저장하지 못하면 아무것도 지우지 않고 설정에 남아 위쪽 실패 안내만 (SPEC-005)
+              if (!ledger.book || !ledger.deleteBook(ledger.book.id)) return
+              setToast('장부를 지웠어요')
+              setViewedMonth(undefined)
+              navigation.backToLedger()
+            }}
             year={ledger.year}
             yearChoices={ledger.yearChoices}
             ledger={ledger.ledger}
@@ -130,9 +150,9 @@ export default function App({ repository, loaded, options }: AppProps) {
               navigation.backToLedger()
             }}
             lastBackupAt={ledger.data.settings.lastBackupAt}
-            onSaveClubInfo={(info) => {
+            onSaveBookInfo={(setup) => {
               // 저장에 실패하면 위쪽 안내 띠만 보이고 "바꿨어요" 는 띄우지 않는다
-              if (ledger.updateClubInfo(info)) setToast('바꿨어요')
+              if (ledger.updateBookInfo(setup)) setToast('바꿨어요')
             }}
             onSendBackup={backup.send}
             onImportBackup={backup.startImport}
@@ -146,6 +166,7 @@ export default function App({ repository, loaded, options }: AppProps) {
           <MonthSummaryScreen
             ledger={ledger.ledger}
             month={screen.month}
+            carryoverWords={ledger.carryoverWords}
             onBack={navigation.backToLedger}
             onNotify={setToast}
           />
@@ -156,6 +177,7 @@ export default function App({ repository, loaded, options }: AppProps) {
             bookName={bookName}
             year={ledger.year}
             ledger={ledger.ledger}
+            carryoverWords={ledger.carryoverWords}
             onBack={navigation.backToLedger}
             onNotify={setToast}
           />
@@ -206,6 +228,8 @@ export default function App({ repository, loaded, options }: AppProps) {
           />
         )
       }
+      case 'new-book':
+        return <NewBookScreen onCreate={createBook} onBack={navigation.backToLedger} />
       case 'ledger':
         return ledgerScreen()
     }
@@ -228,8 +252,8 @@ export default function App({ repository, loaded, options }: AppProps) {
           </div>
           <StartLedgerScreen
             key={year}
-            kind="new-year"
             year={year}
+            carryoverLabel={ledger.carryoverWords.label}
             defaults={ledger.newLedgerDefaults}
             onStart={ledger.startLedger}
           />
@@ -242,6 +266,15 @@ export default function App({ repository, loaded, options }: AppProps) {
         {showBackupReminder && <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={noticeActions['send-backup']} />}
         <LedgerScreen
           bookName={bookName}
+          bookId={ledger.book?.id ?? ''}
+          books={ledger.bookChoices}
+          carryoverWords={ledger.carryoverWords}
+          onPickBook={(id) => {
+            // 고른 장부의 올해 장부, 올해면 이번 달부터 (SPEC-005 AC-3)
+            ledger.switchBook(id)
+            setViewedMonth(undefined)
+          }}
+          onNewBook={() => navigation.open({ name: 'new-book' })}
           year={year}
           ledger={ledger.ledger}
           totals={totals}

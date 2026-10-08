@@ -138,9 +138,9 @@ describe('SPEC-002 30일 백업 안내', () => {
 
       // 기록 하나를 고쳐 저장 실패를 만든다
       await userEvent.click(screen.getByRole('button', { name: '설정 백업 필요' }))
-      await userEvent.click(screen.getByRole('button', { name: /^동아리 이름/ }))
-      await userEvent.clear(screen.getByLabelText('동아리 이름'))
-      await userEvent.type(screen.getByLabelText('동아리 이름'), '새이름')
+      await userEvent.click(screen.getByRole('button', { name: /^장부 이름/ }))
+      await userEvent.clear(screen.getByLabelText('장부 이름'))
+      await userEvent.type(screen.getByLabelText('장부 이름'), '새이름')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 

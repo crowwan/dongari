@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { LedgerInfo } from '../../domain/ledger'
-import type { Ledger } from '../../domain/types'
+import { carryoverWords } from '../../domain/book'
+import type { BookSetup } from '../../domain/ledger'
+import type { BookKind, Ledger } from '../../domain/types'
 import { createInstallPromptStore, type InstallPromptStore } from '../install/installPrompt'
 import { useScreenHistory } from '../useScreenHistory'
 import { SettingsScreen } from './SettingsScreen'
@@ -12,7 +13,8 @@ const LEDGER: Ledger = { year: 2026, carryover: 370_482, entries: [] }
 
 type Handlers = {
   onChangeYear?: (year: number) => void
-  onSaveClubInfo?: (info: LedgerInfo) => void
+  onSaveBookInfo?: (setup: BookSetup) => void
+  onDeleteBook?: () => void
   onSendBackup?: () => void
   onImportBackup?: () => void
 }
@@ -32,22 +34,36 @@ type HarnessProps = {
   lastBackupAt?: string
   handlers?: Handlers
   install?: InstallOptions
+  kind?: BookKind
+  canDeleteBook?: boolean
 }
 
 // 선택 창·편집 화면은 App 처럼 방문 기록 훅이 연다
-function Harness({ ledger = LEDGER, needsBackup = false, lastBackupAt, handlers = {}, install = {} }: HarnessProps) {
+function Harness({
+  ledger = LEDGER,
+  needsBackup = false,
+  lastBackupAt,
+  handlers = {},
+  install = {},
+  kind = 'club',
+  canDeleteBook = true,
+}: HarnessProps) {
   const sheets = useScreenHistory()
   const [installPrompt] = useState(() => install.installPrompt ?? createInstallPromptStore(new EventTarget()))
   return (
     <SettingsScreen
       bookName="한랑드림"
+      bookKind={kind}
+      carryoverWords={carryoverWords(kind, false)}
+      canDeleteBook={canDeleteBook}
+      onDeleteBook={handlers.onDeleteBook ?? vi.fn()}
       year={2026}
       yearChoices={[2026, 2025]}
       ledger={ledger ?? undefined}
       sheets={sheets}
       needsBackup={needsBackup}
       onChangeYear={handlers.onChangeYear ?? vi.fn()}
-      onSaveClubInfo={handlers.onSaveClubInfo ?? vi.fn()}
+      onSaveBookInfo={handlers.onSaveBookInfo ?? vi.fn()}
       lastBackupAt={lastBackupAt}
       onSendBackup={handlers.onSendBackup ?? vi.fn()}
       onImportBackup={handlers.onImportBackup ?? vi.fn()}
@@ -65,13 +81,19 @@ function pressBackButton() {
 
 describe('SPEC-001·002 설정 화면', () => {
   describe('줄 목록', () => {
-    it('묶음 제목(동아리 / 기록 백업) 아래 아이콘 + 이름 + 값 + 화살표 줄이 있다', () => {
+    it('SPEC-005 묶음 제목(장부 정보 / 기록 백업) 아래 아이콘 + 이름 + 값 + 화살표 줄이 있다', () => {
       render(<Harness lastBackupAt="2026-09-03T10:00:00.000+09:00" />)
 
-      const club = screen.getByRole('region', { name: '동아리' })
-      const rows = within(club).getAllByTestId('list-row')
-      expect(rows.map((row) => row.textContent)).toEqual(['동아리 이름 한랑드림', '작년 이월금 370,482원', '장부 연도 2026년'])
+      const book = screen.getByRole('region', { name: '장부 정보' })
+      const rows = within(book).getAllByTestId('list-row')
+      expect(rows.map((row) => row.textContent)).toEqual([
+        '장부 이름 한랑드림',
+        '종류 동아리·모임',
+        '작년 이월금 370,482원',
+        '장부 연도 2026년',
+      ])
       expect(rows.map((row) => row.querySelector('[data-icon]')?.getAttribute('data-icon'))).toEqual([
+        'pen',
         'users',
         'bank',
         'calendar',
@@ -93,11 +115,12 @@ describe('SPEC-001·002 설정 화면', () => {
       expect(screen.getByRole('button', { name: /작년 이월금/ })).toHaveTextContent('적자 20,000원')
     })
 
-    it('고른 연도 장부가 아직 없으면 동아리 이름·이월금 줄 대신 안내를 보이고 연도 줄은 남는다', () => {
+    it('고른 연도 장부가 아직 없으면 장부 이름·종류·이월금 줄 대신 안내를 보이고 연도 줄은 남는다', () => {
       render(<Harness ledger={null} />)
 
       expect(screen.getByText('2026년 장부가 아직 없어요. 장부 화면에서 시작하면 여기서 고칠 수 있어요.')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /동아리 이름/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /장부 이름/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^종류/ })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /장부 연도/ })).toBeInTheDocument()
     })
 
@@ -125,46 +148,46 @@ describe('SPEC-001·002 설정 화면', () => {
     })
   })
 
-  describe('편집 화면 (동아리 이름·작년 이월금)', () => {
-    it('[동아리 이름] 줄을 누르면 설정 목록 대신 그 값 하나만 고치는 화면이 열린다', async () => {
+  describe('편집 화면 (장부 이름·작년 이월금)', () => {
+    it('[장부 이름] 줄을 누르면 설정 목록 대신 그 값 하나만 고치는 화면이 열린다', async () => {
       render(<Harness />)
 
-      await userEvent.click(screen.getByRole('button', { name: /동아리 이름/ }))
+      await userEvent.click(screen.getByRole('button', { name: /장부 이름/ }))
 
-      expect(screen.getByRole('heading', { level: 1, name: '동아리 이름 바꾸기' })).toBeInTheDocument()
-      expect(screen.getByLabelText('동아리 이름')).toHaveValue('한랑드림')
+      expect(screen.getByRole('heading', { level: 1, name: '장부 이름 바꾸기' })).toBeInTheDocument()
+      expect(screen.getByLabelText('장부 이름')).toHaveValue('한랑드림')
       expect(screen.queryByRole('region', { name: '기록 백업' })).not.toBeInTheDocument()
       // 바꾼 것이 없으면 [저장] 을 누를 수 없다
       expect(screen.getByRole('button', { name: '저장' })).toBeDisabled()
     })
 
     it('이름을 고쳐 [저장] 하면 이월금은 그대로 두고 저장을 알리고 설정 목록으로 돌아온다', async () => {
-      const onSaveClubInfo = vi.fn()
-      render(<Harness handlers={{ onSaveClubInfo }} />)
-      await userEvent.click(screen.getByRole('button', { name: /동아리 이름/ }))
+      const onSaveBookInfo = vi.fn()
+      render(<Harness handlers={{ onSaveBookInfo }} />)
+      await userEvent.click(screen.getByRole('button', { name: /장부 이름/ }))
 
-      const name = screen.getByLabelText('동아리 이름')
+      const name = screen.getByLabelText('장부 이름')
       await userEvent.clear(name)
       await userEvent.type(name, '꽃동산')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
-      expect(onSaveClubInfo).toHaveBeenCalledWith({ name: '꽃동산', carryover: 370_482 })
+      expect(onSaveBookInfo).toHaveBeenCalledWith({ name: '꽃동산', kind: 'club', carryover: 370_482 })
       expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
     })
 
     it('이름을 비우면 [저장] 을 누를 수 없고 이유를 알린다', async () => {
       render(<Harness />)
-      await userEvent.click(screen.getByRole('button', { name: /동아리 이름/ }))
+      await userEvent.click(screen.getByRole('button', { name: /장부 이름/ }))
 
-      await userEvent.clear(screen.getByLabelText('동아리 이름'))
+      await userEvent.clear(screen.getByLabelText('장부 이름'))
 
       expect(screen.getByRole('button', { name: '저장' })).toBeDisabled()
-      expect(screen.getByText('동아리 이름을 적어주세요')).toBeInTheDocument()
+      expect(screen.getByText('장부 이름을 적어 주세요')).toBeInTheDocument()
     })
 
     it('[작년 이월금] 줄은 금액 + 남았어요/적자였어요 화면을 열고, 적자로 바꿔 저장하면 이름은 그대로 둔다', async () => {
-      const onSaveClubInfo = vi.fn()
-      render(<Harness handlers={{ onSaveClubInfo }} />)
+      const onSaveBookInfo = vi.fn()
+      render(<Harness handlers={{ onSaveBookInfo }} />)
       await userEvent.click(screen.getByRole('button', { name: /작년 이월금/ }))
 
       expect(screen.getByRole('heading', { level: 1, name: '작년 이월금 바꾸기' })).toBeInTheDocument()
@@ -172,12 +195,12 @@ describe('SPEC-001·002 설정 화면', () => {
       await userEvent.click(screen.getByRole('button', { name: '적자였어요' }))
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
-      expect(onSaveClubInfo).toHaveBeenCalledWith({ name: '한랑드림', carryover: -370_482 })
+      expect(onSaveBookInfo).toHaveBeenCalledWith({ name: '한랑드림', kind: 'club', carryover: -370_482 })
     })
 
     it('이월금을 지우고 0 을 적으면 0 이 보이고 0원으로 저장할 수 있다', async () => {
-      const onSaveClubInfo = vi.fn()
-      render(<Harness handlers={{ onSaveClubInfo }} />)
+      const onSaveBookInfo = vi.fn()
+      render(<Harness handlers={{ onSaveBookInfo }} />)
       await userEvent.click(screen.getByRole('button', { name: /작년 이월금/ }))
 
       const amount = screen.getByLabelText('작년 이월금')
@@ -186,7 +209,7 @@ describe('SPEC-001·002 설정 화면', () => {
       expect(amount).toHaveValue('0')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
-      expect(onSaveClubInfo).toHaveBeenCalledWith({ name: '한랑드림', carryover: 0 })
+      expect(onSaveBookInfo).toHaveBeenCalledWith({ name: '한랑드림', kind: 'club', carryover: 0 })
     })
 
     it('이월금이 0원이면 편집 화면 금액 칸에 0 이 보인다', async () => {
@@ -199,14 +222,14 @@ describe('SPEC-001·002 설정 화면', () => {
     })
 
     it('[‹ 설정] 을 누르면 저장하지 않고 설정 목록으로 돌아온다', async () => {
-      const onSaveClubInfo = vi.fn()
-      render(<Harness handlers={{ onSaveClubInfo }} />)
-      await userEvent.click(screen.getByRole('button', { name: /동아리 이름/ }))
-      await userEvent.type(screen.getByLabelText('동아리 이름'), '2')
+      const onSaveBookInfo = vi.fn()
+      render(<Harness handlers={{ onSaveBookInfo }} />)
+      await userEvent.click(screen.getByRole('button', { name: /장부 이름/ }))
+      await userEvent.type(screen.getByLabelText('장부 이름'), '2')
 
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
 
-      expect(onSaveClubInfo).not.toHaveBeenCalled()
+      expect(onSaveBookInfo).not.toHaveBeenCalled()
       expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
     })
 
@@ -217,6 +240,70 @@ describe('SPEC-001·002 설정 화면', () => {
       pressBackButton()
 
       expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
+    })
+  })
+
+  describe('SPEC-005 장부 정보', () => {
+    it('가계부 장부는 종류 줄이 "개인 가계부"(집 아이콘)이고 이월금 줄 이름이 종류에 맞다', async () => {
+      render(<Harness kind="household" />)
+
+      const rows = within(screen.getByRole('region', { name: '장부 정보' })).getAllByTestId('list-row')
+      expect(rows[1]?.textContent).toBe('종류 개인 가계부')
+      expect(rows[1]?.querySelector('[data-icon="home"]')).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: /^작년에서 넘어온 돈/ }))
+
+      expect(screen.getByRole('heading', { level: 1, name: '작년에서 넘어온 돈 바꾸기' })).toBeInTheDocument()
+      expect(screen.getByLabelText('작년에서 넘어온 돈')).toHaveValue('370,482')
+    })
+
+    it('[종류] 줄을 누르면 "어떤 장부인가요?" 선택 창이 뜨고, 다른 종류를 고르면 이름·이월금은 그대로 종류만 바꿔 저장한다', async () => {
+      const onSaveBookInfo = vi.fn()
+      render(<Harness handlers={{ onSaveBookInfo }} />)
+
+      await userEvent.click(screen.getByRole('button', { name: /^종류/ }))
+      const sheet = screen.getByRole('dialog', { name: '어떤 장부인가요?' })
+      expect(within(sheet).getByRole('button', { name: '동아리·모임' })).toHaveAttribute('aria-pressed', 'true')
+      await userEvent.click(within(sheet).getByRole('button', { name: '개인 가계부' }))
+
+      expect(onSaveBookInfo).toHaveBeenCalledWith({ name: '한랑드림', kind: 'household', carryover: 370_482 })
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
+    })
+
+    it('지금 종류를 다시 고르면 저장하지 않고 창만 닫는다', async () => {
+      const onSaveBookInfo = vi.fn()
+      render(<Harness handlers={{ onSaveBookInfo }} />)
+
+      await userEvent.click(screen.getByRole('button', { name: /^종류/ }))
+      await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '동아리·모임' }))
+
+      expect(onSaveBookInfo).not.toHaveBeenCalled()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('AC-7 맨 아래 위험 글자형 [이 장부 지우기] 는 확인([아니요] [지우기]) 뒤에만 지워 달라고 알린다', async () => {
+      const onDeleteBook = vi.fn()
+      render(<Harness handlers={{ onDeleteBook }} />)
+
+      const remove = screen.getByRole('button', { name: '이 장부 지우기' })
+      expect(remove).toHaveAttribute('data-variant', 'danger-text')
+      await userEvent.click(remove)
+
+      const dialog = screen.getByRole('alertdialog', { name: '‘한랑드림’ 장부와 기록을 모두 지울까요?' })
+      expect(dialog).toHaveAccessibleDescription('되돌릴 수 없어요')
+      await userEvent.click(within(dialog).getByRole('button', { name: '아니요' }))
+      expect(onDeleteBook).not.toHaveBeenCalled()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+      await userEvent.click(remove)
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '지우기' }))
+      expect(onDeleteBook).toHaveBeenCalledOnce()
+    })
+
+    it('AC-7 장부가 하나뿐이면 [이 장부 지우기] 가 없다', () => {
+      render(<Harness canDeleteBook={false} />)
+
+      expect(screen.queryByRole('button', { name: '이 장부 지우기' })).not.toBeInTheDocument()
     })
   })
 
@@ -274,7 +361,7 @@ describe('SPEC-001·002 설정 화면', () => {
 
       const groups = screen.getAllByRole('region')
       expect(groups.map((group) => group.querySelector('h2')?.textContent)).toEqual([
-        '동아리',
+        '장부 정보',
         '기록 백업',
         '앱',
       ])

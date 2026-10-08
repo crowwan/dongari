@@ -37,9 +37,10 @@ export function pwaOptions(tokensCss: string, base: string): Partial<VitePWAOpti
     includeAssets: ['icons/favicon.svg'],
     manifest: {
       id: base,
-      name: '동아리 회계',
-      short_name: '동아리 회계',
-      description: '동아리 수입·지출을 한 줄씩 적으면 월 정리와 올해 결산을 만들어 주는 장부',
+      // 앱 이름 "우리 장부" (SPEC-005). id·start_url·scope 는 그대로라 이미 설치한 홈 화면 앱이 같은 앱으로 열린다
+      name: '우리 장부',
+      short_name: '우리 장부',
+      description: '동아리·모임 회비와 집안 살림의 수입·지출을 한 줄씩 적으면 월 정리와 올해 결산을 만들어 주는 장부',
       lang: 'ko',
       start_url: base,
       scope: base,

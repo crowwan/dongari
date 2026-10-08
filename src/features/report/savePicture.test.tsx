@@ -6,6 +6,7 @@ import { ledger } from '../../test/ledgerFixtures'
 import { MonthSummaryScreen } from './MonthSummaryScreen'
 import type { ShareResult } from '../backup/sendFile'
 import { downloadPicture, isIos, makePicture, type PictureSaver } from './savePicture'
+import { carryoverWords } from '../../domain/book'
 
 vi.mock('html2canvas', () => ({ default: vi.fn() }))
 
@@ -37,7 +38,7 @@ function controlledSaver() {
 
 function renderMonth(saver: PictureSaver) {
   const onNotify = vi.fn()
-  render(<MonthSummaryScreen ledger={SEPTEMBER} month={9} onBack={() => {}} onNotify={onNotify} saver={saver} />)
+  render(<MonthSummaryScreen ledger={SEPTEMBER} month={9} carryoverWords={carryoverWords('club', true)} onBack={() => {}} onNotify={onNotify} saver={saver} />)
   return onNotify
 }
 
@@ -59,7 +60,7 @@ describe('SPEC-003 사진으로 저장', () => {
     const picture = new Blob(['png'])
     await act(async () => finish(picture))
 
-    expect(saver.download).toHaveBeenCalledWith(picture, '동아리회계-2026년-9월-정리.png')
+    expect(saver.download).toHaveBeenCalledWith(picture, '우리장부-2026년-9월-정리.png')
     expect(onNotify).toHaveBeenCalledWith(SAVED)
     expect(screen.getByRole('button', { name: '사진으로 저장' })).toBeEnabled()
   })
@@ -136,7 +137,7 @@ describe('SPEC-003 사진으로 저장 — 아이폰(공유 시트로 사진 앱
     expect(saver.share).toHaveBeenCalledOnce()
     const file = saver.share.mock.calls[0][0]
     expect(file).toBeInstanceOf(File)
-    expect(file.name).toBe('동아리회계-2026년-9월-정리.png')
+    expect(file.name).toBe('우리장부-2026년-9월-정리.png')
     expect(file.type).toBe('image/png')
     expect(saver.download).not.toHaveBeenCalled()
     expect(onNotify).toHaveBeenCalledWith(PHOTOS_SAVED)
@@ -160,7 +161,7 @@ describe('SPEC-003 사진으로 저장 — 아이폰(공유 시트로 사진 앱
 
     await userEvent.click(screen.getByRole('button', { name: '사진으로 저장' }))
 
-    expect(saver.download).toHaveBeenCalledWith(picture, '동아리회계-2026년-9월-정리.png')
+    expect(saver.download).toHaveBeenCalledWith(picture, '우리장부-2026년-9월-정리.png')
     expect(onNotify).toHaveBeenCalledWith(FILES_SAVED)
   })
 
@@ -181,7 +182,7 @@ describe('SPEC-003 사진으로 저장 — 아이폰(공유 시트로 사진 앱
     await act(async () => {})
 
     expect(saver.make).toHaveBeenCalledOnce()
-    expect(saver.share.mock.calls[1][0].name).toBe('동아리회계-2026년-9월-정리.png')
+    expect(saver.share.mock.calls[1][0].name).toBe('우리장부-2026년-9월-정리.png')
     expect(onNotify).toHaveBeenCalledWith(PHOTOS_SAVED)
     expect(screen.getByRole('button', { name: '사진으로 저장' })).toBeEnabled()
   })
@@ -265,9 +266,9 @@ describe('SPEC-003 사진 파일 만들기', () => {
       clicked.push({ href: this.href, download: this.download })
     })
 
-    downloadPicture(picture, '동아리회계-2026년-결산.png')
+    downloadPicture(picture, '우리장부-2026년-결산.png')
 
-    expect(clicked).toEqual([{ href: 'blob:picture', download: '동아리회계-2026년-결산.png' }])
+    expect(clicked).toEqual([{ href: 'blob:picture', download: '우리장부-2026년-결산.png' }])
     // 링크는 문서에 남기지 않는다
     expect(document.querySelector('a[download]')).toBeNull()
     expect(revoked).not.toHaveBeenCalled()
