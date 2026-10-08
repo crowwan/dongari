@@ -30,10 +30,11 @@ export interface ExpenseTableRow {
   right: ExpenseTableCell
 }
 
-// 수입내역 한 줄 (같은 이름은 합친 값)
-export interface IncomeItemTotal {
+// 항목별 합계 한 줄: 이름이 똑같은 기록을 합친 값 (결산표 항목별 합계 표·앱 [항목별 합계] 화면)
+export interface ItemTotal {
   name: string
   amount: number
+  count: number // 합친 기록 수
 }
 
 // v1 연말 양식(PLANS.md 6장) 한 장에 들어가는 값 전부
@@ -42,9 +43,10 @@ export interface YearReport {
   clubName: string
   carryover: number
   months: MonthTotal[] // 1~12월 순서, 항상 12개
-  totals: LedgerTotals // 연간 수입·지출 합계와 잔액. 수입내역 합계 = totals.income
+  totals: LedgerTotals // 연간 수입·지출 합계와 잔액. 항목별 합계 각 쪽의 합 = totals.income / totals.expense
   expenseRows: ExpenseTableRow[]
-  incomeItems: IncomeItemTotal[] // 처음 등장한 순
+  incomeItems: ItemTotal[] // 금액 큰 순, 같으면 그해 먼저 나온 순
+  expenseItems: ItemTotal[]
 }
 
 // 월 정리의 "전달까지 잔액" 자리. 1월은 작년 이월금이라 표시 문구가 다르다
@@ -100,12 +102,20 @@ function expenseTableRows(entries: readonly Entry[]): ExpenseTableRow[] {
   })
 }
 
-function sumIncomeByName(entries: readonly Entry[]): IncomeItemTotal[] {
-  const byName = new Map<string, number>()
-  for (const entry of entries) {
-    if (entry.type === 'income') byName.set(entry.name, (byName.get(entry.name) ?? 0) + entry.amount)
+// 항목별 합계 (AC-2): 이름이 똑같은 기록끼리만 합친다(띄어쓰기·괄호까지). 금액 큰 순, 같으면 그해 먼저 나온 순(달 → 장부 날짜순)
+function itemTotals(entries: readonly Entry[], type: EntryType): ItemTotal[] {
+  const byName = new Map<string, ItemTotal>()
+  for (const entry of MONTHS.flatMap((month) => entriesOf(entries, type, month))) {
+    const item = byName.get(entry.name)
+    if (item) {
+      item.amount += entry.amount
+      item.count += 1
+    } else {
+      byName.set(entry.name, { name: entry.name, amount: entry.amount, count: 1 })
+    }
   }
-  return [...byName].map(([name, amount]) => ({ name, amount }))
+  // sort 는 안정 정렬이라 같은 금액은 처음 나온 순서가 남는다
+  return [...byName.values()].sort((a, b) => b.amount - a.amount)
 }
 
 export function yearReport(ledger: Ledger): YearReport {
@@ -121,7 +131,8 @@ export function yearReport(ledger: Ledger): YearReport {
     })),
     totals: calculateTotals(ledger),
     expenseRows: expenseTableRows(entries),
-    incomeItems: sumIncomeByName(entries),
+    incomeItems: itemTotals(entries, 'income'),
+    expenseItems: itemTotals(entries, 'expense'),
   }
 }
 

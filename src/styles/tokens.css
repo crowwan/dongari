@@ -32,6 +32,9 @@
   /* 금액: 수입은 밝은 청록 글자, 지출은 제목 글자색 (둘 다 부호와 함께) */
   --income-amount: #1b705b;
   --expense-amount: var(--strong);
+  /* 비율 막대 채움(올해 결산 항목별 합계): 수입은 옅은 청록, 지출은 회색. 바탕 홈은 --fill */
+  --income-bar: #8cc7bc;
+  --expense-bar: #b5b5b5;
   /* 위험(지우기)·오류: 빨강 하나 */
   --danger: #b83232;
   --on-danger: #ffffff;
@@ -67,6 +70,8 @@
     --accent-ink: #8cc7bc;
     --income-amount: #5cc49e;
     --expense-amount: var(--strong);
+    --income-bar: #4a8f82;
+    --expense-bar: #6b6b6b;
     --danger: #ff8b8b;
     --on-danger: #2a0f0b;
     --warn-bg: #3a3218;
@@ -98,6 +103,8 @@
   --accent-ink: #8cc7bc;
   --income-amount: #5cc49e;
   --expense-amount: var(--strong);
+  --income-bar: #4a8f82;
+  --expense-bar: #6b6b6b;
   --danger: #ff8b8b;
   --on-danger: #2a0f0b;
   --warn-bg: #3a3218;
@@ -204,6 +211,7 @@
   --icon-circle: 44px; /* 줄 앞 원형 아이콘 바탕 */
   --icon-circle-sm: 36px; /* 줄 선택 앞 원형 아이콘 바탕 */
   --dot: 8px; /* 할 일 있음 점 */
+  --bar-thickness: 6px; /* 비율 막대 굵기 (올해 결산 항목별 합계) */
   --grab-w: 40px; /* 아래에서 올라오는 창 손잡이 */
   --grab-h: 4px;
 

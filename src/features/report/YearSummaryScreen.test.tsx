@@ -26,12 +26,13 @@ function bodyRows(table: HTMLElement): string[][] {
 const V1_EXAMPLE = ledger(V1_EXAMPLE_YEAR)
 
 describe('SPEC-003 올해 결산 화면', () => {
-  it('v1 양식 제목 두 개 "<2025년 한랑드림 수입 지출 내역>" "<2025년 한랑드림 지출내역>" 이 있다', () => {
+  it('양식 제목 셋 "<2025년 한랑드림 수입 지출 내역>" "<2025년 한랑드림 지출내역>" "<2025년 한랑드림 항목별 합계>" 가 있다', () => {
     renderYear(V1_EXAMPLE)
 
     expect(screen.getByRole('heading', { level: 1, name: '2025년 결산' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '<2025년 한랑드림 수입 지출 내역>' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '<2025년 한랑드림 지출내역>' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '<2025년 한랑드림 항목별 합계>' })).toBeInTheDocument()
   })
 
   it('월별 수입·지출 표에 1~12월과 계를 보이고, 옆에 작년 이월금·올해 수입·지출·잔액을 보인다 (AC-1, AC-3)', () => {
@@ -56,18 +57,42 @@ describe('SPEC-003 올해 결산 화면', () => {
     ])
   })
 
-  it('수입내역은 같은 이름을 한 줄로 합쳐 처음 나온 순서로 보이고 아래에 합계를 보인다 (AC-2, AC-3)', () => {
+  it('항목별 합계 표는 머리 [수 입 | 지 출] 이 각각 두 칸이고, 줄마다 왼쪽 수입·오른쪽 지출, 짧은 쪽은 빈 칸, 맨 아래 계 (AC-2, AC-3)', () => {
     renderYear(V1_EXAMPLE)
 
-    const income = screen.getByTestId('year-income-items')
-    expect(within(income).getByText('◈ 수입내역')).toBeInTheDocument()
-    expect(within(income).getAllByTestId('year-income-item').map((item) => item.textContent)).toEqual([
-      '회비(14인)1,630,000',
-      '행사지원금145,050',
-      '예금이자2,153',
+    const table = screen.getByTestId('year-item-table')
+    const heads = [...table.querySelectorAll('thead th')]
+    expect(heads.map((head) => [head.textContent, head.getAttribute('colspan')])).toEqual([
+      ['수 입', '2'],
+      ['지 출', '2'],
     ])
-    expect(within(income).getByTestId('year-income-total')).toHaveTextContent('₩ 1,777,203')
+    expect(bodyRows(table)).toEqual([
+      ['회비(14인)', '1,630,000', '야유회', '627,230'],
+      ['행사지원금', '145,050', '송년회', '410,600'],
+      ['예금이자', '2,153', '대관료', '400,000'],
+      ['', '', '행사비', '400,000'],
+      ['', '', '간식비', '60,240'],
+      ['', '', '간식비(2건)', '58,280'],
+      ['', '', '간식비(8월)', '38,430'],
+      ['계', '1,777,203', '계', '1,994,780'],
+    ])
+    // v1 의 "◈ 수입내역" 목록은 이 표로 바뀌었다
+    expect(screen.queryByText('◈ 수입내역')).not.toBeInTheDocument()
+  })
+
+  it('지출내역 표 바로 아래 "2025년 지출 합계" 줄은 그대로 둔다', () => {
+    renderYear(V1_EXAMPLE)
+
     expect(screen.getByTestId('year-expense-total')).toHaveTextContent('2025년 지출 합계 ₩1,994,780')
+  })
+
+  it('수입만 있는 해는 항목별 합계 표 오른쪽(지출)이 빈 칸이고 지출 계는 0 이다', () => {
+    renderYear(ledger([[3, 'income', '회비', 50_000]]))
+
+    expect(bodyRows(screen.getByTestId('year-item-table'))).toEqual([
+      ['회비', '50,000', '', ''],
+      ['계', '50,000', '계', '0'],
+    ])
   })
 
   it('지출내역 표는 1월↔7월 … 6월↔12월 짝으로 좌우 행 수가 같고, 달 칸은 짝 높이만큼 합친다 (AC-4)', () => {
@@ -145,5 +170,102 @@ describe('SPEC-003 올해 결산 화면', () => {
     expect(within(screen.getByTestId('year-report-capture')).getByTestId('year-report-sheet')).toBeInTheDocument()
     expect(saver.download).toHaveBeenCalledWith(expect.any(Blob), '동아리회계-2025년-결산.png')
     expect(onNotify).toHaveBeenCalledWith('사진을 저장했어요. 갤러리의 Download 앨범에서 볼 수 있어요')
+  })
+})
+
+describe('SPEC-003 올해 결산 [결산표 | 항목별 합계] 전환 (AC-10)', () => {
+  it('제목 아래 [결산표 | 항목별 합계] 전환이 있고 처음은 [결산표] 다', () => {
+    renderYear(V1_EXAMPLE)
+
+    const group = screen.getByRole('group', { name: '무엇을 볼까요?' })
+    expect(within(group).getByRole('button', { name: '결산표' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(group).getByRole('button', { name: '항목별 합계' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('year-report-sheet')).toBeInTheDocument()
+  })
+
+  it('[항목별 합계] 를 고르면 양식 대신 수입·지출 카드에 이름·건수·금액·비율 막대가 보이고 [사진으로 저장] 은 사라진다', async () => {
+    renderYear(V1_EXAMPLE)
+
+    await userEvent.click(screen.getByRole('button', { name: '항목별 합계' }))
+
+    expect(screen.queryByTestId('year-report-sheet')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '사진으로 저장' })).not.toBeInTheDocument()
+
+    const income = screen.getByRole('region', { name: '수입' })
+    expect(within(income).getByTestId('item-totals-total')).toHaveTextContent('1,777,203원')
+    const incomeRows = within(income).getAllByTestId('item-total-row')
+    expect(incomeRows.map((row) => row.textContent)).toEqual([
+      '회비(14인)10건1,630,000원',
+      '행사지원금2건145,050원',
+      '예금이자2건2,153원',
+    ])
+
+    const expense = screen.getByRole('region', { name: '지출' })
+    expect(within(expense).getByTestId('item-totals-total')).toHaveTextContent('1,994,780원')
+    const expenseRows = within(expense).getAllByTestId('item-total-row')
+    expect(expenseRows).toHaveLength(7)
+    expect(expenseRows[0]).toHaveTextContent('야유회1건627,230원')
+    expect(expenseRows[2]).toHaveTextContent('대관료10건400,000원')
+  })
+
+  it('비율 막대 길이는 그해 그쪽 합계 대비 금액 비율이다', async () => {
+    renderYear(
+      ledger([
+        [1, 'expense', '대관료', 30_000],
+        [2, 'expense', '간식비', 10_000],
+      ]),
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: '항목별 합계' }))
+
+    const bars = within(screen.getByRole('region', { name: '지출' })).getAllByTestId('item-total-bar')
+    expect(bars.map((bar) => bar.style.width)).toEqual(['75%', '25%'])
+  })
+
+  it('한쪽 기록이 없으면 그 카드에 "올해 적은 수입이 없어요" 를 보인다', async () => {
+    renderYear(ledger([[3, 'expense', '대관료', 40_000]]))
+
+    await userEvent.click(screen.getByRole('button', { name: '항목별 합계' }))
+
+    const income = screen.getByRole('region', { name: '수입' })
+    expect(within(income).getByText('올해 적은 수입이 없어요')).toBeInTheDocument()
+    expect(within(income).queryByTestId('item-totals-total')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: '지출' })).getAllByTestId('item-total-row')).toHaveLength(1)
+  })
+
+  it('지출 기록이 없으면 지출 카드에 "올해 적은 지출이 없어요" 를 보인다', async () => {
+    renderYear(ledger([[3, 'income', '회비', 40_000]]))
+
+    await userEvent.click(screen.getByRole('button', { name: '항목별 합계' }))
+
+    expect(within(screen.getByRole('region', { name: '지출' })).getByText('올해 적은 지출이 없어요')).toBeInTheDocument()
+  })
+
+  it('[결산표] 로 돌아오면 양식과 [사진으로 저장] 이 다시 보인다', async () => {
+    renderYear(V1_EXAMPLE)
+
+    await userEvent.click(screen.getByRole('button', { name: '항목별 합계' }))
+    await userEvent.click(screen.getByRole('button', { name: '결산표' }))
+
+    expect(screen.getByTestId('year-report-sheet')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '사진으로 저장' })).toBeEnabled()
+  })
+
+  it('전환은 방문 기록에 쌓지 않는다 (안드로이드 뒤로 버튼은 바로 장부로)', async () => {
+    const pushState = vi.spyOn(window.history, 'pushState')
+    renderYear(V1_EXAMPLE)
+
+    await userEvent.click(screen.getByRole('button', { name: '항목별 합계' }))
+    await userEvent.click(screen.getByRole('button', { name: '결산표' }))
+
+    expect(pushState).not.toHaveBeenCalled()
+    pushState.mockRestore()
+  })
+
+  it('기록이 하나도 없으면 전환 없이 안내만 보인다 (AC-5)', () => {
+    renderYear(ledger([], { year: 2026 }))
+
+    expect(screen.queryByRole('group', { name: '무엇을 볼까요?' })).not.toBeInTheDocument()
+    expect(screen.getByText('적은 내역이 있어야 결산을 만들 수 있어요')).toBeInTheDocument()
   })
 })
