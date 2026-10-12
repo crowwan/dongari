@@ -5,7 +5,7 @@ status: done
 milestone: v2.0
 issue: "#1"
 prototype:
-updated: 2026-10-08
+updated: 2026-10-12
 ---
 
 # SPEC-002 안전한 저장과 백업
@@ -26,7 +26,11 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 - 저장 형식: `dongari:v2` 키 하나에 `{ schemaVersion: 3, books: Book[], settings }` — 장부마다 `ledgers: { [year]: Ledger }` (v2.4 여러 장부, SPEC-005). 키 이름은 그대로. 상세 근거는 [ADR 001](../decisions/001-storage.md).
 - 형식을 올릴 때(마이그레이션) 이전 버전 원본을 `dongari:v2:schema-<버전>` 키에 그대로 보관한 뒤 새 형식으로 읽는다. 보관하지 못하면 옮긴 기록은 보여 주되 저장을 막는다(아래 시작 상태 `old-version-unpreserved`).
 - 기록 날짜(일, `Entry.day`, v2.2)는 선택 칸이다. 날짜 칸이 생기기 전에 적은 기록과 그때 만든 백업 파일은 날짜 없이 그대로 읽힌다. 칸을 더할 때는 `schemaVersion` 을 올리지 않았다(근거와 기준: ADR 001 "스키마 버전을 올리는 기준", #77).
-- 앱 시작 시 `navigator.storage.persist()` 를 요청한다.
+- **오래 보관 요청**: 브라우저가 저장 공간이 모자랄 때 이 앱 기록을 먼저 지우지 않도록 `navigator.storage.persist()` 를 요청한다 (#93).
+  - 언제: 앱을 열 때 장부가 하나라도 있으면, 그리고 첫 실행에서 첫 장부를 만든 직후(저장에 성공했을 때). 장부가 없는 첫 화면에서는 요청하지 않는다. 크롬은 사이트를 쓴 흔적·홈 화면 설치 여부로 허락을 정하므로 지킬 기록이 생긴 뒤에 묻는다. 첫 화면에서 백업을 불러와 시작한 경우는 다음에 열 때 요청한다.
+  - 이미 오래 보관이면(`persisted()` 가 true) 다시 요청하지 않는다.
+  - 지원하지 않는 브라우저, 요청 실패·거절은 조용히 넘어간다. 결과를 기다리지 않고 화면을 막지 않는다.
+  - 상태는 화면에 보이지 않는다(설정에 줄 없음). 어머니가 보고 할 수 있는 일이 없고, 할 일(홈 화면에 추가·백업)은 이미 설정에 있다. 허락되기 쉬운 홈 화면 앱에서는 설정 "앱" 묶음째 숨긴다.
 
 ### 홈 화면 추가 (PWA)
 
@@ -119,6 +123,7 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 - PWA: `vite-plugin-pwa` (`src/pwa/pwaOptions.ts`). 빌드 경로(`APP_BASE`, 기본 `/dongari/`)를 `vite.config.ts` 가 `base` 와 `pwaOptions(tokens, base)` 에 함께 넘겨 id·scope·start_url 과 서비스 워커 범위를 맞춘다. 릴리스 전 QA 미리보기는 `/dongari/preview/`. 배포는 GitHub Actions(`deploy.yml`, #52): main 머지 → 미리보기(gh-pages 의 `preview/` 만 교체), 태그 `v*` → 본 주소(gh-pages 전체 교체, 미리보기는 다음 머지 때 다시 채움). 주의는 `CLAUDE.md` 실행·배포. `registerType: 'autoUpdate'` + `injectRegister: 'script'`(등록만 하는 스크립트, 자동 새로고침 코드 없음), workbox 프리캐시(화면 파일 js·css·html + 아이콘 + manifest), 옛 캐시 정리. 본 주소 빌드에만 `navigateFallbackDenylist`(base 아래 `preview`·`lab` 화면 요청은 본 앱 `index.html` 로 답하지 않음 — 본 주소 서비스 워커가 미리보기를 덮지 않게, v2.1.0 서비스 워커가 깔린 뒤부터, #54). manifest 색은 빌드 때 `tokens.css` 에서 읽는다. 아이콘은 `scripts/make-icons.mjs` 로 토큰 색 SVG → PNG (#10).
 - 30일 백업 안내: `features/backup/backupReminder.ts` 의 `needsBackupReminder({ lastBackupAt, lastChangedAt, firstRecordedAt, now })`(시각 주입 순수 함수)와 저장 데이터에서 판단하는 `backupReminderFor(data, now)`. 점 표시는 `IconButton` 의 `dotLabel` (#46, 전 `TopTextButton`). 띠 하나만 고르는 순서는 `App.tsx` (#9).
 - 홈 화면에 추가 줄: `features/install` (`installRules` 줄 표시 조건 `shouldOfferInstall`·브라우저 구분 `browserKind`, `installPrompt` 설치 제안을 화면 밖에서 받아 둠 — 설정 화면을 떠났다 와도 잃지 않게, `InstallGuide` 브라우저별 순서). 줄과 방법 안내 선택 창은 `SettingsScreen` 이 그린다(선택 창 이름 `settings-install-guide`). iOS 전용 메타(apple-*)는 두지 않는다 (#10, #56).
+- 오래 보관 요청: `storage/persist.ts` 의 `requestPersistentStorage(storageManager = navigator.storage)` — `persisted()` 가 false 일 때만 `persist()`, API 없음·예외는 false(테스트는 가짜 storageManager 를 넣는다). 부르는 곳은 둘: 진입점(`main.tsx`, 읽은 데이터에 장부가 있을 때)과 `App` 의 장부 만들기(첫 실행에서 저장 성공 직후). 둘 다 `void` 로 기다리지 않는다 (#93).
 
 ## 열린 질문
 
@@ -150,3 +155,4 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 | 2026-10-07 | 기록 날짜(일) 선택 칸: 날짜 없는 예전 기록·백업 파일은 그대로 읽힘, 범위(1 ~ 장부 연도 그 달 마지막 날) 밖은 깨진 데이터, `schemaVersion` 2 그대로(ADR 001 기준), 기술 메모 가드 위치 (#77) |
 | 2026-10-08 | 저장 형식 v3(장부 여러 개, SPEC-005): `{ schemaVersion: 3, books, settings }`, 키 이름 그대로, 이전 버전 원본 보관 키·보관 실패 시작 상태(`old-version-unpreserved`), 백업 파일에 모든 장부·v2 파일은 장부 하나로 읽기, 기술 메모 (#87) |
 | 2026-10-08 | 앱 이름 "우리 장부"(manifest), 백업 파일 이름 `우리장부-백업-YYYY-MM-DD.txt`, 불러오기 확인 문구 "장부 N개, 기록 M건으로 바꿀까요?", 열 수 없는 파일 안내 "우리 장부에서 보낸…" (SPEC-005, #88) |
+| 2026-10-12 | 오래 보관 요청 구체화: 앱을 열 때 장부가 있으면·첫 장부를 만든 직후에만, 이미 오래 보관이면 다시 묻지 않음, 지원 안 함·실패는 조용히, 설정에 상태 줄은 두지 않음, 기술 메모 (#93) |

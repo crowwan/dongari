@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
@@ -119,6 +119,39 @@ async function createBook(kind: '동아리·모임' | '개인 가계부', name: 
   await userEvent.type(screen.getByLabelText('장부 이름'), name)
   await userEvent.click(screen.getByRole('button', { name: '만들기' }))
 }
+
+// 브라우저 오래 보관 요청(navigator.storage)을 가짜로 바꿔 넣는다. 아직 오래 보관이 아닌 브라우저
+function stubPersistentStorage() {
+  const persist = vi.fn(() => Promise.resolve(true))
+  Object.defineProperty(navigator, 'storage', { value: { persisted: () => Promise.resolve(false), persist }, configurable: true })
+  return persist
+}
+
+describe('SPEC-002 오래 보관 요청 (첫 장부를 만든 직후)', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'storage')
+  })
+
+  it('첫 실행에서 첫 장부를 만들면 브라우저에 오래 보관을 요청한다', async () => {
+    const persist = stubPersistentStorage()
+    renderApp(new MemoryRepository())
+
+    await createBook('동아리·모임', '한랑드림')
+
+    await vi.waitFor(() => expect(persist).toHaveBeenCalledOnce())
+  })
+
+  it('장부가 이미 있을 때 새 장부를 더 만들면 다시 요청하지 않는다 (앱 시작 때 이미 요청)', async () => {
+    const persist = stubPersistentStorage()
+    renderApp(new MemoryRepository(TWO_BOOKS))
+    await userEvent.click((await openBookSheet()).getByRole('button', { name: '새 장부 만들기' }))
+
+    await createBook('동아리·모임', '꽃동산')
+
+    expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+    expect(persist).not.toHaveBeenCalled()
+  })
+})
 
 describe('SPEC-005 장부 바꾸기·새 장부·지우기 (화면)', () => {
   it('AC-3 이름 버튼 → 창에서 다른 장부를 누르면 그 장부의 이번 달 장부 화면이 열리고 마지막에 본 장부로 저장된다', async () => {
