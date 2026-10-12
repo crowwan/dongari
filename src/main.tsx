@@ -16,8 +16,9 @@ async function pickScreen(): Promise<ReactNode> {
   // 저장소는 앱 시작 때 여기서 한 번만 읽는다. 읽기에는 깨진 원본을 옮겨 두는 부작용이 있어 렌더 중에 하지 않는다
   const repository = new LocalStorageRepository()
   const loaded = repository.load()
-  // 브라우저가 공간이 모자랄 때 이 사이트 기록을 먼저 지우지 않게 요청한다 (SPEC-002). 결과를 기다리지 않는다
-  void requestPersistentStorage()
+  // 브라우저가 공간이 모자랄 때 이 사이트 기록을 먼저 지우지 않게 요청한다 (SPEC-002). 결과를 기다리지 않는다.
+  // 지킬 장부가 있을 때만. 첫 실행이면 첫 장부를 만든 직후 App 이 요청한다 (크롬은 쓴 흔적·설치 여부로 허락을 정한다)
+  if (loaded.data.books.length > 0) void requestPersistentStorage()
   return <App repository={repository} loaded={loaded} />
 }
 

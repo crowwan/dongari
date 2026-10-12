@@ -15,6 +15,7 @@ import { storageNotices, type StorageNoticeAction } from './features/storage/sto
 import { useScreenHistory } from './features/useScreenHistory'
 import type { BookSetup, EntryInput } from './domain/ledger'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
+import { requestPersistentStorage } from './storage/persist'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import type { IconName } from './ui/Icon'
 import { IconButton } from './ui/IconButton'
@@ -86,8 +87,13 @@ export default function App({ repository, loaded, options }: AppProps) {
   }
 
   // 새 장부를 만들면 그 장부의 올해 장부 화면(이번 달)으로. 기기에 저장했을 때만 알린다 (SPEC-005 AC-4)
+  // 첫 장부면 브라우저에 오래 보관을 요청한다. 앱 시작 때는 장부가 없어 요청하지 않았다 (SPEC-002). 결과를 기다리지 않는다
   function createBook(setup: BookSetup) {
-    if (ledger.createBook(setup)) setToast('새 장부를 만들었어요')
+    const isFirstBook = ledger.isFirstRun
+    if (ledger.createBook(setup)) {
+      setToast('새 장부를 만들었어요')
+      if (isFirstBook) void requestPersistentStorage()
+    }
     setViewedMonth(undefined)
     // 첫 실행이면 이미 장부 화면 자리라 돌아갈 방문 기록이 없다
     if (screen.name === 'new-book') navigation.backToLedger()
