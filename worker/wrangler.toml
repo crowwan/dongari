@@ -1,0 +1,10 @@
+# 우리 장부 자동 보관 서버 (SPEC-006, #97)
+# 계정 id 는 파일에 쓰지 않는다: 배포할 때 환경변수 CLOUDFLARE_ACCOUNT_ID 로 넘긴다
+name = "uri-jangbu-keep"
+main = "src/index.ts"
+compatibility_date = "2026-10-06"
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "KEEP"
+id = "eb14e96758f34266b94de49bf90e651f"

@@ -91,6 +91,12 @@ updated: 2026-10-13
 
 - 암호화: WebCrypto. 복구 코드 → HKDF(SHA-256)로 (a) 서버 이름용 해시, (b) AES-GCM 키를 따로 만든다. 서버는 이름과 암호문(+ 보관 시각)만 저장.
 - 서버: 같은 레포 `worker/`(Cloudflare Workers + KV, TypeScript). `PUT /v1/keep/:id`(본문 암호문, 1MB 상한), `GET /v1/keep/:id`. CORS 는 `https://crowwan.github.io` 만. 배포는 GitHub Actions(`CLOUDFLARE_API_TOKEN` 비밀값, 사용자가 Cloudflare 개인 계정·토큰을 만들어 레포 Secrets 에 넣는다).
+- 서버 API (확정, #97 `worker/src/keep.ts`). 이름(`:id`)은 64자 소문자 16진수(SHA-256), KV 키 `keep:<id>`
+  - `PUT /v1/keep/:id` — 본문 JSON `{ "v": 1, "savedAt": ISO 시각, "iv": base64, "data": base64 }`, `Content-Type: application/json`. 저장(덮어쓰기) 204, 받은 JSON 그대로 저장. 1MB(1,048,576 바이트) 초과 413, 이름·본문·Content-Type 형식이 틀리면 400
+  - `GET /v1/keep/:id` — 있으면 200 + 저장한 JSON, 없으면 404
+  - `DELETE /v1/keep/:id` — 204 (없어도 204)
+  - CORS: `Origin` 이 `https://crowwan.github.io` 일 때만 받고 `Access-Control-Allow-Origin` 을 그 값으로(메서드 GET·PUT·DELETE·OPTIONS, 헤더 Content-Type). OPTIONS 미리 요청 204. 다른 출처·출처 없음은 403
+  - 그 밖의 경로 404(출처와 상관없이), `/v1/keep/:id` 에 다른 메서드는 405
 - KV 무료 한도: 쓰기 하루 1,000회. 10초 묶음으로 사용자 몇 명이면 한참 남는다.
 - 앱 쪽 보관기는 `LedgerRepository` 저장 뒤 알림을 받아 동작(저장 계층과 분리, 테스트는 가짜 서버).
 
@@ -104,3 +110,4 @@ updated: 2026-10-13
 |---|---|
 | 2026-10-12 | 초안 (사용자: "이렇게 진행" — 1단계 storage.persist #93, 2단계 복구 코드 + Cloudflare) |
 | 2026-10-13 | 승인: 시안("복구 코드 자동 보관") 그대로, 자동 보관 기본 켜짐 |
+| 2026-10-13 | 기술 메모: 서버 API 확정(#97 — 경로·본문 형식·상태 코드·CORS) |

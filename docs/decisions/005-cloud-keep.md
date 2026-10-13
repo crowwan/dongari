@@ -33,3 +33,9 @@ date: 2026-10-12
 - 어려워지는 것: 서버(Worker) 하나를 배포·관리한다(같은 레포 `worker/`, GitHub Actions 배포, Cloudflare 개인 계정·API 토큰). 복구 코드를 잃지 않게 안내가 필요하다.
 - 파일 백업은 그대로 둔다(서버가 없어져도 빠져나갈 길).
 - 다시 볼 조건: 여러 기기 동시 사용이 생기거나, KV 쓰기 한도(하루 1,000회)에 닿으면 D1·R2 또는 로그인 방식(Supabase)을 다시 본다.
+
+## 구현 (2026-10-13, #97)
+
+- 서버는 `worker/`(Worker 이름 `uri-jangbu-keep`, KV 바인딩 `KEEP`). 동작은 올리기(`PUT`)·받기(`GET`)·지우기(`DELETE`, 자동 보관을 끌 때 서버 사본 지우기용) 셋이다. API 는 SPEC-006 기술 메모 "서버 API".
+- 서버는 형식(이름 64자 16진수, `{ v, savedAt, iv, data }`, 1MB 상한)과 출처(`https://crowwan.github.io`)만 본다. 받은 JSON 을 그대로 저장하므로 내용·복구 코드는 여전히 모른다.
+- 배포는 `.github/workflows/worker.yml`(main 에 `worker/**` 변경 또는 수동 실행 → 테스트 → `wrangler deploy`). 계정 id·API 토큰은 레포 Secrets 에만 둔다. 주소 확인·수동 배포는 CLAUDE.md "자동 보관 서버 배포".
