@@ -69,13 +69,15 @@ export function isLedger(value: unknown): value is Ledger {
   )
 }
 
-// 마지막에 본 장부 id 는 없는 장부를 가리켜도 된다 (그때는 첫 장부를 연다, domain/book.currentBook)
+// 마지막에 본 장부 id 는 없는 장부를 가리켜도 된다 (그때는 첫 장부를 연다, domain/book.currentBook).
+// 복구 코드는 글자면 된다 — 형식이 틀리면 깨진 데이터로 보지 않고 새 코드로 바꾼다 (features/keep/recoveryCode)
 export function isSettings(value: unknown): value is Settings {
   return (
     isRecord(value) &&
     isOptionalString(value.lastBackupAt) &&
     isOptionalString(value.lastChangedAt) &&
-    isOptionalString(value.lastBookId)
+    isOptionalString(value.lastBookId) &&
+    isOptionalString(value.recoveryCode)
   )
 }
 
