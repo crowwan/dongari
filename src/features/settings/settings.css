@@ -79,7 +79,7 @@
   justify-content: center;
 }
 
-/* 기록 지키기의 복구 코드 칸 (SPEC-006): 이름 → 큰 코드 + [보내기] → 안내. 자동 보관 줄과 같은 카드 안 */
+/* 기록 지키기의 복구 코드 칸 (SPEC-006): 이름 → 큰 코드 → 안내 → [복구 코드 보내기]. 자동 보관 줄과 같은 카드 안 */
 .settings__code {
   padding: var(--space-3) var(--card-pad-inline) var(--space-4);
   display: flex;
@@ -92,29 +92,14 @@
   color: var(--muted);
 }
 
-.settings__code-line {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* 코드: 크게, 굵게, 고정폭 숫자, 글자 사이를 조금 띄워 4자 묶음이 읽히게. 좁으면 줄표에서 줄을 바꾼다 */
+/* 코드: 크게, 굵게, 고정폭 숫자, 글자 사이를 조금 띄워 4자 묶음이 읽히게. 큰 글씨 설정에서만 줄표 뒤에서 줄을 바꾼다 */
 .settings__code-value {
-  flex: 1;
-  min-width: 0;
   color: var(--strong);
-  font-size: var(--size-amount);
+  font-size: var(--text-heading-size);
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--letter-code);
   line-height: var(--line-tight);
-}
-
-/* [보내기]: 글자 폭만큼 (기본 버튼은 한 줄을 채운다) */
-.settings__code-line .ui-button {
-  flex: none;
-  width: auto;
-  min-height: var(--touch-min);
 }
 
 .settings__code-note {

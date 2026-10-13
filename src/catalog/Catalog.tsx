@@ -827,7 +827,7 @@ export function Catalog() {
         </Section>
 
         <Section title="기록 지키기 (SPEC-006)">
-          <State label="설정 복구 코드 칸 (자동 보관 줄 아래, 같은 카드)">
+          <State label="설정 복구 코드 칸 (자동 보관 줄 아래, 같은 카드. [복구 코드 보내기] 는 아래 한 줄)">
             <div className="settings__list">
               <ListRow icon="cloud" title="자동 보관" end={<span className="settings__value">켜짐 · 3분 전</span>} />
               <RecoveryCode code="HK7M-29QF-MX4P-8R2D" onShare={noop} />

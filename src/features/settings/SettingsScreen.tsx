@@ -306,7 +306,8 @@ export function SettingsScreen({
   )
 }
 
-// 복구 코드 칸: 이름 + 큰 코드(고정폭 숫자) + [보내기] + 안내 (SPEC-006 시안 KeepSettings)
+// 복구 코드 칸: 이름 + 큰 코드(고정폭 숫자, 한 줄) + 안내 + [복구 코드 보내기] (SPEC-006 시안 KeepSettings).
+// 시안은 코드 오른쪽에 [보내기] 를 두었지만 390 폭에서 코드가 두 줄로 갈려 버튼을 아래 한 줄로 내렸다
 export function RecoveryCode({ code, onShare }: { code: string; onShare: () => void }) {
   const labelId = useId()
   return (
@@ -314,15 +315,13 @@ export function RecoveryCode({ code, onShare }: { code: string; onShare: () => v
       <span className="settings__code-label" id={labelId}>
         복구 코드
       </span>
-      <div className="settings__code-line">
-        <span className="settings__code-value" data-testid="recovery-code-value">
-          {code}
-        </span>
-        <Button variant="secondary" icon="share" aria-label="복구 코드 보내기" onClick={onShare}>
-          보내기
-        </Button>
-      </div>
+      <span className="settings__code-value" data-testid="recovery-code-value">
+        {code}
+      </span>
       <p className="settings__code-note">새 폰에서 이 코드를 넣으면 기록이 돌아와요. 가족에게도 보내 두세요.</p>
+      <Button variant="secondary" icon="share" onClick={onShare}>
+        복구 코드 보내기
+      </Button>
     </div>
   )
 }

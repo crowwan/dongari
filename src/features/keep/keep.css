@@ -19,7 +19,7 @@
 
 /* 코드 글 칸: 크게, 굵게, 고정폭 숫자, 글자 사이를 조금 띄워 4자 묶음이 읽히게 */
 .keep-restore .ui-field__input {
-  font-size: var(--text-title-size);
+  font-size: var(--text-heading-size);
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--letter-code);
