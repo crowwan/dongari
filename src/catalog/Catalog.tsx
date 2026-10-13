@@ -5,11 +5,15 @@ import { yearReport } from '../domain/report'
 import type { EntryType } from '../domain/types'
 import { BookPicker } from '../features/books/BookPicker'
 import { InstallGuide } from '../features/install/InstallGuide'
+import { KeepRestoreScreen, KeptSummary } from '../features/keep/KeepRestoreScreen'
+import type { KeepServer } from '../features/keep/keepServer'
+import { KEEP_REMINDER_MESSAGE } from '../features/keep/keepStatus'
 import { CarryoverField } from '../features/ledger/CarryoverField'
 import { tidyDayText } from '../features/ledger/entryDraft'
 import type { BookChoice } from '../features/ledger/useLedger'
 import { ItemTotalsCards } from '../features/report/ItemTotalsCards'
 import { SavePictureBar } from '../features/report/SavePictureBar'
+import { RecoveryCode } from '../features/settings/SettingsScreen'
 import { ItemTotalsTable } from '../features/report/sheet/ItemTotalsTable'
 import { sheetPaper } from '../features/report/sheet/sheetStyles'
 import { AmountDisplay } from '../ui/AmountDisplay'
@@ -108,7 +112,16 @@ const ACTION_ICONS: { icon: IconName; label: string }[] = [
   { icon: 'left', label: '장부로' },
   { icon: 'users', label: '동아리·모임 장부' },
   { icon: 'home', label: '개인 가계부 장부' },
+  { icon: 'cloud', label: '자동 보관' },
+  { icon: 'key', label: '복구 코드로 불러오기' },
 ]
+
+// 복구 코드로 불러오기 미리보기용 서버: 어떤 코드든 보관본이 없다고 답한다
+const NO_KEEP_SERVER: KeepServer = {
+  put: async () => 'ok',
+  get: async () => ({ status: 'not-found' }),
+  remove: async () => true,
+}
 
 // 장부 고르기 창 (SPEC-005): 만든 순, 이름이 긴 장부는 두 줄까지
 const BOOK_CHOICES: BookChoice[] = [
@@ -800,12 +813,31 @@ export function Catalog() {
           <State label="30일 백업 안내 → 백업 파일 보내기 (#9)">
             <NoticeBar message="한 달 넘게 백업하지 않았어요" action={{ label: '백업 파일 보내기', icon: 'share', onClick: noop }} />
           </State>
+          <State label="7일 보관 안내 (SPEC-006, 버튼 없음)">
+            <NoticeBar message={KEEP_REMINDER_MESSAGE} />
+          </State>
           <State label="버튼 눌림">
             <div data-preview-pressed="">
               <NoticeBar
                 message="저장된 기록을 읽지 못했어요. 지금 적는 내용은 저장되지 않아요"
                 action={{ label: '백업 파일 불러오기', onClick: noop }}
               />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="기록 지키기 (SPEC-006)">
+          <State label="설정 복구 코드 칸 (자동 보관 줄 아래, 같은 카드. [복구 코드 보내기] 는 아래 한 줄)">
+            <div className="settings__list">
+              <ListRow icon="cloud" title="자동 보관" end={<span className="settings__value">켜짐 · 3분 전</span>} />
+              <RecoveryCode code="HK7M-29QF-MX4P-8R2D" onShare={noop} />
+            </div>
+          </State>
+          <State label="복구 코드로 불러오기 화면 (16자를 넣고 [불러오기] — 이 미리보기는 늘 '없음')">
+            <div className="catalog__frame catalog__frame--screen">
+              <div className="app__main">
+                <KeepRestoreScreen server={NO_KEEP_SERVER} hasRecords onRestore={() => ({ ok: true })} backLabel="설정" onBack={noop} />
+              </div>
             </div>
           </State>
         </Section>
@@ -897,6 +929,26 @@ export function Catalog() {
                 onConfirm={noop}
                 onCancel={noop}
               />
+            </div>
+          </State>
+          <State label="자세한 내용 붙음 (복구 코드로 불러오기 확인, SPEC-006)">
+            <div className="catalog__frame">
+              <ConfirmDialog
+                open
+                danger
+                title="보관본으로 바꿀까요?"
+                description="이 폰에 있던 기록은 지워져요"
+                confirmLabel="바꾸기"
+                onConfirm={noop}
+                onCancel={noop}
+              >
+                <KeptSummary
+                  savedAt={new Date(2026, 9, 12, 15, 20).toISOString()}
+                  bookCount={2}
+                  bookNames={['한랑드림', '우리집 가계부']}
+                  entryCount={128}
+                />
+              </ConfirmDialog>
             </div>
           </State>
           <State label="버튼 하나 알림 (cancelLabel=null)">

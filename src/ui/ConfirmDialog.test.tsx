@@ -102,4 +102,17 @@ describe('ConfirmDialog', () => {
     await user.keyboard('{Escape}')
     expect(handleCancel).toHaveBeenCalledTimes(1)
   })
+
+  it('SPEC-006 설명 아래 버튼 위에 자세한 내용(보관본 요약 등)을 넣을 수 있다', () => {
+    render(
+      <ConfirmDialog open title="보관본으로 바꿀까요?" onConfirm={() => {}} onCancel={() => {}}>
+        <p>기록 128건</p>
+      </ConfirmDialog>,
+    )
+
+    const details = screen.getByText('기록 128건')
+    expect(screen.getByRole('alertdialog')).toContainElement(details)
+    // 버튼보다 앞에 읽힌다
+    expect(details.compareDocumentPosition(screen.getByRole('button', { name: '확인' }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
 })

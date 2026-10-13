@@ -1,8 +1,14 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
 import { NewBookScreen } from './features/books/NewBookScreen'
+import type { KeepState } from './features/keep/AutoKeeper'
+import { KeepRestoreScreen } from './features/keep/KeepRestoreScreen'
+import { KEEP_REMINDER_MESSAGE, keepRowText, needsKeepReminder } from './features/keep/keepStatus'
+import { recoveryCodeOf } from './features/keep/recoveryCode'
+import { shareRecoveryCode, type ShareCodeResult } from './features/keep/shareCode'
+import type { Keep } from './features/keep/startKeep'
 import { AddEntryForm } from './features/ledger/AddEntryForm'
 import { EditEntryForm } from './features/ledger/EditEntryForm'
 import { LedgerScreen } from './features/ledger/LedgerScreen'
@@ -14,6 +20,7 @@ import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
 import { useScreenHistory } from './features/useScreenHistory'
 import type { BookSetup, EntryInput } from './domain/ledger'
+import type { StoredData } from './domain/types'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { requestPersistentStorage } from './storage/persist'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -28,12 +35,25 @@ type AppProps = {
   // 진입점이 앱 시작 때 한 번 읽은 결과
   loaded: LoadResult
   options?: UseLedgerOptions
+  // 복구 코드 자동 보관 (SPEC-006). 없으면 서버 주소가 정해지기 전 빌드 — 설정에 "준비 중", 복구 코드로 불러오기 없음
+  keep?: Keep
 }
+
+// 복구 코드 [보내기] 결과 알림. 공유 화면을 그냥 닫았으면 알리지 않는다
+const SHARE_CODE_MESSAGES: Record<Exclude<ShareCodeResult, 'cancelled'>, string> = {
+  shared: '복구 코드를 보냈어요',
+  copied: '복사했어요',
+  failed: '보내지 못했어요. 코드를 종이에 적어 두세요',
+}
+
+// 자동 보관이 없는 빌드에서 상태 구독 자리
+const subscribeNothing = () => () => {}
+const noKeepState = (): KeepState | undefined => undefined
 
 // 앱 뼈대 (SPEC-001 화면 구성, 탭 없음): 장부(첫 화면) / 내역 적기·고치기 / 설정 / 월 정리 / 올해 결산 / 새 장부 만들기.
 // 장부가 하나도 없으면 새 장부 만들기 화면만(첫 실행, SPEC-005).
 // 화면은 모두 지금 장부(마지막에 본 장부) 하나를 보여 준다. 장부를 고르기·만들기·지우기는 useLedger 가 지금 장부를 바꾸고 App 은 보던 달을 비운다
-export default function App({ repository, loaded, options }: AppProps) {
+export default function App({ repository, loaded, options, keep }: AppProps) {
   const ledger = useLedger(repository, loaded, options)
   const bookName = ledger.book?.name ?? ''
   const navigation = useScreenHistory()
@@ -53,6 +73,10 @@ export default function App({ repository, loaded, options }: AppProps) {
     },
     onSent: setToast,
   })
+
+  // 자동 보관 상태 (설정 줄 "켜짐 · 3분 전", 7일 안내). 보관기가 바뀌면 다시 그린다
+  const keepState = useSyncExternalStore(keep?.keeper.subscribe ?? subscribeNothing, keep?.keeper.getState ?? noKeepState)
+  const recoveryCode = recoveryCodeOf(ledger.data)
 
   const month = viewedMonth ?? ledger.firstMonth
   const today = now()
@@ -99,6 +123,40 @@ export default function App({ repository, loaded, options }: AppProps) {
     if (screen.name === 'new-book') navigation.backToLedger()
   }
 
+  // 복구 코드로 받아 온 데이터로 전체 바꾸기 (SPEC-006 AC-5). 백업 불러오기와 같이 올해 장부의 처음 달로 돌아가 알린다
+  function restoreKept(data: StoredData) {
+    const result = ledger.restoreBackup(data)
+    if (result.ok) {
+      setViewedMonth(undefined)
+      navigation.backToLedger()
+      setToast('불러왔어요')
+    }
+    return result
+  }
+
+  // 복구 코드로 불러오기 화면에 넘기는 것. 서버 주소가 없는 빌드면 없다
+  const restoreByCode = keep && { server: keep.server, hasRecords: !ledger.isFirstRun, onRestore: restoreKept }
+
+  function shareCode() {
+    if (!recoveryCode) return
+    void shareRecoveryCode(recoveryCode).then((result) => {
+      if (result !== 'cancelled') setToast(SHARE_CODE_MESSAGES[result])
+    })
+  }
+
+  // 자동 보관 끄기: 서버 사본을 지우기로 했으면 지운 결과까지 알린다
+  function turnOffKeep(forgetCopy: boolean) {
+    if (!keep) return
+    keep.keeper.setEnabled(false)
+    if (!forgetCopy) {
+      setToast('자동 보관을 껐어요')
+      return
+    }
+    void keep.keeper.forget().then((removed) =>
+      setToast(removed ? '자동 보관을 끄고 보관해 둔 기록을 지웠어요' : '자동 보관을 껐어요. 보관해 둔 기록은 지우지 못했어요'),
+    )
+  }
+
   // 저장 상태 안내는 어느 화면이든 맨 위에 (SPEC-002). 할 일이 있으면 백업 버튼을 붙인다
   const noticeActions: Record<StorageNoticeAction, { label: string; icon: IconName; onClick: () => void }> = {
     'import-backup': { label: '백업 파일 불러오기', icon: 'folder', onClick: backup.startImport },
@@ -109,20 +167,33 @@ export default function App({ repository, loaded, options }: AppProps) {
     <NoticeBar key={message} message={message} action={action && noticeActions[action]} />
   ))
   const noticeOffersImport = storageNoticeList.some((notice) => notice.action === 'import-backup')
-  // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부·설정 위 띠는 저장 안내가 없을 때만 (띠는 하나만: 저장 > 백업)
+  // 7일 보관 안내 (SPEC-006): 장부 위, 저장 안내가 없을 때만
+  const showKeepReminder = needsKeepReminder(keepState, now()) && storageNoticeList.length === 0
+  // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부·설정 위 띠는 저장 안내가 없을 때만 (띠는 하나만: 저장 > 보관 > 백업)
   const needsBackup = backupReminderFor(ledger.data, now())
   const showBackupReminder = needsBackup && storageNoticeList.length === 0
 
   function screenContent(): ReactNode {
     if (ledger.isFirstRun) {
-      // 첫 실행은 새 장부 만들기 (SPEC-005). 새 폰으로 옮길 때는 장부를 만들지 않고 백업 파일부터 불러온다 (안내 띠에 같은 버튼이 있으면 하나만)
+      if (restoreByCode && screen.name === 'keep-restore') {
+        return <KeepRestoreScreen {...restoreByCode} backLabel="뒤로" onBack={navigation.backToLedger} />
+      }
+      // 첫 실행은 새 장부 만들기 (SPEC-005). 새 폰으로 옮길 때는 장부를 만들지 않고 백업 파일(안내 띠에 같은 버튼이 있으면 하나만)이나
+      // 복구 코드(SPEC-006)로 불러온다
       return (
         <>
-          {!noticeOffersImport && (
+          {(!noticeOffersImport || restoreByCode) && (
             <div className="screen__top-end">
-              <IconButton icon="folder" onClick={backup.startImport}>
-                백업 불러오기
-              </IconButton>
+              {!noticeOffersImport && (
+                <IconButton icon="folder" onClick={backup.startImport}>
+                  백업 불러오기
+                </IconButton>
+              )}
+              {restoreByCode && (
+                <IconButton icon="key" onClick={() => navigation.open({ name: 'keep-restore' })}>
+                  복구 코드로 불러오기
+                </IconButton>
+              )}
             </div>
           )}
           <NewBookScreen onCreate={createBook} />
@@ -162,6 +233,22 @@ export default function App({ repository, loaded, options }: AppProps) {
             }}
             onSendBackup={backup.send}
             onImportBackup={backup.startImport}
+            keep={
+              keep &&
+              keepState && {
+                status: keepRowText(keepState, now()),
+                enabled: keepState.enabled,
+                tooLarge: keepState.tooLarge === true,
+                onTurnOn: () => {
+                  keep.keeper.setEnabled(true)
+                  setToast('자동 보관을 켰어요')
+                },
+                onTurnOff: turnOffKeep,
+              }
+            }
+            recoveryCode={recoveryCode}
+            onShareCode={shareCode}
+            restoreByCode={restoreByCode}
             onBack={navigation.backToLedger}
           />
         )
@@ -236,6 +323,9 @@ export default function App({ repository, loaded, options }: AppProps) {
       }
       case 'new-book':
         return <NewBookScreen onCreate={createBook} onBack={navigation.backToLedger} />
+      case 'keep-restore':
+        // 첫 실행에서 열고 불러온 직후(장부로 돌아가는 중)에만 여기에 온다
+        return restoreByCode ? <KeepRestoreScreen {...restoreByCode} backLabel="장부로" onBack={navigation.backToLedger} /> : null
       case 'ledger':
         return ledgerScreen()
     }
@@ -266,10 +356,13 @@ export default function App({ repository, loaded, options }: AppProps) {
         </>
       )
     }
-    // 장부 위 띠: 저장 안내가 없을 때 30일 백업 안내 (SPEC-002). 홈 화면에 추가는 설정 맨 아래 줄로 권한다 (#56)
+    // 장부 위 띠: 저장 안내가 없을 때 7일 보관 안내(SPEC-006), 그것도 없으면 30일 백업 안내 (SPEC-002). 홈 화면에 추가는 설정 맨 아래 줄로 권한다 (#56)
     return (
       <>
-        {showBackupReminder && <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={noticeActions['send-backup']} />}
+        {showKeepReminder && <NoticeBar message={KEEP_REMINDER_MESSAGE} />}
+        {!showKeepReminder && showBackupReminder && (
+          <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={noticeActions['send-backup']} />
+        )}
         <LedgerScreen
           bookName={bookName}
           bookId={ledger.book?.id ?? ''}

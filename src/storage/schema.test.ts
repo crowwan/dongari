@@ -41,7 +41,7 @@ function validData(): unknown {
       }),
       bookOf({}, { id: 'book-2', name: '우리집 가계부', kind: 'household' }),
     ],
-    { lastBackupAt: '2026-03-01T00:00:00.000Z', lastBookId: 'book-2' },
+    { lastBackupAt: '2026-03-01T00:00:00.000Z', lastBookId: 'book-2', recoveryCode: 'HK7M-29QF-MX4P-8R2D' },
   )
 }
 
@@ -96,6 +96,7 @@ describe('SPEC-002·SPEC-005 저장 스키마 검증', () => {
     ['settings 없음', { schemaVersion: 3, books: [] }],
     ['settings.lastBackupAt 이 숫자', withBooks([], { lastBackupAt: 1 })],
     ['settings.lastBookId 가 숫자', withBooks([], { lastBookId: 1 })],
+    ['SPEC-006 settings.recoveryCode 가 숫자', withBooks([], { recoveryCode: 1 })],
   ])('최상위 형식이 틀리면 거부한다: %s', (_label, raw) => {
     expect(isStoredData(raw)).toBe(false)
   })

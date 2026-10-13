@@ -133,6 +133,7 @@
   --line-tight: 1.3;
   --letter-body: -0.02em;
   --letter-number: -0.03em;
+  --letter-code: 0.04em; /* 복구 코드 "HK7M-29QF-…": 글자를 조금 띄워 4자 묶음과 헷갈리는 글자가 갈리게 (SPEC-006) */
 
   /*
    * 글자 역할 — 개인 디자인 시스템(CONCEPT.md §4-2) 의미 계층 기본값 (SPEC-001 "큰 글씨·쉬운 말 기준").

@@ -359,6 +359,8 @@ describe('SPEC-001 useLedger', () => {
     const BACKUP: StoredData = {
       ...storedWith(),
       books: [book([ledger2026(), { ...ledger2026(), year: 2024 }], { name: '꽃동산' })],
+      // 복구 코드가 든 백업 파일 (SPEC-006, 코드가 없는 옛 파일은 아래 SPEC-006 묶음)
+      settings: { recoveryCode: 'HK7M-29QF-MX4P-8R2D' },
     }
 
     it('지금 기록 전체(data)를 백업용으로 준다', () => {
@@ -684,5 +686,66 @@ describe('SPEC-005 useLedger 장부 바꾸기·만들기·지우기', () => {
     expect(result.current.book?.id).toBe('club')
     expect(result.current.bookChoices).toHaveLength(2)
     expect(memory.load().data.books).toHaveLength(2)
+  })
+})
+
+describe('SPEC-006 useLedger 복구 코드', () => {
+  const CODE = 'HK7M-29QF-MX4P-8R2D'
+  const FILE_CODE = 'AAAA-BBBB-CCCC-DDDD'
+
+  function renderWithCode(repository: LedgerRepository) {
+    const deps: UseLedgerOptions = { ...options(), createRecoveryCode: () => CODE }
+    const loaded = repository.load()
+    return renderHook(() => useLedger(repository, loaded, deps))
+  }
+
+  it('AC-1 첫 장부를 만들면 복구 코드가 생겨 저장된다', () => {
+    const repository = new MemoryRepository()
+    const { result } = renderWithCode(repository)
+
+    act(() => {
+      result.current.createBook({ name: '한랑드림', kind: 'club', carryover: 0 })
+    })
+
+    expect(result.current.data.settings.recoveryCode).toBe(CODE)
+    expect(repository.load().data.settings.recoveryCode).toBe(CODE)
+  })
+
+  it('장부를 더 만들어도 코드는 그대로다', () => {
+    const repository = new MemoryRepository({ ...storedWith(ledger2026()), settings: { recoveryCode: FILE_CODE } })
+    const { result } = renderWithCode(repository)
+
+    act(() => {
+      result.current.createBook({ name: '우리집', kind: 'household', carryover: 0 })
+    })
+
+    expect(repository.load().data.settings.recoveryCode).toBe(FILE_CODE)
+  })
+
+  it('AC-7 백업 파일을 불러오면 파일의 코드를 쓴다', () => {
+    const repository = new MemoryRepository({ ...storedWith(ledger2026()), settings: { recoveryCode: CODE } })
+    const { result } = renderWithCode(repository)
+
+    act(() => {
+      result.current.restoreBackup({ ...storedWith(ledger2026()), settings: { recoveryCode: FILE_CODE } })
+    })
+
+    expect(repository.load().data.settings.recoveryCode).toBe(FILE_CODE)
+  })
+
+  it('코드가 없는 옛 백업 파일을 불러오면 이 폰의 코드를 그대로 쓰고, 이 폰에도 없으면 새로 만든다', () => {
+    const withCode = new MemoryRepository({ ...storedWith(ledger2026()), settings: { recoveryCode: FILE_CODE } })
+    const kept = renderWithCode(withCode)
+    act(() => {
+      kept.result.current.restoreBackup(storedWith(ledger2026()))
+    })
+    expect(withCode.load().data.settings.recoveryCode).toBe(FILE_CODE)
+
+    const firstRun = new MemoryRepository()
+    const created = renderWithCode(firstRun)
+    act(() => {
+      created.result.current.restoreBackup(storedWith(ledger2026()))
+    })
+    expect(firstRun.load().data.settings.recoveryCode).toBe(CODE)
   })
 })

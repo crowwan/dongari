@@ -78,3 +78,33 @@
   display: flex;
   justify-content: center;
 }
+
+/* 기록 지키기의 복구 코드 칸 (SPEC-006): 이름 → 큰 코드 → 안내 → [복구 코드 보내기]. 자동 보관 줄과 같은 카드 안 */
+.settings__code {
+  padding: var(--space-3) var(--card-pad-inline) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+.settings__code-label {
+  font-size: var(--text-caption-size);
+  color: var(--muted);
+}
+
+/* 코드: 크게, 굵게, 고정폭 숫자, 글자 사이를 조금 띄워 4자 묶음이 읽히게. 큰 글씨 설정에서만 줄표 뒤에서 줄을 바꾼다 */
+.settings__code-value {
+  color: var(--strong);
+  font-size: var(--text-heading-size);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-code);
+  line-height: var(--line-tight);
+}
+
+.settings__code-note {
+  margin: 0;
+  font-size: var(--text-caption-size);
+  color: var(--muted);
+  word-break: keep-all;
+}

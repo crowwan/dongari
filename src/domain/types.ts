@@ -42,6 +42,9 @@ export interface Settings {
   lastBackupAt?: string // ISO 8601
   lastChangedAt?: string // ISO 8601
   lastBookId?: string // 마지막에 본 장부. 앱을 열면 이 장부가 열린다 (SPEC-005 AC-2)
+  // 복구 코드 "HK7M-29QF-MX4P-8R2D" (SPEC-006). 첫 장부를 만들 때(또는 이 칸이 생긴 버전을 처음 열 때) 생긴다.
+  // 백업 파일에도 들어가 파일로 옮겨도 같은 보관 자리를 쓴다. 선택 칸이라 schemaVersion 은 그대로 (ADR 001)
+  recoveryCode?: string
 }
 
 export const CURRENT_SCHEMA_VERSION = 3

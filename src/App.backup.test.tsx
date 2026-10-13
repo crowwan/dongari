@@ -32,8 +32,12 @@ function storedWith(...ledgers: Ledger[]): StoredData {
   return {
     ...createEmptyData(),
     books: [book(ledgers, { name: '꽃동산' })],
-    // 마지막 변경까지 백업해 둔 상태 (30일 백업 안내 #9 가 끼지 않게)
-    settings: { lastChangedAt: '2026-10-01T00:00:00.000Z', lastBackupAt: '2026-10-01T00:00:00.000Z' },
+    // 마지막 변경까지 백업해 둔 상태 (30일 백업 안내 #9 가 끼지 않게). 백업 파일에는 복구 코드도 든다 (SPEC-006)
+    settings: {
+      lastChangedAt: '2026-10-01T00:00:00.000Z',
+      lastBackupAt: '2026-10-01T00:00:00.000Z',
+      recoveryCode: 'HK7M-29QF-MX4P-8R2D',
+    },
   }
 }
 
@@ -79,11 +83,11 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
     vi.restoreAllMocks()
   })
 
-  it('설정에 기록 백업 묶음과 [백업 파일 보내기] [백업 파일 불러오기] 가 있다', async () => {
+  it('설정에 기록 지키기 묶음과 [백업 파일 보내기] [백업 파일 불러오기] 가 있다', async () => {
     renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
     await openSettings()
 
-    const card = within(screen.getByRole('region', { name: '기록 백업' }))
+    const card = within(screen.getByRole('region', { name: '기록 지키기' }))
     expect(card.getByRole('button', { name: /^백업 파일 보내기/ })).toBeInTheDocument()
     expect(card.getByRole('button', { name: /^백업 파일 불러오기/ })).toBeInTheDocument()
   })
@@ -99,11 +103,13 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       expect(shareMock).toHaveBeenCalledOnce()
       expect(sharedFiles.map((file) => file.name)).toEqual(['우리장부-백업-2026-10-03.txt'])
       // 파일 안 마지막 백업 시각은 그 파일을 만든 시각 (#38)
+      // 복구 코드도 파일에 든다 (SPEC-006 AC-7)
       expect(JSON.parse(await sharedFiles[0].text())).toEqual(backedUpAt(storedWith(LEDGER_2026), TODAY))
       expect(await screen.findByText('백업 파일을 보냈어요')).toBeInTheDocument()
       expect(repository.load().data.settings).toEqual({
         lastChangedAt: '2026-10-01T00:00:00.000Z',
         lastBackupAt: TODAY.toISOString(),
+        recoveryCode: 'HK7M-29QF-MX4P-8R2D',
       })
     })
 

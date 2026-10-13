@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { Button } from './Button'
 import './ui.css'
 
@@ -15,6 +15,8 @@ type ConfirmDialogProps = {
   danger?: boolean
   onConfirm: () => void
   onCancel: () => void
+  // 설명 아래 버튼 위에 넣는 자세한 내용 (예: 복구 코드로 불러오기의 보관한 때·장부·기록 수, SPEC-006)
+  children?: ReactNode
 }
 
 // 브라우저 confirm·alert 대신 쓰는 앱 안 확인 창
@@ -27,6 +29,7 @@ export function ConfirmDialog({
   danger = false,
   onConfirm,
   onCancel,
+  children,
 }: ConfirmDialogProps) {
   const titleId = useId()
   const descriptionId = useId()
@@ -76,6 +79,7 @@ export function ConfirmDialog({
             </p>
           )}
         </div>
+        {children}
         <div className="ui-dialog__actions" data-count={cancelLabel === null ? 1 : 2}>
           {cancelLabel !== null && (
             <Button ref={cancelRef} variant="secondary" onClick={onCancel}>

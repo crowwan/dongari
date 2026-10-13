@@ -1,7 +1,8 @@
 import { useId, useState, type ReactNode } from 'react'
 import { BOOK_KIND_LABELS, type CarryoverWords } from '../../domain/book'
 import type { BookSetup } from '../../domain/ledger'
-import type { BookKind, Ledger } from '../../domain/types'
+import type { BookKind, Ledger, StoredData } from '../../domain/types'
+import type { SaveResult } from '../../storage/LedgerRepository'
 import { BottomSheet } from '../../ui/BottomSheet'
 import { Button } from '../../ui/Button'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
@@ -14,6 +15,8 @@ import { TextField } from '../../ui/TextField'
 import { BackButton, BackToLedger } from '../BackToLedger'
 import { BACKUP_REMINDER_MESSAGE, lastBackupText } from '../backup/backupReminder'
 import { bookKindIcon } from '../books/bookKindIcon'
+import { KeepRestoreScreen } from '../keep/KeepRestoreScreen'
+import type { KeepServer } from '../keep/keepServer'
 import { InstallGuide } from '../install/InstallGuide'
 import { browserInstallEnvironment, useInstallPrompt, type InstallEnvironment } from '../install/installPrompt'
 import { browserKind, shouldOfferInstall } from '../install/installRules'
@@ -27,9 +30,27 @@ const CARRYOVER_PAGE = 'settings-carryover'
 const KIND_SHEET = 'settings-kind'
 const YEAR_SHEET = 'settings-year'
 const INSTALL_GUIDE_SHEET = 'settings-install-guide'
+const KEEP_SHEET = 'settings-keep'
+const KEEP_RESTORE_PAGE = 'settings-keep-restore'
 
 const KIND_QUESTION = '어떤 장부인가요?'
 const KIND_CHOICES: BookKind[] = ['club', 'household']
+
+// 기록 지키기 (SPEC-006) 자동 보관 줄
+export interface KeepRow {
+  status: string // 오른쪽 값 "켜짐 · 3분 전" / "꺼짐"
+  enabled: boolean
+  tooLarge: boolean // 보관본이 1MB 를 넘어 올리지 못했다
+  onTurnOn: () => void
+  onTurnOff: (forgetCopy: boolean) => void // forgetCopy: 서버에 보관해 둔 사본도 지운다
+}
+
+// 복구 코드로 불러오기 화면에 넘기는 것 (서버 주소가 있는 빌드에만)
+export interface RestoreByCode {
+  server: KeepServer
+  hasRecords: boolean
+  onRestore: (data: StoredData) => SaveResult
+}
 
 type SettingsScreenProps = {
   bookName: string // 지금 장부 이름 (SPEC-005)
@@ -49,6 +70,11 @@ type SettingsScreenProps = {
   lastBackupAt?: string // 마지막으로 백업 파일을 보낸 시각 (백업 보내기 줄에 날짜로)
   onSendBackup: () => void
   onImportBackup: () => void
+  // 자동 보관 줄. 없으면 서버 주소가 정해지기 전 빌드라 "준비 중" (SPEC-006)
+  keep?: KeepRow
+  recoveryCode?: string // 복구 코드. 아직 없으면(읽기 전용 등) 코드 칸을 숨긴다
+  onShareCode: () => void // 복구 코드 [보내기]
+  restoreByCode?: RestoreByCode // 있으면 [복구 코드로 불러오기] 줄
   onBack: () => void
   // 홈 화면에 추가 줄이 보는 브라우저 상태 (기본은 지금 브라우저, 테스트에서 바꿔 넣는다)
   install?: InstallEnvironment
@@ -59,8 +85,8 @@ function carryoverText(carryover: number): string {
   return carryover < 0 ? `적자 ${formatAmount(-carryover)}원` : `${formatAmount(carryover)}원`
 }
 
-// 설정 (SPEC-001 화면 구성, SPEC-002 백업, SPEC-005 장부 정보): 묶음 제목 + 아이콘·이름·값·화살표 줄 목록.
-// 이름·이월금 줄은 그 값 하나만 고치는 편집 화면을, 종류·연도 줄은 선택 창을 연다. 맨 아래 [이 장부 지우기]
+// 설정 (SPEC-001 화면 구성, SPEC-002 백업, SPEC-005 장부 정보, SPEC-006 기록 지키기): 묶음 제목 + 아이콘·이름·값·화살표 줄 목록.
+// 이름·이월금 줄은 그 값 하나만 고치는 편집 화면을, 종류·연도·자동 보관 줄은 선택 창을 연다. 맨 아래 [이 장부 지우기]
 export function SettingsScreen({
   bookName,
   bookKind,
@@ -77,11 +103,20 @@ export function SettingsScreen({
   lastBackupAt,
   onSendBackup,
   onImportBackup,
+  keep,
+  recoveryCode,
+  onShareCode,
+  restoreByCode,
   onBack,
   install = browserInstallEnvironment(),
 }: SettingsScreenProps) {
   const installPrompt = useInstallPrompt(install.installPrompt)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmingKeepOff, setConfirmingKeepOff] = useState(false)
+
+  if (restoreByCode && sheets.sheet === KEEP_RESTORE_PAGE) {
+    return <KeepRestoreScreen {...restoreByCode} backLabel="설정" onBack={sheets.closeSheet} />
+  }
 
   if (ledger && sheets.sheet === BOOK_NAME_PAGE) {
     return (
@@ -140,9 +175,33 @@ export function SettingsScreen({
         <SettingRow icon="calendar" title="장부 연도" value={`${year}년`} onClick={() => sheets.openSheet(YEAR_SHEET)} />
       </SettingsGroup>
 
-      <SettingsGroup title="기록 백업" testId="settings-backup">
-        <SettingRow icon="share" title="백업 파일 보내기" description={lastBackupText(lastBackupAt)} onClick={onSendBackup} />
-        <SettingRow icon="folder" title="백업 파일 불러오기" description="새 폰으로 옮길 때" onClick={onImportBackup} />
+      {/* 기록 지키기 (SPEC-006, 전 "기록 백업"): 자동 보관 + 복구 코드 카드, 파일 백업·불러오기 카드 */}
+      <SettingsGroup
+        title="기록 지키기"
+        testId="settings-keep"
+        more={
+          <>
+            <SettingRow icon="share" title="백업 파일 보내기" description={lastBackupText(lastBackupAt)} onClick={onSendBackup} />
+            <SettingRow icon="folder" title="백업 파일 불러오기" description="새 폰으로 옮길 때" onClick={onImportBackup} />
+            {restoreByCode && (
+              <SettingRow icon="key" title="복구 코드로 불러오기" onClick={() => sheets.openSheet(KEEP_RESTORE_PAGE)} />
+            )}
+          </>
+        }
+      >
+        {keep ? (
+          <SettingRow
+            icon="cloud"
+            title="자동 보관"
+            value={keep.status}
+            description={keep.tooLarge ? '기록이 너무 많아 보관하지 못했어요. 백업 파일을 보내 두세요' : undefined}
+            onClick={() => sheets.openSheet(KEEP_SHEET)}
+          />
+        ) : (
+          // 서버 주소가 정해지기 전 빌드: 누를 것이 없다
+          <ListRow icon="cloud" title="자동 보관" end={<span className="settings__value">준비 중</span>} />
+        )}
+        {recoveryCode && <RecoveryCode code={recoveryCode} onShare={onShareCode} />}
       </SettingsGroup>
 
       {/* 홈 화면에 추가 (SPEC-002): 설치 제안이 있으면 브라우저 설치 창, 없으면 방법 안내. 홈 화면 앱이면 묶음째 없다 */}
@@ -189,6 +248,25 @@ export function SettingsScreen({
         />
       </BottomSheet>
 
+      {keep && (
+        <BottomSheet open={sheets.sheet === KEEP_SHEET} title="자동 보관" onClose={sheets.closeSheet}>
+          <OptionList
+            label="자동 보관"
+            options={[
+              { value: 'on', label: '켜기' },
+              { value: 'off', label: '끄기' },
+            ]}
+            value={keep.enabled ? 'on' : 'off'}
+            onChange={(picked) => {
+              sheets.closeSheet()
+              if (picked === 'on' && !keep.enabled) keep.onTurnOn()
+              // 끄면 서버에 남은 사본을 어떻게 할지 묻는다
+              if (picked === 'off' && keep.enabled) setConfirmingKeepOff(true)
+            }}
+          />
+        </BottomSheet>
+      )}
+
       <BottomSheet open={sheets.sheet === INSTALL_GUIDE_SHEET} title="홈 화면에 추가하는 방법" onClose={sheets.closeSheet}>
         <InstallGuide browser={browserKind(install.userAgent)} />
         <Button onClick={sheets.closeSheet}>확인</Button>
@@ -206,12 +284,58 @@ export function SettingsScreen({
         }}
         onCancel={() => setConfirmingDelete(false)}
       />
+
+      {/* 자동 보관 끄기 (SPEC-006): 서버 사본을 남겨 둘지 지울지. 어느 쪽이든 끈다 (Esc·바깥은 남겨 두기) */}
+      <ConfirmDialog
+        open={confirmingKeepOff}
+        title="보관해 둔 기록도 지울까요?"
+        description="남겨 두면 나중에 복구 코드로 다시 불러올 수 있어요"
+        cancelLabel="남겨 두기"
+        confirmLabel="지우기"
+        danger
+        onConfirm={() => {
+          setConfirmingKeepOff(false)
+          keep?.onTurnOff(true)
+        }}
+        onCancel={() => {
+          setConfirmingKeepOff(false)
+          keep?.onTurnOff(false)
+        }}
+      />
     </div>
   )
 }
 
+// 복구 코드 칸: 이름 + 큰 코드(고정폭 숫자, 한 줄) + 안내 + [복구 코드 보내기] (SPEC-006 시안 KeepSettings).
+// 시안은 코드 오른쪽에 [보내기] 를 두었지만 390 폭에서 코드가 두 줄로 갈려 버튼을 아래 한 줄로 내렸다
+export function RecoveryCode({ code, onShare }: { code: string; onShare: () => void }) {
+  const labelId = useId()
+  return (
+    <div className="settings__code" role="group" aria-labelledby={labelId}>
+      <span className="settings__code-label" id={labelId}>
+        복구 코드
+      </span>
+      <span className="settings__code-value" data-testid="recovery-code-value">
+        {code}
+      </span>
+      <p className="settings__code-note">새 폰에서 이 코드를 넣으면 기록이 돌아와요. 가족에게도 보내 두세요.</p>
+      <Button variant="secondary" icon="share" onClick={onShare}>
+        복구 코드 보내기
+      </Button>
+    </div>
+  )
+}
+
+type SettingsGroupProps = {
+  title: string
+  testId?: string
+  children: ReactNode
+  // 같은 묶음 안 두 번째 카드 (기록 지키기: 자동 보관·복구 코드 카드 아래 파일 백업 카드)
+  more?: ReactNode
+}
+
 // 묶음: 작은 묶음 제목 + 흰 카드 안 줄 목록
-function SettingsGroup({ title, testId, children }: { title: string; testId?: string; children: ReactNode }) {
+function SettingsGroup({ title, testId, children, more }: SettingsGroupProps) {
   const titleId = useId()
   return (
     <section className="settings__group" aria-labelledby={titleId} data-testid={testId}>
@@ -219,6 +343,7 @@ function SettingsGroup({ title, testId, children }: { title: string; testId?: st
         {title}
       </h2>
       <div className="settings__list">{children}</div>
+      {more && <div className="settings__list">{more}</div>}
     </section>
   )
 }
