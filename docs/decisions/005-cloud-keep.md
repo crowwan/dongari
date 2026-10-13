@@ -1,6 +1,6 @@
 ---
 id: 005
-status: proposed
+status: accepted
 date: 2026-10-12
 ---
 
