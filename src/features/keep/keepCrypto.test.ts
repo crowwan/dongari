@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { keepIdOf, openKeep, sealKeep } from './keepCrypto'
+import { fromBase64, keepIdOf, openKeep, sealKeep, toBase64 } from './keepCrypto'
 
 const CODE = 'HK7M-29QF-MX4P-8R2D'
 const SAVED_AT = '2026-10-12T06:20:00.000Z'
@@ -46,5 +46,21 @@ describe('SPEC-006 복구 코드 암호화', () => {
     expect(await openKeep('HK7M-29QF-MX4P-8R2E', envelope)).toBeUndefined()
     expect(await openKeep(CODE, { ...envelope, data: btoa('broken data') })).toBeUndefined()
     expect(await openKeep(CODE, { ...envelope, iv: '%%%' })).toBeUndefined()
+  })
+})
+
+describe('SPEC-006 큰 보관본 (몇 년치 기록, 1MB 상한 가까이)', () => {
+  it('300KB 넘는 바이트도 base64 로 바꾸고 되돌린다 (함수 인자 수 한도에 걸리지 않게)', () => {
+    const bytes = Uint8Array.from({ length: 400_000 }, (_, index) => index % 256)
+    const text = toBase64(bytes)
+    expect(text).toHaveLength(Math.ceil(bytes.length / 3) * 4)
+    expect(fromBase64(text)).toEqual(bytes)
+  })
+
+  it('600KB 평문도 암호화했다가 같은 코드로 풀면 원래 글자다', async () => {
+    const plain = JSON.stringify({ entries: 'ㄱ가a'.repeat(100_000) })
+    expect(new TextEncoder().encode(plain).length).toBeGreaterThan(600_000)
+    const envelope = await sealKeep(CODE, plain, SAVED_AT)
+    expect(await openKeep(CODE, envelope)).toBe(plain)
   })
 })

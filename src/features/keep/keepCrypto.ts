@@ -17,11 +17,19 @@ const ID_INFO = new TextEncoder().encode('keep-id')
 const KEY_INFO = new TextEncoder().encode('keep-key')
 const IV_BYTES = 12
 
-function toBase64(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
+// 한 번에 글자로 바꾸는 바이트 수. 배열 전체를 인자로 펼치면 수만~십여만 개에서 인자 수 한도(RangeError)에 걸린다
+const CHUNK_BYTES = 0x8000
+
+export function toBase64(bytes: Uint8Array): string {
+  const chunks: string[] = []
+  for (let start = 0; start < bytes.length; start += CHUNK_BYTES) {
+    chunks.push(String.fromCharCode(...bytes.subarray(start, start + CHUNK_BYTES)))
+  }
+  return btoa(chunks.join(''))
 }
 
-function fromBase64(text: string): Uint8Array<ArrayBuffer> {
+// 글자를 하나씩 도는 Uint8Array.from 이라 큰 입력도 인자 수 한도에 걸리지 않는다
+export function fromBase64(text: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(atob(text), (char) => char.charCodeAt(0))
 }
 
