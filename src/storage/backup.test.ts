@@ -183,3 +183,14 @@ describe('SPEC-002·SPEC-005 백업 파일 읽기', () => {
     expect(readBackup(newer)).toEqual({ ok: false, reason: 'newer-version' })
   })
 })
+
+describe('SPEC-006 백업 파일의 복구 코드', () => {
+  it('AC-7 백업 파일에 복구 코드가 들어가고, 읽으면 같은 코드다', () => {
+    const data: StoredData = { ...storedWith(ledger(2026, 1)), settings: { recoveryCode: 'HK7M-29QF-MX4P-8R2D' } }
+    const { text } = createBackup(data, NOW)
+
+    expect(JSON.parse(text).settings.recoveryCode).toBe('HK7M-29QF-MX4P-8R2D')
+    const read = readBackup(text)
+    expect(read.ok && read.data.settings.recoveryCode).toBe('HK7M-29QF-MX4P-8R2D')
+  })
+})

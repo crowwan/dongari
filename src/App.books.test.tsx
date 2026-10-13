@@ -34,7 +34,12 @@ const TWO_BOOKS: StoredData = {
       kind: 'household',
     }),
   ],
-  settings: { lastBookId: 'home', lastChangedAt: '2026-10-01T00:00:00.000Z', lastBackupAt: '2026-10-01T00:00:00.000Z' },
+  settings: {
+    lastBookId: 'home',
+    lastChangedAt: '2026-10-01T00:00:00.000Z',
+    lastBackupAt: '2026-10-01T00:00:00.000Z',
+    recoveryCode: 'HK7M-29QF-MX4P-8R2D',
+  },
 }
 
 describe('SPEC-005 여러 장부 저장 형식 (화면)', () => {

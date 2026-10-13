@@ -20,6 +20,7 @@ import {
   type LedgerTotals,
 } from '../../domain/ledger'
 import type { Book, BookKind, EntryType, Ledger, StoredData } from '../../domain/types'
+import { createRecoveryCode, recoveryCodeOf, withRecoveryCode } from '../keep/recoveryCode'
 import type {
   LedgerRepository,
   LoadResult,
@@ -31,6 +32,7 @@ import type {
 export interface UseLedgerOptions {
   now?: () => Date // 기본 연도·입력 시각·변경 시각 (기본: 지금)
   createId?: () => string // 기록·장부 id (기본: crypto.randomUUID)
+  createRecoveryCode?: () => string // 복구 코드 (기본: 무작위, SPEC-006)
 }
 
 // 앱 시작 때 저장소 상태. 화면이 시작 안내를 고르는 데 쓴다 (SPEC-002)
@@ -106,6 +108,7 @@ function withLedger(book: Book, ledger: Ledger): Book {
 export function useLedger(repository: LedgerRepository, loaded: LoadResult, options: UseLedgerOptions = {}): LedgerState {
   const now = options.now ?? (() => new Date())
   const createId = options.createId ?? (() => crypto.randomUUID())
+  const createCode = options.createRecoveryCode ?? createRecoveryCode
 
   const [data, setData] = useState(loaded.data)
   const [year, setYear] = useState(() => now().getFullYear())
@@ -154,7 +157,8 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     return changeLedger((ledger, target) => withLedger(target, change(ledger)))
   }
 
-  // 새 장부는 올해 장부 하나로 시작해 만든 순 맨 뒤에 들어가고 지금 장부가 된다 (같은 이름이어도 id 로 구분)
+  // 새 장부는 올해 장부 하나로 시작해 만든 순 맨 뒤에 들어가고 지금 장부가 된다 (같은 이름이어도 id 로 구분).
+  // 첫 장부면 복구 코드도 이때 생긴다 (SPEC-006 AC-1)
   function addBook(current: StoredData, setup: BookSetup): StoredData {
     const thisYear = now().getFullYear()
     const created: Book = {
@@ -164,7 +168,17 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
       ledgers: { [String(thisYear)]: createLedger(thisYear, setup.carryover) },
       createdAt: now().toISOString(),
     }
-    return { ...current, books: [...current.books, created], settings: { ...current.settings, lastBookId: created.id } }
+    return withRecoveryCode(
+      { ...current, books: [...current.books, created], settings: { ...current.settings, lastBookId: created.id } },
+      createCode,
+    )
+  }
+
+  // 불러올 데이터의 복구 코드: 파일(보관본)의 코드를 쓴다 (SPEC-006 AC-7). 코드가 없는 옛 백업 파일이면
+  // 이 폰의 코드를 그대로 쓰고(같은 보관 자리), 이 폰에도 없으면 새로 만든다
+  function withRestoredCode(backup: StoredData): StoredData {
+    const phoneCode = recoveryCodeOf(latest.current)
+    return withRecoveryCode(backup, () => phoneCode ?? createCode())
   }
 
   // 장부를 지운 데이터: 남은 첫 장부(만든 순)가 지금 장부가 된다
@@ -249,7 +263,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     },
     restoreBackup: (backup) => {
       // 저장하지 못하면 지금 기록을 그대로 둔다: 불러온 것처럼 보였다가 새로고침 때 사라지지 않게
-      const result = replace(backup, (next) => repository.restore(next))
+      const result = replace(withRestoredCode(backup), (next) => repository.restore(next))
       if (result.ok) {
         setYear(now().getFullYear())
         setStartup({ status: 'ok' })
