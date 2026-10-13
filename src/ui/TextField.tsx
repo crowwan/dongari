@@ -14,6 +14,8 @@ type TextFieldProps = {
   disabled?: boolean
   // 나타나자마자 포커스 (하나씩 채우기의 "직접 적기" — 키패드가 바로 뜬다)
   autoFocus?: boolean
+  // 폰 키패드를 대문자로 띄운다 (복구 코드, SPEC-006)
+  autoCapitalize?: 'characters'
 }
 
 // 글자 입력칸 (장부 이름, 항목 직접 적기). 큰 제목 + 큰 글자, 오류는 색과 문장으로 함께 알린다
@@ -26,6 +28,7 @@ export function TextField({
   error,
   disabled,
   autoFocus,
+  autoCapitalize,
 }: TextFieldProps) {
   const inputId = useId()
   const errorId = useId()
@@ -41,6 +44,7 @@ export function TextField({
         type="text"
         autoComplete="off"
         autoFocus={autoFocus}
+        autoCapitalize={autoCapitalize}
         placeholder={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}

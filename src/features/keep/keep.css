@@ -1,0 +1,60 @@
+/*
+ * 복구 코드로 불러오기 화면과 그 확인 창 (SPEC-006). 값은 tokens.css 변수만 쓴다.
+ */
+@import '../screens.css';
+
+/* [‹ 설정] 과 제목은 한 덩어리 (설정 편집 화면 머리와 같다) */
+.keep-restore__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* 질문(글 칸 이름) → 칸 → 안내 한 줄 */
+.keep-restore__question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+/* 코드 글 칸: 크게, 굵게, 고정폭 숫자, 글자 사이를 조금 띄워 4자 묶음이 읽히게 */
+.keep-restore .ui-field__input {
+  font-size: var(--text-title-size);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-code);
+}
+
+/* 확인 창 안 보관본 요약: 회색 면 위 이름 · 값 줄 */
+.keep-restore__facts {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--corner-sm);
+  background: var(--fill);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-body-size);
+  line-height: var(--line-tight);
+}
+
+.keep-restore__fact {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.keep-restore__fact dt {
+  flex: none;
+  color: var(--muted);
+}
+
+/* 값: 굵게, 긴 장부 이름 목록은 줄을 바꿔 오른쪽 정렬 */
+.keep-restore__fact dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--strong);
+  font-weight: var(--weight-bold);
+  text-align: right;
+  word-break: keep-all;
+}

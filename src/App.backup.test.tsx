@@ -83,11 +83,11 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
     vi.restoreAllMocks()
   })
 
-  it('설정에 기록 백업 묶음과 [백업 파일 보내기] [백업 파일 불러오기] 가 있다', async () => {
+  it('설정에 기록 지키기 묶음과 [백업 파일 보내기] [백업 파일 불러오기] 가 있다', async () => {
     renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
     await openSettings()
 
-    const card = within(screen.getByRole('region', { name: '기록 백업' }))
+    const card = within(screen.getByRole('region', { name: '기록 지키기' }))
     expect(card.getByRole('button', { name: /^백업 파일 보내기/ })).toBeInTheDocument()
     expect(card.getByRole('button', { name: /^백업 파일 불러오기/ })).toBeInTheDocument()
   })

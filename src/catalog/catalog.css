@@ -126,6 +126,11 @@
   height: 120px;
 }
 
+/* 화면 하나 통째 (복구 코드로 불러오기, SPEC-006): 제목·칸·아래 고정 버튼이 다 보이게 */
+.catalog__frame--screen {
+  height: 560px;
+}
+
 /* 아래 고정 영역 + 안내 줄 */
 .catalog__frame--note {
   height: 160px;

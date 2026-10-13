@@ -24,6 +24,7 @@ export type Screen =
   | { name: 'add-entry'; month: number } // 내역 적기. month: 장부에서 보던 달 (입력 월 기본값)
   | { name: 'edit-entry'; id: string } // 내역 고치기. id: 고칠 기록
   | { name: 'new-book' } // 새 장부 만들기 (SPEC-005, 장부 고르기 창에서)
+  | { name: 'keep-restore' } // 복구 코드로 불러오기 (SPEC-006, 첫 실행 화면에서. 설정에서는 설정 위 편집 화면으로)
 
 const LEDGER: Screen = { name: 'ledger' }
 

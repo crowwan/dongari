@@ -151,13 +151,13 @@ describe('SPEC-002 30일 백업 안내', () => {
     })
   })
 
-  describe('설정 > 기록 백업 [백업 파일 보내기] 줄의 마지막 백업 날짜', () => {
+  describe('설정 > 기록 지키기 [백업 파일 보내기] 줄의 마지막 백업 날짜', () => {
     it('마지막 백업 날짜를 보여 준다', async () => {
       const lastBackupAt = new Date(2026, 8, 3, 10, 0).toISOString()
       renderApp(new MemoryRepository(storedWith({ lastBackupAt, lastChangedAt: lastBackupAt })))
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
 
-      const card = within(screen.getByRole('region', { name: '기록 백업' }))
+      const card = within(screen.getByRole('region', { name: '기록 지키기' }))
       expect(card.getByText('마지막 백업: 2026년 9월 3일')).toBeInTheDocument()
     })
 
@@ -167,7 +167,7 @@ describe('SPEC-002 30일 백업 안내', () => {
       // 처음 기록(8월 1일)부터 30일이 지나 점이 붙어 있다
       await userEvent.click(screen.getByRole('button', { name: '설정 백업 필요' }))
 
-      const card = within(screen.getByRole('region', { name: '기록 백업' }))
+      const card = within(screen.getByRole('region', { name: '기록 지키기' }))
       expect(card.getByText('아직 백업하지 않았어요')).toBeInTheDocument()
 
       await userEvent.click(card.getByRole('button', { name: /^백업 파일 보내기/ }))
