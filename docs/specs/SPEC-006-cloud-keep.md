@@ -1,7 +1,7 @@
 ---
 id: SPEC-006
 title: 복구 코드로 자동 보관
-status: in-progress
+status: done
 milestone: v2.5
 issue: "#96"
 prototype: https://claude.ai/artifact/8S8y4GuLU5xkVkHTRPxt7M
