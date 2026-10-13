@@ -71,6 +71,31 @@ GitHub Pages 는 `gh-pages` 브랜치를 그대로 보여 준다. 워크플로�
   - 미리보기와 본 주소는 같은 출처(`crowwan.github.io`)라 localStorage(`dongari:v2`)를 같이 쓴다. 미리보기에서 적은 QA 기록이 본 주소 v2 에도 보인다 → QA 는 테스트용 폰·브라우저로 하거나 끝나고 지운다.
   - `/dongari/preview/` 는 본 주소 서비스 워커 범위 안이다. v2.1.0 서비스 워커가 깔리기 전 폰에서는 미리보기가 본 주소 화면으로 열린다(위 #54). 미리보기는 릴리스 전 QA 에만 쓴다.
 
+### 자동 보관 서버 배포 (Cloudflare Worker, `.github/workflows/worker.yml`, #97)
+
+복구 코드 자동 보관(SPEC-006, ADR 005)의 서버. `worker/` 는 앱과 따로 있는 작은 패키지다(자기 `package.json`·`tsconfig.json`·테스트, 루트 lint·타입 검사·테스트·빌드는 `worker/` 를 보지 않는다).
+
+| 언제 | 하는 일 |
+|---|---|
+| PR 에서 `worker/**` 가 바뀜 | `worker-test`(타입 검사·테스트)만. main 필수 체크 `test`(ci.yml)와 별개 |
+| main 에 `worker/**` 변경이 들어옴, 또는 Actions → "보관 서버" → Run workflow | 테스트 → `wrangler deploy` |
+
+- 이름 `uri-jangbu-keep`, KV 바인딩 `KEEP`(namespace id 는 `worker/wrangler.toml`). 계정 id 는 파일에 쓰지 않고 비밀값으로 넘긴다.
+- 레포 Secrets 두 개가 필요하다: `CLOUDFLARE_API_TOKEN`(Workers 편집·KV 쓰기 권한 토큰), `CLOUDFLARE_ACCOUNT_ID`. 없으면 배포 단계가 "보관 서버 배포 비밀값 없음" 오류로 끝난다 → 넣고 Run workflow 로 다시 돌린다.
+- 주소: `https://uri-jangbu-keep.<계정 서브도메인>.workers.dev`. 확인 방법은 둘 중 하나
+  - Actions 배포 로그의 `wrangler deploy` 출력 마지막 주소
+  - Cloudflare 대시보드 → Workers & Pages → `uri-jangbu-keep` → Domains
+- 살아 있는지 확인(값은 아무 64자 16진수):
+  ```bash
+  curl -i "$KEEP_URL/"                                     # 404 (경로 없음 = 서버는 응답)
+  curl -i -X OPTIONS -H 'Origin: https://crowwan.github.io' \
+    "$KEEP_URL/v1/keep/$(printf x | shasum -a 256 | cut -c1-64)"   # 204 + Access-Control-Allow-Origin
+  ```
+  출처(Origin) 없이 `/v1/keep/...` 를 부르면 403 이 맞다.
+- 로컬: `cd worker && npm install && npm test`, 실제 런타임으로 보려면 `npx wrangler dev --local --port 8787`(로컬 KV, 실제 KV 안 건드림).
+- 수동 배포(비상용): `cd worker && CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... npx wrangler deploy` (또는 `npx wrangler login` 뒤). 값은 셸에만, 파일에 쓰지 않는다.
+- API 는 SPEC-006 기술 메모 "서버 API".
+
 ## 폴더 구조
 
 ```
@@ -88,4 +113,5 @@ src/
 ├── catalog/     디자인 카탈로그 `/#/dev/catalog` (개발 모드 전용, 프로덕션 번들 제외)
 └── test/        Vitest 설정, 여러 테스트가 같이 쓰는 장부 기록(ledgerFixtures: v1 예시 1년치, 장부·저장 데이터 만들기)
 public/icons/  앱 아이콘 (scripts/make-icons.mjs 가 토큰 색으로 만든다)
+worker/        자동 보관 서버 (Cloudflare Worker + KV, 따로 있는 패키지). src/index.ts 진입점(기본 내보내기만), src/keep.ts 요청 처리, wrangler.toml
 ```
