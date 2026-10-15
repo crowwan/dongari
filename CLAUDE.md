@@ -94,9 +94,19 @@ GitHub Pages 는 `gh-pages` 브랜치를 그대로 보여 준다. 워크플로�
     "$KEEP_URL/v1/keep/$(printf x | shasum -a 256 | cut -c1-64)"   # 204 + Access-Control-Allow-Origin
   ```
   출처(Origin) 없이 `/v1/keep/...` 를 부르면 403 이 맞다.
+- 요약 토큰(SPEC-007, #104): 보관 지켜보기 워크플로(#106)가 `GET /v1/report` 를 부를 때 쓴다. 넣지 않으면 요약은 늘 401.
+  ```bash
+  TOKEN=$(openssl rand -hex 32)
+  cd worker && printf %s "$TOKEN" | npx wrangler secret put REPORT_TOKEN   # Worker 비밀값
+  ```
+  같은 값을 레포 Secrets `KEEP_REPORT_TOKEN` 에도 넣는다. 확인:
+  ```bash
+  curl -i -H "Authorization: Bearer $TOKEN" "$KEEP_URL/v1/report"   # 200 + { now, devices: [...] }
+  curl -i "$KEEP_URL/v1/report"                                     # 401
+  ```
 - 로컬: `cd worker && npm install && npm test`, 실제 런타임으로 보려면 `npx wrangler dev --local --port 8787`(로컬 KV, 실제 KV 안 건드림).
 - 수동 배포(비상용): `cd worker && CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... npx wrangler deploy` (또는 `npx wrangler login` 뒤). 값은 셸에만, 파일에 쓰지 않는다.
-- API 는 SPEC-006 기술 메모 "서버 API".
+- API 는 SPEC-006 기술 메모 "서버 API", 상태 신호·요약은 SPEC-007 기술 메모 "서버 API 추가".
 
 ## 폴더 구조
 
