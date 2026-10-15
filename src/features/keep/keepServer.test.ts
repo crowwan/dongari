@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { KeepEnvelope } from './keepCrypto'
-import { createKeepServer, KEEP_SIZE_LIMIT } from './keepServer'
+import { createKeepServer, KEEP_SIZE_LIMIT, type KeepStatus } from './keepServer'
 
 const ID = 'a'.repeat(64)
 const ENVELOPE: KeepEnvelope = { v: 1, savedAt: '2026-10-12T06:20:00.000Z', iv: 'aXY=', data: 'ZGF0YQ==' }
@@ -59,5 +59,44 @@ describe('SPEC-006 자동 보관 서버 (Worker API v1)', () => {
     await expect(createKeepServer('https://k.dev', fetchFn).remove(ID)).resolves.toBe(true)
     expect(fetchFn.mock.calls[0]?.[1]?.method).toBe('DELETE')
     await expect(createKeepServer('https://k.dev', offline()).remove(ID)).resolves.toBe(false)
+  })
+})
+
+describe('SPEC-007 보관 상태 신호 (PUT /v1/status/:id)', () => {
+  const STATUS: KeepStatus = {
+    v: 1,
+    enabled: true,
+    pendingSince: '2026-10-14T00:00:00.000Z',
+    lastKeptAt: '2026-10-13T00:00:00.000Z',
+    tooLarge: false,
+    appVersion: '2.6.0',
+  }
+
+  it('AC-1 PUT {주소}/v1/status/:id 에 상태를 JSON 으로 한 번 보낸다', async () => {
+    const fetchFn = respond(204)
+    await createKeepServer('https://keep.example.dev/', fetchFn).sendStatus(ID, STATUS)
+
+    expect(fetchFn).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchFn.mock.calls[0] ?? []
+    expect(url).toBe(`https://keep.example.dev/v1/status/${ID}`)
+    expect(init?.method).toBe('PUT')
+    expect(new Headers(init?.headers).get('content-type')).toBe('application/json')
+    expect(JSON.parse(String(init?.body))).toEqual(STATUS)
+  })
+
+  it('AC-1 선택 칸이 없는 상태는 키 없이 보낸다 (null 로 보내지 않는다)', async () => {
+    const fetchFn = respond(204)
+    await createKeepServer('https://k.dev', fetchFn).sendStatus(ID, { v: 1, enabled: false, tooLarge: false, appVersion: '2.6.0' })
+    expect(fetchFn.mock.calls[0]?.[1]?.body).toBe('{"v":1,"enabled":false,"tooLarge":false,"appVersion":"2.6.0"}')
+  })
+
+  it('AC-2 인터넷이 없거나 서버 오류여도 예외 없이 끝나고 다시 보내지 않는다', async () => {
+    const noNetwork = offline()
+    await expect(createKeepServer('https://k.dev', noNetwork).sendStatus(ID, STATUS)).resolves.toBeUndefined()
+    expect(noNetwork).toHaveBeenCalledTimes(1)
+
+    const serverError = respond(500)
+    await expect(createKeepServer('https://k.dev', serverError).sendStatus(ID, STATUS)).resolves.toBeUndefined()
+    expect(serverError).toHaveBeenCalledTimes(1)
   })
 })

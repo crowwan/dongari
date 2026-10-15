@@ -121,6 +121,7 @@ const NO_KEEP_SERVER: KeepServer = {
   put: async () => 'ok',
   get: async () => ({ status: 'not-found' }),
   remove: async () => true,
+  sendStatus: async () => {},
 }
 
 // 장부 고르기 창 (SPEC-005): 만든 순, 이름이 긴 장부는 두 줄까지

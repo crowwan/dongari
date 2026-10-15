@@ -3,7 +3,7 @@ import { CURRENT_SCHEMA_VERSION, type StoredData } from '../../domain/types'
 import { book, ledger } from '../../test/ledgerFixtures'
 import { AutoKeeper, type KeepState, type KeepStateStore } from './AutoKeeper'
 import { keepIdOf, openKeep, type KeepEnvelope } from './keepCrypto'
-import type { KeepPutResult, KeepServer } from './keepServer'
+import type { KeepPutResult, KeepServer, KeepStatus } from './keepServer'
 
 const CODE = 'HK7M-29QF-MX4P-8R2D'
 const START = new Date('2026-10-13T00:00:00.000Z')
@@ -16,13 +16,16 @@ function stored(entryName = '회비'): StoredData {
   }
 }
 
-// 가짜 서버: 올린 것을 모아 두고, 답은 테스트가 정한다
+// 가짜 서버: 올린 것·상태 신호를 모아 두고, 답은 테스트가 정한다. calls 는 부른 차례
 function fakeServer() {
   const puts: { id: string; envelope: KeepEnvelope }[] = []
   const removed: string[] = []
+  const statuses: { id: string; status: KeepStatus }[] = []
+  const calls: ('put' | 'status')[] = []
   let result: KeepPutResult = 'ok'
   const server: KeepServer = {
     put: async (id, envelope) => {
+      calls.push('put')
       puts.push({ id, envelope })
       return result
     },
@@ -31,11 +34,17 @@ function fakeServer() {
       removed.push(id)
       return true
     },
+    sendStatus: async (id, status) => {
+      calls.push('status')
+      statuses.push({ id, status })
+    },
   }
   return {
     server,
     puts,
     removed,
+    statuses,
+    calls,
     answer: (next: KeepPutResult) => {
       result = next
     },
@@ -299,5 +308,139 @@ describe('SPEC-006 자동 보관기', () => {
     await keeper.idle()
     expect(listener).toHaveBeenCalled()
     unsubscribe()
+  })
+})
+
+describe('SPEC-007 앱을 열 때 보관 상태 신호', () => {
+  const NOW = new Date('2026-10-15T00:00:00.000Z')
+
+  function setup(state: KeepState) {
+    const fake = fakeServer()
+    const keeper = new AutoKeeper({ server: fake.server, store: memoryStore(state), now: () => NOW, appVersion: '2.6.0' })
+    return { ...fake, keeper }
+  }
+
+  it('AC-1 올리기 시도가 끝난 뒤 상태 신호를 한 번 보낸다', async () => {
+    const { keeper, calls, statuses } = setup({ enabled: true, pendingSince: '2026-10-14T00:00:00.000Z' })
+    await keeper.start(stored())
+
+    expect(calls).toEqual(['put', 'status'])
+    expect(statuses[0]?.id).toBe(await keepIdOf(CODE))
+    // 올린 결과(밀린 것 없음, 마지막 보관 시각)가 담긴다
+    expect(statuses[0]?.status).toEqual({ v: 1, enabled: true, lastKeptAt: NOW.toISOString(), tooLarge: false, appVersion: '2.6.0' })
+  })
+
+  it('AC-1 올릴 것이 없어도 신호는 한 번 보낸다', async () => {
+    const { keeper, calls, statuses } = setup({ enabled: true, lastKeptAt: '2026-10-14T00:00:00.000Z' })
+    await keeper.start(stored())
+
+    expect(calls).toEqual(['status'])
+    expect(statuses[0]?.status).toEqual({
+      v: 1,
+      enabled: true,
+      lastKeptAt: '2026-10-14T00:00:00.000Z',
+      tooLarge: false,
+      appVersion: '2.6.0',
+    })
+  })
+
+  it('AC-1 올리기에 실패하면 밀린 때를, 너무 크면 tooLarge 를 담는다', async () => {
+    const failed = setup({ enabled: true, lastKeptAt: '2026-10-01T00:00:00.000Z', pendingSince: '2026-10-10T00:00:00.000Z' })
+    failed.answer('failed')
+    await failed.keeper.start(stored())
+    expect(failed.statuses[0]?.status).toMatchObject({ pendingSince: '2026-10-10T00:00:00.000Z', tooLarge: false })
+
+    const tooLarge = setup({ enabled: true })
+    tooLarge.answer('too-large')
+    await tooLarge.keeper.start(stored())
+    expect(tooLarge.statuses[0]?.status).toMatchObject({ pendingSince: NOW.toISOString(), tooLarge: true })
+  })
+
+  it('AC-1 신호에는 켜짐·밀린 때·마지막 보관·너무 큼·앱 버전뿐이고 장부 내용·복구 코드는 들어가지 않는다', async () => {
+    const { keeper, statuses } = setup({ enabled: true, pendingSince: '2026-10-14T00:00:00.000Z' })
+    await keeper.start(stored('대관료'))
+
+    const status = statuses[0]?.status
+    expect(Object.keys(status ?? {}).sort()).toEqual(['appVersion', 'enabled', 'lastKeptAt', 'tooLarge', 'v'])
+    const body = JSON.stringify(status)
+    expect(body).not.toContain(CODE)
+    expect(body).not.toContain(CODE.replaceAll('-', ''))
+    expect(body).not.toContain('대관료')
+    expect(body).not.toContain('10000')
+  })
+
+  it('AC-2 자동 보관이 꺼졌어도 복구 코드가 있으면 꺼짐 신호를 보낸다 (올리지는 않는다)', async () => {
+    const { keeper, calls, statuses } = setup({ enabled: false, lastKeptAt: '2026-10-01T00:00:00.000Z' })
+    await keeper.start(stored())
+
+    expect(calls).toEqual(['status'])
+    expect(statuses[0]?.status).toEqual({
+      v: 1,
+      enabled: false,
+      lastKeptAt: '2026-10-01T00:00:00.000Z',
+      tooLarge: false,
+      appVersion: '2.6.0',
+    })
+  })
+
+  it('AC-2 복구 코드가 없으면 신호를 보내지 않는다', async () => {
+    const { keeper, calls } = setup({ enabled: true })
+    await keeper.start({ ...stored(), settings: {} })
+    expect(calls).not.toContain('status')
+  })
+
+  it('AC-2 저장할 때는 신호를 보내지 않는다 (앱을 열 때 한 번뿐)', async () => {
+    const { keeper, calls } = setup({ enabled: true, lastKeptAt: '2026-10-14T00:00:00.000Z' })
+    await keeper.start(stored())
+    keeper.saved(stored('간식비'))
+    await keeper.flush()
+
+    expect(calls).toEqual(['status', 'put'])
+  })
+
+  // 서버(#104)가 받는 모양: 정해진 칸만, 선택 칸은 없으면 키째 뺀다(null 은 400), appVersion 1~32자
+  const STATUS_KEYS = ['v', 'enabled', 'pendingSince', 'lastKeptAt', 'tooLarge', 'appVersion']
+  function expectServerShape(body: string) {
+    const parsed: unknown = JSON.parse(body)
+    if (typeof parsed !== 'object' || parsed === null) throw new Error('객체가 아니다')
+    const entries = Object.entries(parsed)
+    expect(entries.map(([key]) => key).filter((key) => !STATUS_KEYS.includes(key))).toEqual([])
+    expect(entries.filter(([, value]) => value === null || value === undefined)).toEqual([])
+    const appVersion = entries.find(([key]) => key === 'appVersion')?.[1]
+    expect(typeof appVersion === 'string' && appVersion.length >= 1 && appVersion.length <= 32).toBe(true)
+  }
+
+  it('AC-1 밀린 것·보관한 적이 없으면 선택 칸(pendingSince·lastKeptAt)은 null 이 아니라 키째 빠진다', async () => {
+    const { keeper, statuses } = setup({ enabled: false })
+    await keeper.start(stored())
+
+    const body = JSON.stringify(statuses[0]?.status)
+    expect(body).toBe('{"v":1,"enabled":false,"tooLarge":false,"appVersion":"2.6.0"}')
+    expectServerShape(body)
+  })
+
+  it('AC-1 어떤 상태든 보내는 본문은 서버가 받는 모양이다 (정해진 칸만, null 없음, 앱 버전 1~32자)', async () => {
+    const states: KeepState[] = [
+      { enabled: true },
+      { enabled: false },
+      { enabled: true, lastKeptAt: '2026-10-14T00:00:00.000Z' },
+      { enabled: true, lastKeptAt: '2026-10-01T00:00:00.000Z', pendingSince: '2026-10-10T00:00:00.000Z', tooLarge: true },
+    ]
+    for (const state of states) {
+      const fake = fakeServer()
+      fake.answer('failed')
+      // 앱 버전은 실제 빌드 값(기본)으로
+      const keeper = new AutoKeeper({ server: fake.server, store: memoryStore(state), now: () => NOW })
+      await keeper.start(stored())
+      expectServerShape(JSON.stringify(fake.statuses[0]?.status))
+    }
+  })
+
+  it('앱 버전은 빌드 때 넣은 package.json version 이 기본이다', async () => {
+    const fake = fakeServer()
+    const keeper = new AutoKeeper({ server: fake.server, store: memoryStore({ enabled: false }), now: () => NOW })
+    await keeper.start(stored())
+    expect(fake.statuses[0]?.status.appVersion).toBe(__APP_VERSION__)
+    expect(__APP_VERSION__).toMatch(/^\d+\.\d+\.\d+/)
   })
 })
