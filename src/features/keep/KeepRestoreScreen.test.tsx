@@ -29,11 +29,12 @@ async function serverWithKept(): Promise<KeepServer> {
     put: async () => 'ok',
     get: async (asked) => (asked === id ? { status: 'found', envelope } : { status: 'not-found' }),
     remove: async () => true,
+    sendStatus: async () => {},
   }
 }
 
 function answering(result: KeepGetResult): KeepServer {
-  return { put: async () => 'ok', get: async () => result, remove: async () => true }
+  return { put: async () => 'ok', get: async () => result, remove: async () => true, sendStatus: async () => {} }
 }
 
 type Restore = (data: StoredData) => SaveResult

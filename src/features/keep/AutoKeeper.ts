@@ -4,10 +4,11 @@
 // - 화면을 떠나면(visibilitychange hidden) 기다리지 않고 남은 것을 바로
 // - 실패·인터넷 없음은 조용히 밀린 채로 두고 다음 저장·앱 열기·연결 회복(online) 때 다시
 // - 읽기 전용(SPEC-002)이면 저장이 실패해 알림이 오지 않고, 진입점도 앱을 열 때 올리지 않는다
+// - 앱을 열 때 올리기 시도가 끝나면 상태 신호를 한 번 보낸다 (SPEC-007, 꺼져 있어도. 복구 코드가 없으면 안 보낸다)
 import type { StoredData } from '../../domain/types'
 import { createBackup } from '../../storage/backup'
 import { keepIdOf, sealKeep } from './keepCrypto'
-import type { KeepServer } from './keepServer'
+import type { KeepServer, KeepStatus } from './keepServer'
 import { recoveryCodeOf } from './recoveryCode'
 
 // 기기에만 두는 보관 상태 (백업 파일에 넣지 않는다 — 폰마다 다르다)
@@ -28,6 +29,7 @@ export interface AutoKeeperOptions {
   store: KeepStateStore
   now?: () => Date
   delayMs?: number // 저장을 모으는 시간 (기본 10초)
+  appVersion?: string // 상태 신호에 넣는 앱 버전 (기본 빌드 때 넣은 package.json version)
 }
 
 const BATCH_DELAY_MS = 10_000
@@ -37,6 +39,7 @@ export class AutoKeeper {
   private readonly store: KeepStateStore
   private readonly now: () => Date
   private readonly delayMs: number
+  private readonly appVersion: string
   private state: KeepState
   private readonly listeners = new Set<() => void>()
   // 올릴 기록 (마지막으로 저장한 것)
@@ -46,11 +49,18 @@ export class AutoKeeper {
   // 올리는 동안 새로 저장한 때. 다 올린 뒤에도 그만큼은 밀린 채로 남는다
   private savedDuringUpload: string | undefined
 
-  constructor({ server, store, now = () => new Date(), delayMs = BATCH_DELAY_MS }: AutoKeeperOptions) {
+  constructor({
+    server,
+    store,
+    now = () => new Date(),
+    delayMs = BATCH_DELAY_MS,
+    appVersion = __APP_VERSION__,
+  }: AutoKeeperOptions) {
     this.server = server
     this.store = store
     this.now = now
     this.delayMs = delayMs
+    this.appVersion = appVersion
     this.state = store.load()
   }
 
@@ -62,13 +72,15 @@ export class AutoKeeper {
     return () => this.listeners.delete(listener)
   }
 
-  // 앱을 열 때: 밀린 것이 있거나 한 번도 보관하지 않았으면(이 버전을 처음 연 폰) 바로 올린다
-  start(data: StoredData): void {
+  // 앱을 열 때: 밀린 것이 있거나 한 번도 보관하지 않았으면(이 버전을 처음 연 폰) 바로 올린다.
+  // 올리기 시도가 끝나면(올릴 것이 없으면 바로) 상태 신호를 한 번 보낸다. 신호까지 끝나면 풀린다
+  async start(data: StoredData): Promise<void> {
     this.latest = data
-    if (!this.state.enabled || data.books.length === 0) return
-    if (this.state.pendingSince === undefined && this.state.lastKeptAt !== undefined) return
-    this.markPending()
-    void this.upload()
+    if (this.needsUploadOnStart(data)) {
+      this.markPending()
+      await this.upload()
+    }
+    await this.reportStatus(data)
   }
 
   // 저장소가 저장에 성공했다 (기록 변경·백업 불러오기·복구 코드로 불러오기)
@@ -128,6 +140,27 @@ export class AutoKeeper {
   // 올리는 중인 것이 끝날 때까지 (테스트·화면이 기다린다)
   async idle(): Promise<void> {
     while (this.uploading) await this.uploading
+  }
+
+  private needsUploadOnStart(data: StoredData): boolean {
+    if (!this.state.enabled || data.books.length === 0) return false
+    return this.state.pendingSince !== undefined || this.state.lastKeptAt === undefined
+  }
+
+  // 상태 신호 (SPEC-007): 켜짐·밀린 때·마지막 보관·너무 큼·앱 버전만. 장부 내용·복구 코드는 넣지 않는다
+  private async reportStatus(data: StoredData): Promise<void> {
+    const code = recoveryCodeOf(data)
+    if (code === undefined) return
+    const { enabled, pendingSince, lastKeptAt, tooLarge = false } = this.state
+    const status: KeepStatus = {
+      v: 1,
+      enabled,
+      ...(pendingSince !== undefined && { pendingSince }),
+      ...(lastKeptAt !== undefined && { lastKeptAt }),
+      tooLarge,
+      appVersion: this.appVersion,
+    }
+    await this.server.sendStatus(await keepIdOf(code), status)
   }
 
   private markPending() {

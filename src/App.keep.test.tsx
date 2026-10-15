@@ -52,6 +52,7 @@ function fakeServer(stored: Record<string, KeepEnvelope> = {}) {
       removed.push(id)
       return true
     },
+    sendStatus: async () => {},
   }
   return { server, removed }
 }

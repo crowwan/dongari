@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { isCatalogRoute } from './catalog/route'
-import { createKeep, withStartupRecoveryCode } from './features/keep/startKeep'
+import { createKeep, startKeep, withStartupRecoveryCode } from './features/keep/startKeep'
 import { LocalStorageRepository } from './storage/LocalStorageRepository'
 import { NotifyingRepository } from './storage/NotifyingRepository'
 import { requestPersistentStorage } from './storage/persist'
@@ -24,11 +24,11 @@ async function pickScreen(): Promise<ReactNode> {
   if (loaded.data.books.length > 0) void requestPersistentStorage()
 
   // 복구 코드 자동 보관 (SPEC-006): 서버 주소(VITE_KEEP_URL)가 있는 빌드에서만. 저장에 성공할 때마다 보관기에 알린다.
-  // 읽기 전용이면 앱을 열 때 올리지 않는다 (백업을 불러와 저장 막힘이 풀리면 그 저장부터 올린다)
+  // 앱을 열 때 올리고 상태 신호를 보낸다 (SPEC-007, 읽기 전용이면 둘 다 안 한다)
   const keep = createKeep(import.meta.env.VITE_KEEP_URL)
   if (!keep) return <App repository={storage} loaded={loaded} />
   const repository = new NotifyingRepository(storage, (data) => keep.keeper.saved(data))
-  if (loaded.status !== 'read-only') keep.keeper.start(loaded.data)
+  void startKeep(keep.keeper, loaded)
   keep.keeper.listen(window, document, () => document.visibilityState)
   return <App repository={repository} loaded={loaded} keep={keep} />
 }

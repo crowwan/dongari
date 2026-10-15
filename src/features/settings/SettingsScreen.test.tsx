@@ -491,6 +491,7 @@ describe('SPEC-006 설정 기록 지키기', () => {
     put: async () => 'ok',
     get: async () => ({ status: 'not-found' }),
     remove: async () => true,
+    sendStatus: async () => {},
   }
 
   function keepRow(overrides: Partial<KeepRow> = {}): KeepRow {

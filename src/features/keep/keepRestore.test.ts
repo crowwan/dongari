@@ -28,6 +28,7 @@ function serverWith(stored: Record<string, KeepEnvelope>, fallback?: KeepGetResu
       return envelope ? { status: 'found', envelope } : { status: 'not-found' }
     },
     remove: async () => true,
+    sendStatus: async () => {},
   }
 }
 
