@@ -51,6 +51,8 @@ type AddEntryFormProps = {
   onBack: () => void
   // 답한 것이 있는지 알린다. 있으면 닫기 전에 "적던 내용을 버릴까요?" 를 묻는다
   onDirtyChange?: (dirty: boolean) => void
+  // 지금 단계·적는 값이 바뀔 때마다 알린다 (연습 장부가 말풍선을 옮긴다, SPEC-008)
+  onStepChange?: (state: StepState) => void
 }
 
 // 내역 적기 (SPEC-001 기록 입력, ADR 004): 적는 내역 하나는 "지금 적는 내역" 카드 하나 — 답한 것은 카드 안 한 줄로 접히고,
@@ -69,6 +71,7 @@ export function AddEntryForm({
   onSave,
   onBack,
   onDirtyChange,
+  onStepChange,
 }: AddEntryFormProps) {
   const [state, dispatch] = useReducer(stepReducer, { year, month }, startSteps)
   const { draft } = state
@@ -82,6 +85,10 @@ export function AddEntryForm({
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
+
+  useEffect(() => {
+    onStepChange?.(state)
+  }, [state, onStepChange])
 
   function pressButton() {
     switch (state.step) {

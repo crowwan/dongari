@@ -164,3 +164,55 @@
     transform: none;
   }
 }
+
+/* ---------- 연습 말풍선 (SPEC-008): [✕]·[알겠어요] 없이 아래 줄 "연습 N / 4" (+ 갈래의 [다음에 할게요]) ---------- */
+
+.ui-coach[data-kind='practice'] .ui-coach__bubble {
+  grid-template-columns: 1fr;
+}
+
+.ui-coach__foot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* "연습 1 / 4": 14 SemiBold, 80% 진하기, 고정폭 숫자 */
+.ui-coach__progress {
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* [다음에 할게요]: [알겠어요] 와 같은 짝 (카드색 면 + 제목색 굵은 글자) */
+.ui-coach__action {
+  margin-left: auto;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-5);
+  border: 0;
+  border-radius: var(--corner-sm);
+  background: var(--surface);
+  color: var(--strong);
+  font-family: var(--typeface);
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+  letter-spacing: var(--letter-body);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ui-coach__action:active {
+  background: var(--pressed);
+}
+
+.ui-coach__action:focus-visible {
+  outline: var(--focus-ring) solid var(--surface);
+  outline-offset: var(--stroke);
+}

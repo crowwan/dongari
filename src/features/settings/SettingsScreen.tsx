@@ -79,6 +79,8 @@ type SettingsScreenProps = {
   onShareCode: () => void // [복구 코드 보내기]
   restoreByCode?: RestoreByCode // 있으면 [복구 코드로 불러오기] 줄
   onBack: () => void
+  // [연습해 보기] (SPEC-008): 저장되지 않는 연습 장부를 연다. 없으면 줄이 없다
+  onPractice?: () => void
   // 홈 화면에 추가 줄이 보는 브라우저 상태 (기본은 지금 브라우저, 테스트에서 바꿔 넣는다)
   install?: InstallEnvironment
 }
@@ -112,9 +114,11 @@ export function SettingsScreen({
   onShareCode,
   restoreByCode,
   onBack,
+  onPractice,
   install = browserInstallEnvironment(),
 }: SettingsScreenProps) {
   const installPrompt = useInstallPrompt(install.installPrompt)
+  const offersInstall = shouldOfferInstall({ standalone: install.standalone, installed: installPrompt.installed })
   // 다른 방법으로 옮기기: 설정을 열 때마다 처음엔 접혀 있다 (편집·불러오기 화면에 다녀와도 그대로)
   const [moreOpen, setMoreOpen] = useState(false)
 
@@ -217,15 +221,19 @@ export function SettingsScreen({
         <SettingRow icon="calendar" title="장부 연도" value={`${year}년`} onClick={() => sheets.openSheet(YEAR_SHEET)} />
       </SettingsGroup>
 
-      {/* 홈 화면에 추가 (SPEC-002): 설치 제안이 있으면 브라우저 설치 창, 없으면 방법 안내. 홈 화면 앱이면 묶음째 없다 */}
-      {shouldOfferInstall({ standalone: install.standalone, installed: installPrompt.installed }) && (
+      {/* 앱: 홈 화면에 추가 (SPEC-002, 설치 제안이 있으면 브라우저 설치 창, 없으면 방법 안내. 홈 화면 앱이면 없다) +
+          맨 아래 [연습해 보기] (SPEC-008, 홈 화면 앱에서도 있어 묶음은 늘 있다) */}
+      {(offersInstall || onPractice) && (
         <SettingsGroup title="앱" testId="settings-block-app">
-          <SettingRow
-            icon="phone"
-            title="홈 화면에 추가"
-            description="기록이 더 안전해요"
-            onClick={() => (installPrompt.canInstall ? void installPrompt.install() : sheets.openSheet(INSTALL_GUIDE_SHEET))}
-          />
+          {offersInstall && (
+            <SettingRow
+              icon="phone"
+              title="홈 화면에 추가"
+              description="기록이 더 안전해요"
+              onClick={() => (installPrompt.canInstall ? void installPrompt.install() : sheets.openSheet(INSTALL_GUIDE_SHEET))}
+            />
+          )}
+          {onPractice && <SettingRow icon="play" title="연습해 보기" description="저장되지 않는 장부로 따라 해 봐요" onClick={onPractice} />}
         </SettingsGroup>
       )}
 

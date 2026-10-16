@@ -23,24 +23,28 @@ function lockOutside(openElements: HTMLElement[]): () => void {
   }
 }
 
+// 열어 둘 요소가 없는 창(확인 창·선택 창). 기본값을 그리기마다 새로 만들지 않게 하나로 둔다
+const NOTHING_KEPT: readonly RefObject<HTMLElement | null>[] = []
+
 // 창이 열려 있는 동안: 창 밖을 잠그고 focusTarget 으로 포커스를 옮긴다. 닫히면 잠금을 풀고 연 자리(열 때 포커스가 있던 곳)로 돌려준다.
 // 풀기가 먼저다: inert 인 곳에는 포커스가 가지 않는다.
 // enabled 가 false 면(카탈로그 견본) 아무것도 하지 않는다.
-// keepOpen(SPEC-008 말풍선): 창 밖이지만 열어 둘 요소(가리키는 버튼). 닫히면 포커스를 연 자리 대신 이 요소에 둔다
-// (그 버튼을 눌러 화면이 바뀌었으면 요소가 없어져 그 화면 규칙을 따른다)
+// keepOpen(SPEC-008 말풍선): 창 밖이지만 열어 둘 요소들(가리키는 버튼, 같이 열어 둘 날 칸·금액 칸, 연습 띠 [그만하기]).
+// 닫히면 포커스를 연 자리 대신 첫 요소(가리키는 버튼)에 둔다 (그 버튼을 눌러 화면이 바뀌었으면 요소가 없어져 그 화면 규칙을 따른다).
+// 목록은 그리기마다 새로 만들지 않는다 (바뀌면 잠금을 다시 걸고 포커스를 다시 옮긴다)
 export function useModalLayer(
   open: boolean,
   layerRef: RefObject<HTMLElement | null>,
   focusTarget: RefObject<HTMLElement | null>,
   enabled = true,
-  keepOpen?: RefObject<HTMLElement | null>,
+  keepOpen: readonly RefObject<HTMLElement | null>[] = NOTHING_KEPT,
 ) {
   useEffect(() => {
     const layer = layerRef.current
     if (!open || !enabled || !layer) return
-    const kept = keepOpen?.current ?? undefined
-    const previous = kept ?? document.activeElement
-    const unlock = lockOutside(kept ? [layer, kept] : [layer])
+    const kept = keepOpen.flatMap((ref) => (ref.current ? [ref.current] : []))
+    const previous = kept[0] ?? document.activeElement
+    const unlock = lockOutside([layer, ...kept])
     focusTarget.current?.focus({ preventScroll: true })
     return () => {
       unlock()

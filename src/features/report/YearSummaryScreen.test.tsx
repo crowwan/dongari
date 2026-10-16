@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createRef } from 'react'
+import type { ComponentProps } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { carryoverWords, type CarryoverWords } from '../../domain/book'
@@ -27,7 +27,7 @@ function renderYear(
   data: Ledger | undefined,
   saver: PictureSaver = fakeSaver(),
   words: CarryoverWords = carryoverWords('club', true),
-  guideTargetRef = createRef<HTMLButtonElement>(),
+  extra: Partial<ComponentProps<typeof YearSummaryScreen>> = {},
 ) {
   const onNotify = vi.fn()
   render(
@@ -39,10 +39,10 @@ function renderYear(
       onBack={() => {}}
       onNotify={onNotify}
       saver={saver}
-      guideTargetRef={guideTargetRef}
+      {...extra}
     />,
   )
-  return { onNotify, saver, guideTargetRef }
+  return { onNotify, saver }
 }
 
 // 결산표(제출용) 쪽을 연다 (처음은 단톡방용 요약)
@@ -393,11 +393,57 @@ describe('SPEC-003 단톡방용 요약 (v2.6)', () => {
     expect(screen.getByRole('button', { name: '사진으로 저장' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '사진 보내기' })).toBeDisabled()
   })
+})
 
-  it('SPEC-008 처음 쓰는 분 안내 3번이 가리키는 버튼은 보내기 버튼이 있어도 [사진으로 저장] 이다', () => {
-    const { guideTargetRef } = renderYear(V1_EXAMPLE, sendingSaver().saver)
+const PRACTICE_RIBBON = '연습 · 진짜 결산이 아니에요'
 
-    expect(guideTargetRef.current).toBe(screen.getByRole('button', { name: '사진으로 저장' }))
+describe('SPEC-008 연습 결산 사진 (YearSummaryScreen)', () => {
+  it('AC-17 연습 결산이면 단톡방용 요약·결산표 사진 영역 맨 위에 "연습 · 진짜 결산이 아니에요" 띠가 있다', () => {
+    renderYear(V1_EXAMPLE, fakeSaver(), carryoverWords('club', true), { practice: true })
+
+    expect(screen.getByTestId('year-share-summary').firstElementChild).toHaveTextContent(PRACTICE_RIBBON)
+    showSheet()
+    expect(within(screen.getByTestId('year-report-sheet')).getByText(PRACTICE_RIBBON)).toBeInTheDocument()
+  })
+
+  it('AC-17 사진으로 그리는 영역(보내기·저장 모두)에 띠가 들어간다', async () => {
+    const { saver } = renderYear(V1_EXAMPLE, sendingSaver().saver, carryoverWords('club', true), { practice: true })
+
+    await userEvent.click(screen.getByRole('button', { name: '사진 보내기' }))
+    showSheet()
+    await userEvent.click(screen.getByRole('button', { name: '사진으로 저장' }))
+
+    const drawn = vi.mocked(saver.make).mock.calls.map(([element]) => element.textContent ?? '')
+    expect(drawn).toHaveLength(2)
+    for (const text of drawn) expect(text.startsWith(PRACTICE_RIBBON)).toBe(true)
+  })
+
+  it('진짜 결산에는 띠가 없다', () => {
+    renderYear(V1_EXAMPLE)
+
+    expect(screen.queryByText(PRACTICE_RIBBON)).not.toBeInTheDocument()
+    showSheet()
+    expect(screen.queryByText(PRACTICE_RIBBON)).not.toBeInTheDocument()
+  })
+
+  it('[사진 보내기]·[사진으로 저장] 이 끝나면 결과를 알린다 (연습이 다음 단계를 정한다)', async () => {
+    const { saver, share } = sendingSaver()
+    const onPictureResult = vi.fn()
+    renderYear(V1_EXAMPLE, saver, carryoverWords('club', true), { onPictureResult })
+
+    await userEvent.click(screen.getByRole('button', { name: '사진 보내기' }))
+    expect(onPictureResult).toHaveBeenLastCalledWith('send', 'shared')
+
+    share.mockRejectedValueOnce(new DOMException('닫음', 'AbortError'))
+    await userEvent.click(screen.getByRole('button', { name: '사진 보내기' }))
+    expect(onPictureResult).toHaveBeenLastCalledWith('send', 'cancelled')
+
+    share.mockRejectedValueOnce(new DOMException('늦음', 'NotAllowedError'))
+    await userEvent.click(screen.getByRole('button', { name: '사진 보내기' }))
+    expect(onPictureResult).toHaveBeenLastCalledWith('send', 'notAllowed')
+
+    await userEvent.click(screen.getByRole('button', { name: '사진으로 저장' }))
+    expect(onPictureResult).toHaveBeenLastCalledWith('save', 'downloaded')
   })
 })
 

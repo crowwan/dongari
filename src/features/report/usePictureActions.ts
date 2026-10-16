@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import type { ShareResult } from '../backup/sendFile'
 import type { PictureSaver } from './savePicture'
 
 export const SAVED_MESSAGE = '사진을 저장했어요. 갤러리의 Download 앨범에서 볼 수 있어요'
@@ -14,6 +15,9 @@ const PREPARE_DELAY_MS = 600
 
 export type PictureAction = 'save' | 'send'
 
+// 버튼 하나가 끝난 결과: 공유 창(시트)의 결과, 또는 내려받기를 시작했다 (사진을 만들지 못한 실패는 알리지 않는다)
+export type PictureResult = ShareResult | 'downloaded'
+
 // 사진은 다 만들었는데, 만드는 사이 누른 순간이 지나 공유 창(시트)이 거부된 사진. 한 번 더 누르면 바로 연다
 type HeldPicture = { action: PictureAction; picture: Blob; fileName: string }
 
@@ -27,6 +31,8 @@ type UsePictureActionsOptions = {
   onNotify: (message: string) => void
   // 사진으로 만들 것이 있는지 (기록 없는 올해 결산은 없음)
   enabled?: boolean
+  // 버튼이 끝난 결과 (연습 장부가 결산 보내기 단계를 정한다, SPEC-008)
+  onResult?: (action: PictureAction, result: PictureResult) => void
 }
 
 // 같은 화면 사진을 이미 만들고 있거나 만들어 두었으면 그것을 쓰고, 아니면 새로 만든다. 실패하면 잊어서 다음에 다시 만든다
@@ -51,7 +57,7 @@ function makeOnce(preparedRef: RefObject<PreparedPicture | undefined>, saver: Pi
 // - send: 폰 공유 창에 넘긴다 (v2.6 [사진 보내기], 공유 창을 쓸 수 있는 폰만)
 // 만드는 동안(busy) 두 버튼 모두 다시 눌러도 무시한다. 공유 창은 누른 순간 안에서만 열리므로
 // 공유 창을 쓸 수 있으면 화면을 열 때 사진을 미리 만들어 두고, 그래도 거부되면 만든 사진을 들고 있다가(ready) 한 번 더 누를 때 바로 연다
-export function usePictureActions({ fileName, saver, onNotify, enabled = true }: UsePictureActionsOptions) {
+export function usePictureActions({ fileName, saver, onNotify, enabled = true, onResult }: UsePictureActionsOptions) {
   const targetRef = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState<PictureAction>()
   // 화면이 다시 그려지기 전에 연달아 눌려도 한 번만 만들도록 바로 바뀌는 값으로 막는다
@@ -79,13 +85,20 @@ export function usePictureActions({ fileName, saver, onNotify, enabled = true }:
   async function deliverSave(picture: Blob, canRetry: boolean) {
     if (saver.share) {
       const result = await saver.share(new File([picture], fileName, { type: 'image/png' }))
-      if (result === 'shared') return onNotify(PHOTOS_SAVED_MESSAGE)
+      if (result === 'shared') {
+        onNotify(PHOTOS_SAVED_MESSAGE)
+        return onResult?.('save', result)
+      }
       // 공유 시트를 그냥 닫았다: 실패가 아니니 조용히 둔다
-      if (result === 'cancelled') return
-      if (result === 'notAllowed' && canRetry) return setHeld({ action: 'save', picture, fileName })
+      if (result === 'cancelled') return onResult?.('save', result)
+      if (result === 'notAllowed' && canRetry) {
+        setHeld({ action: 'save', picture, fileName })
+        return onResult?.('save', result)
+      }
     }
     saver.download(picture, fileName)
     onNotify(saver.share ? FILES_SAVED_MESSAGE : SAVED_MESSAGE)
+    onResult?.('save', 'downloaded')
   }
 
   // 만든 사진을 공유 창에 넘긴다. 고르거나 닫으면 조용히 원래대로(공유 창이 닫혔다고 보낸 것은 아니다),
@@ -93,10 +106,14 @@ export function usePictureActions({ fileName, saver, onNotify, enabled = true }:
   async function deliverSend(picture: Blob, canRetry: boolean) {
     if (!saver.send) return
     const result = await saver.send(new File([picture], fileName, { type: 'image/png' }))
-    if (result === 'shared' || result === 'cancelled') return
-    if (result === 'notAllowed' && canRetry) return setHeld({ action: 'send', picture, fileName })
+    if (result === 'shared' || result === 'cancelled') return onResult?.('send', result)
+    if (result === 'notAllowed' && canRetry) {
+      setHeld({ action: 'send', picture, fileName })
+      return onResult?.('send', result)
+    }
     saver.download(picture, fileName)
     onNotify(saver.share ? FILES_SAVED_MESSAGE : SEND_SAVED_MESSAGE)
+    onResult?.('send', 'downloaded')
   }
 
   async function run(action: PictureAction, deliver: (picture: Blob, canRetry: boolean) => Promise<void>) {

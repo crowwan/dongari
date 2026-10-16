@@ -1,4 +1,3 @@
-import type { Ref } from 'react'
 import { BottomActionBar } from '../../ui/BottomActionBar'
 import type { PictureAction } from './usePictureActions'
 
@@ -25,8 +24,6 @@ type SavePictureBarProps = {
   onSend?: () => void
   // 사진으로 만들 것이 없을 때 (기록 없는 올해 결산)
   disabled?: boolean
-  // [사진으로 저장] 버튼 자체 (올해 결산 안내 말풍선이 가리킬 때, SPEC-008)
-  buttonRef?: Ref<HTMLButtonElement>
 }
 
 // 월 정리·올해 결산 아래 고정 버튼 (SPEC-003). 공유 창을 쓸 수 있으면 보조 [⬇ 사진으로 저장] + 주 [↗ 사진 보내기],
@@ -41,14 +38,13 @@ export function SavePictureBar({
   onSave,
   onSend = () => {},
   disabled = false,
-  buttonRef,
 }: SavePictureBarProps) {
   const locked = disabled || busy !== undefined
   const saveLabel = busy === 'save' ? MAKING_LABEL : saveReady ? '사진 앱에 저장' : '사진으로 저장'
   const saveNote = saveReady ? READY_NOTE : sharesToPhotos && !disabled ? PHOTOS_NOTE : undefined
 
   if (!canSend) {
-    return <BottomActionBar buttonRef={buttonRef} icon="download" label={saveLabel} onClick={onSave} disabled={locked} note={saveNote} />
+    return <BottomActionBar icon="download" label={saveLabel} onClick={onSave} disabled={locked} note={saveNote} />
   }
 
   return (
@@ -60,7 +56,6 @@ export function SavePictureBar({
       note={sendReady ? READY_NOTE : saveNote}
       noteFor={sendReady ? 'main' : 'secondary'}
       secondary={{ icon: 'download', label: saveLabel, onClick: onSave, disabled: locked }}
-      secondaryRef={buttonRef}
     />
   )
 }

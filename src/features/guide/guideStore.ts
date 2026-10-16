@@ -1,6 +1,6 @@
 // 안내 상태를 이 폰에만 둔다 (SPEC-008). 장부 데이터(dongari:v2)·기록 파일·자동으로 지키기 보관본과 따로 — dongari:keep 과 같은 방식
 import { isRecord } from '../../storage/schema'
-import { GUIDE_NUMBERS, GUIDE_OFF, type GuideNumber, type GuideState } from './guideRules'
+import { GUIDE_OFF, SEEN_GUIDE_NUMBERS, type GuideState, type SeenGuideNumber } from './guideRules'
 
 export const GUIDE_KEY = 'dongari:guide'
 
@@ -12,8 +12,9 @@ export interface GuideStore {
 
 type KeyValueStorage = Pick<Storage, 'getItem' | 'setItem'>
 
-function isGuideNumber(value: unknown): value is GuideNumber {
-  return GUIDE_NUMBERS.some((guide) => guide === value)
+// #122 시절 본 번호(1·2·3)도 받는다
+function isSeenGuideNumber(value: unknown): value is SeenGuideNumber {
+  return SEEN_GUIDE_NUMBERS.some((guide) => guide === value)
 }
 
 function isGuideState(value: unknown): value is GuideState {
@@ -22,7 +23,7 @@ function isGuideState(value: unknown): value is GuideState {
     value.v === 1 &&
     typeof value.active === 'boolean' &&
     Array.isArray(value.seen) &&
-    value.seen.every(isGuideNumber)
+    value.seen.every(isSeenGuideNumber)
   )
 }
 

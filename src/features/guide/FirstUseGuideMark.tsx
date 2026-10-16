@@ -1,27 +1,16 @@
 import { CoachMark } from '../../ui/CoachMark'
-import { GUIDE_MESSAGES } from './guideMessages'
-import type { GuideNumber } from './guideRules'
-import type { FirstUseGuide, GuideTargets } from './useFirstUseGuide'
+import { RECOVERY_GUIDE_MESSAGE } from './guideMessages'
+import type { FirstUseGuide } from './useFirstUseGuide'
 
-const TARGET_OF: Record<GuideNumber, keyof GuideTargets> = {
-  1: 'addEntry',
-  2: 'monthSummary',
-  3: 'yearAction',
-  4: 'settings',
-}
-
-// 떠 있는 처음 쓰는 분 안내 말풍선 하나 (SPEC-008)
+// 진짜 장부의 복구 코드 안내 말풍선 (SPEC-008 4번): [설정] 을 가리키고 [알겠어요]·[✕] 로 닫는다
 export function FirstUseGuideMark({ guide }: { guide: FirstUseGuide }) {
-  const { showing } = guide
-  if (showing === undefined) return null
+  if (!guide.showing) return null
   return (
     <CoachMark
-      // 번호가 바뀌면 새 말풍선으로 (가리키는 버튼·잠금을 처음부터)
-      key={showing}
       open
-      name={String(showing)}
-      target={guide.targets[TARGET_OF[showing]]}
-      message={GUIDE_MESSAGES[showing]}
+      name="4"
+      target={guide.settings}
+      message={RECOVERY_GUIDE_MESSAGE}
       onDismiss={guide.dismiss}
       onTargetPress={guide.pressTarget}
     />

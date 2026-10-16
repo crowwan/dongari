@@ -1,15 +1,14 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref, type RefObject } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import type { CarryoverWords } from '../../domain/book'
 import { yearReport } from '../../domain/report'
 import type { Ledger } from '../../domain/types'
 import { SegmentedControl, type SegmentOptions } from '../../ui/SegmentedControl'
 import { BackToLedger } from '../BackToLedger'
-import { YEAR_GUIDE_TARGET } from '../guide/guideMessages'
 import { pictureSaver, yearPictureName, yearSummaryPictureName, type PictureSaver } from './savePicture'
 import { SavePictureBar } from './SavePictureBar'
 import { SHEET_WIDTH } from './sheet/sheetStyles'
 import { YearReportSheet } from './sheet/YearReportSheet'
-import { usePictureActions } from './usePictureActions'
+import { usePictureActions, type PictureAction, type PictureResult } from './usePictureActions'
 import { YearShareSummary } from './YearShareSummary'
 import './report.css'
 
@@ -24,8 +23,10 @@ type YearSummaryScreenProps = {
   onNotify: (message: string) => void
   // 사진 만들기·내려받기·공유 창 (테스트는 가짜를 넣는다)
   saver?: PictureSaver
-  // 처음 쓰는 분 안내 3번 말풍선이 가리키는 아래 버튼 (SPEC-008, 지금은 [사진으로 저장] — guideMessages YEAR_GUIDE_TARGET)
-  guideTargetRef?: Ref<HTMLButtonElement>
+  // 연습 장부 결산 (SPEC-008): 사진 영역 맨 위에 "연습 · 진짜 결산이 아니에요" 띠
+  practice?: boolean
+  // [사진으로 저장]·[사진 보내기] 가 끝난 결과 (연습 장부가 결산 보내기 단계를 정한다)
+  onPictureResult?: (action: PictureAction, result: PictureResult) => void
 }
 
 // 결산 화면에서 볼 것 (v2.6): 단톡방용 요약(큰 글씨 카드 셋) / 결산표(제출용, v1 양식). 둘 다 그대로 사진 한 장이 된다
@@ -81,7 +82,8 @@ export function YearSummaryScreen({
   onBack,
   onNotify,
   saver = pictureSaver,
-  guideTargetRef,
+  practice = false,
+  onPictureResult,
 }: YearSummaryScreenProps) {
   const [view, setView] = useState<YearView>('summary')
   // 기록이 하나라도 있어야 결산을 만든다
@@ -91,6 +93,7 @@ export function YearSummaryScreen({
     saver,
     onNotify,
     enabled: report !== undefined,
+    onResult: onPictureResult,
   })
 
   return (
@@ -102,14 +105,14 @@ export function YearSummaryScreen({
           <SegmentedControl label="무엇을 볼까요?" options={YEAR_VIEWS} value={view} onChange={setView} />
           {view === 'summary' ? (
             <>
-              <YearShareSummary report={report} bookName={bookName} carryoverWords={carryoverWords} targetRef={targetRef} />
+              <YearShareSummary report={report} bookName={bookName} carryoverWords={carryoverWords} targetRef={targetRef} practice={practice} />
               <p className="screen__note report__photo-note">이 화면 그대로 사진 한 장이 돼요</p>
             </>
           ) : (
             <>
               <p className="screen__note">두 손가락으로 벌리면 크게 볼 수 있어요</p>
               <FitToWidth targetRef={targetRef}>
-                <YearReportSheet report={report} bookName={bookName} carryoverLabel={carryoverWords.sheet} />
+                <YearReportSheet report={report} bookName={bookName} carryoverLabel={carryoverWords.sheet} practice={practice} />
               </FitToWidth>
             </>
           )}
@@ -126,7 +129,6 @@ export function YearSummaryScreen({
         onSave={save}
         onSend={send}
         disabled={!report}
-        buttonRef={YEAR_GUIDE_TARGET === 'save-picture' ? guideTargetRef : undefined}
       />
     </div>
   )

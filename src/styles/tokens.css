@@ -40,6 +40,9 @@
   --on-danger: #ffffff;
   /* 안내 띠, 아래에서 올라오는 창·확인 창 뒤 가리기 */
   --warn-bg: #fff4d8;
+  /* 알아 둘 것 띠(연습 중이에요, SPEC-008): 옅은 회청 면 + 회청 글자. 노랑(경고)·옅은 청록(고른 것)과 뜻이 겹치지 않게 */
+  --info-bg: #e8eef2;
+  --info-ink: #24455c;
   --scrim: rgb(0 0 0 / 60%);
   /* 스위치 손잡이: 앱에서 그림자를 쓰는 유일한 곳 */
   --knob: #ffffff;
@@ -75,6 +78,8 @@
     --danger: #ff8b8b;
     --on-danger: #2a0f0b;
     --warn-bg: #3a3218;
+    --info-bg: #1c252c;
+    --info-ink: #b4cde0;
     --scrim: rgb(0 0 0 / 70%);
     --knob: #3a3a3a;
     --knob-shadow: none;
@@ -108,6 +113,8 @@
   --danger: #ff8b8b;
   --on-danger: #2a0f0b;
   --warn-bg: #3a3218;
+  --info-bg: #1c252c;
+  --info-ink: #b4cde0;
   --scrim: rgb(0 0 0 / 70%);
   --knob: #3a3a3a;
   --knob-shadow: none;
@@ -184,6 +191,7 @@
   --card-pad-inline: var(--space-5);
 
   /* 반경 */
+  --corner-xs: 4px; /* 사진 위 작은 띠 (연습 결산 "연습 · 진짜 결산이 아니에요", SPEC-008) */
   --corner-sm: 12px; /* 컨트롤 안 작은 덩어리: 스위치 손잡이, 빠른 더하기, 열두 달 칸 */
   --corner-md: 16px; /* 컨트롤: 버튼, 입력칸, 줄 선택, 안내 띠 */
   --corner-lg: 20px; /* 카드, 확인 창 */
@@ -222,7 +230,7 @@
   --grab-h: 4px;
 
   /*
-   * 안내 말풍선 (SPEC-008 처음 쓰는 분 안내). 색은 알림과 같은 짝(--strong 면 + --surface 글자)이라 다크에서 그대로 뒤집히고,
+   * 안내 말풍선 (SPEC-008 복구 코드 안내·연습 단계 말풍선). 색은 알림과 같은 짝(--strong 면 + --surface 글자)이라 다크에서 그대로 뒤집히고,
    * 뒤 화면은 --scrim, 가리키는 버튼 둘레는 --accent-ink(--focus-ring 굵기)
    */
   --coach-inset: 20px; /* 화면 좌우에서 말풍선까지 */
@@ -233,6 +241,15 @@
   --coach-ring-gap: 3px; /* 가리키는 버튼과 청록 둘레 사이 */
   --coach-gap: 24px; /* 가리키는 버튼 가장자리에서 말풍선까지 (둘레 + 꼬리가 들어갈 자리) */
   --coach-rise: 6px; /* 나타날 때 이만큼 아래에서 올라온다 (동작 줄이기면 없음) */
+
+  /* 연습 장부 (SPEC-008): 연습 띠(--info-bg 면 + --info-ink 글자), 첫 실행 물음 번호, 끝 화면 체크 */
+  --practice-band-pad: 8px 12px 8px 20px; /* 연습 띠 안쪽 여백 위·오른쪽·아래·왼쪽 */
+  --practice-band-min: 72px; /* 연습 띠 높이 최소 */
+  --practice-band-gap: 10px; /* 띠 안 ⓘ·글·[그만하기] 사이 */
+  --practice-row-min: 52px; /* "따라 해 볼 것"·"배운 것" 한 줄 */
+  --practice-number: 32px; /* 번호 동그라미 */
+  --practice-done: 72px; /* 끝 화면 체크 동그라미 */
+  --practice-done-icon: 36px;
 
   /* 모션 */
   --motion-fast: 120ms;

@@ -75,13 +75,20 @@ function isDialogEntry(state: unknown): boolean {
   return isOwnEntry(state) && 'dialog' in state
 }
 
-// 장부까지 되돌릴 칸 수: 화면 칸(장부가 아니면) + 선택 창 칸 + 확인 창 칸. 맨 위 칸이 아래 칸의 이름을 모두 들고 있다
-function entriesAboveLedger(state: unknown): number {
+// 장부까지 되돌릴 칸 수: 화면 칸(장부가 아니면) + 선택 창 칸 + 확인 창 칸. 맨 위 칸이 아래 칸의 이름을 모두 들고 있다.
+// 연습 장부(SPEC-008)를 끝낼 때도 이 수만큼 되돌린다
+export function entriesAboveLedger(state: unknown): number {
   if (!isOwnEntry(state)) return 0
   return (state.screen === 'ledger' ? 0 : 1) + (isSheetEntry(state) ? 1 : 0) + (isDialogEntry(state) ? 1 : 0)
 }
 
-export function useScreenHistory(): ScreenHistory {
+type ScreenHistoryOptions = {
+  // 연습 장부(SPEC-008): 뒤로 버튼이 화면을 닫지 않고 이 확인 창("연습을 그만할까요?")을 연다.
+  // 빠진 칸을 바로 다시 쌓아 그 자리 그대로 두고, 확인 창·선택 창이 떠 있으면 평소처럼 그것만 닫는다
+  backOpensDialog?: string
+}
+
+export function useScreenHistory({ backOpensDialog }: ScreenHistoryOptions = {}): ScreenHistory {
   const [screen, setScreen] = useState<Screen>(LEDGER)
   const [confirmingLeave, setConfirmingLeave] = useState(false)
   const leaveNeedsConfirm = useRef(false)
@@ -195,6 +202,12 @@ export function useScreenHistory(): ScreenHistory {
       const onBack = sheetBack.current
       changeSheet(null)
       onBack?.()
+      return
+    }
+    if (backOpensDialog !== undefined && !goingBack.current) {
+      pushEntry({ screen: screen.name })
+      pushEntry({ screen: screen.name, dialog: backOpensDialog })
+      changeDialog(backOpensDialog)
       return
     }
     const needsConfirm = leaveNeedsConfirm.current && !goingBack.current

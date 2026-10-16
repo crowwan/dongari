@@ -1068,11 +1068,11 @@ export function Catalog() {
           </Button>
         </Section>
 
-        <Section title="CoachMark (처음 쓰는 분 안내 말풍선, SPEC-008)">
-          <State label="아래 버튼을 가리킬 때 (1번 [+ 내역 적기]: 말풍선 위, 꼬리 아래)">
+        <Section title="CoachMark (안내 말풍선, SPEC-008)">
+          <State label="연습 말풍선이 아래 버튼을 가리킬 때 ([+ 내역 적기]: 말풍선 위, 꼬리 아래, [✕]·[알겠어요] 없이 연습 1 / 4)">
             <CoachMarkSample place="bottom" />
           </State>
-          <State label="위쪽 버튼을 가리킬 때 (4번 [설정]: 말풍선 아래, 꼬리 위)">
+          <State label="복구 코드 안내가 위쪽 버튼을 가리킬 때 (4번 [설정]: 말풍선 아래, 꼬리 위)">
             <CoachMarkSample place="top" />
           </State>
         </Section>
@@ -1134,15 +1134,11 @@ function CoachMarkSample({ place }: { place: 'top' | 'bottom' }) {
       ) : (
         <BottomActionBar buttonRef={targetRef} icon="plus" label="내역 적기" onClick={noop} />
       )}
-      <CoachMark
-        inline
-        open
-        name={place === 'top' ? '4' : '1'}
-        target={targetRef}
-        message={place === 'top' ? '폰을 바꿔도 기록이 돌아오게 복구 코드를 보내 두세요' : '돈이 들어오거나 나가면 여기를 눌러 한 줄씩 적어요'}
-        onDismiss={noop}
-        onTargetPress={noop}
-      />
+      {place === 'top' ? (
+        <CoachMark inline open name="4" target={targetRef} message="폰을 바꿔도 기록이 돌아오게 복구 코드를 보내 두세요" onDismiss={noop} />
+      ) : (
+        <CoachMark inline open name="open-add" target={targetRef} message="회비 10,000원을 적어 볼게요. 여기를 눌러요" progress="연습 1 / 4" />
+      )}
     </div>
   )
 }

@@ -133,11 +133,13 @@ describe('#110 카탈로그 견본 (inline)', () => {
 })
 
 describe('SPEC-008 말풍선: 창 밖에 열어 둘 요소 (keepOpen)', () => {
-  // 뒤 화면 안의 가리키는 버튼은 열어 두고 나머지는 잠그는 창
-  function Pointing({ open }: { open: boolean }) {
+  // 뒤 화면 안의 가리키는 버튼(과 같이 열어 둘 칸)은 열어 두고 나머지는 잠그는 창
+  function Pointing({ open, withField = false }: { open: boolean; withField?: boolean }) {
     const layerRef = useRef<HTMLDivElement>(null)
     const targetRef = useRef<HTMLButtonElement>(null)
-    useModalLayer(open, layerRef, targetRef, true, targetRef)
+    const fieldRef = useRef<HTMLInputElement>(null)
+    const [keepOpen] = useState(() => (withField ? [targetRef, fieldRef] : [targetRef]))
+    useModalLayer(open, layerRef, targetRef, true, keepOpen)
     return (
       <>
         <main>
@@ -148,6 +150,7 @@ describe('SPEC-008 말풍선: 창 밖에 열어 둘 요소 (keepOpen)', () => {
             </button>
           </header>
           <button type="button">내역 적기</button>
+          <input aria-label="금액" ref={fieldRef} />
         </main>
         {open &&
           createPortal(
@@ -166,6 +169,15 @@ describe('SPEC-008 말풍선: 창 밖에 열어 둘 요소 (keepOpen)', () => {
     expect(isLocked(screen.getByRole('button', { name: '설정' }))).toBe(false)
     expect(isLocked(screen.getByRole('button', { name: '알겠어요' }))).toBe(false)
     expect(isLocked(screen.getByRole('button', { name: '결산' }))).toBe(true)
+    expect(isLocked(screen.getByRole('button', { name: '내역 적기' }))).toBe(true)
+    expect(screen.getByRole('button', { name: '설정' })).toHaveFocus()
+  })
+
+  it('열어 둘 요소를 여럿 받으면(가리키는 버튼 + 금액 칸) 모두 누를 수 있고 나머지는 잠긴다', () => {
+    render(<Pointing open withField />)
+
+    expect(isLocked(screen.getByRole('button', { name: '설정' }))).toBe(false)
+    expect(isLocked(screen.getByRole('textbox', { name: '금액' }))).toBe(false)
     expect(isLocked(screen.getByRole('button', { name: '내역 적기' }))).toBe(true)
     expect(screen.getByRole('button', { name: '설정' })).toHaveFocus()
   })

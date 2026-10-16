@@ -6,6 +6,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Circle,
+  CirclePlay,
   CloudCheck,
   CircleMinus,
   CirclePlus,
@@ -16,6 +18,7 @@ import {
   Gift,
   Hospital,
   House,
+  Info,
   KeyRound,
   Landmark,
   Pencil,
@@ -58,6 +61,9 @@ export type IconName =
   | 'key'
   | 'alert'
   | 'close'
+  | 'play'
+  | 'info'
+  | 'circle'
 
 const ICONS: Record<IconName, LucideIcon> = {
   // 항목 (domain/itemIcon 이 이름으로 고른다)
@@ -99,6 +105,10 @@ const ICONS: Record<IconName, LucideIcon> = {
   alert: TriangleAlert,
   // 안내 말풍선 닫기 (SPEC-008): 글자 없는 유일한 버튼이라 화면 읽기 이름("안내 닫기")을 버튼에 단다
   close: X,
+  // 연습 장부 (SPEC-008): [연습해 보기] 재생, 연습 띠 ⓘ, 끝 화면 "배운 것" 의 아직 안 한 줄(빈 동그라미)
+  play: CirclePlay,
+  info: Info,
+  circle: Circle,
 }
 
 // 꾸밈 아이콘: 화면 읽기에서 숨기고(뜻은 옆 글자가 전한다), 크기·색은 놓인 자리의 CSS 가 정한다

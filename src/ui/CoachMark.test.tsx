@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -54,7 +54,7 @@ describe('SPEC-008 안내 말풍선 (CoachMark)', () => {
     expect(onDismiss).toHaveBeenCalledTimes(2)
   })
 
-  it('열리면 포커스가 가리키는 버튼으로 가고, 그 버튼의 설명(aria-describedby)이 말풍선 글이다 (AC-12)', () => {
+  it('열리면 포커스가 가리키는 버튼으로 가고, 그 버튼의 설명(aria-describedby)이 말풍선 글이다 (AC-31)', () => {
     render(<Sample />)
 
     const target = screen.getByRole('button', { name: '설정' })
@@ -71,7 +71,7 @@ describe('SPEC-008 안내 말풍선 (CoachMark)', () => {
     expect(screen.getByRole('button', { name: '설정' })).not.toHaveAttribute('aria-describedby')
   })
 
-  it('떠 있는 동안 말풍선과 가리키는 버튼 밖은 inert 로 잠긴다 (AC-7)', () => {
+  it('떠 있는 동안 말풍선과 가리키는 버튼 밖은 inert 로 잠긴다 (AC-31)', () => {
     render(<Sample />)
 
     expect(isLocked(screen.getByRole('button', { name: '결산' }))).toBe(true)
@@ -110,9 +110,69 @@ describe('SPEC-008 안내 말풍선 (CoachMark)', () => {
   })
 })
 
+// 연습 말풍선: [✕]·[알겠어요] 없이 아래 줄 "연습 N / 4" (+ [다음에 할게요]). 가리키는 버튼과 같이 열어 둘 칸
+function PracticeSample({ onLater }: { onLater?: () => void }) {
+  const targetRef = useRef<HTMLButtonElement>(null)
+  const fieldRef = useRef<HTMLInputElement>(null)
+  const [alsoOpen] = useState(() => [fieldRef])
+  return (
+    <main>
+      <button type="button">결산</button>
+      <input aria-label="얼마인가요?" ref={fieldRef} />
+      <button type="button" ref={targetRef}>
+        +1만
+      </button>
+      <CoachMark
+        open
+        name="practice"
+        target={targetRef}
+        alsoOpen={alsoOpen}
+        message="+1만을 눌러 10,000원을 만들어요"
+        progress="연습 1 / 4"
+        action={onLater && { label: '다음에 할게요', onClick: onLater }}
+      />
+    </main>
+  )
+}
+
+describe('SPEC-008 연습 말풍선 (CoachMark)', () => {
+  it('AC-10 [알겠어요]·[✕] 없이 아래 줄에 "연습 N / 4" 를 보인다', () => {
+    render(<PracticeSample />)
+
+    expect(screen.queryByRole('button', { name: '알겠어요' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '안내 닫기' })).not.toBeInTheDocument()
+    expect(screen.getByText('연습 1 / 4')).toBeInTheDocument()
+  })
+
+  it('가리키는 버튼의 설명은 말풍선 글 + "연습 N / 4" 이고 포커스가 그 버튼으로 간다', () => {
+    render(<PracticeSample />)
+
+    const target = screen.getByRole('button', { name: '+1만' })
+    expect(target).toHaveFocus()
+    expect(target).toHaveAccessibleDescription('+1만을 눌러 10,000원을 만들어요 연습 1 / 4')
+  })
+
+  it('AC-11 같이 열어 둔 칸(금액 칸)은 누를 수 있고 그 밖은 잠긴다', () => {
+    render(<PracticeSample />)
+
+    expect(isLocked(screen.getByRole('textbox', { name: '얼마인가요?' }))).toBe(false)
+    expect(isLocked(screen.getByRole('button', { name: '+1만' }))).toBe(false)
+    expect(isLocked(screen.getByRole('button', { name: '결산' }))).toBe(true)
+  })
+
+  it('갈래에서는 아래 줄 오른쪽 [다음에 할게요] 를 누를 수 있다', async () => {
+    const onLater = vi.fn()
+    render(<PracticeSample onLater={onLater} />)
+
+    await userEvent.click(screen.getByRole('button', { name: '다음에 할게요' }))
+
+    expect(onLater).toHaveBeenCalledOnce()
+  })
+})
+
 describe('SPEC-008 말풍선 모양 기준 (coachMark.css)', () => {
-  it('[알겠어요]·[✕] 는 누르는 곳 최소(--touch-min, 56px) 이상이다 (AC-14)', () => {
-    for (const selector of ['.ui-coach__close', '.ui-coach__ok']) {
+  it('AC-37 [알겠어요]·[✕]·[다음에 할게요] 는 누르는 곳 최소(--touch-min, 56px) 이상이다', () => {
+    for (const selector of ['.ui-coach__close', '.ui-coach__ok', '.ui-coach__action']) {
       // 그 선택자로 끝나는 규칙을 모두 모은다 (여러 선택자를 묶은 공용 규칙 포함)
       const pattern = new RegExp(`^${selector.replace('.', '\\.')} \\{([^}]*)\\}`, 'gm')
       const rule = [...coachCss.matchAll(pattern)].map((match) => match[1]).join('\n')
@@ -121,7 +181,7 @@ describe('SPEC-008 말풍선 모양 기준 (coachMark.css)', () => {
     }
   })
 
-  it('올라오는 효과는 동작 줄이기를 켜지 않았을 때만 쓴다 (AC-13)', () => {
+  it('올라오는 효과는 동작 줄이기를 켜지 않았을 때만 쓴다 (AC-36)', () => {
     const [outside, motionBlock = ''] = coachCss.split('@media (prefers-reduced-motion: no-preference)')
     expect(outside).not.toMatch(/animation:/)
     expect(motionBlock).toMatch(/\.ui-coach__bubble \{\s*animation: ui-coach-in var\(--motion-base\) var\(--motion-curve\)/)

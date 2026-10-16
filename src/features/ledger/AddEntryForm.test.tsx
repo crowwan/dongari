@@ -5,6 +5,7 @@ import { frequentChoices, lastUsedType, type EntryInput } from '../../domain/led
 import type { Entry, EntryType } from '../../domain/types'
 import { useScreenHistory } from '../useScreenHistory'
 import { AddEntryForm } from './AddEntryForm'
+import type { StepState } from './entrySteps'
 
 // 지난 기록: 대관료·꽃값(지출) → 찬조금(수입) 순으로 썼다
 const HISTORY: Entry[] = [
@@ -18,6 +19,7 @@ function makeHandlers() {
     onSave: vi.fn<(input: EntryInput) => void>(),
     onBack: vi.fn<() => void>(),
     onDirtyChange: vi.fn<(dirty: boolean) => void>(),
+    onStepChange: vi.fn<(state: StepState) => void>(),
   }
 }
 
@@ -41,6 +43,7 @@ function Harness({ year, month, saved, handlers }: HarnessProps) {
       onSave={handlers.onSave}
       onBack={handlers.onBack}
       onDirtyChange={handlers.onDirtyChange}
+      onStepChange={handlers.onStepChange}
     />
   )
 }
@@ -606,5 +609,21 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
       expect(actionButton()).toHaveAccessibleName('저장')
       expect(screen.queryByRole('button', { name: '다 적었어요' })).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('SPEC-008 연습 장부가 보는 단계', () => {
+  it('지금 단계(며칠 → 무엇 → 얼마)와 금액이 바뀔 때마다 알린다', async () => {
+    const { onStepChange } = renderForm()
+    const latest = () => onStepChange.mock.lastCall?.[0]
+    expect(latest()?.step).toBe('day')
+
+    await userEvent.click(screen.getByRole('button', { name: '오늘 7일' }))
+    expect(latest()?.step).toBe('item')
+    await userEvent.click(within(itemList()).getByRole('button', { name: /회비/ }))
+    expect(latest()?.step).toBe('amount')
+    await userEvent.click(screen.getByRole('button', { name: '1만 원 더하기' }))
+
+    expect(latest()?.draft.amount).toBe(10_000)
   })
 })

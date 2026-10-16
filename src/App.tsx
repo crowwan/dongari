@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
 import { NewBookScreen } from './features/books/NewBookScreen'
 import { FirstUseGuideMark } from './features/guide/FirstUseGuideMark'
-import type { GuideScreen } from './features/guide/guideRules'
 import type { GuideStore } from './features/guide/guideStore'
 import { useFirstUseGuide } from './features/guide/useFirstUseGuide'
 import type { KeepState } from './features/keep/AutoKeeper'
@@ -16,9 +15,13 @@ import type { Keep } from './features/keep/startKeep'
 import { AddEntryForm } from './features/ledger/AddEntryForm'
 import { EditEntryForm } from './features/ledger/EditEntryForm'
 import { LedgerScreen } from './features/ledger/LedgerScreen'
+import type { StepState } from './features/ledger/entrySteps'
 import { StartLedgerScreen } from './features/ledger/StartLedgerScreen'
-import { useLedger, type UseLedgerOptions } from './features/ledger/useLedger'
+import { useLedger, type LedgerState, type UseLedgerOptions } from './features/ledger/useLedger'
+import { PRACTICE_STOP_DIALOG, type PracticeSlot } from './features/practice/practiceSlot'
+import type { PracticeView } from './features/practice/practiceSteps'
 import { MonthSummaryScreen } from './features/report/MonthSummaryScreen'
+import { pictureSaver, type PictureSaver } from './features/report/savePicture'
 import { YearSummaryScreen } from './features/report/YearSummaryScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
@@ -26,7 +29,7 @@ import { useScreenHeading } from './features/useScreenHeading'
 import { useScreenHistory } from './features/useScreenHistory'
 import { totalEntryCount } from './domain/book'
 import type { BookSetup, EntryInput } from './domain/ledger'
-import type { StoredData } from './domain/types'
+import type { BookKind, StoredData } from './domain/types'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { requestPersistentStorage } from './storage/persist'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -43,8 +46,16 @@ type AppProps = {
   options?: UseLedgerOptions
   // 복구 코드 자동 보관 (SPEC-006). 없으면 서버 주소가 정해지기 전 빌드 — 설정에 "준비 중", 복구 코드로 불러오기 없음
   keep?: Keep
-  // 처음 쓰는 분 안내 상태 (SPEC-008, 이 폰에만). 없으면 안내를 하지 않는다
+  // 복구 코드 안내 말풍선 상태 (SPEC-008, 이 폰에만). 없으면 안내를 하지 않는다
   guideStore?: GuideStore
+  // 월 정리·올해 결산 사진 만들기·공유 창 (테스트는 가짜를 넣는다)
+  saver?: PictureSaver
+  // 연습 장부로 그릴 때 (SPEC-008): 연습 띠·단계 말풍선을 얹고, 뒤로 버튼은 그만할까요를 묻는다
+  practice?: PracticeSlot
+  // 설정 [연습해 보기] (SPEC-008): 지금 장부 종류와 연습이 끝나면 돌아올 진짜 장부 데이터
+  onStartPractice?: (kind: BookKind, back: LoadResult) => void
+  // 장부가 하나도 없는 첫 실행 화면인지 (첫 실행 새 장부 만들기에서 뒤로 버튼은 첫 실행 물음으로, SPEC-008)
+  onFirstRunChange?: (firstRun: boolean) => void
 }
 
 // 복구 코드 [보내기] 결과 알림. 공유 화면을 그냥 닫았으면 알리지 않는다
@@ -54,6 +65,11 @@ const SHARE_CODE_MESSAGES: Record<Exclude<ShareCodeResult, 'cancelled'>, string>
   failed: '보내지 못했어요. 코드를 종이에 적어 두세요',
 }
 
+// 연습이 끝나면 다시 그릴 진짜 장부: 지금 데이터 + 앱을 열 때의 시작 상태 (저장 안 됨 표시·마지막 저장 실패는 다시 그리면 없어진다)
+function currentLoad({ startup, data }: LedgerState): LoadResult {
+  return startup.status === 'read-only' ? { status: 'read-only', reason: startup.reason, data } : { status: startup.status, data }
+}
+
 // 자동 보관이 없는 빌드에서 상태 구독 자리
 const subscribeNothing = () => () => {}
 const noKeepState = (): KeepState | undefined => undefined
@@ -61,10 +77,21 @@ const noKeepState = (): KeepState | undefined => undefined
 // 앱 뼈대 (SPEC-001 화면 구성, 탭 없음): 장부(첫 화면) / 내역 적기·고치기 / 설정 / 월 정리 / 올해 결산 / 새 장부 만들기.
 // 장부가 하나도 없으면 새 장부 만들기 화면만(첫 실행, SPEC-005).
 // 화면은 모두 지금 장부(마지막에 본 장부) 하나를 보여 준다. 장부를 고르기·만들기·지우기는 useLedger 가 지금 장부를 바꾸고 App 은 보던 달을 비운다
-export default function App({ repository, loaded, options, keep, guideStore }: AppProps) {
+export default function App({
+  repository,
+  loaded,
+  options,
+  keep,
+  guideStore,
+  saver = pictureSaver,
+  practice,
+  onStartPractice,
+  onFirstRunChange,
+}: AppProps) {
   const ledger = useLedger(repository, loaded, options)
   const bookName = ledger.book?.name ?? ''
-  const navigation = useScreenHistory()
+  // 연습 장부에서는 뒤로 버튼이 화면을 닫지 않고 "연습을 그만할까요?" 를 묻는다 (SPEC-008)
+  const navigation = useScreenHistory({ backOpensDialog: practice ? PRACTICE_STOP_DIALOG : undefined })
   // 화면이 바뀌면 새 화면 제목에 포커스·브라우저 제목 (#110)
   const mainRef = useRef<HTMLElement>(null)
   useScreenHeading(mainRef)
@@ -73,6 +100,9 @@ export default function App({ repository, loaded, options, keep, guideStore }: A
   const [toast, setToast] = useState<string | null>(null)
   // 연달아 적기 (SPEC-001 v2.1): 이번에 내역 적기 화면에 들어와 저장한 내역. 장부로 돌아오면 비운다
   const [chainSaved, setChainSaved] = useState<EntryInput[]>([])
+  // 내역 적기의 지금 단계 (연습 말풍선이 본다). form: 연달아 적기로 다시 그린 몇 번째 화면인지
+  const [entryStep, setEntryStep] = useState<{ form: number; state: StepState }>()
+  const reportEntryStep = useCallback((state: StepState) => setEntryStep({ form: chainSaved.length, state }), [chainSaved.length])
   // 백업 파일 보내기·불러오기 (SPEC-002). 불러오면 올해 장부의 처음 달로 돌아가 알린다
   const now = options?.now ?? (() => new Date())
   const backup = useBackup(ledger, {
@@ -108,6 +138,11 @@ export default function App({ repository, loaded, options, keep, guideStore }: A
     setViewedMonth(lastChainSaved.month)
     setToast(`${chainSaved.length}건을 저장했어요`)
   }
+  const { isFirstRun } = ledger
+  useEffect(() => {
+    onFirstRunChange?.(isFirstRun)
+  }, [isFirstRun, onFirstRunChange])
+
   // 고치는 기록. 다른 경로로 지워졌으면 undefined
   const editingEntry = screen.name === 'edit-entry' ? ledger.ledger?.entries.find((entry) => entry.id === screen.id) : undefined
   const editingEntryMissing = screen.name === 'edit-entry' && editingEntry === undefined
@@ -189,29 +224,37 @@ export default function App({ repository, loaded, options, keep, guideStore }: A
     <NoticeBar key={message} message={message} action={action && noticeActions[action]} />
   ))
   const noticeOffersImport = storageNoticeList.some((notice) => notice.action === 'import-backup')
-  // 7일 보관 안내 (SPEC-006): 장부 위, 저장 안내가 없을 때만
-  const showKeepReminder = needsKeepReminder(keepState, now()) && storageNoticeList.length === 0
-  // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부·설정 위 띠는 저장 안내가 없을 때만 (띠는 하나만: 저장 > 보관 > 백업)
-  const needsBackup = backupReminderFor(ledger.data, now())
+  // 7일 보관 안내 (SPEC-006): 장부 위, 저장 안내가 없을 때만. 연습 장부에는 없다 (진짜 장부에 대한 안내, SPEC-008)
+  const showKeepReminder = !practice && needsKeepReminder(keepState, now()) && storageNoticeList.length === 0
+  // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부·설정 위 띠는 저장 안내가 없을 때만 (띠는 하나만: 저장 > 보관 > 백업). 연습 장부에는 없다
+  const needsBackup = !practice && backupReminderFor(ledger.data, now())
   const showBackupReminder = needsBackup && storageNoticeList.length === 0
 
-  // 처음 쓰는 분 안내 말풍선 (SPEC-008): 장부 화면·올해 결산이 새로 보일 때 띄울 것을 묻는다
-  const guideScreen: GuideScreen =
-    ledger.isFirstRun ? 'other' : screen.name === 'ledger' && ledger.ledger ? 'ledger' : screen.name === 'year-summary' ? 'year-summary' : 'other'
+  // 복구 코드 안내 말풍선 (SPEC-008 4번): 장부 화면이 새로 보일 때 띄울지 묻는다
   const guide = useFirstUseGuide({
     store: guideStore,
     visit: ledger.isFirstRun ? undefined : screen,
     context: {
-      screen: guideScreen,
+      screen: !ledger.isFirstRun && screen.name === 'ledger' && ledger.ledger ? 'ledger' : 'other',
       entryCount: totalEntryCount(ledger.data),
-      monthHasEntries: ledger.ledger?.entries.some((entry) => entry.month === month) ?? false,
-      yearHasEntries: (ledger.ledger?.entries.length ?? 0) > 0,
       keepUsable: keepState?.enabled === true && recoveryCode !== undefined,
       blocked:
         storageNoticeList.length > 0 || navigation.dialog !== null || navigation.sheet !== null || navigation.confirmingLeave,
     },
     dialogs: navigation,
   })
+
+  // 연습 말풍선이 보는 지금 화면 (SPEC-008)
+  const practiceView: PracticeView = {
+    screen: screen.name,
+    covered: navigation.dialog !== null || navigation.sheet !== null || navigation.confirmingLeave,
+    entries: ledger.ledger?.entries ?? [],
+    entry:
+      screen.name === 'add-entry' && entryStep?.form === chainSaved.length
+        ? { step: entryStep.state.step, amount: entryStep.state.draft.amount, saved: chainSaved.length }
+        : undefined,
+    canSend: saver.send !== undefined,
+  }
 
   function screenContent(): ReactNode {
     if (ledger.isFirstRun) {
@@ -291,6 +334,7 @@ export default function App({ repository, loaded, options, keep, guideStore }: A
             onShareCode={shareCode}
             restoreByCode={restoreByCode}
             onBack={navigation.backToLedger}
+            onPractice={onStartPractice && (() => onStartPractice(ledger.book?.kind ?? 'club', currentLoad(ledger)))}
           />
         )
       case 'month-summary':
@@ -303,6 +347,7 @@ export default function App({ repository, loaded, options, keep, guideStore }: A
             carryoverWords={ledger.carryoverWords}
             onBack={navigation.backToLedger}
             onNotify={setToast}
+            saver={saver}
           />
         )
       case 'year-summary':
@@ -314,7 +359,9 @@ export default function App({ repository, loaded, options, keep, guideStore }: A
             carryoverWords={ledger.carryoverWords}
             onBack={navigation.backToLedger}
             onNotify={setToast}
-            guideTargetRef={guide.targets.yearAction}
+            saver={saver}
+            practice={practice !== undefined}
+            onPictureResult={practice?.onPictureResult}
           />
         )
       case 'add-entry':
@@ -342,6 +389,7 @@ export default function App({ repository, loaded, options, keep, guideStore }: A
             }}
             onBack={navigation.requestBack}
             onDirtyChange={navigation.confirmBeforeLeave}
+            onStepChange={practice && reportEntryStep}
           />
         )
       case 'edit-entry': {
@@ -430,7 +478,7 @@ export default function App({ repository, loaded, options, keep, guideStore }: A
           onAddEntry={(entryMonth) => navigation.open({ name: 'add-entry', month: entryMonth })}
           onEditEntry={(id) => navigation.open({ name: 'edit-entry', id })}
           unsavedEntryIds={ledger.unsavedEntryIds}
-          guideTargets={guide.targets}
+          settingsRef={guide.settings}
         />
       </>
     )
@@ -438,6 +486,7 @@ export default function App({ repository, loaded, options, keep, guideStore }: A
 
   return (
     <div className="app">
+      {practice?.render(practiceView, navigation)}
       <main ref={mainRef} className="app__main">
         {notices}
         {screenContent()}

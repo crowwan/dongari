@@ -1,0 +1,219 @@
+/*
+ * 연습 장부 (SPEC-008): 연습 띠, 첫 실행 물음, 끝 화면. 값은 tokens.css 변수만 쓴다.
+ */
+@import '../../styles/tokens.css';
+
+/* ---------- 연습 띠: 모든 연습 화면 맨 위, 옅은 회청 면 + 회청 글자 ---------- */
+
+/* 화면을 내려도 맨 위에 붙어 있다. 높이 72 이상, 안쪽 여백 위 8·오른쪽 12·아래 8·왼쪽 20 */
+.practice-band {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  padding: var(--practice-band-pad);
+  padding-top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
+  background: var(--info-bg);
+  color: var(--info-ink);
+  font-family: var(--typeface);
+  letter-spacing: var(--letter-body);
+}
+
+/* 말풍선·읽기 막음이 떠 있는 동안: 스크림(40) 위에 밝게 남아 [그만하기] 를 누를 수 있다. 확인 창(20)이 뜨면 내려가 같이 어두워진다 */
+.practice-band[data-raised] {
+  z-index: 41;
+}
+
+.practice-band__inner {
+  max-width: var(--content-max);
+  min-height: calc(var(--practice-band-min) - var(--space-4));
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--practice-band-gap);
+}
+
+.practice-band__inner > .ui-icon {
+  flex: none;
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+/* "연습 중이에요"(Bold) / "저장되지 않아요"(14) 두 줄, 낱말 단위 줄바꿈 */
+.practice-band__text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  line-height: var(--line-tight);
+  word-break: keep-all;
+}
+
+.practice-band__text strong {
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-bold);
+}
+
+.practice-band__text span {
+  font-size: var(--text-caption-size);
+}
+
+/* [그만하기]: 카드색 면 + 제목색 SemiBold, 높이 56 이상, 반경 12, 줄바꿈 없음 */
+.practice-band__stop {
+  flex: none;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--corner-sm);
+  background: var(--surface);
+  color: var(--strong);
+  font-family: var(--typeface);
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+  letter-spacing: var(--letter-body);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.practice-band__stop:active {
+  background: var(--pressed);
+}
+
+.practice-band__stop:focus-visible {
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
+
+/* 월 정리를 연 뒤 1초쯤: 말풍선 없이 읽게 두고 누르기만 막는다 (띠는 이 위) */
+.practice-reading {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+/* ---------- 첫 실행 물음·끝 화면 ---------- */
+
+/* 버튼은 화면 흐름 맨 아래 (글자를 키워도 고정 영역이 글을 가리지 않게) */
+.practice-screen {
+  min-height: calc(100dvh - var(--space-5) - var(--space-8) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
+.practice-screen__title {
+  font-size: var(--text-title-size);
+}
+
+.practice-screen__lead {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--size-large);
+  line-height: var(--line-body);
+  word-break: keep-all;
+}
+
+.practice-screen__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-body-size);
+  line-height: var(--line-body);
+  word-break: keep-all;
+}
+
+.practice-card {
+  padding: var(--card-pad-block) var(--card-pad-inline);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.practice-card__title {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+}
+
+.practice-plan,
+.practice-learned {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.practice-plan__row,
+.practice-learned__row {
+  min-height: var(--practice-row-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--strong);
+  font-size: var(--text-row-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+}
+
+/* 번호: 옅은 청록 동그라미 + 청록 글자 */
+.practice-plan__number {
+  flex: none;
+  width: var(--practice-number);
+  height: var(--practice-number);
+  border-radius: var(--corner-pill);
+  background: var(--primary-soft);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 배운 것: 청록 체크, 아직 안 한 줄은 빈 동그라미 */
+.practice-learned__row > .ui-icon {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--accent-ink);
+}
+
+.practice-learned__row[data-done='false'] > .ui-icon {
+  color: var(--faint);
+}
+
+/* 끝 화면 위쪽 청록 동그라미 체크 (72, 옅은 청록 면 + 청록) */
+.practice-done {
+  width: var(--practice-done);
+  height: var(--practice-done);
+  border-radius: var(--corner-pill);
+  background: var(--primary-soft);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+}
+
+.practice-done > .ui-icon {
+  width: var(--practice-done-icon);
+  height: var(--practice-done-icon);
+}
+
+.practice-actions {
+  margin-top: auto;
+  padding-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.practice-actions__note {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--line-body);
+  text-align: center;
+  word-break: keep-all;
+}
