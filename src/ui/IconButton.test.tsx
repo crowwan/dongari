@@ -30,20 +30,20 @@ describe('IconButton', () => {
     expect(handleClick).toHaveBeenCalledTimes(1)
   })
 
-  it('기본은 면 없는 글자 버튼, fill 이면 회색 면 버튼이다 (data-variant)', () => {
+  it('기본은 면 없는 글자 버튼, surface 면 흰 면 버튼이다 (data-variant)', () => {
     render(
       <>
         <IconButton icon="chart" onClick={() => {}}>
           결산
         </IconButton>
-        <IconButton icon="receipt" variant="fill" onClick={() => {}}>
+        <IconButton icon="receipt" variant="surface" onClick={() => {}}>
           10월 정리 보기
         </IconButton>
       </>,
     )
 
     expect(screen.getByRole('button', { name: '결산' })).toHaveAttribute('data-variant', 'plain')
-    expect(screen.getByRole('button', { name: '10월 정리 보기' })).toHaveAttribute('data-variant', 'fill')
+    expect(screen.getByRole('button', { name: '10월 정리 보기' })).toHaveAttribute('data-variant', 'surface')
   })
 
   it('점 표시: 점을 그리고 화면 읽기 이름에도 이유를 붙인다 (색만으로 알리지 않는다)', () => {

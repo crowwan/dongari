@@ -66,8 +66,9 @@ function carryoverNote(carryover: number, words: CarryoverWords): string | undef
   return undefined
 }
 
-// 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 [결산][설정] → 잔액 카드 → ‹ N월 ▾ › → 그 달 카드 → 아래 고정 [+ 내역 적기].
-// 위쪽 이름·연도는 한 버튼이라 누르면 장부 고르기 창이 열린다 (SPEC-005 A)
+// 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 [결산][설정] → 잔액 카드 → ‹ N월 ▾ › → [N월 정리 보기] → 그 달 카드 → 아래 고정 [+ 내역 적기].
+// 위쪽 이름·연도는 한 버튼이라 누르면 장부 고르기 창이 열린다 (SPEC-005 A).
+// 위쪽 줄은 이름 버튼이 본문 8자 폭을 못 가지면 [결산][설정] 이 이름 아래 줄로 내려간다 (SPEC-001 v2.6, ledger.css)
 export function LedgerScreen({
   bookName,
   bookId,
@@ -89,6 +90,8 @@ export function LedgerScreen({
   onAddEntry,
   onEditEntry,
 }: LedgerScreenProps) {
+  const group = monthGroup(ledger.entries, month)
+
   return (
     <div className="screen screen--stack ledger" data-testid="ledger-screen">
       <header className="ledger__top">
@@ -111,7 +114,7 @@ export function LedgerScreen({
           </button>
         </h1>
         <div className="ledger__top-actions">
-          <IconButton icon="chart" onClick={onOpenYearSummary}>
+          <IconButton icon="chart" variant="surface" onClick={onOpenYearSummary}>
             결산
           </IconButton>
           <IconButton
@@ -136,11 +139,16 @@ export function LedgerScreen({
           onPickMonth={() => sheets.openSheet(MONTH_SHEET)}
         />
 
-        <MonthCard
-          group={monthGroup(ledger.entries, month)}
-          onEditEntry={onEditEntry}
-          onOpenMonthSummary={onOpenMonthSummary}
-        />
+        {/* 달 넘기기 바로 아래: 내역이 많아도 첫 화면에 보인다. 그 달 기록이 없으면 없다 (SPEC-001 v2.6) */}
+        {group.entries.length > 0 && (
+          <div className="ledger__month-action">
+            <IconButton icon="receipt" variant="surface" onClick={() => onOpenMonthSummary(month)}>
+              {`${month}월 정리 보기`}
+            </IconButton>
+          </div>
+        )}
+
+        <MonthCard group={group} onEditEntry={onEditEntry} />
       </div>
 
       <BottomActionBar icon="plus" label="내역 적기" onClick={() => onAddEntry?.(month)} />
@@ -174,11 +182,10 @@ export function LedgerScreen({
 type MonthCardProps = {
   group: MonthGroup
   onEditEntry?: (id: string) => void
-  onOpenMonthSummary: (month: number) => void
 }
 
-// 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(날짜순, 원형 아이콘, 보조 줄 "7일 · 지출") → [N월 정리 보기]. 기록이 없으면 안내 한 줄만
-function MonthCard({ group, onEditEntry, onOpenMonthSummary }: MonthCardProps) {
+// 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(날짜순, 원형 아이콘, 보조 줄 "7일 · 지출", 줄 끝 ›). 기록이 없으면 안내 한 줄만
+function MonthCard({ group, onEditEntry }: MonthCardProps) {
   const { month } = group
 
   return (
@@ -211,13 +218,9 @@ function MonthCard({ group, onEditEntry, onOpenMonthSummary }: MonthCardProps) {
                 description={rowDescription(entry)}
                 end={<AmountText type={entry.type} amount={entry.amount} />}
                 onClick={() => onEditEntry?.(entry.id)}
+                chevron
               />
             ))}
-          </div>
-          <div className="ledger__month-action">
-            <IconButton icon="receipt" variant="fill" onClick={() => onOpenMonthSummary(month)}>
-              {`${month}월 정리 보기`}
-            </IconButton>
           </div>
         </>
       )}

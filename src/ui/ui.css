@@ -147,7 +147,7 @@
   background: var(--danger);
 }
 
-/* 아이콘 + 글자 버튼: plain 은 면 없이 글자만, fill 은 회색 면 (카드 안 [10월 정리 보기]) */
+/* 아이콘 + 글자 버튼: plain 은 면 없이 글자만(회색 아이콘), surface 는 흰 면 + 청록 아이콘 ([결산], [10월 정리 보기]) */
 .ui-icon-button {
   min-height: var(--touch-min);
   padding: 0 var(--space-3);
@@ -170,14 +170,19 @@
   color: var(--muted);
 }
 
-.ui-icon-button[data-variant='fill'] {
-  width: 100%;
-  background: var(--fill);
+.ui-icon-button[data-variant='surface'] {
+  background: var(--surface);
+}
+
+.ui-icon-button[data-variant='surface'] .ui-icon {
+  color: var(--accent-ink);
 }
 
 /* 한 달씩 넘기기: [‹] 9월 ▾ [›] */
 .ui-stepper {
+  container: month-stepper / inline-size;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
@@ -205,14 +210,17 @@
 }
 
 .ui-stepper__label {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
   font-size: var(--text-heading-size);
   font-weight: var(--text-heading-weight);
   line-height: var(--line-tight);
 }
 
-/* 가운데 달 누르기: 달 글자 + ▾ */
+/* 가운데 달 누르기: 달 글자 + ▾. 폭이 모자라면 이 칸이 줄어들어 [‹][›](56) 가 화면 밖으로 밀리지 않는다 (SPEC-001 v2.6) */
 .ui-stepper__pick {
+  min-width: 0;
   min-height: var(--touch-min);
   padding: 0 var(--space-3);
   border: 0;
@@ -229,6 +237,19 @@
   width: var(--icon-sm);
   height: var(--icon-sm);
   color: var(--muted);
+}
+
+/*
+ * 아주 좁을 때(화면 확대 200% 등): [‹][›](56) 사이에 달 글자가 들어가지 않으면 달을 위 줄 가운데로 올리고 [‹][›] 는 아래 줄 양끝에.
+ * 달 글자가 "1/0/월" 처럼 한 글자씩 쌓이지 않게 (SPEC-001 v2.6 AC-30).
+ * 조건 = 달 글자 본문 4rem + 화살표 56×2·사이 12×2·달 버튼 안쪽 여백·▾ (px 합 180). 컨테이너 쿼리 조건에는 var() 를 쓸 수 없어 풀어 썼다
+ */
+@container month-stepper (width < calc(4rem + 180px)) {
+  .ui-stepper > .ui-stepper__pick {
+    order: -1;
+    flex-basis: 100%;
+    justify-content: center;
+  }
 }
 
 /*
@@ -574,19 +595,43 @@
   text-wrap: balance;
 }
 
-/* 목록 한 줄: 원형 아이콘 44 + 이름·보조 두 줄 + 오른쪽. 카드 안에 줄줄이 놓인다 (줄 사이 선 없음) */
+/* 목록 한 줄: 원형 아이콘 44 + 이름·보조 두 줄 + 오른쪽 (+ 줄 끝 ›). 카드 안에 줄줄이 놓인다 (줄 사이 선 없음) */
 .ui-row {
+  container: list-row / inline-size;
   box-sizing: border-box;
   width: 100%;
-  min-height: var(--row-min);
-  padding: var(--space-2) var(--card-pad-inline);
+  padding: 0;
   border: 0;
   background: none;
+  display: block;
+  color: var(--ink);
+  text-align: left;
+}
+
+.ui-row__inner {
+  box-sizing: border-box;
+  min-height: var(--row-min);
+  padding: var(--space-2) var(--card-pad-inline);
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  color: var(--ink);
-  text-align: left;
+}
+
+/*
+ * 아주 좁을 때(화면 확대 200% 등): 이름 칸이 본문 4자 폭도 못 가지면 원형 아이콘을 빼고 좌우 여백·사이를 줄인다.
+ * 아이콘은 꾸밈이고 수입·지출은 보조 줄 글자와 금액 부호로도 보인다. 그렇지 않으면 이름이 한 글자씩 세로로 쌓인다 (SPEC-001 v2.6 AC-30).
+ * 조건 = 본문 4rem + 아이콘 44·여백 20×2·사이 12×2·› 20 (px 합 128). 컨테이너 쿼리 조건에는 var() 를 쓸 수 없어 토큰 값을 풀어 썼다
+ */
+@container list-row (width < calc(4rem + 128px)) {
+  .ui-row__inner {
+    padding-inline: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  /* 아래쪽 .ui-row__icon 의 display 보다 앞서게 한 단계 좁힌다 */
+  .ui-row__inner > .ui-row__icon {
+    display: none;
+  }
 }
 
 button.ui-row {
@@ -611,11 +656,29 @@ button.ui-row {
   color: var(--accent-ink);
 }
 
-.ui-row__text {
+/*
+ * 이름·보조 줄 + 오른쪽 내용 (SPEC-001 v2.6): 이름과 한 줄에 안 들어가면 오른쪽 내용이 이름 아래 줄로 내려가 오른쪽에 붙는다.
+ * 오른쪽 내용(금액)은 한 덩어리라 중간에서 갈리지 않는다
+ */
+.ui-row__body {
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+}
+
+.ui-row__text {
+  /* 이름 글자 폭만큼 자리를 잡고, 금액과 한 줄에 안 들어가면 금액이 아래 줄로 (이름 칸이 줄어 금액 옆에 끼지 않는다) */
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
+  /* 이름은 낱말 단위로 줄을 바꾸고, 칸보다 긴 낱말만 글자 단위로 나눈다 ("김/순/자" 처럼 쌓이지 않게) */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .ui-row__title {
@@ -623,7 +686,6 @@ button.ui-row {
   font-size: var(--text-row-size);
   font-weight: var(--text-row-weight);
   line-height: var(--line-tight);
-  overflow-wrap: anywhere;
 }
 
 .ui-row__description {
@@ -634,7 +696,22 @@ button.ui-row {
 
 .ui-row__end {
   flex: none;
+  max-width: 100%;
+  margin-left: auto;
   font-size: var(--text-row-size);
+  white-space: nowrap;
+}
+
+/* 줄 끝 › : 누르면 고칠 수 있다는 표시 (설정 줄 › 와 같은 크기·색) */
+.ui-row__chevron {
+  flex: none;
+  display: flex;
+  color: var(--faint);
+}
+
+.ui-row__chevron .ui-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
 }
 
 /* 둘 중 하나 스위치: 회색 몸통 안에서 고른 쪽만 손잡이(흰 면 + 굵게)로 떠오른다 */

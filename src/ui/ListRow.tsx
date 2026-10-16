@@ -14,22 +14,33 @@ type ListRowProps = {
   end?: ReactNode
   // 있으면 줄 전체가 버튼 (예: 눌러 고치기)
   onClick?: () => void
+  // 줄 맨 끝 › (누르면 고칠 수 있다는 표시, 모양만이라 화면 읽기 이름에는 없다)
+  chevron?: boolean
 }
 
-// 목록 한 줄: 원형 아이콘 + 두 줄 글 + 오른쪽 (토스 TDS ListRow 패턴). 장부 내역, 항목 목록, 설정 줄
-export function ListRow({ icon, tone = 'neutral', title, description, end, onClick }: ListRowProps) {
+// 목록 한 줄: 원형 아이콘 + 두 줄 글 + 오른쪽 (토스 TDS ListRow 패턴). 장부 내역, 설정 줄.
+// 이름과 오른쪽 내용이 한 줄에 안 들어가면 오른쪽 내용이 이름 아래 줄로 내려간다 (금액은 한 덩어리, SPEC-001 v2.6)
+export function ListRow({ icon, tone = 'neutral', title, description, end, onClick, chevron = false }: ListRowProps) {
+  // 줄(.ui-row)은 폭을 재는 컨테이너, 안쪽(.ui-row__inner)이 배치. 아주 좁으면 안쪽 배치를 바꾼다 (ui.css)
   const content = (
-    <>
+    <span className="ui-row__inner">
       <span className="ui-row__icon">
         <Icon name={icon} />
       </span>
-      <span className="ui-row__text">
-        <span className="ui-row__title">{title}</span>
-        {/* 줄 버튼 이름이 "회비 수입 +140,000원" 처럼 띄어 읽히게 */}
-        {description && <> <span className="ui-row__description">{description}</span></>}
+      <span className="ui-row__body">
+        <span className="ui-row__text">
+          <span className="ui-row__title">{title}</span>
+          {/* 줄 버튼 이름이 "회비 수입 +140,000원" 처럼 띄어 읽히게 */}
+          {description && <> <span className="ui-row__description">{description}</span></>}
+        </span>
+        {end !== undefined && <> <span className="ui-row__end">{end}</span></>}
       </span>
-      {end !== undefined && <> <span className="ui-row__end">{end}</span></>}
-    </>
+      {chevron && (
+        <span className="ui-row__chevron" data-testid="list-row-chevron" aria-hidden="true">
+          <Icon name="right" />
+        </span>
+      )}
+    </span>
   )
 
   if (onClick) {

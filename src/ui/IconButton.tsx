@@ -6,8 +6,8 @@ type IconButtonProps = {
   // 아이콘 옆 글자. 기호만 있는 버튼은 만들지 않는다 (SPEC-001)
   children: string
   onClick: () => void
-  // plain: 면 없는 글자 버튼 (위쪽 [결산] [설정], [← 장부로]) / fill: 회색 면 버튼 (카드 안 [10월 정리 보기])
-  variant?: 'plain' | 'fill'
+  // plain: 면 없는 글자 버튼 (위쪽 [설정], [← 장부로]) / surface: 흰 면 + 청록 아이콘 (위쪽 [결산], 달 넘기기 아래 [10월 정리 보기])
+  variant?: 'plain' | 'surface'
   // 점 표시 (예: 백업 필요). 주면 오른쪽 위에 점을 찍고, 화면 읽기 이름에 이 말을 붙인다
   dotLabel?: string
 }
