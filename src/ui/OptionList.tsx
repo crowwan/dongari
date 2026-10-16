@@ -1,3 +1,4 @@
+import { useId, type ReactNode } from 'react'
 import { Icon, type IconName } from './Icon'
 import './ui.css'
 
@@ -12,7 +13,8 @@ export type Option<T extends string> = {
 }
 
 // 목록 맨 아래 고르는 줄이 아닌 따로 하는 일 줄 ([✎ 직접 적기])
-export type OptionListAction = { label: string; icon: IconName; onClick: () => void }
+// expanded 를 주면 펼치는 줄이 된다: 펼침 상태를 읽히고(aria-expanded), 펼쳤을 때 그 줄 아래(목록 안)에 panel 을 보인다 (고치기 직접 적기 칸, v2.6)
+export type OptionListAction = { label: string; icon: IconName; onClick: () => void; expanded?: boolean; panel?: ReactNode }
 
 type OptionListProps<T extends string> = {
   // 묶음 이름 (화면 읽기용)
@@ -26,6 +28,8 @@ type OptionListProps<T extends string> = {
 
 // 여럿 중 하나: 줄 목록, 고른 줄은 옅은 청록 면 + 굵게 + 체크 (선택 창 안 장부 연도, 내역 적기 항목 목록)
 export function OptionList<T extends string>({ label, options, value, onChange, action }: OptionListProps<T>) {
+  const panelId = useId()
+  const panelOpen = action?.expanded === true && action.panel !== undefined
   return (
     <div className="ui-options" role="group" aria-label={label} data-testid="option-list">
       {options.map((option) => {
@@ -57,12 +61,24 @@ export function OptionList<T extends string>({ label, options, value, onChange, 
         )
       })}
       {action && (
-        <button type="button" className="ui-options__option ui-options__action" data-testid="option-list-action" onClick={action.onClick}>
+        <button
+          type="button"
+          className="ui-options__option ui-options__action"
+          data-testid="option-list-action"
+          aria-expanded={action.expanded}
+          aria-controls={panelOpen ? panelId : undefined}
+          onClick={action.onClick}
+        >
           <span className="ui-options__icon">
             <Icon name={action.icon} />
           </span>
           <span className="ui-options__label">{action.label}</span>
         </button>
+      )}
+      {panelOpen && (
+        <div className="ui-options__panel" id={panelId} data-testid="option-list-panel">
+          {action.panel}
+        </div>
       )}
     </div>
   )

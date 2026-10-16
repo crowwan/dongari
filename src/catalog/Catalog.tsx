@@ -446,6 +446,29 @@ export function Catalog() {
               />
             </div>
           </State>
+          <State label="[직접 적기] 펼침: 줄 아래 같은 면에 이름 칸 + 수입·지출 스위치, 체크 지움 (내역 고치기, SPEC-001 v2.6)">
+            <OptionList
+              label="자주 쓴 항목"
+              options={[
+                { value: '꽃값', label: '꽃값', icon: itemIcon('꽃값'), note: '지출' },
+                { value: '회비', label: '회비', icon: itemIcon('회비'), note: '수입', tone: 'income' },
+              ]}
+              value={null}
+              onChange={noop}
+              action={{
+                label: '직접 적기',
+                icon: 'pen',
+                onClick: noop,
+                expanded: true,
+                panel: (
+                  <>
+                    <TextField label="무엇인지 적어 주세요" labelRole="label" value="꽃바구니" placeholder="예: 꽃값" onChange={noop} />
+                    <SegmentedControl label="수입인가요, 지출인가요?" options={ENTRY_TYPES} value="expense" onChange={noop} />
+                  </>
+                ),
+              }}
+            />
+          </State>
           <State label="선택 창 안: 회색 면 + 흰 원 · 고른 줄 옅은 청록 + 체크 (설정 장부 연도)">
             <div className="catalog__frame catalog__frame--sheet">
               <BottomSheet inline open title="어느 해 장부를 볼까요?" onClose={noop}>
@@ -917,6 +940,20 @@ export function Catalog() {
                 danger
                 title="이 기록을 정말 지울까요?"
                 confirmLabel="지우기"
+                onConfirm={noop}
+                onCancel={noop}
+              />
+            </div>
+          </State>
+          <State label="버릴까요 + 설명 줄 (연달아 적기로 넣은 뒤 나갈 때, SPEC-001 v2.6)">
+            <div className="catalog__frame">
+              <ConfirmDialog
+                inline
+                open
+                danger
+                title="적던 내용을 버릴까요?"
+                description="장부에 넣은 2건은 그대로 있어요"
+                confirmLabel="버리기"
                 onConfirm={noop}
                 onCancel={noop}
               />
