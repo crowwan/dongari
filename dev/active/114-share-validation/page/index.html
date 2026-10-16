@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+<title>공유 창 시험</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<!-- 기술 검증 #114: 갤럭시에서 결산 사진 공유 창(navigator.share files). 앱 번들과 별개인 한 파일 실험 페이지 -->
+<style>
+  :root { --fg: #111; --muted: #555; --line: #ccc; --bg: #fff; --box: #f3f4f6; --accent: #1d4ed8; --ok: #047857; --bad: #b91c1c; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; font: 20px/1.5 system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; color: var(--fg); background: var(--bg); }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  h2 { font-size: 23px; margin: 28px 0 10px; padding-top: 16px; border-top: 2px solid var(--line); }
+  p { margin: 6px 0; }
+  .muted { color: var(--muted); font-size: 17px; }
+  button { display: block; width: 100%; min-height: 60px; margin: 10px 0; padding: 12px 14px; font: inherit; font-weight: 700; border: 2px solid var(--accent); border-radius: 12px; background: var(--accent); color: #fff; text-align: center; }
+  button.secondary { background: #fff; color: var(--accent); }
+  button:active { opacity: .7; }
+  button:disabled { opacity: .45; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pair button { margin: 0; }
+  .delay { margin: 14px 0 6px; font-weight: 700; }
+  .env { background: var(--box); border-radius: 12px; padding: 12px; font-size: 17px; word-break: break-all; }
+  .env b { display: inline-block; min-width: 7.5em; }
+  .pick label { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; margin: 8px 0; border: 2px solid var(--line); border-radius: 12px; }
+  .pick input { width: 28px; height: 28px; flex: none; }
+  .pick label:has(input:checked) { border-color: var(--accent); background: #eef2ff; }
+  .status { min-height: 1.5em; font-weight: 700; color: var(--accent); }
+  #log { list-style: none; margin: 0; padding: 0; }
+  #log li { border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 10px 0; font-size: 17px; word-break: break-all; }
+  #log li.ok { border-color: var(--ok); }
+  #log li.bad { border-color: var(--bad); }
+  #log li.wait { border-style: dashed; }
+  #log .head { font-size: 19px; font-weight: 700; }
+  #copyBox { width: 100%; height: 200px; font-size: 14px; display: none; margin-top: 8px; }
+  /* html2canvas 로 그릴 결산표. 화면 밖에 두고 360px 폭 × 2배 = 720px 폭 사진 */
+  #sheet { position: absolute; left: -10000px; top: 0; width: 360px; height: 1172px; background: #fff; color: #111; padding: 16px; overflow: hidden; font: 15px/1.4 system-ui, sans-serif; }
+  #sheet h3 { margin: 0 0 4px; font-size: 22px; }
+  #sheet table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  #sheet td { border-bottom: 1px solid #ddd; padding: 5px 2px; }
+  #sheet td:last-child { text-align: right; }
+</style>
+</head>
+<body>
+<h1>공유 창 시험</h1>
+<p class="muted">우리 장부 결산 사진을 카톡 단톡방으로 보낼 수 있는지 갤럭시에서 시험하는 화면입니다 (#114). 버튼을 누르면 아래 "기록"에 결과가 쌓입니다.</p>
+
+<h2>1. 이 폰 정보</h2>
+<div class="env" id="env"></div>
+
+<h2>2. 보낼 사진 고르기</h2>
+<div class="pick" id="pick">
+  <label><input type="radio" name="pic" value="small" checked> 작은 사진 (400×400)</label>
+  <label><input type="radio" name="pic" value="big"> 결산표 크기 (720×2344)</label>
+  <label><input type="radio" name="pic" value="real"> 실제 앱처럼 만든 결산표 (html2canvas)</label>
+</div>
+<p class="muted" id="picInfo">사진 만드는 중…</p>
+
+<h2>3. 공유 창 열기</h2>
+<p class="muted">"사진만" 은 사진 파일만, "사진+글자" 는 제목·글자도 같이 보냅니다. 몇 초 뒤에 여는 버튼은 사진 만드는 시간을 흉내 냅니다.</p>
+<div id="shareButtons"></div>
+<p class="delay">누른 뒤 사진을 만들고 바로 공유 (실제 앱과 같은 순서)</p>
+<div class="pair">
+  <button type="button" data-make="1" data-text="0">만들고 공유 · 사진만</button>
+  <button type="button" data-make="1" data-text="1">만들고 공유 · 사진+글자</button>
+</div>
+<p id="status" class="status" role="status" aria-live="polite"></p>
+
+<h2>4. 공유가 안 될 때 (내려받기)</h2>
+<button type="button" class="secondary" id="download">사진 내려받기 (&lt;a download&gt;)</button>
+
+<h2>5. 기록</h2>
+<button type="button" id="copy">결과 복사</button>
+<p id="copyStatus" class="status" role="status" aria-live="polite"></p>
+<textarea id="copyBox" readonly aria-label="복사할 결과"></textarea>
+<button type="button" class="secondary" id="clear">기록 지우기</button>
+<ol id="log"></ol>
+
+<div id="sheet" aria-hidden="true"></div>
+
+<script>
+'use strict'
+// 기록은 공유 창에서 다른 앱으로 갔다 와도(탭이 다시 열려도) 남도록 이 폰에 저장한다 (앱 저장 키 dongari:* 와 겹치지 않는 이름)
+const LOG_KEY = 'dongari-lab-share-test:log'
+const SHARE_TITLE = '우리 장부 2026년 결산'
+const SHARE_TEXT = '2026년 결산 사진입니다. 확인해 주세요.'
+const DELAYS = [0, 1, 3, 6]
+const HTML2CANVAS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
+
+const $ = (id) => document.getElementById(id)
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches
+const pictures = {} // small / big / real → File
+
+// ---- 기록 ----
+function loadLog() {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]') } catch { return [] }
+}
+function saveLog(entries) {
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(entries)) } catch { /* 저장 못 해도 화면 기록은 남긴다 */ }
+}
+let logEntries = loadLog()
+
+function addLog(entry) {
+  const record = { at: new Date().toLocaleTimeString('ko-KR'), standalone: isStandalone(), ...entry }
+  logEntries.unshift(record)
+  saveLog(logEntries)
+  renderLog()
+  return record
+}
+// 공유 창을 부른 기록을 결과가 나오면 고친다 (공유 창이 끝내 답하지 않으면 "기다리는 중" 으로 남는다)
+function updateLog(record, fields) {
+  Object.assign(record, fields)
+  saveLog(logEntries)
+  renderLog()
+}
+function entryLines(e) {
+  const lines = [`[${e.at}] ${e.action} → ${e.result}`]
+  if (e.picture) lines.push(`사진: ${e.picture}`)
+  if (e.canShare !== undefined) lines.push(`canShare: ${e.canShare}`)
+  if (e.activeAtCall !== undefined) lines.push(`부를 때 사용자 활성화: ${e.activeAtCall}`)
+  if (e.makeMs !== undefined) lines.push(`사진 만들기: ${e.makeMs}ms`)
+  if (e.callMs !== undefined) lines.push(`누른 뒤 공유 부르기까지: ${e.callMs}ms`)
+  if (e.settleMs !== undefined) lines.push(`공유 창 결과까지: ${e.settleMs}ms`)
+  if (e.message) lines.push(`메시지: ${e.message}`)
+  lines.push(`standalone: ${e.standalone}`)
+  return lines
+}
+function renderLog() {
+  const list = $('log')
+  list.replaceChildren()
+  if (logEntries.length === 0) {
+    const li = document.createElement('li')
+    li.textContent = '아직 기록이 없습니다.'
+    list.append(li)
+    return
+  }
+  for (const e of logEntries) {
+    const li = document.createElement('li')
+    li.className = e.pending ? 'wait' : e.ok ? 'ok' : 'bad'
+    const [head, ...rest] = entryLines(e)
+    const h = document.createElement('div')
+    h.className = 'head'
+    h.textContent = head
+    li.append(h)
+    for (const line of rest) {
+      const d = document.createElement('div')
+      d.textContent = line
+      li.append(d)
+    }
+    list.append(li)
+  }
+}
+
+// ---- 이 폰 정보 ----
+function envInfo() {
+  const share = typeof navigator.share === 'function'
+  const canShare = typeof navigator.canShare === 'function'
+  const canSharePic = (key) => {
+    if (!canShare || !pictures[key]) return '-'
+    try { return String(navigator.canShare({ files: [pictures[key]] })) } catch (error) { return `오류 ${error.name}` }
+  }
+  return [
+    ['주소', location.href],
+    ['standalone', String(isStandalone())],
+    ['share 있음', String(share)],
+    ['canShare 있음', String(canShare)],
+    ['canShare 작은', canSharePic('small')],
+    ['canShare 결산표', canSharePic('big')],
+    ['canShare 실제', canSharePic('real')],
+    ['userActivation', navigator.userActivation ? '있음' : '없음'],
+    ['userAgent', navigator.userAgent],
+  ]
+}
+function renderEnv() {
+  const env = $('env')
+  env.replaceChildren()
+  for (const [k, v] of envInfo()) {
+    const row = document.createElement('div')
+    const b = document.createElement('b')
+    b.textContent = k
+    row.append(b, ` ${v}`)
+    env.append(row)
+  }
+}
+
+// ---- 사진 만들기 ----
+function canvasToFile(canvas, name) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(new File([blob], name, { type: 'image/png' })) : reject(new Error('PNG 를 만들지 못함')), 'image/png')
+  })
+}
+function makeSmall() {
+  const c = document.createElement('canvas')
+  c.width = 400; c.height = 400
+  const g = c.getContext('2d')
+  g.fillStyle = '#1d4ed8'; g.fillRect(0, 0, 400, 400)
+  g.fillStyle = '#fff'; g.font = 'bold 44px sans-serif'; g.textAlign = 'center'
+  g.fillText('공유 시험', 200, 190)
+  g.font = '28px sans-serif'; g.fillText(new Date().toLocaleString('ko-KR'), 200, 250)
+  return canvasToFile(c, '공유시험-작은사진.png')
+}
+// 결산표 크기(720×2344)를 캔버스로 직접 그린다. 줄마다 글자가 있어 실제 사진과 비슷한 용량이 되게
+function makeBig() {
+  const W = 720, H = 2344
+  const c = document.createElement('canvas')
+  c.width = W; c.height = H
+  const g = c.getContext('2d')
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H)
+  g.fillStyle = '#111'; g.font = 'bold 48px sans-serif'
+  g.fillText('2026년 결산 (시험)', 40, 90)
+  g.font = '30px sans-serif'
+  let y = 170
+  for (let i = 1; y < H - 60; i++) {
+    g.fillStyle = i % 2 ? '#f3f4f6' : '#fff'; g.fillRect(24, y - 40, W - 48, 56)
+    g.fillStyle = '#111'
+    g.fillText(`${((i - 1) % 12) + 1}월 ${['회비', '간식', '대관료', '경조사', '교통비'][i % 5]} ${i}`, 40, y)
+    const amount = ((i * 37_123) % 400_000).toLocaleString('ko-KR') + '원'
+    g.fillText(amount, W - 40 - g.measureText(amount).width, y)
+    y += 64
+  }
+  return canvasToFile(c, '공유시험-결산표크기.png')
+}
+function fillSheet() {
+  const rows = []
+  for (let i = 1; i <= 34; i++) {
+    rows.push(`<tr><td>${((i - 1) % 12) + 1}월</td><td>${['회비', '간식', '대관료', '경조사', '교통비'][i % 5]}</td><td>${((i * 37_123) % 400_000).toLocaleString('ko-KR')}원</td></tr>`)
+  }
+  $('sheet').innerHTML = `<h3>2026년 결산 (시험)</h3><div>우리 장부 · html2canvas 로 그린 사진</div><table>${rows.join('')}</table>`
+}
+let html2canvasLoading
+function loadHtml2canvas() {
+  if (window.html2canvas) return Promise.resolve(window.html2canvas)
+  html2canvasLoading ??= new Promise((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = HTML2CANVAS_URL
+    s.onload = () => resolve(window.html2canvas)
+    s.onerror = () => { html2canvasLoading = undefined; reject(new Error('html2canvas 를 불러오지 못함 (인터넷 확인)')) }
+    document.head.append(s)
+  })
+  return html2canvasLoading
+}
+// 실제 앱과 같은 방식: html2canvas(scale 2, 흰 바탕) → toBlob
+async function makeReal() {
+  const html2canvas = await loadHtml2canvas()
+  const canvas = await html2canvas($('sheet'), { scale: 2, backgroundColor: '#ffffff', logging: false })
+  return canvasToFile(canvas, '공유시험-실제결산표.png')
+}
+const makers = { small: makeSmall, big: makeBig, real: makeReal }
+
+function selectedKey() {
+  return document.querySelector('input[name="pic"]:checked').value
+}
+function describe(file) {
+  return file ? `${file.name} (${Math.round(file.size / 1024)}KB)` : '아직 없음'
+}
+function renderPicInfo() {
+  const key = selectedKey()
+  $('picInfo').textContent = `고른 사진: ${describe(pictures[key])}`
+}
+async function prepare(key) {
+  const t0 = performance.now()
+  pictures[key] = await makers[key]()
+  return Math.round(performance.now() - t0)
+}
+
+// ---- 공유 ----
+function shareData(file, withText) {
+  return withText ? { files: [file], title: SHARE_TITLE, text: SHARE_TEXT } : { files: [file] }
+}
+function safeCanShare(data) {
+  if (typeof navigator.canShare !== 'function') return '없음'
+  try { return String(navigator.canShare(data)) } catch (error) { return `오류 ${error.name}` }
+}
+function activation() {
+  return navigator.userActivation ? String(navigator.userActivation.isActive) : '모름'
+}
+async function runShare({ delaySec, make, withText }) {
+  const t0 = performance.now()
+  const key = selectedKey()
+  const action = make
+    ? `누른 뒤 만들고 공유 · ${withText ? '사진+글자' : '사진만'}`
+    : `${delaySec === 0 ? '바로' : `${delaySec}초 뒤`} 공유 · ${withText ? '사진+글자' : '사진만'}`
+  const entry = { action }
+  let record
+  try {
+    if (make) {
+      $('status').textContent = '사진 만드는 중…'
+      entry.makeMs = await prepare(key)
+      renderPicInfo()
+    } else if (delaySec > 0) {
+      for (let left = delaySec; left > 0; left--) {
+        $('status').textContent = `${left}초 뒤 공유 창을 엽니다…`
+        await sleep(1000)
+      }
+    }
+    const file = pictures[key]
+    if (!file) throw Object.assign(new Error('사진이 아직 없음'), { name: '사진없음' })
+    entry.picture = describe(file)
+    const data = shareData(file, withText)
+    entry.canShare = safeCanShare(data)
+    if (typeof navigator.share !== 'function') throw Object.assign(new Error('navigator.share 없음'), { name: '공유없음' })
+    entry.activeAtCall = activation()
+    $('status').textContent = '공유 창을 여는 중…'
+    const t1 = performance.now()
+    entry.callMs = Math.round(t1 - t0)
+    const sharing = navigator.share(data)
+    record = addLog({ ...entry, pending: true, ok: false, result: '공유 창을 불렀음 (결과 기다리는 중)' })
+    await sharing
+    updateLog(record, { pending: false, ok: true, result: '성공 (보냈음)', settleMs: Math.round(performance.now() - t1) })
+  } catch (error) {
+    const failed = { pending: false, ok: false, result: `오류 ${error.name}`, message: error.message }
+    if (entry.callMs !== undefined) failed.settleMs = Math.round(performance.now() - t0 - entry.callMs)
+    if (record) updateLog(record, failed)
+    else addLog({ ...entry, ...failed })
+  } finally {
+    $('status').textContent = ''
+  }
+}
+
+function buildShareButtons() {
+  const box = $('shareButtons')
+  for (const delaySec of DELAYS) {
+    const label = document.createElement('p')
+    label.className = 'delay'
+    label.textContent = delaySec === 0 ? '바로 공유' : `${delaySec}초 뒤 공유`
+    const pair = document.createElement('div')
+    pair.className = 'pair'
+    for (const withText of [false, true]) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = withText ? '사진+글자' : '사진만'
+      b.dataset.delay = String(delaySec)
+      b.dataset.text = withText ? '1' : '0'
+      pair.append(b)
+    }
+    box.append(label, pair)
+  }
+}
+
+// ---- 내려받기 (공유를 못 쓸 때 대체) ----
+function download() {
+  const file = pictures[selectedKey()]
+  if (!file) { addLog({ action: '내려받기', ok: false, result: '오류 사진없음' }); return }
+  const url = URL.createObjectURL(file)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = file.name
+  document.body.append(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 40_000)
+  addLog({ action: '내려받기', ok: true, result: '내려받기 시작 (갤러리 Download 앨범 확인)', picture: describe(file) })
+}
+
+// ---- 결과 복사 ----
+function reportText() {
+  const env = envInfo().map(([k, v]) => `${k}: ${v}`).join('\n')
+  const logs = logEntries.map((e) => entryLines(e).join('\n')).join('\n\n')
+  return `# 공유 창 시험 결과 (#114)\n${env}\n\n## 기록 (최근 것이 위)\n${logs || '(없음)'}\n`
+}
+async function copyReport() {
+  const text = reportText()
+  try {
+    await navigator.clipboard.writeText(text)
+    $('copyStatus').textContent = '결과를 복사했습니다. 카톡이나 메모에 붙여 넣어 주세요.'
+  } catch {
+    // 복사가 막히면 글을 보여 주고 전체 선택해 둔다 (길게 눌러 복사)
+    const box = $('copyBox')
+    box.value = text
+    box.style.display = 'block'
+    box.focus()
+    box.select()
+    $('copyStatus').textContent = '자동 복사가 안 됩니다. 아래 글을 길게 눌러 복사해 주세요.'
+  }
+}
+
+// ---- 시작 ----
+document.addEventListener('click', (event) => {
+  const b = event.target.closest('button')
+  if (!b) return
+  if (b.dataset.delay !== undefined) runShare({ delaySec: Number(b.dataset.delay), make: false, withText: b.dataset.text === '1' })
+  else if (b.dataset.make) runShare({ delaySec: 0, make: true, withText: b.dataset.text === '1' })
+})
+$('download').addEventListener('click', download)
+$('copy').addEventListener('click', copyReport)
+$('clear').addEventListener('click', () => { logEntries = []; saveLog(logEntries); renderLog() })
+$('pick').addEventListener('change', async () => {
+  renderPicInfo()
+  const key = selectedKey()
+  if (!pictures[key]) {
+    $('picInfo').textContent = '사진 만드는 중…'
+    try { await prepare(key) } catch (error) { $('picInfo').textContent = `사진을 못 만들었습니다: ${error.message}` ; return }
+    renderPicInfo(); renderEnv()
+  }
+})
+
+buildShareButtons()
+fillSheet()
+renderLog()
+renderEnv()
+// 작은 사진·결산표 크기는 미리 만들어 둔다. html2canvas 결산표도 미리 만들어 두되(인터넷 필요) 실패해도 나머지는 쓴다
+;(async () => {
+  await prepare('small')
+  await prepare('big')
+  renderPicInfo(); renderEnv()
+  try {
+    const ms = await prepare('real')
+    addLog({ action: '페이지 열 때 html2canvas 결산표 미리 만들기', ok: true, result: '완료', makeMs: ms, picture: describe(pictures.real) })
+  } catch (error) {
+    addLog({ action: '페이지 열 때 html2canvas 결산표 미리 만들기', ok: false, result: `오류 ${error.name}`, message: error.message })
+  }
+  renderPicInfo(); renderEnv()
+})()
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {})
+</script>
+</body>
+</html>
