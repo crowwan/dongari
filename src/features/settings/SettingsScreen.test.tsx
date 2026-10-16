@@ -8,6 +8,7 @@ import type { BookKind, Ledger } from '../../domain/types'
 import { createInstallPromptStore, type InstallPromptStore } from '../install/installPrompt'
 import type { KeepServer } from '../keep/keepServer'
 import { useScreenHistory } from '../useScreenHistory'
+import { createUpdateWatcher, type AppVersion } from '../version/appVersion'
 import { SettingsScreen, type KeepRow } from './SettingsScreen'
 
 const LEDGER: Ledger = { year: 2026, carryover: 370_482, entries: [] }
@@ -44,7 +45,11 @@ type HarnessProps = {
   recoveryCode?: string
   // 복구 코드로 불러오기에 쓰는 서버 (없으면 줄이 없다)
   keepServer?: KeepServer
+  // 버전 줄 (없으면 본 주소 2.6.0, 새 버전 받지 않음)
+  version?: AppVersion
 }
+
+const MAIN_VERSION: AppVersion = { label: '2.6.0', updates: createUpdateWatcher(undefined), reload: () => {} }
 
 // 선택 창·편집 화면은 App 처럼 방문 기록 훅이 연다
 function Harness({
@@ -58,6 +63,7 @@ function Harness({
   keep,
   recoveryCode = 'HK7M-29QF-MX4P-8R2D',
   keepServer,
+  version = MAIN_VERSION,
 }: HarnessProps) {
   const sheets = useScreenHistory()
   const [installPrompt] = useState(() => install.installPrompt ?? createInstallPromptStore(new EventTarget()))
@@ -85,6 +91,7 @@ function Harness({
       onBack={vi.fn()}
       onPractice={handlers.onPractice ?? vi.fn()}
       install={{ standalone: install.standalone ?? false, userAgent: install.userAgent ?? CHROME_UA, installPrompt }}
+      version={version}
     />
   )
 }
@@ -766,7 +773,7 @@ describe('SPEC-008 설정 [연습해 보기]', () => {
   it('AC-24 "앱" 묶음 맨 아래에 [연습해 보기](보조 "저장되지 않는 장부로 따라 해 봐요") 줄이 있다', () => {
     render(<Harness />)
 
-    expect(appRows()).toEqual(['홈 화면에 추가 기록이 더 안전해요', '연습해 보기 저장되지 않는 장부로 따라 해 봐요'])
+    expect(appRows()).toEqual(['홈 화면에 추가 기록이 더 안전해요', '연습해 보기 저장되지 않는 장부로 따라 해 봐요', '버전 2.6.0'])
     const row = screen.getByRole('button', { name: /연습해 보기/ })
     expect(row.querySelector('[data-icon="right"]')).toBeInTheDocument()
   })
@@ -774,7 +781,7 @@ describe('SPEC-008 설정 [연습해 보기]', () => {
   it('AC-24 홈 화면 앱에서도 "앱" 묶음에 [연습해 보기] 한 줄이 있다', () => {
     render(<Harness install={{ standalone: true }} />)
 
-    expect(appRows()).toEqual(['연습해 보기 저장되지 않는 장부로 따라 해 봐요'])
+    expect(appRows()).toEqual(['연습해 보기 저장되지 않는 장부로 따라 해 봐요', '버전 2.6.0'])
   })
 
   it('[연습해 보기] 를 누르면 연습을 연다', async () => {
@@ -784,5 +791,55 @@ describe('SPEC-008 설정 [연습해 보기]', () => {
     await userEvent.click(screen.getByRole('button', { name: /연습해 보기/ }))
 
     expect(onPractice).toHaveBeenCalledOnce()
+  })
+})
+
+describe('SPEC-002 설정 버전 줄·새 버전 바꾸기 (#135)', () => {
+  // 옛 워커가 다루던 화면 흉내: controllerchange 를 보내면 새 버전을 받은 상태가 된다
+  function controlledWorkers() {
+    return Object.assign(new EventTarget(), { controller: {} })
+  }
+  const versionRow = () => within(screen.getByRole('region', { name: '앱' })).getAllByTestId('list-row').at(-1)
+
+  it('"앱" 묶음 맨 아래에 누를 수 없는 버전 줄이 본 주소 버전을 보인다', () => {
+    render(<Harness />)
+
+    const row = versionRow()
+    expect(row?.textContent?.trim()).toBe('버전 2.6.0')
+    expect(row?.tagName).not.toBe('BUTTON')
+    expect(row?.querySelector('[data-icon="right"]')).not.toBeInTheDocument()
+  })
+
+  it('미리보기 빌드 값("2.6.0 · 미리보기 abc1234")도 그대로 보인다', () => {
+    render(<Harness version={{ ...MAIN_VERSION, label: '2.6.0 · 미리보기 abc1234' }} />)
+
+    expect(versionRow()?.textContent?.trim()).toBe('버전 2.6.0 · 미리보기 abc1234')
+  })
+
+  it('홈 화면 앱에서도 버전 줄이 보인다', () => {
+    render(<Harness install={{ standalone: true }} />)
+
+    expect(versionRow()?.textContent?.trim()).toBe('버전 2.6.0')
+  })
+
+  it('새 버전을 받지 않았으면 [지금 바꾸기] 가 없다', () => {
+    render(<Harness />)
+
+    expect(screen.queryByRole('button', { name: '지금 바꾸기' })).not.toBeInTheDocument()
+    expect(screen.queryByText('새 버전을 받았어요')).not.toBeInTheDocument()
+  })
+
+  it('새 버전을 받으면 버전 줄에 "새 버전을 받았어요" 와 [지금 바꾸기] 가 생기고, 누르면 새로 연다', async () => {
+    const workers = controlledWorkers()
+    const reload = vi.fn()
+    render(<Harness version={{ label: '2.6.0', updates: createUpdateWatcher(workers), reload }} />)
+
+    act(() => {
+      workers.dispatchEvent(new Event('controllerchange'))
+    })
+
+    expect(versionRow()?.textContent?.trim()).toBe('버전 새 버전을 받았어요 2.6.0')
+    await userEvent.click(screen.getByRole('button', { name: '지금 바꾸기' }))
+    expect(reload).toHaveBeenCalledOnce()
   })
 })

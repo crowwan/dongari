@@ -62,6 +62,7 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
   - 비밀값이 없으면 "미리보기 배포 비밀값 없음", 권한이 없으면 "미리보기 프로젝트 확인 실패"/"미리보기 프로젝트 만들기 실패"(HTTP 코드·Cloudflare 오류 코드와 토큰 권한 넣는 길 안내)로 끝난다 → 고치고 Actions 에서 Re-run.
   - 프로젝트가 처음 생긴 뒤 `*.pages.dev` 주소가 열리기까지 몇 분 걸릴 수 있다.
   - wrangler 는 `worker/` 에 잠근 버전을 쓴다(워크플로가 `worker/` 에서 `npm ci` 뒤 `npx wrangler`).
+- 미리보기 빌드에만 `VITE_BUILD_SHA=${GITHUB_SHA::7}` 를 넘겨 설정 버전 줄이 "2.6.0 · 미리보기 abc1234" 로 보인다(본 주소 태그 빌드는 버전만, #135). 로컬에서 보려면 `APP_BASE=/ VITE_BUILD_SHA=abc1234 npm run build`.
 - 미리보기는 `--branch main` 하나로만 올린다. 배포마다 생기는 배포별 주소(`https://<hash>.uri-jangbu-preview.pages.dev`)는 보관 서버가 받지 않으니(정확한 주소만 허용) QA 는 고정 주소에서 한다.
 - 두 배포는 같은 concurrency 그룹에서 차례로 돈다(진행 중인 배포는 끊지 않음). 대기 중인 배포가 있을 때 또 하나가 오면 GitHub 이 대기 중인 쪽을 취소하니, 태그 배포가 취소됐으면 Actions 에서 다시 실행한다.
 - gh-pages 의 옛 `preview/`(#128 전 미리보기 자리)는 더 채우지 않는다. 다음 릴리스(통째 교체) 때 정리된다. 실험 페이지 `lab/share-test` 는 #114(#130 으로 합침, 실기기 확인은 미리보기에서) 참고용으로 gh-pages 에 남아 있다(`npx gh-pages --add` 로 손으로 올린 것, 다음 릴리스 때 같이 지워진다 — `dev/active/114-share-validation/README.md`).
@@ -70,7 +71,7 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
   - **미리보기는 #128 부터 다른 출처라 이 간섭(서비스 워커 범위, 옛 캐시 정리가 미리보기 캐시를 지우던 일, 릴리스 때 미리보기가 지워지던 일)이 모두 해당 없다.** 미리보기 빌드(`/`)에는 제외 목록을 넣지 않는다(옆에 하위 폴더 화면이 없음).
 - 수동 배포(비상용, Actions 가 막혔을 때만): `npm run deploy:preview`(= 워크플로 미리보기와 같은 동작, `worker/` 의 wrangler 로 — `cd worker && npm install` 과 `npx wrangler login` 또는 `CLOUDFLARE_ACCOUNT_ID`·`CLOUDFLARE_API_TOKEN` 셸 변수가 먼저 필요), `npm run deploy`(= 태그 배포와 같은 동작, 내 계정으로 gh-pages 에 바로 push).
 - 미리보기 주의:
-  - 미리보기는 본 주소와 다른 출처라 localStorage(`dongari:v2`·`dongari:keep`·`dongari:guide`)·서비스 워커·홈 화면 앱이 따로다. 미리보기에서 적고 지운 것은 본 장부에 안 보인다.
+  - 미리보기는 본 주소와 다른 출처라 localStorage(`dongari:v2`·`dongari:keep`·`dongari:guide`·`dongari:install-offer`)·서비스 워커·홈 화면 앱이 따로다. 미리보기에서 적고 지운 것은 본 장부에 안 보인다.
   - 보관 서버는 같은 서버(`VITE_KEEP_URL` 그대로)를 쓰지만, 미리보기 출처의 요청은 KV 의 다른 자리(`preview:keep:<id>`·`preview:status:<id>`)에 둔다. 미리보기에서 어머니 복구 코드로 불러오면 본 사본이 아니라 미리보기 자리(대개 "없음")를 보고, 미리보기 자동 보관은 본 사본을 덮어쓰지 않는다. 보관 지켜보기 요약(`/v1/report`)은 본 자리(`status:`)만 본다.
   - 그래서 미리보기에서 본 장부 내용으로 QA 하려면 본 주소에서 기록 파일을 보내 미리보기에서 불러온다(복구 코드로는 못 가져온다). 기록 파일에는 복구 코드도 들어 있어 미리보기가 본 주소와 같은 코드를 쓰게 되지만, 서버 자리가 달라 본 사본을 덮지 않는다.
 
@@ -135,7 +136,7 @@ src/
 ├── App.tsx      앱 뼈대: 첫 실행(새 장부 만들기) / 장부(첫 화면)·내역 적기·고치기·설정·월 정리·올해 결산·새 장부 만들기 화면 전환(탭 없음, features/useScreenHistory: 뒤로 버튼·닫기 전 확인·선택 창 openSheet/closeSheet·확인 창 openDialog/closeDialog, features/useScreenHeading: 화면이 바뀌면 h1 포커스·브라우저 제목) + 저장 상태 안내
 ├── domain/      v2 데이터 타입과 계산 순수 함수 (Entry, Ledger, Book, StoredData(schemaVersion 3, 장부 여러 개), book.ts 지금 장부·장부 잔액·종류별 이월금 문구, ledger.ts 장부, report.ts 월 정리·올해 결산, entryDate.ts 날짜(일) 검증·날짜순)
 ├── storage/     v2 저장 계층 (LedgerRepository, LocalStorage·Memory 구현, 저장 성공 알림 NotifyingRepository(자동 보관용), 스키마 가드, 마이그레이션(v2 → v3 장부 하나로, 옛 원본 보관), 백업 파일 만들기·읽기)
-├── features/    화면 단위 (books: 장부 고르기 창 목록·새 장부 만들기, ledger: 장부·새 연도 시작·내역 적기(하나씩 채우기 entrySteps)·고치기·useLedger, settings, report: 월 정리·올해 결산(단톡방용 요약·결산표)·사진으로 저장·사진 보내기, report/sheet: v1 연말 양식(인라인 hex 예외), storage: 저장 안내 문구, backup: 백업 보내기·불러오기 흐름, install: 설정 [홈 화면에 추가] 줄 규칙·설치 제안·방법 안내, keep: 복구 코드·암호화·자동 보관기·복구 코드로 불러오기(SPEC-006), guide: 진짜 장부 복구 코드 안내 말풍선(4번) 규칙·기기 상태 dongari:guide(SPEC-008), practice: 첫 실행 물음·연습 장부(메모리 저장소로 그린 App + 연습 띠·단계 말풍선 practiceSteps·끝 화면, SPEC-008 #132), useScreenHistory·BackToLedger)
+├── features/    화면 단위 (books: 장부 고르기 창 목록·새 장부 만들기, ledger: 장부·새 연도 시작·내역 적기(하나씩 채우기 entrySteps)·고치기·useLedger, settings, report: 월 정리·올해 결산(단톡방용 요약·결산표)·사진으로 저장·사진 보내기, report/sheet: v1 연말 양식(인라인 hex 예외), storage: 저장 안내 문구, backup: 백업 보내기·불러오기 흐름, install: 설정 [홈 화면에 추가] 줄 규칙·설치 제안·방법 안내·누름 동작 useInstallAction, 첫 장부 뒤 장부 위 권하기 카드 InstallOfferCard·상태 dongari:install-offer(SPEC-002 #135), version: 설정 버전 줄 값(__APP_VERSION__ + 미리보기 VITE_BUILD_SHA)·새 버전 받음(controllerchange, #135), keep: 복구 코드·암호화·자동 보관기·복구 코드로 불러오기(SPEC-006), guide: 진짜 장부 복구 코드 안내 말풍선(4번) 규칙·기기 상태 dongari:guide(SPEC-008), practice: 첫 실행 물음·연습 장부(메모리 저장소로 그린 App + 연습 띠·단계 말풍선 practiceSteps·끝 화면, SPEC-008 #132), useScreenHistory·BackToLedger)
 ├── pwa/         홈 화면 추가·오프라인 설정 (vite-plugin-pwa 옵션, manifest 색은 tokens.css 에서)
 ├── ui/          기본 컴포넌트 (Button, Icon, ListRow, OptionList, SegmentedControl, BottomSheet, MonthPicker, DayInput, MonthButton, EntryCard, SavedEntries, AmountDisplay, IconButton, NoticeBar, BalanceCard, MonthStepper, …, keyboard: 아이폰 키패드가 뜬 동안 아래 고정 버튼을 질문 바로 아래로, modalLayer: 창이 떠 있는 동안 뒤 화면 inert·포커스 옮기기/돌려주기, CoachMark: 꼬리 달린 안내 말풍선)
 ├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준), font.css + fonts/ (Pretendard 가변 서브셋, scripts/subset-font.py 로 만든다)

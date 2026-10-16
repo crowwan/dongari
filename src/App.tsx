@@ -6,6 +6,11 @@ import { NewBookScreen } from './features/books/NewBookScreen'
 import { FirstUseGuideMark } from './features/guide/FirstUseGuideMark'
 import type { GuideStore } from './features/guide/guideStore'
 import { useFirstUseGuide } from './features/guide/useFirstUseGuide'
+import { useInstallAction } from './features/install/installAction'
+import { InstallGuideSheet } from './features/install/InstallGuideSheet'
+import { showsInstallOffer, type InstallOfferStore } from './features/install/installOffer'
+import { InstallOfferCard } from './features/install/InstallOfferCard'
+import { browserInstallEnvironment, type InstallEnvironment } from './features/install/installPrompt'
 import type { KeepState } from './features/keep/AutoKeeper'
 import { KeepRestoreScreen } from './features/keep/KeepRestoreScreen'
 import { KEEP_REMINDER_MESSAGE, keepStatusText, needsKeepReminder } from './features/keep/keepStatus'
@@ -56,7 +61,14 @@ type AppProps = {
   onStartPractice?: (kind: BookKind, back: LoadResult) => void
   // 장부가 하나도 없는 첫 실행 화면인지 (첫 실행 새 장부 만들기에서 뒤로 버튼은 첫 실행 물음으로, SPEC-008)
   onFirstRunChange?: (firstRun: boolean) => void
+  // 첫 장부 뒤 홈 화면에 추가 권하기 상태 (SPEC-002 #135, 이 폰에만). 없으면 권하지 않는다
+  installOfferStore?: InstallOfferStore
+  // 홈 화면에 추가 줄·권하기 카드가 보는 브라우저 상태 (기본은 지금 브라우저, 테스트에서 바꿔 넣는다)
+  install?: InstallEnvironment
 }
+
+// 장부 위 권하기 카드 [홈 화면에 추가] 의 방법 안내 선택 창 (설정 줄은 settings-install-guide)
+const LEDGER_INSTALL_GUIDE_SHEET = 'ledger-install-guide'
 
 // 복구 코드 [보내기] 결과 알림. 공유 화면을 그냥 닫았으면 알리지 않는다
 const SHARE_CODE_MESSAGES: Record<Exclude<ShareCodeResult, 'cancelled'>, string> = {
@@ -87,6 +99,8 @@ export default function App({
   practice,
   onStartPractice,
   onFirstRunChange,
+  installOfferStore,
+  install = browserInstallEnvironment(),
 }: AppProps) {
   const ledger = useLedger(repository, loaded, options)
   const bookName = ledger.book?.name ?? ''
@@ -117,6 +131,19 @@ export default function App({
     onSent: setToast,
     dialogs: navigation,
   })
+
+  // 홈 화면에 추가 (SPEC-002): 권하기 카드는 첫 장부를 만든 직후부터 [나중에]·설치 전까지 (#135)
+  const installAction = useInstallAction(install, navigation, LEDGER_INSTALL_GUIDE_SHEET)
+  const [installOffer, setInstallOffer] = useState(() => installOfferStore?.load())
+  const finishInstallOffer = useCallback(() => {
+    installOfferStore?.save('done')
+    setInstallOffer('done')
+  }, [installOfferStore])
+  // 설치를 마쳤으면(카드·설정 줄·브라우저 메뉴 어느 쪽이든) 기기에 적어 다시 권하지 않는다. 화면은 installed 로 이미 숨는다
+  const installedNow = installAction.installed && installOffer === 'waiting'
+  useEffect(() => {
+    if (installedNow) installOfferStore?.save('done')
+  }, [installedNow, installOfferStore])
 
   // 자동 보관 상태 (설정 줄 "켜짐 · 3분 전", 7일 안내). 보관기가 바뀌면 다시 그린다
   const keepState = useSyncExternalStore(keep?.keeper.subscribe ?? subscribeNothing, keep?.keeper.getState ?? noKeepState)
@@ -169,6 +196,11 @@ export default function App({
         void requestPersistentStorage()
         // 처음 쓰는 분 안내는 이때만 켠다 (SPEC-008). 두 번째 장부를 만들 때는 켜지 않는다
         guide.activate()
+        // 홈 화면에 추가 권하기도 첫 장부 직후에만 (SPEC-002 #135). 연습 장부에는 없다
+        if (installOfferStore && !practice) {
+          installOfferStore.save('waiting')
+          setInstallOffer('waiting')
+        }
       }
     }
     setViewedMonth(undefined)
@@ -229,6 +261,14 @@ export default function App({
   // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부·설정 위 띠는 저장 안내가 없을 때만 (띠는 하나만: 저장 > 보관 > 백업). 연습 장부에는 없다
   const needsBackup = !practice && backupReminderFor(ledger.data, now())
   const showBackupReminder = needsBackup && storageNoticeList.length === 0
+  // 홈 화면에 추가 권하기 (SPEC-002 #135): 띠 순서 맨 뒤 — 위 띠가 하나라도 있으면 뒤로 미룬다
+  const showInstallOffer = showsInstallOffer({
+    status: installOffer,
+    standalone: install.standalone,
+    installed: installAction.installed,
+    practice: practice !== undefined,
+    otherNotice: storageNoticeList.length > 0 || showKeepReminder || showBackupReminder,
+  })
 
   // 복구 코드 안내 말풍선 (SPEC-008 4번): 장부 화면이 새로 보일 때 띄울지 묻는다
   const guide = useFirstUseGuide({
@@ -335,6 +375,7 @@ export default function App({
             restoreByCode={restoreByCode}
             onBack={navigation.backToLedger}
             onPractice={onStartPractice && (() => onStartPractice(ledger.book?.kind ?? 'club', currentLoad(ledger)))}
+            install={install}
           />
         )
       case 'month-summary':
@@ -446,13 +487,16 @@ export default function App({
         </>
       )
     }
-    // 장부 위 띠: 저장 안내가 없을 때 7일 보관 안내(SPEC-006), 그것도 없으면 30일 백업 안내 (SPEC-002). 홈 화면에 추가는 설정 맨 아래 줄로 권한다 (#56)
+    // 장부 위 띠는 하나만: 저장 안내 > 7일 보관 안내(SPEC-006) > 30일 백업 안내(SPEC-002) > 첫 장부 뒤 홈 화면에 추가 권하기(SPEC-002 #135).
+    // 홈 화면에 추가는 늘 설정 "앱" 묶음 줄에도 있다 (#56)
     return (
       <>
         {showKeepReminder && <NoticeBar message={KEEP_REMINDER_MESSAGE} />}
         {!showKeepReminder && showBackupReminder && (
           <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={noticeActions['send-backup']} />
         )}
+        {showInstallOffer && <InstallOfferCard onInstall={installAction.start} onLater={finishInstallOffer} />}
+        <InstallGuideSheet install={install} sheets={navigation} guideSheet={LEDGER_INSTALL_GUIDE_SHEET} />
         <LedgerScreen
           bookName={bookName}
           bookId={ledger.book?.id ?? ''}
