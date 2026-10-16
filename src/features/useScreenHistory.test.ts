@@ -416,3 +416,22 @@ describe('#110 접근성 점검 09 확인 창과 뒤로 버튼', () => {
   })
 })
 
+describe('SPEC-008 말풍선(확인 창 칸)에서 화면 열기', () => {
+  it('말풍선이 가리키는 버튼으로 화면을 열면(내역 적기) 말풍선 칸을 그 화면 칸으로 바꿔, 뒤로 버튼 한 번에 장부로 온다', () => {
+    const replace = vi.spyOn(window.history, 'replaceState')
+    const onBack = vi.fn()
+    const { result } = renderHook(() => useScreenHistory())
+    act(() => result.current.openDialog('guide-1', onBack))
+    push.mockClear()
+
+    act(() => result.current.open({ name: 'add-entry', month: 10 }))
+
+    expect(push).not.toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledWith({ screen: 'add-entry' }, '')
+    expect(result.current.dialog).toBeNull()
+    pressBackButton()
+    expect(result.current.screen).toEqual({ name: 'ledger' })
+    expect(onBack).not.toHaveBeenCalled()
+  })
+})
+

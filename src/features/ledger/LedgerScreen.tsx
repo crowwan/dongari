@@ -14,6 +14,7 @@ import { MonthPicker } from '../../ui/MonthPicker'
 import { MonthStepper } from '../../ui/MonthStepper'
 import { BACKUP_DOT_LABEL } from '../backup/backupReminder'
 import { BookPicker } from '../books/BookPicker'
+import type { GuideTargets } from '../guide/useFirstUseGuide'
 import type { SheetHistory } from '../useScreenHistory'
 import type { BookChoice } from './useLedger'
 import './ledger.css'
@@ -61,6 +62,8 @@ type LedgerScreenProps = {
   onEditEntry?: (id: string) => void
   // 이 폰에 저장되지 않은 기록 id → 그 줄에 "저장 안 됨" 알약 (SPEC-002 v2.6)
   unsavedEntryIds?: ReadonlySet<string>
+  // 처음 쓰는 분 안내 말풍선이 가리키는 버튼들 (SPEC-008)
+  guideTargets?: Pick<GuideTargets, 'addEntry' | 'monthSummary' | 'settings'>
 }
 
 // 잔액 카드 보조 줄: 작년 이월금이 잔액에 들어 있다는 것. 적자면 빼기표 대신 "적자", 0원이면 숨긴다.
@@ -95,6 +98,7 @@ export function LedgerScreen({
   onAddEntry,
   onEditEntry,
   unsavedEntryIds,
+  guideTargets,
 }: LedgerScreenProps) {
   const group = monthGroup(ledger.entries, month)
 
@@ -124,6 +128,7 @@ export function LedgerScreen({
             결산
           </IconButton>
           <IconButton
+            ref={guideTargets?.settings}
             icon="settings"
             onClick={onOpenSettings}
             dotLabel={settingsNeedsBackup ? BACKUP_DOT_LABEL : undefined}
@@ -148,7 +153,7 @@ export function LedgerScreen({
         {/* 달 넘기기 바로 아래: 내역이 많아도 첫 화면에 보인다. 그 달 기록이 없으면 없다 (SPEC-001 v2.6) */}
         {group.entries.length > 0 && (
           <div className="ledger__month-action">
-            <IconButton icon="receipt" variant="surface" onClick={() => onOpenMonthSummary(month)}>
+            <IconButton ref={guideTargets?.monthSummary} icon="receipt" variant="surface" onClick={() => onOpenMonthSummary(month)}>
               {`${month}월 정리 보기`}
             </IconButton>
           </div>
@@ -157,7 +162,7 @@ export function LedgerScreen({
         <MonthCard group={group} onEditEntry={onEditEntry} unsavedEntryIds={unsavedEntryIds} />
       </div>
 
-      <BottomActionBar icon="plus" label="내역 적기" onClick={() => onAddEntry?.(month)} />
+      <BottomActionBar buttonRef={guideTargets?.addEntry} icon="plus" label="내역 적기" onClick={() => onAddEntry?.(month)} />
 
       <BottomSheet open={sheets.sheet === MONTH_SHEET} title="몇 월을 볼까요?" onClose={sheets.closeSheet}>
         <MonthPicker

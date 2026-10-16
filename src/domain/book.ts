@@ -18,6 +18,11 @@ export function bookBalance(book: Book, thisYear: number): number | undefined {
   return shown && calculateTotals(shown).balance
 }
 
+// 모든 장부·연도를 합한 기록 수 (기록 파일 요약, 처음 쓰는 분 안내 SPEC-008)
+export function totalEntryCount(data: StoredData): number {
+  return data.books.flatMap((book) => Object.values(book.ledgers)).reduce((sum, item) => sum + item.entries.length, 0)
+}
+
 // 그 장부의 첫 해인가: 앞선 연도 장부가 없다 (가계부 이월금 이름이 "지금 남은 돈" 인 해)
 export function isFirstYear(book: Book | undefined, year: number): boolean {
   return !Object.values(book?.ledgers ?? {}).some((ledger) => ledger.year < year)

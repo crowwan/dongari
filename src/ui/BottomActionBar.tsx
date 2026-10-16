@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, type Ref } from 'react'
 import { Button, type ButtonVariant } from './Button'
 import type { IconName } from './Icon'
 import { shouldRevealBar, useKeyboardOpen } from './keyboard'
@@ -14,13 +14,15 @@ type BottomActionBarProps = {
   note?: string
   // 기본은 주 버튼. 할 일이 위 목록 고르기이고 아래는 끝내기뿐이면 보조 (연달아 적기 [다 적었어요])
   variant?: Extract<ButtonVariant, 'primary' | 'secondary'>
+  // 버튼 자체 (안내 말풍선이 가리킬 때, SPEC-008)
+  buttonRef?: Ref<HTMLButtonElement>
 }
 
 // 화면 아래 고정 영역 + 버튼 하나 ([+ 내역 적기], [저장], [사진으로 저장], 보조 [다 적었어요]).
 // 목록을 내려도 사라지지 않고 엄지가 닿는 자리 (ADR 003). 홈 표시줄(safe-area) 만큼 띄운다.
 // 키패드가 레이아웃을 줄이지 않는 브라우저(아이폰)에서 키패드가 뜨면 고정을 풀고 지금 질문 바로 아래 흐름에 둔 뒤
 // 키패드 바로 위로 스크롤한다 (keyboard.ts, #70). 갤럭시는 레이아웃이 줄어 늘 고정
-export function BottomActionBar({ label, icon, onClick, disabled, note, variant }: BottomActionBarProps) {
+export function BottomActionBar({ label, icon, onClick, disabled, note, variant, buttonRef }: BottomActionBarProps) {
   const noteId = useId()
   const barRef = useRef<HTMLDivElement>(null)
   const keyboardOpen = useKeyboardOpen()
@@ -52,7 +54,7 @@ export function BottomActionBar({ label, icon, onClick, disabled, note, variant 
             {note}
           </p>
         )}
-        <Button variant={variant} icon={icon} onClick={onClick} disabled={disabled} aria-describedby={note ? noteId : undefined}>
+        <Button ref={buttonRef} variant={variant} icon={icon} onClick={onClick} disabled={disabled} aria-describedby={note ? noteId : undefined}>
           {label}
         </Button>
       </div>

@@ -1,9 +1,10 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref, type RefObject } from 'react'
 import type { CarryoverWords } from '../../domain/book'
 import { yearReport } from '../../domain/report'
 import type { Ledger } from '../../domain/types'
 import { SegmentedControl, type SegmentOptions } from '../../ui/SegmentedControl'
 import { BackToLedger } from '../BackToLedger'
+import { YEAR_GUIDE_TARGET } from '../guide/guideMessages'
 import { ItemTotalsCards } from './ItemTotalsCards'
 import { pictureSaver, yearPictureName, type PictureSaver } from './savePicture'
 import { SavePictureBar } from './SavePictureBar'
@@ -23,6 +24,8 @@ type YearSummaryScreenProps = {
   onNotify: (message: string) => void
   // 사진 만들기·내려받기 (테스트는 가짜를 넣는다)
   saver?: PictureSaver
+  // 처음 쓰는 분 안내 3번 말풍선이 가리키는 아래 버튼 (SPEC-008, 지금은 [사진으로 저장] — guideMessages YEAR_GUIDE_TARGET)
+  guideTargetRef?: Ref<HTMLButtonElement>
 }
 
 // 결산 화면에서 볼 것: 결산표(v1 양식, 사진으로 저장) / 항목별 합계(앱 화면만, v2.3)
@@ -77,6 +80,7 @@ export function YearSummaryScreen({
   onBack,
   onNotify,
   saver = pictureSaver,
+  guideTargetRef,
 }: YearSummaryScreenProps) {
   const { targetRef, saving, ready, sharesToPhotos, save } = useSavePicture({ fileName: yearPictureName(year), saver, onNotify })
   const [view, setView] = useState<YearView>('sheet')
@@ -106,7 +110,14 @@ export function YearSummaryScreen({
         <p className="report__empty">적은 내역이 있어야 결산을 만들 수 있어요</p>
       )}
       {showsSheet && (
-        <SavePictureBar saving={saving} ready={ready} sharesToPhotos={sharesToPhotos} onSave={save} disabled={!report} />
+        <SavePictureBar
+          saving={saving}
+          ready={ready}
+          sharesToPhotos={sharesToPhotos}
+          onSave={save}
+          disabled={!report}
+          buttonRef={YEAR_GUIDE_TARGET === 'save-picture' ? guideTargetRef : undefined}
+        />
       )}
     </div>
   )
