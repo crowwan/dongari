@@ -17,10 +17,10 @@
 
 ## 현재 상태
 
-- 최신 릴리스: v2.5.0 (2026-10-13, 복구 코드 자동 보관 — 서버 https://uri-jangbu-keep.crowwan.workers.dev). 다음 마일스톤 v2.6
+- 최신 릴리스: v2.6.0 (2026-10-16, 이모 첫 사용 — 연습 장부·결산 보내기·큰 글씨·설정 정리·자동 보관 지켜보기, #137). 다음 마일스톤 미정. 미리보기 https://uri-jangbu-preview.pages.dev/ (Cloudflare Pages, #128)
 - 끝난 스펙: SPEC-001 한 줄 장부 입력, SPEC-002 안전한 저장과 백업, SPEC-003 월 정리와 올해 결산
 - v2.0.0 은 갤럭시 실기기 QA(홈 화면 추가·오프라인, 사진 저장 Download 앨범, 백업 보내기·불러오기)와 어머니 사용성 테스트(SPEC-001 AC-13) 전에 배포했다. 남은 확인은 릴리스 이슈 #40 체크리스트
-- 다음 마일스톤 v2.6: SPEC-007 자동 보관 지켜보기 (approved, ADR 006 — 상태 신호 + GitHub Actions 일일 점검), SPEC-008 처음 쓰는 분 연습 장부 (#132 — 첫 실행 물음, 메모리 연습 장부, 진짜 장부 말풍선은 복구 코드 하나)
+- v2.6 에서 끝낸 스펙: SPEC-007 자동 보관 지켜보기, SPEC-008 처음 쓰는 분 연습 장부, SPEC-001·002·003·006 v2.6 보강
 - backlog 스펙: SPEC-004 적어 둔 글로 한 번에 적기 (draft — 1단계: 글 붙여넣기·공유 받기 → 확인 화면, 사진 인식기는 엔진 비교 후 2단계. 사진 → 글 추출이 동작할 때 다시 본다)
 - GitHub Project: crowwan #3
 - v2 는 거래 기록 모델이다 (`docs/prd.md` 데이터 모델). v1 코드는 #16 에서 모두 정리했다 (v1 연말 양식은 `features/report/sheet` 로 옮겨 `YearReport` 를 그린다).
@@ -65,7 +65,7 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
 - 미리보기 빌드에만 `VITE_BUILD_SHA=${GITHUB_SHA::7}` 를 넘겨 설정 버전 줄이 "2.6.0 · 미리보기 abc1234" 로 보인다(본 주소 태그 빌드는 버전만, #135). 로컬에서 보려면 `APP_BASE=/ VITE_BUILD_SHA=abc1234 npm run build`.
 - 미리보기는 `--branch main` 하나로만 올린다. 배포마다 생기는 배포별 주소(`https://<hash>.uri-jangbu-preview.pages.dev`)는 보관 서버가 받지 않으니(정확한 주소만 허용) QA 는 고정 주소에서 한다.
 - 두 배포는 같은 concurrency 그룹에서 차례로 돈다(진행 중인 배포는 끊지 않음). 대기 중인 배포가 있을 때 또 하나가 오면 GitHub 이 대기 중인 쪽을 취소하니, 태그 배포가 취소됐으면 Actions 에서 다시 실행한다.
-- gh-pages 의 옛 `preview/`(#128 전 미리보기 자리)는 더 채우지 않는다. 다음 릴리스(통째 교체) 때 정리된다. 실험 페이지 `lab/share-test` 는 #114(#130 으로 합침, 실기기 확인은 미리보기에서) 참고용으로 gh-pages 에 남아 있다(`npx gh-pages --add` 로 손으로 올린 것, 다음 릴리스 때 같이 지워진다 — `dev/active/114-share-validation/README.md`).
+- gh-pages 의 옛 `preview/`(#128 전 미리보기 자리)는 더 채우지 않는다. 다음 릴리스(통째 교체) 때 정리된다. 실험 페이지 `lab/share-test` 는 #114(#130 으로 합침, 실기기 확인은 미리보기에서) 참고용으로 gh-pages 에 남아 있다(`npx gh-pages --add` 로 손으로 올린 것, 다음 릴리스 때 같이 지워진다 — `dev/archive/114-share-validation/README.md`).
 - 본 주소 서비스 워커(범위 `/dongari/`)와 하위 폴더 (#54):
   - v2.0.0 의 본 주소 서비스 워커는 `/dongari/preview/` 화면 요청도 받아 본 주소 `index.html` 로 답했다. v2.1.0 부터 본 주소 빌드에만 `navigateFallbackDenylist`(`/dongari/preview`·`/dongari/lab` 아래, `src/pwa/pwaOptions.ts`)를 넣어 그 화면 요청은 네트워크로 보낸다. `lab/` 이 남아 있어 그대로 둔다.
   - **미리보기는 #128 부터 다른 출처라 이 간섭(서비스 워커 범위, 옛 캐시 정리가 미리보기 캐시를 지우던 일, 릴리스 때 미리보기가 지워지던 일)이 모두 해당 없다.** 미리보기 빌드(`/`)에는 제외 목록을 넣지 않는다(옆에 하위 폴더 화면이 없음).
