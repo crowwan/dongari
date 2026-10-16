@@ -193,7 +193,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `Icon` | Lucide 아이콘 하나, 크기·색은 놓인 자리 CSS 가 정한다 (`data-icon`) | 모든 아이콘 |
 | `ListRow` | 원형 아이콘 44 + 이름(Row 16 SemiBold)·보조 줄(Caption) + 오른쪽(`end`). `tone="income"` 이면 청록 원(`data-tone`). `onClick` 이 있으면 줄 전체가 버튼 · 눌림. 버튼 이름은 "회비 수입 +140,000원" 처럼 띄어 읽힌다(#46) | 장부 내역 줄(보조 줄 "수입"/"지출"), 설정 줄(오른쪽 값 + ›) |
 | `SegmentedControl` | 회색 몸통 안 두 칸, 고른 쪽만 흰 손잡이 + 굵게(`aria-pressed`, `data-state`). 묶음 이름 `role="group"`. 옵션은 꼭 두 개(`SegmentOptions` 튜플) | 수입/지출, 이월금 [남았어요 \| 적자였어요] (#46) |
-| `BottomSheet` | 아래에서 올라오는 흰 창(위쪽 반경 24 + 손잡이), 제목 Heading, `role="dialog"`. 바깥 누르기·Esc 로 닫힘, 열면 창에 포커스·닫으면 연 자리로. 안드로이드 뒤로 버튼은 아래 "선택 창과 뒤로 버튼" | 장부 달 고르기 "몇 월을 볼까요?", 설정 연도 "어느 해 장부를 볼까요?" |
+| `BottomSheet` | 아래에서 올라오는 흰 창(위쪽 반경 24 + 손잡이), 제목 Heading, `role="dialog"`. 바깥 누르기·Esc 로 닫힘, 열면 창에 포커스·닫으면 연 자리로. `body` 아래에 그리고 떠 있는 동안 뒤 화면 `inert`(#110, 카탈로그 견본은 `inline`). 안드로이드 뒤로 버튼은 아래 "선택 창과 뒤로 버튼" | 장부 달 고르기 "몇 월을 볼까요?", 설정 연도 "어느 해 장부를 볼까요?" |
 | `MonthPicker` | 3열 × 4행, 고른 달 청록 채움 + 굵게, 이번 달 청록 테두리(`aria-current="date"`, `data-current`) | `BottomSheet` 안 |
 | `DayInput` (#80) | 날 숫자 칸: `AmountDisplay` 와 같은 흰 카드·오른쪽 정렬 Display 숫자 + 작은 "일"(같은 CSS 를 쓴다). 숫자 키패드(`inputmode="numeric"`, `maxlength` 2, 숫자만 거르기는 부르는 쪽 `tidyDayText`), 자리표시 없음, 칸 이름은 숨은 `label`("며칠인가요?"), `autoFocus` 선택. 아래 빠른 칩 줄(`chips`, "오늘 7일"·"방금 5일", `[+1만]` 과 같은 회색 면 Label SemiBold, 두 칸 격자라 하나면 반 폭, `role="group"` "빠른 날짜", 눌러도 칸 포커스 유지). 칩이 없으면 줄을 숨긴다. 포커스 링은 금액 칸과 같이 숫자 + "일" 상자 전체에 · 칩 눌림 | 내역 적기 "며칠인가요?"(칩 있음), 고치기 "며칠인가요?"(칩 없음) |
 | `MonthButton` (#77) | 질문 제목 옆 [10월 ▾]: 흰 면(반경 16, 56 이상) + 달 글자(Row 16 SemiBold) + ▾, "10월 달 바꾸기"로 읽힘(`aria-haspopup="dialog"`) · 눌림 | 내역 적기·고치기 "며칠인가요?" → 열두 달 선택 창 |
@@ -209,7 +209,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 |---|---|
 | `Button` | 주(청록 채움, 높이 60) / 보조(옅은 청록 면 + 청록 글자) / 위험(빨강 채움) / 위험 글자형(밑줄) × 기본·눌림·비활성, 키보드 포커스. 글자 앞 `icon` (#45) |
 | `MoneyInput` / `TextField` | 흰 면 + 옅은 둘레(64) / 포커스 청록 둘레 / 오류 빨강 둘레 + 문장 / 비활성 점선. 이름 글자 역할 `labelRole`, `TextField` `autoFocus` (#47). `MoneyInput` 은 0원도 적는 칸(이월금)용: 처음 값 0 은 `0`, 다 지우면 빈칸(자리표시 0), 친 글자를 들고 있어 빈칸과 직접 친 0 을 가른다. 0원이 없는 내역 금액은 `AmountDisplay`(0 = 빈칸) (#59) |
-| `ConfirmDialog` | 기본 / 위험(빨강 확인), 아니요는 보조 버튼, 열리면 "아니요"에 포커스, Esc = 아니요. 설명 줄, `cancelLabel={null}` 이면 버튼 하나짜리 알림 창. `children` 은 설명 아래 버튼 위 자세한 내용(복구 코드로 불러오기의 보관본 요약 `KeptSummary`: 회색 면(`--fill`, 반경 12) 안 이름 `--muted` · 값 굵게 오른쪽, SPEC-006) |
+| `ConfirmDialog` | 기본 / 위험(빨강 확인), 아니요는 보조 버튼, 열리면 "아니요"에 포커스, Esc = 아니요. `body` 아래에 그리고 떠 있는 동안 뒤 화면 `inert`, 닫으면 연 자리로 포커스(#110, 카탈로그 견본은 `inline`). 뒤로 버튼은 아래 "선택 창과 뒤로 버튼"(`openDialog`). 설명 줄, `cancelLabel={null}` 이면 버튼 하나짜리 알림 창. `children` 은 설명 아래 버튼 위 자세한 내용(복구 코드로 불러오기의 보관본 요약 `KeptSummary`: 회색 면(`--fill`, 반경 12) 안 이름 `--muted` · 값 굵게 오른쪽, SPEC-006) |
 | `Toast` | 제목색 면 + 카드색 글자 알약 (2초, 긴 문장은 글자당 0.12초, `role="status"`) |
 | `NoticeBar` | 노란 면(반경 16) + SemiBold 문장(`role="alert"`, 낱말 단위 줄바꿈 `keep-all`), 할 일이 있으면 아래 흰 면 버튼 하나(왼쪽 정렬, 아이콘 `action.icon` 가능 — [공유 백업 파일 보내기]) |
 | `BalanceCard` | 이름(Caption Medium) → 큰 숫자(Display 30, "원" 60%) → 보조 줄(있을 때만), 적자는 `−` |
@@ -241,7 +241,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 선택 창(`BottomSheet`)이나 설정 편집 화면처럼 화면 위에 잠깐 뜨는 것은 **방문 기록 한 칸**으로 연다. 그래야 안드로이드 뒤로 버튼이 창만 닫고 앱이나 화면을 나가지 않는다.
 
 ```tsx
-const history = useScreenHistory()           // 화면 컴포넌트는 SheetHistory(sheet·openSheet·closeSheet)만 받는다
+const history = useScreenHistory()           // 화면 컴포넌트는 SheetHistory(sheet·openSheet·closeSheet, dialog·openDialog·closeDialog)만 받는다
 <MonthStepper onPickMonth={() => history.openSheet('ledger-month')} … />
 <BottomSheet open={history.sheet === 'ledger-month'} title="몇 월을 볼까요?" onClose={history.closeSheet}>
   <MonthPicker value={month} onChange={(m) => { setMonth(m); history.closeSheet() }} />
@@ -255,6 +255,13 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 - 다른 화면을 열거나 장부로 돌아오면 창은 닫힌 상태로 시작한다.
 - 창에서 다른 화면을 열 때(장부 고르기 창 [+ 새 장부 만들기] → 새 장부 만들기, #88): `closeSheet()` 없이 `open(화면)` 하나만 — 창 칸을 화면 칸으로 바꿔 끼워(`replaceState`) 그 화면에서 뒤로 버튼 한 번에 장부로 온다.
 - 내역 적기·고치기(#47, #77, #80): 두 화면의 "며칠인가요?" [10월 ▾] 달 선택 창(`'entry-month'`, `EntryMonthSheet`)도 이 방법으로 연다(#77 의 고치기 날짜 선택 창 `'entry-date'` 는 #80 에서 지웠다). 창이 열린 채 [저장] 할 일은 없지만, 저장 뒤 `backToLedger()` 는 창이 열려 있어도 두 칸을 되돌린다. 하나씩 채우기는 처음 상태(보던 달만)에서 답한 것이 하나라도 있으면 `confirmBeforeLeave(true)`.
+
+- 확인 창(#110): `openDialog(이름, onBack)` 으로 연다(화면·선택 창 칸 위에 한 칸 더, 장부 화면에서도). `open={history.dialog === 이름}`, [아니요]·Esc 는 `closeDialog()`. 뒤로 버튼은 확인 창만 닫고 `onBack`([아니요] 와 같은 정리, 예: 백업 창 비우기·자동 보관 [남겨 두기])을 부른다. 확인 뒤 장부로 갈 때(지우기·불러오기)는 `closeDialog()` 없이 `backToLedger()` 하나만 — 쌓은 칸 수만큼 한 번에 되돌린다(장부 위 창이면 한 칸). 선택 창에서 확인 창으로 넘어갈 때(자동 보관 [끄기])는 `openSheet(확인 창 이름, onBack)` 으로 창 칸을 바꿔 끼운다.
+
+### 창이 뜨면 뒤 화면 잠금, 화면이 바뀌면 제목 알리기 (#110)
+
+- 화면 위에 뜨는 창(`ConfirmDialog`·`BottomSheet`, 앞으로 만들 안내 말풍선도)은 `ui/modalLayer` 의 `useModalLayer` 를 쓴다: `document.body` 아래에 그리고(`createPortal`), 떠 있는 동안 창 밖에 `inert`(Tab·화면 읽기·누르기가 창 밖으로 나가지 않음), 열면 정한 곳에 포커스, 닫으면 잠금을 풀고 연 자리로 포커스.
+- 화면이 바뀌면(`main` 안 h1 요소가 바뀌면) `useScreenHeading` 이 새 h1 에 포커스(`tabIndex=-1`, 포커스 테두리 없음 — 화면 읽기용)를 주고, `document.title` 을 "h1 글자 · 우리 장부" 로 바꾼다. 화면마다 h1 은 하나. 앱을 처음 열 때와 화면이 스스로 칸에 포커스를 준 때(내역 적기 날 칸 → 숫자 키패드)는 옮기지 않는다.
 
 공통 규칙: 누르는 곳 `--touch-min` 이상, 포커스 링 보임, 그림자 없음(스위치 손잡이 제외), 컴포넌트는 토큰 변수만 쓰고 `className`·`style` 을 받지 않는다. 루트에 `data-testid`, 상태가 있으면 `data-state`/`data-variant`/`data-kind`/`data-tone`.
 
@@ -306,3 +313,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-08 | 여러 장부 화면(#88): 장부 화면 이름 ▾ 버튼, `BookPicker`(장부 줄 + 점선 [+ 새 장부 만들기]), 새 장부 만들기 화면, 설정 "장부 정보"·종류 선택 창·[이 장부 지우기], `CarryoverField` 칸 이름 `label`, 아이콘 `home`(가계부)·가계부 항목 `cart`·`bolt`·`hospital`·`wallet`, 창에서 화면 열기(`open` 이 창 칸 바꿔 끼움). 앱 이름 "우리 장부" | |
 | 2026-10-13 | 복구 코드 자동 보관(SPEC-006, #98): 설정 "기록 백업" → "기록 지키기"(자동 보관 줄 + 복구 코드 칸 + [복구 코드 보내기], 파일 백업 줄 + [복구 코드로 불러오기]), 복구 코드로 불러오기 화면, `ConfirmDialog` `children`(보관본 요약 `KeptSummary`), 7일 보관 안내 띠, 첫 실행 [복구 코드로 불러오기]. 토큰 `--letter-code`, 아이콘 `cloud`·`key`, `TextField` `autoCapitalize`, `NoticeBar` 문장 `keep-all` | |
 | 2026-10-16 | 내역 적기 새 이름 "수입인가요, 지출인가요?" 는 누르면 바로 "얼마인가요?" 로, 아래 [다음] 없음 (#111) | |
+| 2026-10-16 | 창 접근성(#110): `ConfirmDialog`·`BottomSheet` 를 `body` 아래에 그리고 떠 있는 동안 뒤 화면 `inert`(`ui/modalLayer`, 카탈로그 견본 `inline`), 확인 창 뒤로 버튼(`openDialog`), 화면이 바뀌면 h1 포커스·`document.title`(`useScreenHeading`) | |
