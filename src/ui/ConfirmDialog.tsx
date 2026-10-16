@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from './Button'
+import { useModalLayer } from './modalLayer'
 import './ui.css'
 
 type ConfirmDialogProps = {
@@ -17,6 +19,8 @@ type ConfirmDialogProps = {
   onCancel: () => void
   // 설명 아래 버튼 위에 넣는 자세한 내용 (예: 복구 코드로 불러오기의 보관한 때·장부·기록 수, SPEC-006)
   children?: ReactNode
+  // 카탈로그 견본: 제자리에 그리고 뒤 화면을 잠그거나 포커스를 옮기지 않는다
+  inline?: boolean
 }
 
 // 브라우저 confirm·alert 대신 쓰는 앱 안 확인 창
@@ -30,22 +34,16 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   children,
+  inline = false,
 }: ConfirmDialogProps) {
   const titleId = useId()
   const descriptionId = useId()
   const cancelRef = useRef<HTMLButtonElement>(null)
   const confirmRef = useRef<HTMLButtonElement>(null)
+  const layerRef = useRef<HTMLDivElement>(null)
 
-  // 열릴 때 안전한 쪽(아니요, 없으면 하나뿐인 버튼)에 포커스, 닫히면 원래 자리로 돌려준다
-  useEffect(() => {
-    if (!open) return
-    const previous = document.activeElement
-    const safeButton = cancelRef.current ?? confirmRef.current
-    safeButton?.focus({ preventScroll: true })
-    return () => {
-      if (previous instanceof HTMLElement) previous.focus()
-    }
-  }, [open])
+  // 떠 있는 동안 뒤 화면을 잠그고(#110) 안전한 쪽(아니요, 없으면 하나뿐인 버튼)에 포커스, 닫히면 연 자리로 돌려준다
+  useModalLayer(open, layerRef, cancelLabel === null ? confirmRef : cancelRef, !inline)
 
   // Esc 는 아니요와 같다
   useEffect(() => {
@@ -60,8 +58,8 @@ export function ConfirmDialog({
   if (!open) return null
   const variant = danger ? 'danger' : cancelLabel === null ? 'notice' : 'default'
 
-  return (
-    <div className="ui-dialog-backdrop" data-testid="confirm-dialog" data-variant={variant}>
+  const dialog = (
+    <div ref={layerRef} className="ui-dialog-backdrop" data-testid="confirm-dialog" data-variant={variant}>
       <div
         className="ui-dialog"
         role="alertdialog"
@@ -93,4 +91,5 @@ export function ConfirmDialog({
       </div>
     </div>
   )
+  return inline ? dialog : createPortal(dialog, document.body)
 }

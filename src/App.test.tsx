@@ -726,13 +726,17 @@ describe('SPEC-001 앱 뼈대', () => {
       await stepBack(6)
       await openEditForm('대관료')
       const back = vi.spyOn(window.history, 'back')
+      const go = vi.spyOn(window.history, 'go')
 
       await userEvent.click(screen.getByRole('button', { name: '이 내역 지우기' }))
       await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '지우기' }))
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
-      expect(back).toHaveBeenCalledOnce()
+      // 확인 창 칸(#110)과 화면 칸을 한 번에
+      expect(go).toHaveBeenCalledExactlyOnceWith(-2)
+      expect(back).not.toHaveBeenCalled()
       back.mockRestore()
+      go.mockRestore()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('4월')
       expect(within(screen.getByTestId('month-card')).queryByTestId('list-row')).not.toBeInTheDocument()
       // 200,000 + 140,000

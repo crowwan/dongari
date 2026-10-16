@@ -3,6 +3,7 @@ import { useState, type ChangeEvent } from 'react'
 import { createBackup, readBackup, type BackupSummary } from '../../storage/backup'
 import type { StoredData } from '../../domain/types'
 import type { LedgerState } from '../ledger/useLedger'
+import type { SheetHistory } from '../useScreenHistory'
 import { importConfirmTitle, importFailureMessage, REPLACE_WARNING, restoreFailureMessage } from './backupMessages'
 import { sendFile } from './sendFile'
 
@@ -25,13 +26,18 @@ interface BackupOptions {
   now: () => Date
   onRestored: () => void // 불러와 저장까지 했다 (장부로 돌아가 알린다)
   onSent: (message: string) => void // 보냈다 (알림 문구)
+  // 확인·알림 창을 방문 기록 한 칸으로 연다 (뒤로 버튼은 창만 닫는다 = [아니요], #110)
+  dialogs: Pick<SheetHistory, 'openDialog' | 'closeDialog'>
 }
+
+// 백업 불러오기 확인·알림 창 이름
+const BACKUP_DIALOG = 'backup'
 
 type Pending = { data: StoredData; summary: BackupSummary }
 
 export function useBackup(
   ledger: Pick<LedgerState, 'data' | 'restoreBackup' | 'recordBackup'>,
-  { now, onRestored, onSent }: BackupOptions,
+  { now, onRestored, onSent, dialogs }: BackupOptions,
 ): BackupFlow {
   const [fileInput, setFileInput] = useState<HTMLInputElement | null>(null)
   const [pending, setPending] = useState<Pending | undefined>()
@@ -39,24 +45,41 @@ export function useBackup(
 
   const hasRecords = ledger.data.books.length > 0
 
+  // 창을 비운다 ([아니요]·Esc·뒤로 버튼)
+  function clear() {
+    setNotice(undefined)
+    setPending(undefined)
+  }
+
+  // 확인 창이든 알림이든 창 하나. 이미 떠 있으면(불러오기 실패 알림) 칸을 바꿔 끼운다
+  function showDialog() {
+    dialogs.openDialog(BACKUP_DIALOG, clear)
+  }
+
   async function readChosenFile(file: File) {
     let text: string
     try {
       text = await file.text()
     } catch {
       setNotice(importFailureMessage('broken'))
+      showDialog()
       return
     }
     const result = readBackup(text)
     if (result.ok) setPending({ data: result.data, summary: result.summary })
     else setNotice(importFailureMessage(result.reason))
+    showDialog()
   }
 
   function restorePending(chosen: Pending) {
     setPending(undefined)
     const result = ledger.restoreBackup(chosen.data)
+    // 불러왔으면 부른 쪽이 장부로 돌아간다 (backToLedger 가 창의 칸까지 되돌린다). 못 했으면 같은 창을 알림으로 바꾼다
     if (result.ok) onRestored()
-    else setNotice(restoreFailureMessage(result.reason))
+    else {
+      setNotice(restoreFailureMessage(result.reason))
+      showDialog()
+    }
   }
 
   function dialog(): BackupDialog | undefined {
@@ -93,12 +116,14 @@ export function useBackup(
     },
     dialog: dialog(),
     confirm: () => {
-      if (notice) setNotice(undefined)
-      else if (pending) restorePending(pending)
+      if (notice) {
+        setNotice(undefined)
+        dialogs.closeDialog()
+      } else if (pending) restorePending(pending)
     },
     close: () => {
-      setNotice(undefined)
-      setPending(undefined)
+      clear()
+      dialogs.closeDialog()
     },
   }
 }

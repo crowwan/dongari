@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
@@ -18,6 +18,7 @@ import { MonthSummaryScreen } from './features/report/MonthSummaryScreen'
 import { YearSummaryScreen } from './features/report/YearSummaryScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
+import { useScreenHeading } from './features/useScreenHeading'
 import { useScreenHistory } from './features/useScreenHistory'
 import type { BookSetup, EntryInput } from './domain/ledger'
 import type { StoredData } from './domain/types'
@@ -57,6 +58,9 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
   const ledger = useLedger(repository, loaded, options)
   const bookName = ledger.book?.name ?? ''
   const navigation = useScreenHistory()
+  // 화면이 바뀌면 새 화면 제목에 포커스·브라우저 제목 (#110)
+  const mainRef = useRef<HTMLElement>(null)
+  useScreenHeading(mainRef)
   // 장부 화면에서 넘겨 본 달. 다른 화면에 다녀와도 그대로이고, 연도를 바꾸면 비워서 그 해의 처음 달(올해면 이번 달, 지난 연도면 12월)로
   const [viewedMonth, setViewedMonth] = useState<number | undefined>()
   const [toast, setToast] = useState<string | null>(null)
@@ -72,6 +76,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
       setToast('불러왔어요')
     },
     onSent: setToast,
+    dialogs: navigation,
   })
 
   // 자동 보관 상태 (설정 줄 "켜짐 · 3분 전", 7일 안내). 보관기가 바뀌면 다시 그린다
@@ -176,7 +181,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
   function screenContent(): ReactNode {
     if (ledger.isFirstRun) {
       if (restoreByCode && screen.name === 'keep-restore') {
-        return <KeepRestoreScreen {...restoreByCode} backLabel="뒤로" onBack={navigation.backToLedger} />
+        return <KeepRestoreScreen {...restoreByCode} dialogs={navigation} backLabel="뒤로" onBack={navigation.backToLedger} />
       }
       // 첫 실행은 새 장부 만들기 (SPEC-005). 새 폰으로 옮길 때는 장부를 만들지 않고 백업 파일(안내 띠에 같은 버튼이 있으면 하나만)이나
       // 복구 코드(SPEC-006)로 불러온다
@@ -211,10 +216,11 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
             canDeleteBook={ledger.bookChoices.length > 1}
             onDeleteBook={() => {
               // 저장하지 못하면 아무것도 지우지 않고 설정에 남아 위쪽 실패 안내만 (SPEC-005)
-              if (!ledger.book || !ledger.deleteBook(ledger.book.id)) return
+              if (!ledger.book || !ledger.deleteBook(ledger.book.id)) return false
               setToast('장부를 지웠어요')
               setViewedMonth(undefined)
               navigation.backToLedger()
+              return true
             }}
             year={ledger.year}
             yearChoices={ledger.yearChoices}
@@ -325,7 +331,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
         return <NewBookScreen onCreate={createBook} onBack={navigation.backToLedger} />
       case 'keep-restore':
         // 첫 실행에서 열고 불러온 직후(장부로 돌아가는 중)에만 여기에 온다
-        return restoreByCode ? <KeepRestoreScreen {...restoreByCode} backLabel="장부로" onBack={navigation.backToLedger} /> : null
+        return restoreByCode ? <KeepRestoreScreen {...restoreByCode} dialogs={navigation} backLabel="장부로" onBack={navigation.backToLedger} /> : null
       case 'ledger':
         return ledgerScreen()
     }
@@ -394,7 +400,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
 
   return (
     <div className="app">
-      <main className="app__main">
+      <main ref={mainRef} className="app__main">
         {notices}
         {screenContent()}
       </main>

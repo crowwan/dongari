@@ -7,6 +7,7 @@ import { BookPicker } from '../features/books/BookPicker'
 import { InstallGuide } from '../features/install/InstallGuide'
 import { KeepRestoreScreen, KeptSummary } from '../features/keep/KeepRestoreScreen'
 import type { KeepServer } from '../features/keep/keepServer'
+import type { SheetHistory } from '../features/useScreenHistory'
 import { KEEP_REMINDER_MESSAGE } from '../features/keep/keepStatus'
 import { CarryoverField } from '../features/ledger/CarryoverField'
 import { tidyDayText } from '../features/ledger/entryDraft'
@@ -122,6 +123,13 @@ const NO_KEEP_SERVER: KeepServer = {
   get: async () => ({ status: 'not-found' }),
   remove: async () => true,
   sendStatus: async () => {},
+}
+
+// 복구 코드로 불러오기 미리보기용 확인 창 자리: 보관본이 없으니 확인 창은 뜨지 않는다
+const NO_DIALOGS: Pick<SheetHistory, 'dialog' | 'openDialog' | 'closeDialog'> = {
+  dialog: null,
+  openDialog: () => {},
+  closeDialog: () => {},
 }
 
 // 장부 고르기 창 (SPEC-005): 만든 순, 이름이 긴 장부는 두 줄까지
@@ -440,7 +448,7 @@ export function Catalog() {
           </State>
           <State label="선택 창 안: 회색 면 + 흰 원 · 고른 줄 옅은 청록 + 체크 (설정 장부 연도)">
             <div className="catalog__frame catalog__frame--sheet">
-              <BottomSheet open title="어느 해 장부를 볼까요?" onClose={noop}>
+              <BottomSheet inline open title="어느 해 장부를 볼까요?" onClose={noop}>
                 <OptionList
                   label="장부 연도"
                   options={[
@@ -459,7 +467,7 @@ export function Catalog() {
         <Section title="BookPicker (장부 고르기 창, SPEC-005)">
           <State label="지금 장부 청록 둘레 + ✓, 맨 아래 점선 [+ 새 장부 만들기] (눌러 보기)">
             <div className="catalog__frame catalog__frame--sheet">
-              <BottomSheet open title="어느 장부를 볼까요?" onClose={noop}>
+              <BottomSheet inline open title="어느 장부를 볼까요?" onClose={noop}>
                 <BookPicker books={BOOK_CHOICES} currentId={pickedBook} onPick={setPickedBook} onNew={noop} />
               </BottomSheet>
             </div>
@@ -469,7 +477,7 @@ export function Catalog() {
         <Section title="BottomSheet">
           <State label="아래에서 올라오는 선택 창 + MonthPicker (바깥 누르기·Esc 로 닫힘)">
             <div className="catalog__frame catalog__frame--sheet">
-              <BottomSheet open title="몇 월인가요?" onClose={noop}>
+              <BottomSheet inline open title="몇 월인가요?" onClose={noop}>
                 <MonthPicker value={9} currentMonth={10} onChange={noop} />
               </BottomSheet>
             </div>
@@ -837,7 +845,14 @@ export function Catalog() {
           <State label="복구 코드로 불러오기 화면 (16자를 넣고 [불러오기] — 이 미리보기는 늘 '없음')">
             <div className="catalog__frame catalog__frame--screen">
               <div className="app__main">
-                <KeepRestoreScreen server={NO_KEEP_SERVER} hasRecords onRestore={() => ({ ok: true })} backLabel="설정" onBack={noop} />
+                <KeepRestoreScreen
+                  server={NO_KEEP_SERVER}
+                  hasRecords
+                  onRestore={() => ({ ok: true })}
+                  backLabel="설정"
+                  onBack={noop}
+                  dialogs={NO_DIALOGS}
+                />
               </div>
             </div>
           </State>
@@ -857,7 +872,7 @@ export function Catalog() {
           </State>
           <State label="방법 안내 선택 창 · 삼성 인터넷">
             <div className="catalog__frame catalog__frame--sheet">
-              <BottomSheet open title="홈 화면에 추가하는 방법" onClose={noop}>
+              <BottomSheet inline open title="홈 화면에 추가하는 방법" onClose={noop}>
                 <InstallGuide browser="samsung" />
                 <Button onClick={noop}>확인</Button>
               </BottomSheet>
@@ -891,12 +906,13 @@ export function Catalog() {
         <Section title="ConfirmDialog">
           <State label="기본">
             <div className="catalog__frame">
-              <ConfirmDialog open title="예시 기록으로 되돌릴까요?" confirmLabel="되돌리기" onConfirm={noop} onCancel={noop} />
+              <ConfirmDialog inline open title="예시 기록으로 되돌릴까요?" confirmLabel="되돌리기" onConfirm={noop} onCancel={noop} />
             </div>
           </State>
           <State label="위험">
             <div className="catalog__frame">
               <ConfirmDialog
+                inline
                 open
                 danger
                 title="이 기록을 정말 지울까요?"
@@ -909,6 +925,7 @@ export function Catalog() {
           <State label="장부 지우기 (설정 맨 아래, SPEC-005)">
             <div className="catalog__frame">
               <ConfirmDialog
+                inline
                 open
                 danger
                 title="‘우리집 가계부’ 장부와 기록을 모두 지울까요?"
@@ -922,6 +939,7 @@ export function Catalog() {
           <State label="설명 붙음 + 위험 (백업 불러오기)">
             <div className="catalog__frame">
               <ConfirmDialog
+                inline
                 open
                 danger
                 title="장부 2개, 기록 128건으로 바꿀까요?"
@@ -935,6 +953,7 @@ export function Catalog() {
           <State label="자세한 내용 붙음 (복구 코드로 불러오기 확인, SPEC-006)">
             <div className="catalog__frame">
               <ConfirmDialog
+                inline
                 open
                 danger
                 title="보관본으로 바꿀까요?"
@@ -955,6 +974,7 @@ export function Catalog() {
           <State label="버튼 하나 알림 (cancelLabel=null)">
             <div className="catalog__frame">
               <ConfirmDialog
+                inline
                 open
                 title="이 파일은 열 수 없어요"
                 description="우리 장부에서 보낸 백업 파일인지 확인해 주세요"

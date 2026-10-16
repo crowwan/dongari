@@ -15,7 +15,7 @@ const LEDGER: Ledger = { year: 2026, carryover: 370_482, entries: [] }
 type Handlers = {
   onChangeYear?: (year: number) => void
   onSaveBookInfo?: (setup: BookSetup) => void
-  onDeleteBook?: () => void
+  onDeleteBook?: () => boolean
   onSendBackup?: () => void
   onImportBackup?: () => void
   onShareCode?: () => void
@@ -66,7 +66,7 @@ function Harness({
       bookKind={kind}
       carryoverWords={carryoverWords(kind, false)}
       canDeleteBook={canDeleteBook}
-      onDeleteBook={handlers.onDeleteBook ?? vi.fn()}
+      onDeleteBook={handlers.onDeleteBook ?? vi.fn(() => true)}
       year={2026}
       yearChoices={[2026, 2025]}
       ledger={ledger ?? undefined}
@@ -297,7 +297,7 @@ describe('SPEC-001·002 설정 화면', () => {
     })
 
     it('AC-7 맨 아래 위험 글자형 [이 장부 지우기] 는 확인([아니요] [지우기]) 뒤에만 지워 달라고 알린다', async () => {
-      const onDeleteBook = vi.fn()
+      const onDeleteBook = vi.fn(() => true)
       render(<Harness handlers={{ onDeleteBook }} />)
 
       const remove = screen.getByRole('button', { name: '이 장부 지우기' })
@@ -596,5 +596,48 @@ describe('SPEC-006 설정 기록 지키기', () => {
     expect(screen.queryByTestId('settings-screen')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '설정' }))
     expect(screen.getByTestId('settings-screen')).toBeInTheDocument()
+  })
+
+  describe('#110 접근성 점검 09 뒤로 버튼', () => {
+    it('자동 보관을 끄며 묻는 창에서 뒤로 버튼을 누르면 [남겨 두기] 와 같이 끄고(사본은 남김) 창만 닫힌다', async () => {
+      const onTurnOff = vi.fn()
+      render(<Harness keep={keepRow({ onTurnOff })} />)
+      await userEvent.click(screen.getByRole('button', { name: /^자동 보관/ }))
+      await userEvent.click(within(screen.getByRole('group', { name: '자동 보관' })).getByRole('button', { name: '끄기' }))
+      await screen.findByRole('alertdialog')
+
+      pressBackButton()
+
+      expect(onTurnOff).toHaveBeenCalledExactlyOnceWith(false)
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: '자동 보관' })).not.toBeInTheDocument()
+      expect(screen.getByTestId('settings-screen')).toBeInTheDocument()
+    })
+  })
+})
+
+describe('#110 접근성 점검 09 설정 확인 창과 뒤로 버튼', () => {
+  it('장부 지우기 확인 창에서 뒤로 버튼을 누르면 확인 창만 닫히고 지우지 않는다', async () => {
+    const onDeleteBook = vi.fn(() => true)
+    render(<Harness handlers={{ onDeleteBook }} />)
+    await userEvent.click(screen.getByRole('button', { name: '이 장부 지우기' }))
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+
+    pressBackButton()
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-screen')).toBeInTheDocument()
+    expect(onDeleteBook).not.toHaveBeenCalled()
+  })
+
+  it('장부를 지우지 못하면(저장 실패) 확인 창을 닫고 설정에 남는다', async () => {
+    const onDeleteBook = vi.fn(() => false)
+    render(<Harness handlers={{ onDeleteBook }} />)
+    await userEvent.click(screen.getByRole('button', { name: '이 장부 지우기' }))
+
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '지우기' }))
+
+    expect(onDeleteBook).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
 })
