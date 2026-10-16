@@ -85,5 +85,24 @@ describe('OptionList', () => {
 
     expect(onAction).toHaveBeenCalledOnce()
     expect(onChange).not.toHaveBeenCalled()
+    // 펼침 상태를 주지 않으면 aria-expanded 도 없다 (내역 적기)
+    expect(last).not.toHaveAttribute('aria-expanded')
+  })
+
+  it('따로 하는 일 줄이 펼치는 줄이면 펼침 상태를 읽히고, 펼쳤을 때만 그 줄 아래(목록 안)에 칸을 보인다 (고치기 직접 적기)', () => {
+    const action = { label: '직접 적기', icon: 'pen', onClick: vi.fn(), panel: <input aria-label="이름 칸" /> } as const
+    const { rerender } = render(
+      <OptionList label="항목" options={YEARS} value={null} onChange={vi.fn()} action={{ ...action, expanded: false }} />,
+    )
+
+    const toggle = screen.getByRole('button', { name: '직접 적기' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('textbox', { name: '이름 칸' })).not.toBeInTheDocument()
+
+    rerender(<OptionList label="항목" options={YEARS} value={null} onChange={vi.fn()} action={{ ...action, expanded: true }} />)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const field = within(screen.getByRole('group', { name: '항목' })).getByRole('textbox', { name: '이름 칸' })
+    expect(toggle).toHaveAttribute('aria-controls', field.parentElement?.id)
   })
 })

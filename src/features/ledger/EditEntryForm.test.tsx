@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { frequentChoices, type EntryInput } from '../../domain/ledger'
-import type { Entry, EntryType } from '../../domain/types'
+import type { Entry } from '../../domain/types'
 import { useScreenHistory } from '../useScreenHistory'
 import { EditEntryForm } from './EditEntryForm'
 import type { EntryDraft } from './entryDraft'
@@ -38,7 +38,7 @@ function Harness({ initial, handlers }: { initial: EntryDraft; handlers: Handler
       year={2026}
       initial={initial}
       currentMonth={10}
-      frequentChoices={(type?: EntryType) => frequentChoices(HISTORY, type)}
+      frequentChoices={() => frequentChoices(HISTORY)}
       sheets={sheets}
       onSave={handlers.onSave}
       onBack={handlers.onBack}
@@ -58,6 +58,9 @@ const saveButton = () => screen.getByRole('button', { name: '저장' })
 const dayField = () => screen.getByRole('textbox', { name: '며칠인가요?' })
 const typeGroup = () => screen.getByRole('group', { name: '수입인가요, 지출인가요?' })
 const itemList = () => screen.getByRole('group', { name: '자주 쓴 항목' })
+// 목록 맨 아래 [✎ 직접 적기] 줄 (누르면 이름 칸·수입/지출 스위치가 열린다, v2.6)
+const customButton = () => within(itemList()).getByRole('button', { name: '직접 적기' })
+const nameField = () => screen.getByRole('textbox', { name: '무엇인지 적어 주세요' })
 // 날짜 질문 제목 옆 [4월 ▾] → 열두 달 선택 창에서 고른다
 async function pickMonth(current: number, next: number) {
   await userEvent.click(screen.getByRole('button', { name: `${current}월 달 바꾸기` }))
@@ -70,24 +73,31 @@ async function typeDay(text: string) {
   if (text !== '') await userEvent.type(dayField(), text)
 }
 
+// 항목 줄 이름 (눌린 상태가 없는 [직접 적기] 줄은 빼고)
 const itemNames = () =>
   within(itemList())
     .getAllByRole('button')
+    .filter((button) => button.hasAttribute('aria-pressed'))
     .map((button) => button.textContent)
 
 describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
-  it('위에서부터 날짜([4월 ▾] + 날 숫자 칸 "7") → 수입/지출 스위치 → 무엇(항목 목록 + 직접 적기 칸) → 얼마, 맨 아래 [이 내역 지우기], 아래 고정 [저장]', () => {
+  it('AC-31 위에서부터 며칠인가요?([4월 ▾] + 날 숫자 칸 "7") → 무엇인가요?(항목 목록) → 얼마인가요? → [이 내역 지우기], 아래 고정 [저장]. 수입·지출 스위치는 처음엔 없다', () => {
     renderForm()
 
     expect(screen.getByRole('heading', { level: 1, name: '내역 고치기' })).toBeInTheDocument()
     const questions = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
-    expect(questions).toEqual(['며칠인가요?', '수입인가요, 지출인가요?', '무엇인가요?', '얼마인가요?'])
+    expect(questions).toEqual(['며칠인가요?', '무엇인가요?', '얼마인가요?'])
+    expect(screen.queryByRole('group', { name: '수입인가요, 지출인가요?' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: '무엇인지 적어 주세요' })).not.toBeInTheDocument()
+    // 화면 순서: 금액 칸 다음에 [이 내역 지우기]
+    const amount = screen.getByLabelText('얼마인가요?')
+    const deleteButton = screen.getByRole('button', { name: '이 내역 지우기' })
+    expect(amount.compareDocumentPosition(deleteButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: '4월 달 바꾸기' })).toBeInTheDocument()
     expect(dayField()).toHaveValue('7')
     expect(dayField()).toHaveAttribute('inputmode', 'numeric')
     // 고치기는 값을 한눈에 보는 화면이라 칸에 저절로 포커스를 주지 않는다
     expect(dayField()).not.toHaveFocus()
-    expect(screen.getByTestId('segmented-control')).toBeInTheDocument()
     expect(screen.getByTestId('amount-display')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '이 내역 지우기' })).toBeInTheDocument()
     expect(within(screen.getByTestId('bottom-action-bar')).getByRole('button', { name: '저장' })).toBeInTheDocument()
@@ -96,19 +106,9 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
   it('AC-6 그 기록 값이 채워진 채로 열리고, 지금 이름은 항목 목록에서 체크된다', () => {
     renderForm()
 
-    expect(within(typeGroup()).getByRole('button', { name: '수입' })).toHaveAttribute('aria-pressed', 'true')
     expect(within(itemList()).getByRole('button', { name: '회비 수입' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByLabelText('직접 적기')).toHaveValue('회비')
     expect(screen.getByLabelText('얼마인가요?')).toHaveValue('140,000')
     expect(saveButton()).toBeEnabled()
-  })
-
-  it('"직접 적기" 는 질문이 아니라 입력칸 보조 이름이다', () => {
-    renderForm()
-
-    const nameField = screen.getByLabelText('직접 적기').closest('[data-testid="text-field"]')
-    expect(nameField).toHaveAttribute('data-label-role', 'label')
-    expect(screen.queryByRole('heading', { name: '직접 적기' })).not.toBeInTheDocument()
   })
 
   describe('AC-25 날짜', () => {
@@ -219,37 +219,99 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
     })
   })
 
-  describe('항목', () => {
-    it('항목 목록은 고른 종류의 항목만 보여 주고, 종류를 바꾸면 그 종류의 목록이 된다', async () => {
+  describe('AC-32 항목 목록 (수입·지출 함께)', () => {
+    it('수입·지출 항목이 함께 보이고(최근 사용 순 + 기본 항목), 목록 아래에 "항목을 고르면 수입·지출도 같이 바뀌어요"', () => {
       renderForm()
-      expect(itemNames()).toEqual(['찬조금 수입', '회비 수입'])
 
-      await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
-
-      expect(itemNames()).toEqual(['꽃값 지출', '대관료 지출', '간식비 지출'])
+      expect(itemNames()).toEqual(['찬조금 수입', '꽃값 지출', '대관료 지출', '간식비 지출', '회비 수입'])
+      expect(screen.getByText('항목을 고르면 수입·지출도 같이 바뀌어요')).toBeInTheDocument()
     })
 
-    it('AC-4 항목을 누르면 이름 칸이 채워지고 체크된다', async () => {
-      renderForm()
+    it('지금 이름이 목록에 없으면 맨 위에 그 내역의 종류로 더해 체크한다', () => {
+      renderForm({ ...SAVED, type: 'expense', name: '꽃바구니', amount: 30_000 })
 
-      await userEvent.click(within(itemList()).getByRole('button', { name: '찬조금 수입' }))
+      expect(itemNames()[0]).toBe('꽃바구니 지출')
+      expect(within(itemList()).getByRole('button', { name: '꽃바구니 지출' })).toHaveAttribute('aria-pressed', 'true')
+      expect(itemNames()).toHaveLength(6)
+    })
 
-      expect(screen.getByLabelText('직접 적기')).toHaveValue('찬조금')
-      expect(within(itemList()).getByRole('button', { name: '찬조금 수입' })).toHaveAttribute('aria-pressed', 'true')
+    it('다른 종류의 항목을 고르고 저장하면 그 이름·종류로 바뀐다', async () => {
+      const { onSave } = renderForm()
+
+      await userEvent.click(within(itemList()).getByRole('button', { name: '꽃값 지출' }))
+      expect(within(itemList()).getByRole('button', { name: '꽃값 지출' })).toHaveAttribute('aria-pressed', 'true')
       expect(within(itemList()).getByRole('button', { name: '회비 수입' })).toHaveAttribute('aria-pressed', 'false')
+      await userEvent.click(saveButton())
+
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 7, type: 'expense', name: '꽃값', amount: 140_000 })
     })
   })
 
-  describe('AC-5 빠진 것이 있으면 [저장] 비활성 + 안내 (한 번에 하나, 위에서부터)', () => {
-    it('이름을 지우면 "무엇인지 적어 주세요"', async () => {
+  describe('AC-33 [직접 적기] 는 누를 때만 칸이 열린다', () => {
+    it('처음엔 닫혀 있고(aria-expanded=false), 누르면 빈 이름 칸과 지금 종류로 골라진 수입·지출 스위치가 열리며 목록 체크가 지워진다', async () => {
+      renderForm()
+      expect(customButton()).toHaveAttribute('aria-expanded', 'false')
+
+      await userEvent.click(customButton())
+
+      expect(customButton()).toHaveAttribute('aria-expanded', 'true')
+      expect(nameField()).toHaveValue('')
+      // 키패드는 저절로 뜨지 않는다
+      expect(nameField()).not.toHaveFocus()
+      expect(within(typeGroup()).getByRole('button', { name: '수입' })).toHaveAttribute('aria-pressed', 'true')
+      expect(within(itemList()).getByRole('button', { name: '회비 수입' })).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    it('칸이 열린 채 이름이 비면 [저장] 비활성 + "무엇인지 적어 주세요"', async () => {
       renderForm()
 
-      await userEvent.clear(screen.getByLabelText('직접 적기'))
+      await userEvent.click(customButton())
 
       expect(saveButton()).toBeDisabled()
       expect(saveButton()).toHaveAccessibleDescription('무엇인지 적어 주세요')
     })
 
+    it('이름을 적고 스위치를 바꿔 저장하면 그 이름·종류로 바뀐다 (회비 환불을 지출로)', async () => {
+      const { onSave } = renderForm()
+
+      await userEvent.click(customButton())
+      await userEvent.type(nameField(), '회비 환불')
+      await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
+      await userEvent.click(saveButton())
+
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 7, type: 'expense', name: '회비 환불', amount: 140_000 })
+    })
+
+    it('목록 줄을 누르면 칸이 닫히고 적던 글자는 지워진다', async () => {
+      renderForm()
+      await userEvent.click(customButton())
+      await userEvent.type(nameField(), '꽃바')
+
+      await userEvent.click(within(itemList()).getByRole('button', { name: '대관료 지출' }))
+
+      expect(customButton()).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByRole('textbox', { name: '무엇인지 적어 주세요' })).not.toBeInTheDocument()
+      expect(within(itemList()).getByRole('button', { name: '대관료 지출' })).toHaveAttribute('aria-pressed', 'true')
+
+      await userEvent.click(customButton())
+      expect(nameField()).toHaveValue('')
+    })
+
+    it('[직접 적기] 를 다시 누르면 칸이 닫히고 원래 고른 항목으로 돌아간다', async () => {
+      const { onSave } = renderForm()
+      await userEvent.click(customButton())
+      await userEvent.type(nameField(), '꽃바')
+
+      await userEvent.click(customButton())
+
+      expect(screen.queryByRole('textbox', { name: '무엇인지 적어 주세요' })).not.toBeInTheDocument()
+      expect(within(itemList()).getByRole('button', { name: '회비 수입' })).toHaveAttribute('aria-pressed', 'true')
+      await userEvent.click(saveButton())
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 7, type: 'income', name: '회비', amount: 140_000 })
+    })
+  })
+
+  describe('AC-5 빠진 것이 있으면 [저장] 비활성 + 안내 (한 번에 하나, 위에서부터)', () => {
     it('금액을 지우면 "얼마인지 적어 주세요"', async () => {
       renderForm()
 
@@ -264,7 +326,6 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
 
     await pickMonth(4, 5)
     await typeDay('31')
-    await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
     await userEvent.click(within(itemList()).getByRole('button', { name: '꽃값 지출' }))
     await userEvent.click(screen.getByRole('button', { name: '1만 원 더하기' }))
     await userEvent.click(saveButton())
@@ -277,8 +338,18 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       const { onDirtyChange } = renderForm()
       expect(onDirtyChange).toHaveBeenLastCalledWith(false)
 
-      await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
+      await userEvent.click(within(itemList()).getByRole('button', { name: '꽃값 지출' }))
 
+      expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+    })
+
+    it('[직접 적기] 칸을 열기만 하고 글자를 적지 않았으면 바뀐 것이 아니다. 글자를 적으면 바뀌었다고 알린다', async () => {
+      const { onDirtyChange } = renderForm()
+
+      await userEvent.click(customButton())
+      expect(onDirtyChange).toHaveBeenLastCalledWith(false)
+
+      await userEvent.type(nameField(), '꽃')
       expect(onDirtyChange).toHaveBeenLastCalledWith(true)
     })
 
@@ -313,9 +384,9 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
     it('바꾼 값을 처음 값으로 되돌리면 다시 바뀐 것이 없다고 알린다', async () => {
       const { onDirtyChange } = renderForm()
 
-      await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
+      await userEvent.click(within(itemList()).getByRole('button', { name: '꽃값 지출' }))
       expect(onDirtyChange).toHaveBeenLastCalledWith(true)
-      await userEvent.click(within(typeGroup()).getByRole('button', { name: '수입' }))
+      await userEvent.click(within(itemList()).getByRole('button', { name: '회비 수입' }))
 
       expect(onDirtyChange).toHaveBeenLastCalledWith(false)
     })
@@ -342,7 +413,7 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
 
       expect(onDelete).not.toHaveBeenCalled()
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-      expect(screen.getByLabelText('직접 적기')).toHaveValue('회비')
+      expect(within(itemList()).getByRole('button', { name: '회비 수입' })).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('확인 창에서 [지우기] 를 눌러야 지운다', async () => {

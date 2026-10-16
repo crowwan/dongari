@@ -404,10 +404,12 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
         {notices}
         {screenContent()}
       </main>
-      {/* 내역 적기·고치기에서 적던 내용이 있을 때 [← 장부로]·뒤로 버튼을 누르면 묻는다 */}
+      {/* 내역 적기·고치기에서 적던 내용이 있을 때 [← 장부로]·뒤로 버튼을 누르면 묻는다.
+          연달아 적기로 넣은 것이 있으면 그건 남는다고 알린다 (AC-34). 고치기 화면에서는 chainSaved 가 늘 비어 있다 */}
       <ConfirmDialog
         open={navigation.confirmingLeave}
         title="적던 내용을 버릴까요?"
+        description={chainSaved.length > 0 ? `장부에 넣은 ${chainSaved.length}건은 그대로 있어요` : undefined}
         confirmLabel="버리기"
         danger
         onConfirm={navigation.confirmLeave}

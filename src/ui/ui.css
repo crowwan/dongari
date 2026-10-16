@@ -865,6 +865,14 @@ button.ui-row {
   font-weight: var(--weight-semibold);
 }
 
+/* 펼치는 줄 아래 칸 (고치기 [직접 적기] → 이름 칸 + 수입·지출 스위치): 같은 흰 면 안, 줄 글자 왼쪽 선에 맞춘다 */
+.ui-options__panel {
+  padding: var(--space-1) var(--space-4) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
+}
+
 .ui-options__option[aria-pressed='true'] {
   background: var(--primary-soft);
   color: var(--strong);

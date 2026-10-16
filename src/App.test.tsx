@@ -568,6 +568,30 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(screen.getByRole('status')).toHaveTextContent('1건을 저장했어요')
     })
 
+    it('AC-34 연달아 적기로 넣은 뒤 다음 내역을 적다가 나가면 버릴까요 창에 "장부에 넣은 N건은 그대로 있어요" 가 보인다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await saveItem('대관료 지출', '40000')
+      await saveItem('간식비 지출', '5000')
+      await pickDay(4)
+
+      await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+
+      expect(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).toHaveAccessibleDescription('장부에 넣은 2건은 그대로 있어요')
+    })
+
+    it('AC-34 넣은 것이 없으면 버릴까요 창에 설명 줄이 없다', async () => {
+      renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+      await openEntryForm()
+      await pickDay(4)
+
+      await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+
+      const dialog = screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })
+      expect(dialog).not.toHaveAttribute('aria-describedby')
+      expect(screen.queryByText(/그대로 있어요/)).not.toBeInTheDocument()
+    })
+
     it('AC-21 다음 내역을 적던 중이면 버릴지 묻고, [버리기] 면 적던 한 건만 버리고 저장한 내역은 남는다', async () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openEntryForm()
@@ -643,9 +667,7 @@ describe('SPEC-001 앱 뼈대', () => {
       // 날짜 없는 예전 기록
       expect(screen.getByRole('button', { name: '4월 달 바꾸기' })).toBeInTheDocument()
       expect(dayField()).toHaveValue('')
-      expect(within(typeGroup()).getByRole('button', { name: '지출' })).toHaveAttribute('aria-pressed', 'true')
       expect(within(itemList()).getByRole('button', { name: '대관료 지출' })).toHaveAttribute('aria-pressed', 'true')
-      expect(screen.getByLabelText('직접 적기')).toHaveValue('대관료')
       expect(screen.getByLabelText('얼마인가요?')).toHaveValue('40,000')
       expect(window.history.state).toEqual({ screen: 'edit-entry' })
     })
@@ -839,6 +861,8 @@ describe('SPEC-001 앱 뼈대', () => {
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
       expect(screen.getByRole('alertdialog', { name: '적던 내용을 버릴까요?' })).toBeInTheDocument()
+      // AC-34 고치기 화면이면 설명 줄이 없다
+      expect(screen.queryByText(/그대로 있어요/)).not.toBeInTheDocument()
     })
 
     it('AC-12 적던 내용이 있을 때 뒤로 버튼을 누르면 입력창을 닫지 않고 묻는다. [아니요] 뒤에 다시 누르면 또 묻고, [버리기] 면 장부로', async () => {

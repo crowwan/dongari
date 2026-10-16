@@ -55,6 +55,21 @@
   gap: var(--stack);
 }
 
+/* 고치기 [직접 적기] 칸 안 보조 이름 + 스위치 ("수입인가요, 지출인가요?"): 입력칸 보조 이름(TextField label)과 같은 글자 */
+.entry__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+.entry__field-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  line-height: var(--line-tight);
+}
+
 /* 답 아래 조용한 글자 버튼 ([‹ 목록에서 고르기]): 화살표가 화면 좌우 여백 선에 오게 */
 .entry__aside {
   display: flex;
