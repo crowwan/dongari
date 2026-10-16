@@ -1,8 +1,8 @@
+import { useEffect, useEffectEvent } from 'react'
 import { BottomSheet } from '../../ui/BottomSheet'
-import { Button } from '../../ui/Button'
 import type { SheetHistory } from '../useScreenHistory'
 import { InstallGuide } from './InstallGuide'
-import type { InstallEnvironment } from './installPrompt'
+import { useInstallPrompt, type InstallEnvironment } from './installPrompt'
 import { browserKind } from './installRules'
 
 type InstallGuideSheetProps = {
@@ -11,12 +11,21 @@ type InstallGuideSheetProps = {
   guideSheet: string // 선택 창 이름 (useInstallAction 에 넘긴 것과 같게)
 }
 
-// 방법 안내 선택 창 "홈 화면에 추가하는 방법" + [확인] (SPEC-002). 설정 줄과 장부 위 권하기 카드(#135)가 같이 쓴다
+// 방법 안내 선택 창 "홈 화면에 추가하는 방법" (SPEC-002, SPEC-009 A 그림 넘기기). 설정 줄과 장부 위 권하기 카드(#135)가 같이 쓴다.
+// 창 안 장 번호는 그림 안내가 들고 있어 닫았다 다시 열면 1장부터다
 export function InstallGuideSheet({ install, sheets, guideSheet }: InstallGuideSheetProps) {
+  const open = sheets.sheet === guideSheet
+  const { installed } = useInstallPrompt(install.installPrompt)
+  const closeSheet = useEffectEvent(() => sheets.closeSheet())
+
+  // 따라 하다 브라우저 메뉴로 설치를 마치면(appinstalled) 창을 닫는다 (SPEC-009 예외와 경계)
+  useEffect(() => {
+    if (open && installed) closeSheet()
+  }, [open, installed])
+
   return (
-    <BottomSheet open={sheets.sheet === guideSheet} title="홈 화면에 추가하는 방법" onClose={sheets.closeSheet}>
-      <InstallGuide browser={browserKind(install.userAgent)} />
-      <Button onClick={sheets.closeSheet}>확인</Button>
+    <BottomSheet open={open} title="홈 화면에 추가하는 방법" onClose={sheets.closeSheet}>
+      <InstallGuide browser={browserKind(install.userAgent)} onFinish={sheets.closeSheet} />
     </BottomSheet>
   )
 }

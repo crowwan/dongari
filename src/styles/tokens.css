@@ -52,6 +52,16 @@
   --primary-pressed: #234843;
   --primary-soft-pressed: #d5e5e1;
   --danger-pressed: #982a2a;
+  /*
+   * 그림 속 브라우저 화면 (SPEC-009 설치 안내·카톡 메뉴 그림): 로고 없는 회색 면. 앱 면 색을 빌려 쓰고, 테마마다 다시 정해야
+   * 다크로 고정한 상자(data-theme) 안에서도 따라 바뀐다(var() 는 정한 자리에서 값이 정해진다). 누를 곳은 --accent-ink 로 따로 그린다
+   */
+  --browser-page: var(--bg);
+  --browser-bar: var(--line);
+  --browser-field: var(--surface);
+  --browser-menu: var(--surface);
+  --browser-ink: var(--ink);
+  --browser-dim: var(--faint);
   color-scheme: light;
 }
 
@@ -87,6 +97,12 @@
     --primary-pressed: #3a6e67;
     --primary-soft-pressed: #284541;
     --danger-pressed: #ffadad;
+    --browser-page: var(--bg);
+    --browser-bar: var(--line);
+    --browser-field: var(--surface);
+    --browser-menu: var(--surface);
+    --browser-ink: var(--ink);
+    --browser-dim: var(--faint);
     color-scheme: dark;
   }
 }
@@ -122,6 +138,12 @@
   --primary-pressed: #3a6e67;
   --primary-soft-pressed: #284541;
   --danger-pressed: #ffadad;
+  --browser-page: var(--bg);
+  --browser-bar: var(--line);
+  --browser-field: var(--surface);
+  --browser-menu: var(--surface);
+  --browser-ink: var(--ink);
+  --browser-dim: var(--faint);
   color-scheme: dark;
 }
 
@@ -251,8 +273,23 @@
   --practice-done: 72px; /* 끝 화면 체크 동그라미 */
   --practice-done-icon: 36px;
 
+  /*
+   * 그림 (SPEC-009): 브라우저 화면 모형·홈 화면 모습. 그림 속 글자는 그림 틀 크기에 묶여 있어 px 로 둔다
+   * (폰 글자 크기를 따라 커지면 메뉴 줄이 그림 밖으로 넘친다). 같은 뜻은 그림 밖 글 줄이 rem 글자로 전한다
+   */
+  --picture-text: 14px; /* 그림 속 메뉴 줄·확인 창 글자 */
+  --picture-text-sm: 12px; /* 그림 속 주소창·아래 칸 이름 */
+  --browser-bar-h: 44px; /* 주소창 줄·아래 도구 줄 높이 */
+  --browser-button: 32px; /* 줄 안 둥근 단추 */
+  --browser-line: 10px; /* 흐린 글 줄 막대 굵기 */
+  --browser-block: 44px; /* 흐린 덩어리(카드) 높이 */
+  --tap-arrow: 32px; /* 누를 곳을 가리키는 청록 화살표 */
+  --home-icon: 48px; /* 홈 화면 모습 그림의 앱 아이콘 */
+  --home-name-bar: 8px; /* 다른 앱 이름 자리 막대 굵기 */
+
   /* 모션 */
   --motion-fast: 120ms;
   --motion-base: 220ms;
   --motion-curve: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-blink: 1.6s; /* 그림 속 누를 곳 화살표·동그라미가 한 번 흐려졌다 돌아오는 시간 (동작 줄이기면 멈춤, SPEC-009) */
 }

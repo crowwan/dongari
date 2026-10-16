@@ -456,15 +456,16 @@ C 카톡 안에서 열렸을 때
 
 ### 홈 화면 모습 그림
 
-- 부품 하나(가칭 `features/install/HomeScreenPreview`). 이름은 manifest 와 같은 값을 한 곳에서 가져온다. 지금 `src/pwa/pwaOptions.ts` 의 `short_name: '우리 장부'` 를 상수로 빼서(가칭 `APP_SHORT_NAME`) manifest 와 이 부품이 같이 쓴다. AC-1 은 그 상수와 그림 글이 같은지, manifest 옵션의 `short_name` 이 그 상수인지 본다.
+- 부품 하나 `features/install/HomeScreenPreview`(#142, `decorative` 면 그림을 화면 읽기에서 숨기고 아래 줄만 읽힌다 — A 4장처럼 옆에 같은 뜻의 글 줄이 있을 때). 이름은 manifest 와 같은 값을 한 곳에서 가져온다. `src/pwa/appName.ts` 의 `APP_SHORT_NAME` 을 manifest(`pwaOptions.ts`)와 이 부품이 같이 쓴다. AC-1 은 그 상수와 그림 글이 같은지, manifest 옵션의 `short_name` 이 그 상수인지 본다.
 - 아이콘은 `import.meta.env.BASE_URL + 'icons/icon-192.png'`(빌드 경로 `APP_BASE` 를 따라감). 이미 workbox 프리캐시에 들어 있다.
 - 카탈로그(`/#/dev/catalog`)에 그림·그림 안내 네 장(브라우저별)·B 화면·C 화면을 상태별로 올린다.
 
 ### A 그림 안내
 
 - `InstallGuide`(지금 글 세 줄)를 장 넘기기 부품으로 바꾼다. 장 데이터는 브라우저별 배열 한 곳에 둔다(글 줄 + 그림 종류 + 누를 곳). 그림은 장마다 작은 부품(회색 면 브라우저 틀 + 메뉴 줄)이다.
+  - #142 구현: 문구·순서 `features/install/installGuideSteps.ts`(`INSTALL_GUIDE_WORDS` 그림 속 글자, `INSTALL_GUIDE_STEPS` 브라우저별 네 장), 장 그림 `InstallGuidePicture`, 브라우저 화면 모형 부품 `features/install/BrowserPicture`(`BrowserPicture`·`BrowserBar`·`BrowserPage`·`BrowserMenu`·`BrowserDialog`·누를 곳 표시 `TapMark` — C 카톡 메뉴 그림도 같은 부품으로 그린다), 넘겨 보는 안내 틀 `ui/SlideGuide`(B 에서도 쓸 수 있다). 모르는 브라우저 칩은 `SegmentedControl`.
 - `InstallGuideSheet`·`useInstallAction` 의 열기 조건은 그대로 두고, 창 안 내용과 [확인] 버튼이 [이전]·[다음]/[다 했어요] 로 바뀐다. 창을 닫았다 열면 1장부터라 장 번호는 창 안 상태로 충분하다.
-- 깜빡임은 CSS 애니메이션(투명도), `@media (prefers-reduced-motion: reduce)` 에서 멈춤. 값은 `tokens.css` 모션 토큰에서 고른다.
+- 깜빡임은 CSS 애니메이션(투명도), 동작 줄이기면 멈춤. 값은 `tokens.css` 모션 토큰에서 고른다. #142: `--motion-blink`(1.6s), 애니메이션은 `@media (prefers-reduced-motion: no-preference)` 안에만 둔다(AC-8 은 CSS 파일을 읽어 본다).
 - 창이 열려 있는 동안 `appinstalled` 를 듣고 닫는다(`installPrompt` 스토어의 `installed` 가 true 로 바뀌면).
 
 ### B
@@ -496,9 +497,9 @@ C 카톡 안에서 열렸을 때
 
 ## 열린 질문
 
-- 본문의 (확인 필요) 문구·동작 T-1~T-8 — 결정: 기술 확인 후 (첫 이슈, 개발 확인 화면)
+- 본문의 (확인 필요) 문구·동작 T-1~T-8 — 결정: 기술 확인 후 (첫 이슈, 개발 확인 화면). **배포 뒤 확인** (사용자 결정 2026-10-16: 실기기 확인 #141 은 배포 뒤에 한다). A 그림 안내(#142)의 T-1·T-2 문구는 위 표의 예상값으로 넣었고, 문구·순서는 `src/features/install/installGuideSteps.ts` 한 곳에서 고친다(그림 속 진한 줄과 글 줄 `[ ]` 안 글자가 같은지 테스트가 본다)
 - openExternal 이 안 열리면 주 버튼을 크롬 intent 로 바꾸고 이름을 [크롬으로 열기] 로 할지, 메뉴 그림을 주 안내로 올릴지 — 결정: 기술 확인 후 (T-3)
-- 그림 안내 창이 떠 있는 채로 브라우저 메뉴를 열 때 창이 메뉴를 가리지 않는지(크롬 ⋮ 는 위, 삼성 ≡ 는 아래 — 삼성은 창이 아래에서 올라와 겹칠 수 있다). 겹치면 창을 위쪽 절반에 띄우거나 "창을 닫고 메뉴를 눌러요" 를 글 줄에 더한다 — 결정: 구현 중 (실기기 T-2 와 같이)
+- 그림 안내 창이 떠 있는 채로 브라우저 메뉴를 열 때 창이 메뉴를 가리지 않는지(크롬 ⋮ 는 위, 삼성 ≡ 는 아래 — 삼성은 창이 아래에서 올라와 겹칠 수 있다). 겹치면 창을 위쪽 절반에 띄우거나 "창을 닫고 메뉴를 눌러요" 를 글 줄에 더한다 — 결정: 실기기 T-2 와 같이, **배포 뒤 확인** (#142 는 지금 선택 창 그대로 아래에서 올라온다)
 - 카톡 안 장부를 옮긴 뒤 카톡 안 장부를 지울지(그대로 두면 카톡에서 다시 열 때 ② 가 계속 뜬다 — 계속 인터넷 앱으로 안내하는 것이라 지금은 그대로 둔다) — 결정: v2.7 사용 후
 
 ## 변경 이력
@@ -507,3 +508,4 @@ C 카톡 안에서 열렸을 때
 |---|---|
 | 2026-10-16 | 초안: v2.7 시안 https://claude.ai/artifact/DHKyo1y5u31KCDxNsTzZ16 (사용자 결정 2026-10-16 — A·C 추천값, D 넣지 않음, B 는 "연습 끝 화면 다음에 먼저 묻기" 로 바꿈: "홈 화면에 추가하시겠어요?" + 좋은 점 + [추가할게요]/[다음에 할게요], [추가할게요] 만 설치 따라 하기 → 설치 확인 → 여기서 새 장부, [다음에 할게요] 는 바로 새 장부·카드 안 띄움). 사용자 추가 "홈화면추가했을 때 어떻게 보이는지도 같이 안내에" → 홈 화면 모습 그림(묻는 화면·그림 안내 4장·설치 확인 화면). 실기기 확인 T-1~T-8 과 개발 확인 화면 `/#/dev/env`. AC-1~37. status approved(사용자 승인) |
 | 2026-10-16 | 개발 확인 화면 구현(#141): 주소(미리보기 `/#/dev/env`, intent 는 `?dev=env`), 열리는 기준 미리보기 빌드 = `APP_BASE=/`(`__PREVIEW_BUILD__`, `VITE_DEV_TOOLS` 안 씀), 버튼 이름([설치 창 띄우기]·[복사 시험]·[붙여넣기 시험]·[kakaotalk openExternal 로 열기]), `navigator.share`·`canShare(files)` 표시, 결과 기록 sessionStorage. 실기기 결과(T-1~T-8)는 다음 문서 PR |
+| 2026-10-16 | A 그림 안내·홈 화면 모습 그림 구현(#142): 문구는 T-1·T-2 예상값 그대로, 실기기 확인은 배포 뒤(사용자 결정) — 열린 질문에 "배포 뒤 확인" 표시. 부품 이름 확정(`HomeScreenPreview`·`APP_SHORT_NAME`·`installGuideSteps`·`BrowserPicture`·`TapMark`·`SlideGuide`). 장 번호 "1 / 4" 는 글 줄 앞 알약, 화면 읽기는 "1 / 4, …". 창이 떠 있는 동안 `appinstalled` 가 오면 창을 닫는다(예외와 경계 그대로) |

@@ -4,7 +4,11 @@ import { itemIcon } from '../domain/itemIcon'
 import { yearReport } from '../domain/report'
 import type { EntryType } from '../domain/types'
 import { BookPicker } from '../features/books/BookPicker'
+import { BrowserBar, BrowserMenu, BrowserPage, BrowserPicture } from '../features/install/BrowserPicture'
+import { HomeScreenPreview } from '../features/install/HomeScreenPreview'
 import { InstallGuide } from '../features/install/InstallGuide'
+import { InstallGuidePicture } from '../features/install/InstallGuidePicture'
+import type { GuidePicture } from '../features/install/installGuideSteps'
 import { KeepRestoreScreen, KeptSummary } from '../features/keep/KeepRestoreScreen'
 import type { KeepServer } from '../features/keep/keepServer'
 import type { SheetHistory } from '../features/useScreenHistory'
@@ -40,6 +44,7 @@ import { NoticeBar } from '../ui/NoticeBar'
 import { OptionList, type Option } from '../ui/OptionList'
 import { SavedEntries, type SavedEntry } from '../ui/SavedEntries'
 import { SegmentedControl, type SegmentOptions } from '../ui/SegmentedControl'
+import { SlideGuide } from '../ui/SlideGuide'
 import { TextField } from '../ui/TextField'
 import { Toast } from '../ui/Toast'
 import './catalog.css'
@@ -80,6 +85,12 @@ const COLOR_TOKENS = [
   '--primary-pressed',
   '--primary-soft-pressed',
   '--danger-pressed',
+  '--browser-page',
+  '--browser-bar',
+  '--browser-field',
+  '--browser-menu',
+  '--browser-ink',
+  '--browser-dim',
 ]
 
 // 자리 크기 (개편 2·3·4 에서 역할 토큰으로 옮긴 뒤 지운다)
@@ -195,6 +206,16 @@ const EXPENSE_ONLY_REPORT = itemReport([
 ])
 
 const noop = () => {}
+
+// 설치 안내 그림 장 (홈 화면 모습 그림 장은 위 HomeScreenPreview 로 본다)
+const GUIDE_PICTURES: GuidePicture[] = [
+  'chrome-menu-button',
+  'chrome-menu',
+  'chrome-confirm',
+  'samsung-menu-button',
+  'samsung-add-page',
+  'samsung-confirm',
+]
 
 // 개발 모드 전용 디자인 카탈로그: 모든 기본 컴포넌트를 모든 상태로 한 화면에서 본다
 export function Catalog() {
@@ -923,8 +944,14 @@ export function Catalog() {
           </State>
         </Section>
 
-        <Section title="InstallGuide (홈 화면에 추가 방법 안내)">
-          <State label="설정 [홈 화면에 추가] 줄 (설치 제안이 없으면 누를 때 아래 안내 창)">
+        <Section title="홈 화면 모습 그림 (SPEC-009 HomeScreenPreview)">
+          <State label="묻는 화면·그림 안내 마지막 장·설치 확인 화면이 같이 쓴다. 화면 읽기: &quot;홈 화면에 '우리 장부' 아이콘이 생겨요&quot;">
+            <HomeScreenPreview />
+          </State>
+        </Section>
+
+        <Section title="InstallGuide (홈 화면에 추가 방법 안내, SPEC-009 그림 넘기기)">
+          <State label="설정 [홈 화면에 추가] 줄 (설치 제안이 없으면 누를 때 크롬 그림 안내 창)">
             <div className="catalog__card">
               <ListRow
                 icon="phone"
@@ -935,16 +962,59 @@ export function Catalog() {
               />
             </div>
           </State>
-          <State label="방법 안내 선택 창 · 삼성 인터넷">
-            <div className="catalog__frame catalog__frame--sheet">
+          <State label="방법 안내 선택 창 · 크롬 (1 / 4, [이전]·[다음] 으로 넘겨 보기)">
+            <div className="catalog__frame catalog__frame--guide">
               <BottomSheet inline open title="홈 화면에 추가하는 방법" onClose={noop}>
-                <InstallGuide browser="samsung" />
-                <Button onClick={noop}>확인</Button>
+                <InstallGuide browser="chrome" onFinish={noop} />
               </BottomSheet>
             </div>
           </State>
-          <State label="브라우저를 모를 때 (삼성 인터넷 + 크롬)">
-            <InstallGuide browser="other" />
+          <State label="방법 안내 선택 창 · 삼성 인터넷">
+            <div className="catalog__frame catalog__frame--guide">
+              <BottomSheet inline open title="홈 화면에 추가하는 방법" onClose={noop}>
+                <InstallGuide browser="samsung" onFinish={noop} />
+              </BottomSheet>
+            </div>
+          </State>
+          <State label="브라우저를 모를 때 (먼저 앱 고르기, 고르면 그 브라우저 1장)">
+            <InstallGuide browser="other" onFinish={noop} />
+          </State>
+          <State label="그림 장 모아 보기 (크롬 1·2·3, 삼성 인터넷 1·2·3 — 누를 곳 깜빡임, 동작 줄이기면 멈춤)">
+            <div className="catalog__pictures">
+              {GUIDE_PICTURES.map((picture) => (
+                <InstallGuidePicture key={picture} picture={picture} />
+              ))}
+            </div>
+          </State>
+        </Section>
+
+        <Section title="BrowserPicture · TapMark (브라우저 화면 모형 부품)">
+          <State label="부품 조합 예: 아래 도구 줄 ⋮ 를 누르고 아래 메뉴의 한 줄을 고르는 그림 (위 줄 단추면 화살표가 아래에서 위로)">
+            <div className="catalog__pictures">
+              <BrowserPicture name="example-bottom-button">
+                <BrowserPage title="우리 장부" />
+                <BrowserBar place="bottom" items={[{ icon: 'left' }, { icon: 'right' }, { icon: 'refresh' }, { icon: 'kebab', hot: true }]} />
+              </BrowserPicture>
+              <BrowserPicture name="example-bottom-menu">
+                <BrowserPage title="우리 장부" />
+                <BrowserMenu place="bottom" items={[{ label: '새로고침' }, { label: '링크 복사' }, { label: '메뉴 한 줄', hot: true }]} />
+                <BrowserBar place="bottom" items={[{ icon: 'left' }, { icon: 'right' }, { icon: 'refresh' }, { icon: 'kebab' }]} />
+              </BrowserPicture>
+            </div>
+          </State>
+        </Section>
+
+        <Section title="SlideGuide (넘겨 보는 안내 틀)">
+          <State label="그림 한 장 + &quot;1 / 3&quot; 글 줄 + [이전]·[다음], 마지막 장은 끝 버튼 이름. 손으로만 넘긴다">
+            <SlideGuide
+              slides={[
+                { picture: <HomeScreenPreview decorative />, text: '첫째 장 글 한 줄' },
+                { picture: <div className="catalog__frame" />, text: '둘째 장 글 한 줄' },
+                { picture: <div className="catalog__frame" />, text: '셋째 장은 끝 버튼이 [다 했어요]' },
+              ]}
+              finishLabel="다 했어요"
+              onFinish={noop}
+            />
           </State>
         </Section>
 
@@ -1103,8 +1173,7 @@ export function Catalog() {
       />
       <Toast message={toast} onDone={() => setToast(null)} />
       <BottomSheet open={installGuideOpen} title="홈 화면에 추가하는 방법" onClose={() => setInstallGuideOpen(false)}>
-        <InstallGuide browser="chrome" />
-        <Button onClick={() => setInstallGuideOpen(false)}>확인</Button>
+        <InstallGuide browser="chrome" onFinish={() => setInstallGuideOpen(false)} />
       </BottomSheet>
       <BottomSheet open={sheetOpen} title="몇 월인가요?" onClose={() => setSheetOpen(false)}>
         <MonthPicker
