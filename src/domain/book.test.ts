@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { book, ledger } from '../test/ledgerFixtures'
-import { bookBalance, carryoverWords, currentBook, isFirstYear } from './book'
+import { bookBalance, carryoverWords, currentBook, isFirstYear, totalEntryCount } from './book'
 import { CURRENT_SCHEMA_VERSION, type StoredData } from './types'
 
 const CLUB = book([], { id: 'club', name: '한랑드림' })
@@ -73,5 +73,15 @@ describe('SPEC-005 종류별 이월금 이름', () => {
     expect(isFirstYear(twoYears, 2026)).toBe(false)
     expect(isFirstYear(book([]), 2026)).toBe(true)
     expect(isFirstYear(undefined, 2026)).toBe(true)
+  })
+})
+
+describe('SPEC-008 모든 장부 기록 수', () => {
+  it('장부와 연도를 모두 합해 센다', () => {
+    const dues = [1, 'income', '회비', 10_000] as const
+    const club = book([ledger([dues, dues], { year: 2025 }), ledger([dues], { year: 2026 })], { id: 'club' })
+    const home = book([ledger([dues, dues, dues], { year: 2026 })], { id: 'home', kind: 'household' })
+    expect(totalEntryCount({ schemaVersion: CURRENT_SCHEMA_VERSION, books: [club, home], settings: {} })).toBe(6)
+    expect(totalEntryCount({ schemaVersion: CURRENT_SCHEMA_VERSION, books: [], settings: {} })).toBe(0)
   })
 })

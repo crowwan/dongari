@@ -1,0 +1,307 @@
+import { act, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it } from 'vitest'
+import App from './App'
+import type { StoredData } from './domain/types'
+import { ACTIVE_GUIDE, GUIDE_OFF, type GuideNumber, type GuideState } from './features/guide/guideRules'
+import { GUIDE_KEY, localGuideStore, type GuideStore } from './features/guide/guideStore'
+import { AutoKeeper, type KeepState } from './features/keep/AutoKeeper'
+import type { KeepServer } from './features/keep/keepServer'
+import type { Keep } from './features/keep/startKeep'
+import { createBackup } from './storage/backup'
+import { MemoryRepository } from './storage/MemoryRepository'
+import { ledger, storedWith, type EntrySpec } from './test/ledgerFixtures'
+
+const TODAY = new Date('2026-10-13T09:00:00.000+09:00')
+const PHONE_CODE = 'HK7M-29QF-MX4P-8R2D'
+
+// 기기의 안내 상태 (dongari:guide 대신 메모리)
+function memoryGuideStore(initial?: GuideState) {
+  const store = { saved: initial, load: () => store.saved, save: (next: GuideState) => (store.saved = next) }
+  return store
+}
+
+const seenUpTo = (...seen: GuideNumber[]): GuideState => ({ ...ACTIVE_GUIDE, seen })
+
+// 10월 기록 n 건이 든 2026년 장부 (복구 코드 있음, 기록 파일도 보내 둬서 30일 안내가 끼지 않는다)
+function phoneWith(count: number): StoredData {
+  const specs: EntrySpec[] = Array.from({ length: count }, (_, index) => [10, 'expense', `지출${index + 1}`, 10_000])
+  return { ...storedWith(ledger(specs, { year: 2026 })), settings: { lastBackupAt: TODAY.toISOString(), recoveryCode: PHONE_CODE } }
+}
+
+// 아무 일도 하지 않는 보관 서버로 자동으로 지키기를 쓸 수 있는 빌드
+function keepWith(state: KeepState = { enabled: true, lastKeptAt: TODAY.toISOString() }): Keep {
+  const server: KeepServer = {
+    put: async () => 'ok',
+    get: async () => ({ status: 'not-found' }),
+    remove: async () => true,
+    sendStatus: async () => {},
+  }
+  let saved = state
+  const store = { load: () => saved, save: (next: KeepState) => (saved = next) }
+  return { keeper: new AutoKeeper({ server, store, now: () => TODAY }), server }
+}
+
+function renderApp(data: StoredData | undefined, guideStore: GuideStore, keep?: Keep) {
+  let seq = 0
+  const repository = new MemoryRepository(data)
+  const view = render(
+    <App
+      repository={repository}
+      loaded={repository.load()}
+      keep={keep}
+      guideStore={guideStore}
+      options={{ now: () => TODAY, createId: () => `id-${++seq}`, createRecoveryCode: () => PHONE_CODE }}
+    />,
+  )
+  return { repository, ...view }
+}
+
+function pressBackButton() {
+  act(() => {
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+  })
+}
+
+const coachMark = () => screen.queryByTestId('coach-mark')
+
+function isLocked(element: HTMLElement): boolean {
+  return element.closest('[inert]') !== null
+}
+
+async function createFirstBook() {
+  await userEvent.click(screen.getByRole('button', { name: '동아리·모임' }))
+  await userEvent.type(screen.getByLabelText('장부 이름'), '한랑드림')
+  await userEvent.click(screen.getByRole('button', { name: '만들기' }))
+  await screen.findByTestId('ledger-screen')
+}
+
+// 내역 적기 화면에서 처음 쓰는 이름의 지출 하나를 [저장] 한다 (연달아 적기라 내역 적기에 남는다)
+async function saveExpense(name: string) {
+  const dayField = screen.getByRole('textbox', { name: '며칠인가요?' })
+  await userEvent.clear(dayField)
+  await userEvent.type(dayField, '3')
+  await userEvent.click(screen.getByRole('button', { name: '다음' }))
+  await userEvent.click(within(screen.getByRole('group', { name: '자주 쓴 항목' })).getByRole('button', { name: '직접 적기' }))
+  await userEvent.type(screen.getByLabelText('직접 적기'), name)
+  await userEvent.click(screen.getByRole('button', { name: '다음' }))
+  await userEvent.click(within(screen.getByRole('group', { name: '수입인가요, 지출인가요?' })).getByRole('button', { name: '지출' }))
+  await userEvent.type(screen.getByLabelText('얼마인가요?'), '10000')
+  await userEvent.click(screen.getByRole('button', { name: '저장' }))
+}
+
+async function finishEntries() {
+  await userEvent.click(screen.getByRole('button', { name: '다 적었어요' }))
+  await screen.findByTestId('ledger-screen')
+}
+
+// 가리키는 버튼과 그 설명(말풍선 글)
+function expectPointing(guide: GuideNumber, buttonName: string | RegExp, message: string) {
+  expect(coachMark()).toHaveAttribute('data-state', String(guide))
+  const target = screen.getByRole('button', { name: buttonName })
+  expect(target).toHaveAccessibleDescription(message)
+  return target
+}
+
+describe('SPEC-008 처음 쓰는 분 안내 말풍선 (화면)', () => {
+  it('AC-1 첫 실행에서 새 장부를 만들면 장부 화면에 말풍선 1이 [+ 내역 적기] 를 가리키며 뜬다', async () => {
+    const guideStore = memoryGuideStore()
+    renderApp(undefined, guideStore)
+    expect(coachMark()).not.toBeInTheDocument()
+
+    await createFirstBook()
+
+    expect(await screen.findByTestId('coach-mark')).toBeInTheDocument()
+    expectPointing(1, '내역 적기', '돈이 들어오거나 나가면 여기를 눌러 한 줄씩 적어요')
+    expect(guideStore.saved).toEqual(ACTIVE_GUIDE)
+  })
+
+  it('AC-2·AC-8 [+ 내역 적기] 를 누르면 말풍선이 닫히고 내역 적기가 열리며, 첫 기록을 저장하고 돌아오면 말풍선 2가 [10월 정리 보기] 를 가리킨다', async () => {
+    const guideStore = memoryGuideStore()
+    renderApp(undefined, guideStore)
+    await createFirstBook()
+    await screen.findByTestId('coach-mark')
+
+    await userEvent.click(screen.getByRole('button', { name: '내역 적기' }))
+    expect(screen.getByRole('heading', { level: 1, name: '내역 적기' })).toBeInTheDocument()
+    expect(coachMark()).not.toBeInTheDocument()
+    expect(guideStore.saved?.seen).toEqual([1])
+
+    await saveExpense('대관료')
+    await finishEntries()
+
+    expect(await screen.findByTestId('coach-mark')).toBeInTheDocument()
+    expectPointing(2, '10월 정리 보기', '이번 달에 얼마 쓰고 남았는지 여기서 봐요')
+  })
+
+  it('AC-3 기록이 있을 때 처음 올해 결산을 열면 말풍선 3이 아래 [사진으로 저장] 을 가리킨다', async () => {
+    renderApp(phoneWith(1), memoryGuideStore(seenUpTo(1, 2)))
+    expect(coachMark()).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '결산' }))
+
+    expect(await screen.findByTestId('coach-mark')).toBeInTheDocument()
+    expectPointing(3, '사진으로 저장', '사진으로 저장해 카톡·문자로 보낼 수 있어요')
+  })
+
+  it('AC-3 기록이 없으면 올해 결산을 열어도 말풍선 3이 뜨지 않는다', async () => {
+    renderApp(phoneWith(0), memoryGuideStore(seenUpTo(1)))
+
+    await userEvent.click(screen.getByRole('button', { name: '결산' }))
+
+    expect(screen.getByRole('heading', { level: 1, name: '2026년 결산' })).toBeInTheDocument()
+    expect(coachMark()).not.toBeInTheDocument()
+  })
+
+  it('AC-4 모든 장부 기록이 3건 이상이고 자동으로 지키기를 쓸 수 있으면 장부에서 말풍선 4가 [설정] 을 가리킨다', async () => {
+    renderApp(phoneWith(3), memoryGuideStore(seenUpTo(1, 2, 3)), keepWith())
+
+    expect(await screen.findByTestId('coach-mark')).toBeInTheDocument()
+    expectPointing(4, /^설정/, '폰을 바꿔도 기록이 돌아오게 복구 코드를 보내 두세요')
+  })
+
+  it('AC-5 서버 주소가 없는 빌드면 말풍선 4가 뜨지 않는다', () => {
+    renderApp(phoneWith(3), memoryGuideStore(seenUpTo(1, 2, 3)))
+
+    expect(coachMark()).not.toBeInTheDocument()
+  })
+
+  it('AC-5 자동으로 지키기가 꺼져 있으면 말풍선 4가 뜨지 않고, 켜면 다음에 장부로 돌아올 때 뜬다', async () => {
+    const keep = keepWith({ enabled: false })
+    renderApp(phoneWith(3), memoryGuideStore(seenUpTo(1, 2, 3)), keep)
+    expect(coachMark()).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /^설정/ }))
+    act(() => keep.keeper.setEnabled(true))
+    expect(coachMark()).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /장부로/ }))
+    await screen.findByTestId('ledger-screen')
+
+    expect(await screen.findByTestId('coach-mark')).toHaveAttribute('data-state', '4')
+  })
+
+  it('AC-6 두 말풍선이 같이 걸리면(3건을 한 번에 저장하고 돌아옴) 2만 뜨고, 닫아도 4가 잇따라 뜨지 않으며 다음에 장부가 보일 때 뜬다', async () => {
+    const guideStore = memoryGuideStore()
+    renderApp(undefined, guideStore, keepWith())
+    await createFirstBook()
+    await userEvent.click(await screen.findByRole('button', { name: '알겠어요' }))
+
+    await userEvent.click(screen.getByRole('button', { name: '내역 적기' }))
+    await saveExpense('대관료')
+    await saveExpense('꽃값')
+    await saveExpense('간식')
+    await finishEntries()
+
+    expect(await screen.findByTestId('coach-mark')).toHaveAttribute('data-state', '2')
+    await userEvent.click(screen.getByRole('button', { name: '알겠어요' }))
+    expect(coachMark()).not.toBeInTheDocument()
+
+    // 다음에 장부 화면이 보일 때 (월 정리에 다녀옴)
+    await userEvent.click(screen.getByRole('button', { name: '10월 정리 보기' }))
+    expect(coachMark()).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /장부로/ }))
+    await screen.findByTestId('ledger-screen')
+    expect(await screen.findByTestId('coach-mark')).toHaveAttribute('data-state', '4')
+  })
+
+  it('AC-7 말풍선이 떠 있는 동안 말풍선과 가리키는 버튼 밖은 inert 라 누르기·Tab 이 닿지 않는다', async () => {
+    renderApp(phoneWith(3), memoryGuideStore(seenUpTo(1, 2, 3)), keepWith())
+    await screen.findByTestId('coach-mark')
+
+    expect(isLocked(screen.getByRole('button', { name: '결산' }))).toBe(true)
+    expect(isLocked(screen.getByRole('button', { name: '내역 적기' }))).toBe(true)
+    expect(isLocked(screen.getByRole('button', { name: /^설정/ }))).toBe(false)
+    expect(isLocked(screen.getByRole('button', { name: '알겠어요' }))).toBe(false)
+    expect(isLocked(screen.getByRole('button', { name: '안내 닫기' }))).toBe(false)
+  })
+
+  it('AC-8 [10월 정리 보기]·[설정] 을 누르면 말풍선이 닫히고 그 화면이 열린다', async () => {
+    renderApp(phoneWith(3), memoryGuideStore(seenUpTo(1)), keepWith())
+    await screen.findByTestId('coach-mark')
+
+    await userEvent.click(screen.getByRole('button', { name: '10월 정리 보기' }))
+    expect(screen.getByRole('heading', { level: 1, name: '2026년 10월 정리' })).toBeInTheDocument()
+    expect(coachMark()).not.toBeInTheDocument()
+
+    // 뒤로 버튼 한 번에 장부로 (말풍선 칸을 화면 칸으로 바꿔 끼웠다)
+    pressBackButton()
+    await screen.findByTestId('ledger-screen')
+    expect(await screen.findByTestId('coach-mark')).toHaveAttribute('data-state', '4')
+    await userEvent.click(screen.getByRole('button', { name: /^설정/ }))
+    expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
+    expect(coachMark()).not.toBeInTheDocument()
+  })
+
+  it.each([
+    { how: '[알겠어요]', close: () => userEvent.click(screen.getByRole('button', { name: '알겠어요' })) },
+    { how: '[✕]', close: () => userEvent.click(screen.getByRole('button', { name: '안내 닫기' })) },
+    { how: '뒤로 버튼', close: async () => pressBackButton() },
+  ])('AC-9 $how 으로 닫으면 장부 화면에 남고, 그 말풍선은 앱을 다시 열어도 뜨지 않는다', async ({ close }) => {
+    const guideStore = memoryGuideStore(seenUpTo(1, 2, 3))
+    const { repository, unmount } = renderApp(phoneWith(3), guideStore, keepWith())
+    await screen.findByTestId('coach-mark')
+
+    await close()
+
+    expect(coachMark()).not.toBeInTheDocument()
+    expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
+    expect(guideStore.saved?.seen).toContain(4)
+    unmount()
+    render(<App repository={repository} loaded={repository.load()} keep={keepWith()} guideStore={guideStore} options={{ now: () => TODAY }} />)
+    expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
+    expect(coachMark()).not.toBeInTheDocument()
+  })
+
+  it('AC-10 첫 실행에서 기록 파일로 불러와 시작하면 말풍선이 하나도 뜨지 않는다', async () => {
+    const guideStore = memoryGuideStore()
+    renderApp(undefined, guideStore)
+
+    await userEvent.click(screen.getByRole('button', { name: '기록 파일 불러오기' }))
+    await userEvent.upload(
+      screen.getByLabelText('기록 파일 고르기'),
+      new File([createBackup(phoneWith(0), TODAY).text], '우리장부-기록.txt', { type: 'text/plain' }),
+    )
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '불러오기' }))
+    await screen.findByTestId('ledger-screen')
+
+    expect(guideStore.saved).toEqual(GUIDE_OFF)
+    expect(coachMark()).not.toBeInTheDocument()
+  })
+
+  it('AC-10 이미 쓰던 폰에서 두 번째 장부를 만들어도 안내를 켜지 않는다', async () => {
+    const guideStore = memoryGuideStore(GUIDE_OFF)
+    renderApp(phoneWith(0), guideStore)
+
+    await userEvent.click(screen.getByTestId('book-button'))
+    await userEvent.click(within(screen.getByRole('dialog', { name: '어느 장부를 볼까요?' })).getByRole('button', { name: '새 장부 만들기' }))
+    await userEvent.click(screen.getByRole('button', { name: '개인 가계부' }))
+    await userEvent.type(screen.getByLabelText('장부 이름'), '우리집')
+    await userEvent.click(screen.getByRole('button', { name: '만들기' }))
+    await screen.findByTestId('ledger-screen')
+
+    expect(guideStore.saved).toEqual(GUIDE_OFF)
+    expect(coachMark()).not.toBeInTheDocument()
+  })
+
+  it('AC-11 안내 상태는 dongari:guide 에만 있고 장부 데이터(기록 파일·보관본의 원본)에는 들어가지 않는다. 값이 깨졌으면 뜨지 않는다', async () => {
+    localStorage.setItem(GUIDE_KEY, '{깨짐')
+    const { repository, unmount } = renderApp(phoneWith(0), localGuideStore())
+    expect(coachMark()).not.toBeInTheDocument()
+    localStorage.removeItem(GUIDE_KEY)
+    unmount()
+
+    const fresh = memoryGuideStore()
+    const first = renderApp(undefined, fresh)
+    await createFirstBook()
+    await screen.findAllByTestId('coach-mark')
+    expect(JSON.stringify(first.repository.load().data)).not.toMatch(/guide|seen/)
+    expect(JSON.stringify(repository.load().data)).not.toMatch(/guide|seen/)
+  })
+
+  it('AC-12 말풍선이 열리면 포커스가 가리키는 버튼으로 간다', async () => {
+    renderApp(phoneWith(3), memoryGuideStore(seenUpTo(1, 2, 3)), keepWith())
+    await screen.findByTestId('coach-mark')
+
+    expect(screen.getByRole('button', { name: /^설정/ })).toHaveFocus()
+  })
+})

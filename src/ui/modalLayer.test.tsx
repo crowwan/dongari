@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BottomSheet } from './BottomSheet'
 import { ConfirmDialog } from './ConfirmDialog'
+import { useModalLayer } from './modalLayer'
 
 // 뒤 화면 버튼이 잠겼는지: 자신이나 조상 중 inert 가 있으면 Tab·화면 읽기가 닿지 않는다
 function isLocked(element: HTMLElement): boolean {
@@ -127,5 +129,55 @@ describe('#110 카탈로그 견본 (inline)', () => {
     expect(document.querySelector('[inert]')).toBeNull()
     expect(screen.getByRole('alertdialog').closest('main')).not.toBeNull()
     expect(screen.getByRole('dialog').closest('main')).not.toBeNull()
+  })
+})
+
+describe('SPEC-008 말풍선: 창 밖에 열어 둘 요소 (keepOpen)', () => {
+  // 뒤 화면 안의 가리키는 버튼은 열어 두고 나머지는 잠그는 창
+  function Pointing({ open }: { open: boolean }) {
+    const layerRef = useRef<HTMLDivElement>(null)
+    const targetRef = useRef<HTMLButtonElement>(null)
+    useModalLayer(open, layerRef, targetRef, true, targetRef)
+    return (
+      <>
+        <main>
+          <header>
+            <button type="button">결산</button>
+            <button type="button" ref={targetRef}>
+              설정
+            </button>
+          </header>
+          <button type="button">내역 적기</button>
+        </main>
+        {open &&
+          createPortal(
+            <div ref={layerRef}>
+              <button type="button">알겠어요</button>
+            </div>,
+            document.body,
+          )}
+      </>
+    )
+  }
+
+  it('창과 열어 둘 요소(가리키는 버튼)는 누를 수 있고 그 밖은 모두 잠긴다. 포커스는 가리키는 버튼으로 간다', () => {
+    render(<Pointing open />)
+
+    expect(isLocked(screen.getByRole('button', { name: '설정' }))).toBe(false)
+    expect(isLocked(screen.getByRole('button', { name: '알겠어요' }))).toBe(false)
+    expect(isLocked(screen.getByRole('button', { name: '결산' }))).toBe(true)
+    expect(isLocked(screen.getByRole('button', { name: '내역 적기' }))).toBe(true)
+    expect(screen.getByRole('button', { name: '설정' })).toHaveFocus()
+  })
+
+  it('닫으면 잠금이 모두 풀리고 포커스는 (열 때 있던 곳이 아니라) 가리키는 버튼에 남는다', () => {
+    const { rerender } = render(<Pointing open={false} />)
+    screen.getByRole('button', { name: '내역 적기' }).focus()
+    rerender(<Pointing open />)
+
+    rerender(<Pointing open={false} />)
+
+    expect(document.querySelector('[inert]')).toBeNull()
+    expect(screen.getByRole('button', { name: '설정' })).toHaveFocus()
   })
 })

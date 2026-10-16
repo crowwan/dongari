@@ -125,9 +125,12 @@ export function useScreenHistory(): ScreenHistory {
   }
 
   // 화면 칸 쌓기. 선택 창이 열려 있으면 창의 칸을 화면 칸으로 바꿔 끼운다: 창을 닫는 back() 은 늦게 오는 popstate 라
-  // 바로 이어 쌓으면 순서가 꼬이고, 바꿔 끼우면 그 화면에서 뒤로 버튼 한 번에 장부로 온다
+  // 바로 이어 쌓으면 순서가 꼬이고, 바꿔 끼우면 그 화면에서 뒤로 버튼 한 번에 장부로 온다.
+  // 확인 창 칸도 같다: 안내 말풍선(SPEC-008)이 가리키는 버튼을 누르면 말풍선 칸을 그 화면 칸으로 바꿔 끼운다
   function enterScreen(name: Screen['name']) {
-    if (sheetRef.current !== null && isSheetEntry(window.history.state)) {
+    const top: unknown = window.history.state
+    const onLayer = (sheetRef.current !== null && isSheetEntry(top)) || (dialogRef.current !== null && isDialogEntry(top))
+    if (onLayer) {
       const state: HistoryState = { screen: name }
       window.history.replaceState(state, '')
     } else {

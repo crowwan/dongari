@@ -3,6 +3,10 @@ import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
 import { NewBookScreen } from './features/books/NewBookScreen'
+import { FirstUseGuideMark } from './features/guide/FirstUseGuideMark'
+import type { GuideScreen } from './features/guide/guideRules'
+import type { GuideStore } from './features/guide/guideStore'
+import { useFirstUseGuide } from './features/guide/useFirstUseGuide'
 import type { KeepState } from './features/keep/AutoKeeper'
 import { KeepRestoreScreen } from './features/keep/KeepRestoreScreen'
 import { KEEP_REMINDER_MESSAGE, keepStatusText, needsKeepReminder } from './features/keep/keepStatus'
@@ -20,6 +24,7 @@ import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
 import { useScreenHeading } from './features/useScreenHeading'
 import { useScreenHistory } from './features/useScreenHistory'
+import { totalEntryCount } from './domain/book'
 import type { BookSetup, EntryInput } from './domain/ledger'
 import type { StoredData } from './domain/types'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
@@ -38,6 +43,8 @@ type AppProps = {
   options?: UseLedgerOptions
   // 복구 코드 자동 보관 (SPEC-006). 없으면 서버 주소가 정해지기 전 빌드 — 설정에 "준비 중", 복구 코드로 불러오기 없음
   keep?: Keep
+  // 처음 쓰는 분 안내 상태 (SPEC-008, 이 폰에만). 없으면 안내를 하지 않는다
+  guideStore?: GuideStore
 }
 
 // 복구 코드 [보내기] 결과 알림. 공유 화면을 그냥 닫았으면 알리지 않는다
@@ -54,7 +61,7 @@ const noKeepState = (): KeepState | undefined => undefined
 // 앱 뼈대 (SPEC-001 화면 구성, 탭 없음): 장부(첫 화면) / 내역 적기·고치기 / 설정 / 월 정리 / 올해 결산 / 새 장부 만들기.
 // 장부가 하나도 없으면 새 장부 만들기 화면만(첫 실행, SPEC-005).
 // 화면은 모두 지금 장부(마지막에 본 장부) 하나를 보여 준다. 장부를 고르기·만들기·지우기는 useLedger 가 지금 장부를 바꾸고 App 은 보던 달을 비운다
-export default function App({ repository, loaded, options, keep }: AppProps) {
+export default function App({ repository, loaded, options, keep, guideStore }: AppProps) {
   const ledger = useLedger(repository, loaded, options)
   const bookName = ledger.book?.name ?? ''
   const navigation = useScreenHistory()
@@ -71,6 +78,8 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
   const backup = useBackup(ledger, {
     now,
     onRestored: () => {
+      // 첫 실행에서 기록 파일로 시작했으면 이미 쓰던 분이다 (SPEC-008)
+      if (ledger.isFirstRun) guide.turnOff()
       setViewedMonth(undefined)
       navigation.backToLedger()
       setToast('불러왔어요')
@@ -121,7 +130,11 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
     const isFirstBook = ledger.isFirstRun
     if (ledger.createBook(setup)) {
       setToast('새 장부를 만들었어요')
-      if (isFirstBook) void requestPersistentStorage()
+      if (isFirstBook) {
+        void requestPersistentStorage()
+        // 처음 쓰는 분 안내는 이때만 켠다 (SPEC-008). 두 번째 장부를 만들 때는 켜지 않는다
+        guide.activate()
+      }
     }
     setViewedMonth(undefined)
     // 첫 실행이면 이미 장부 화면 자리라 돌아갈 방문 기록이 없다
@@ -130,8 +143,10 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
 
   // 복구 코드로 받아 온 데이터로 전체 바꾸기 (SPEC-006 AC-5). 백업 불러오기와 같이 올해 장부의 처음 달로 돌아가 알린다
   function restoreKept(data: StoredData) {
+    const wasFirstRun = ledger.isFirstRun
     const result = ledger.restoreBackup(data)
     if (result.ok) {
+      if (wasFirstRun) guide.turnOff()
       setViewedMonth(undefined)
       navigation.backToLedger()
       setToast('불러왔어요')
@@ -179,6 +194,24 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
   // 30일 백업 안내 (SPEC-002): [설정] 점 표시는 늘, 장부·설정 위 띠는 저장 안내가 없을 때만 (띠는 하나만: 저장 > 보관 > 백업)
   const needsBackup = backupReminderFor(ledger.data, now())
   const showBackupReminder = needsBackup && storageNoticeList.length === 0
+
+  // 처음 쓰는 분 안내 말풍선 (SPEC-008): 장부 화면·올해 결산이 새로 보일 때 띄울 것을 묻는다
+  const guideScreen: GuideScreen =
+    ledger.isFirstRun ? 'other' : screen.name === 'ledger' && ledger.ledger ? 'ledger' : screen.name === 'year-summary' ? 'year-summary' : 'other'
+  const guide = useFirstUseGuide({
+    store: guideStore,
+    visit: ledger.isFirstRun ? undefined : screen,
+    context: {
+      screen: guideScreen,
+      entryCount: totalEntryCount(ledger.data),
+      monthHasEntries: ledger.ledger?.entries.some((entry) => entry.month === month) ?? false,
+      yearHasEntries: (ledger.ledger?.entries.length ?? 0) > 0,
+      keepUsable: keepState?.enabled === true && recoveryCode !== undefined,
+      blocked:
+        storageNoticeList.length > 0 || navigation.dialog !== null || navigation.sheet !== null || navigation.confirmingLeave,
+    },
+    dialogs: navigation,
+  })
 
   function screenContent(): ReactNode {
     if (ledger.isFirstRun) {
@@ -281,6 +314,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
             carryoverWords={ledger.carryoverWords}
             onBack={navigation.backToLedger}
             onNotify={setToast}
+            guideTargetRef={guide.targets.yearAction}
           />
         )
       case 'add-entry':
@@ -396,6 +430,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
           onAddEntry={(entryMonth) => navigation.open({ name: 'add-entry', month: entryMonth })}
           onEditEntry={(id) => navigation.open({ name: 'edit-entry', id })}
           unsavedEntryIds={ledger.unsavedEntryIds}
+          guideTargets={guide.targets}
         />
       </>
     )
@@ -419,6 +454,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
         onCancel={navigation.cancelLeave}
       />
       <BackupDialogs backup={backup} />
+      <FirstUseGuideMark guide={guide} />
       <Toast message={toast} onDone={() => setToast(null)} />
     </div>
   )

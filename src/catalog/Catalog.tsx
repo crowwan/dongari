@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { carryoverWords } from '../domain/book'
 import { itemIcon } from '../domain/itemIcon'
 import { yearReport } from '../domain/report'
@@ -24,6 +24,7 @@ import { BalanceCard } from '../ui/BalanceCard'
 import { BottomActionBar } from '../ui/BottomActionBar'
 import { BottomSheet } from '../ui/BottomSheet'
 import { Button } from '../ui/Button'
+import { CoachMark } from '../ui/CoachMark'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { DayInput } from '../ui/DayInput'
 import { EntryCard } from '../ui/EntryCard'
@@ -1043,6 +1044,15 @@ export function Catalog() {
           </Button>
         </Section>
 
+        <Section title="CoachMark (처음 쓰는 분 안내 말풍선, SPEC-008)">
+          <State label="아래 버튼을 가리킬 때 (1번 [+ 내역 적기]: 말풍선 위, 꼬리 아래)">
+            <CoachMarkSample place="bottom" />
+          </State>
+          <State label="위쪽 버튼을 가리킬 때 (4번 [설정]: 말풍선 아래, 꼬리 위)">
+            <CoachMarkSample place="top" />
+          </State>
+        </Section>
+
         <Section title="Toast">
           <State label="보이는 중">
             <div className="catalog__frame">
@@ -1082,6 +1092,33 @@ export function Catalog() {
           }}
         />
       </BottomSheet>
+    </div>
+  )
+}
+
+// 말풍선 견본: 틀 안에 가리키는 버튼 하나와 말풍선(inline). 뒤 화면 잠금·포커스 옮기기는 하지 않는다
+function CoachMarkSample({ place }: { place: 'top' | 'bottom' }) {
+  const targetRef = useRef<HTMLButtonElement>(null)
+  return (
+    <div className="catalog__frame catalog__frame--coach">
+      {place === 'top' ? (
+        <div className="catalog__row catalog__coach-top">
+          <IconButton ref={targetRef} icon="settings" onClick={noop}>
+            설정
+          </IconButton>
+        </div>
+      ) : (
+        <BottomActionBar buttonRef={targetRef} icon="plus" label="내역 적기" onClick={noop} />
+      )}
+      <CoachMark
+        inline
+        open
+        name={place === 'top' ? '4' : '1'}
+        target={targetRef}
+        message={place === 'top' ? '폰을 바꿔도 기록이 돌아오게 복구 코드를 보내 두세요' : '돈이 들어오거나 나가면 여기를 눌러 한 줄씩 적어요'}
+        onDismiss={noop}
+        onTargetPress={noop}
+      />
     </div>
   )
 }

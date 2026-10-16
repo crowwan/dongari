@@ -221,6 +221,19 @@
   --grab-w: 40px; /* 아래에서 올라오는 창 손잡이 */
   --grab-h: 4px;
 
+  /*
+   * 안내 말풍선 (SPEC-008 처음 쓰는 분 안내). 색은 알림과 같은 짝(--strong 면 + --surface 글자)이라 다크에서 그대로 뒤집히고,
+   * 뒤 화면은 --scrim, 가리키는 버튼 둘레는 --accent-ink(--focus-ring 굵기)
+   */
+  --coach-inset: 20px; /* 화면 좌우에서 말풍선까지 */
+  --coach-pad: 16px 16px 12px 18px; /* 말풍선 안쪽 여백 위·오른쪽·아래·왼쪽 */
+  --coach-line: 1.45; /* 말풍선 글 줄 간격 */
+  --coach-tail: 18px; /* 꼬리 마름모 한 변 (45° 돌림) */
+  --coach-tail-corner: 3px;
+  --coach-ring-gap: 3px; /* 가리키는 버튼과 청록 둘레 사이 */
+  --coach-gap: 24px; /* 가리키는 버튼 가장자리에서 말풍선까지 (둘레 + 꼬리가 들어갈 자리) */
+  --coach-rise: 6px; /* 나타날 때 이만큼 아래에서 올라온다 (동작 줄이기면 없음) */
+
   /* 모션 */
   --motion-fast: 120ms;
   --motion-base: 220ms;

@@ -1,3 +1,4 @@
+import type { Ref } from 'react'
 import { BottomActionBar } from '../../ui/BottomActionBar'
 
 type SavePictureBarProps = {
@@ -9,13 +10,16 @@ type SavePictureBarProps = {
   onSave: () => void
   // 사진으로 만들 것이 없을 때 (기록 없는 올해 결산)
   disabled?: boolean
+  // 버튼 자체 (올해 결산 안내 말풍선이 가리킬 때, SPEC-008)
+  buttonRef?: Ref<HTMLButtonElement>
 }
 
 // 월 정리·올해 결산 아래 고정 [⬇ 사진으로 저장]. 만드는 동안은 "만드는 중…" 으로 바뀌고 누를 수 없다.
 // 아이폰은 공유 시트에서 무엇을 고를지 버튼 위에 알려 주고, 사진이 준비돼 한 번 더 눌러야 하면 [사진 앱에 저장] 으로 바뀐다
-export function SavePictureBar({ saving, ready = false, sharesToPhotos = false, onSave, disabled = false }: SavePictureBarProps) {
+export function SavePictureBar({ saving, ready = false, sharesToPhotos = false, onSave, disabled = false, buttonRef }: SavePictureBarProps) {
   return (
     <BottomActionBar
+      buttonRef={buttonRef}
       icon="download"
       label={saving ? '만드는 중…' : ready ? '사진 앱에 저장' : '사진으로 저장'}
       onClick={onSave}

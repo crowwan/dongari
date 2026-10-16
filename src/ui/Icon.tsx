@@ -28,6 +28,7 @@ import {
   TriangleAlert,
   Users,
   Wallet,
+  X,
   Zap,
   type LucideIcon,
 } from 'lucide-react'
@@ -56,6 +57,7 @@ export type IconName =
   | 'cloud'
   | 'key'
   | 'alert'
+  | 'close'
 
 const ICONS: Record<IconName, LucideIcon> = {
   // 항목 (domain/itemIcon 이 이름으로 고른다)
@@ -95,6 +97,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   key: KeyRound,
   // 저장 안 됨 알약 (SPEC-002 v2.6): 경고 세모
   alert: TriangleAlert,
+  // 안내 말풍선 닫기 (SPEC-008): 글자 없는 유일한 버튼이라 화면 읽기 이름("안내 닫기")을 버튼에 단다
+  close: X,
 }
 
 // 꾸밈 아이콘: 화면 읽기에서 숨기고(뜻은 옆 글자가 전한다), 크기·색은 놓인 자리의 CSS 가 정한다

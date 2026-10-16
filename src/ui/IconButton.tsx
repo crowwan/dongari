@@ -1,3 +1,4 @@
+import type { Ref } from 'react'
 import { Icon, type IconName } from './Icon'
 import './ui.css'
 
@@ -10,12 +11,15 @@ type IconButtonProps = {
   variant?: 'plain' | 'surface'
   // 점 표시 (예: 기록 파일 보내기 필요). 주면 오른쪽 위에 점을 찍고, 화면 읽기 이름에 이 말을 붙인다
   dotLabel?: string
+  // 안내 말풍선이 가리킬 때 (SPEC-008)
+  ref?: Ref<HTMLButtonElement>
 }
 
 // 아이콘 + 글자 버튼. 주 버튼보다 조용한 이동·보조 동작
-export function IconButton({ icon, children, onClick, variant = 'plain', dotLabel }: IconButtonProps) {
+export function IconButton({ icon, children, onClick, variant = 'plain', dotLabel, ref }: IconButtonProps) {
   return (
     <button
+      ref={ref}
       type="button"
       className="ui-icon-button"
       data-testid="icon-button"

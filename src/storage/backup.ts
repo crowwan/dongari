@@ -1,4 +1,5 @@
 // 백업 파일 만들기·읽기 (SPEC-002 백업). 파일 하나에 전체 저장 데이터(모든 장부, SPEC-005)를 담는다
+import { totalEntryCount } from '../domain/book'
 import type { StoredData } from '../domain/types'
 import { migrate, NewerSchemaError } from './migrate'
 
@@ -47,11 +48,7 @@ export function createBackup(data: StoredData, now: Date): BackupFile {
 }
 
 function summarize(data: StoredData): BackupSummary {
-  const ledgers = data.books.flatMap((book) => Object.values(book.ledgers))
-  return {
-    bookCount: data.books.length,
-    entryCount: ledgers.reduce((sum, item) => sum + item.entries.length, 0),
-  }
+  return { bookCount: data.books.length, entryCount: totalEntryCount(data) }
 }
 
 // 백업 파일 글자를 검증해 저장 데이터로 만든다. 낮은 버전 파일은 저장소와 같은 마이그레이션을 거친다

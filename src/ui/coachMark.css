@@ -1,0 +1,166 @@
+/*
+ * 안내 말풍선 (SPEC-008). 값은 tokens.css 의 --coach-* 와 공용 토큰만 쓴다.
+ * 자리(--coach-anchor·--coach-tail-x·--coach-hole-*)와 data-side 는 CoachMark 가 가리키는 버튼을 재서 넣는다
+ */
+@import '../styles/tokens.css';
+
+/* 틀: 화면 전체(카탈로그 견본은 가까운 position 조상 안). 누르기는 말풍선만 받고, 나머지는 아래 inert 화면으로 흘려 아무 일도 없다 */
+.ui-coach {
+  position: fixed;
+  inset: 0;
+  /* 확인 창(20)·알림(30) 위 */
+  z-index: 40;
+  pointer-events: none;
+  overflow: hidden;
+  font-family: var(--typeface);
+}
+
+.ui-coach[data-inline] {
+  position: absolute;
+}
+
+/* 가리키는 버튼 자리: 안은 비워 버튼이 그대로 보이고, 둘레 밖은 스크림으로 어둡게, 청록 둘레를 두른다 */
+.ui-coach__hole {
+  position: absolute;
+  top: calc(var(--coach-hole-top, 0px) - var(--coach-ring-gap));
+  left: calc(var(--coach-hole-left, 0px) - var(--coach-ring-gap));
+  width: calc(var(--coach-hole-width, 0px) + var(--coach-ring-gap) * 2);
+  height: calc(var(--coach-hole-height, 0px) + var(--coach-ring-gap) * 2);
+  border-radius: calc(var(--corner-md) + var(--coach-ring-gap));
+  box-shadow:
+    0 0 0 var(--focus-ring) var(--accent-ink),
+    0 0 0 100vmax var(--scrim);
+}
+
+/* 말풍선: 제목색 면 + 카드색 글자 (알림과 같은 짝). 글 | [✕] / [알겠어요] */
+.ui-coach__bubble {
+  position: absolute;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  width: calc(100% - var(--coach-inset) * 2);
+  max-width: calc(var(--content-max) - var(--coach-inset) * 2);
+  margin-inline: auto;
+  padding: var(--coach-pad);
+  border-radius: var(--corner-md);
+  background: var(--strong);
+  color: var(--surface);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: var(--space-2);
+  pointer-events: auto;
+}
+
+.ui-coach[data-side='above'] .ui-coach__bubble {
+  bottom: calc(var(--coach-anchor, 0px) + var(--coach-gap));
+}
+
+.ui-coach[data-side='below'] .ui-coach__bubble {
+  top: calc(var(--coach-anchor, 0px) + var(--coach-gap));
+}
+
+/* 재기 전(첫 그리기)에는 보이지 않는다 */
+.ui-coach:not([data-side]) .ui-coach__bubble {
+  visibility: hidden;
+}
+
+/* 꼬리: 마름모를 말풍선 가장자리에 반쯤 걸쳐 가리키는 버튼 가운데 쪽으로 */
+.ui-coach__bubble::after {
+  content: '';
+  position: absolute;
+  left: var(--coach-tail-x, 50%);
+  width: var(--coach-tail);
+  height: var(--coach-tail);
+  border-radius: var(--coach-tail-corner);
+  background: var(--strong);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.ui-coach[data-side='above'] .ui-coach__bubble::after {
+  bottom: calc(var(--coach-tail) / -2 + var(--space-1));
+}
+
+.ui-coach[data-side='below'] .ui-coach__bubble::after {
+  top: calc(var(--coach-tail) / -2 + var(--space-1));
+}
+
+.ui-coach__message {
+  margin: 0;
+  align-self: center;
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--coach-line);
+  letter-spacing: var(--letter-body);
+  /* 한글 낱말 가운데서 줄을 바꾸지 않는다 */
+  word-break: keep-all;
+}
+
+.ui-coach__close,
+.ui-coach__ok {
+  font-family: var(--typeface);
+  letter-spacing: var(--letter-body);
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ui-coach__close:focus-visible,
+.ui-coach__ok:focus-visible {
+  /* 짙은 말풍선 위라 청록 대신 카드색 링 */
+  outline: var(--focus-ring) solid var(--surface);
+  outline-offset: var(--stroke);
+}
+
+/* [✕]: 누르는 곳은 56 이지만 말풍선 오른쪽 위 여백까지 차지해 글 옆 자리를 덜 먹는다 */
+.ui-coach__close {
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  margin: calc(var(--space-3) * -1) calc(var(--space-3) * -1) 0 0;
+  padding: 0;
+  border-radius: var(--corner-sm);
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--surface);
+}
+
+/* [알겠어요]: 카드색 면 + 제목색 굵은 글자, 오른쪽 아래 */
+.ui-coach__ok {
+  grid-column: 1 / -1;
+  justify-self: end;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-5);
+  border-radius: var(--corner-sm);
+  background: var(--surface);
+  color: var(--strong);
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+/* 눌림: 말풍선 면(--strong)보다 한 단계 옅은 본문색 */
+.ui-coach__close:active {
+  background: var(--ink);
+}
+
+.ui-coach__ok:active {
+  background: var(--pressed);
+}
+
+/* 동작 줄이기를 켜지 않은 사람에게만 아래에서 올라오는 효과 */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-coach__bubble {
+    animation: ui-coach-in var(--motion-base) var(--motion-curve);
+  }
+}
+
+@keyframes ui-coach-in {
+  from {
+    transform: translateY(var(--coach-rise));
+  }
+  to {
+    transform: none;
+  }
+}
