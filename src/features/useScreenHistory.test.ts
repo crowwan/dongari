@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useScreenHistory } from './useScreenHistory'
+import { useScreenHistory, type Screen } from './useScreenHistory'
 
 // 안드로이드 뒤로 버튼: 브라우저가 방문 기록을 하나 빼고 popstate 를 보낸다
 function pressBackButton() {
@@ -22,9 +22,9 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function renderOpened() {
+function renderOpened(screen: Screen = { name: 'add-entry', month: 3 }) {
   const { result } = renderHook(() => useScreenHistory())
-  act(() => result.current.open({ name: 'add-entry', month: 3 }))
+  act(() => result.current.open(screen))
   push.mockClear()
   return result
 }
@@ -303,3 +303,116 @@ describe('SPEC-001 화면 이동과 뒤로가기', () => {
     })
   })
 })
+
+describe('#110 접근성 점검 09 확인 창과 뒤로 버튼', () => {
+  it('확인 창을 열면 방문 기록을 한 칸 쌓는다 (장부 화면에서도)', () => {
+    const { result } = renderHook(() => useScreenHistory())
+
+    act(() => result.current.openDialog('backup'))
+
+    expect(result.current.dialog).toBe('backup')
+    expect(push).toHaveBeenCalledWith({ screen: 'ledger', dialog: 'backup' }, '')
+  })
+
+  it('확인 창이 떠 있을 때 뒤로 버튼은 확인 창만 닫고 화면은 그대로다 ([아니요] 와 같다)', () => {
+    const result = renderOpened({ name: 'edit-entry', id: 'a' })
+    const onBack = vi.fn()
+    act(() => result.current.openDialog('delete', onBack))
+
+    pressBackButton()
+
+    expect(result.current.dialog).toBeNull()
+    expect(onBack).toHaveBeenCalledOnce()
+    expect(result.current.screen).toEqual({ name: 'edit-entry', id: 'a' })
+    expect(back).not.toHaveBeenCalled()
+  })
+
+  it('장부 화면의 확인 창(백업 불러오기)도 뒤로 버튼으로 닫히고 앱은 장부에 남는다', () => {
+    const { result } = renderHook(() => useScreenHistory())
+    act(() => result.current.openDialog('backup'))
+
+    pressBackButton()
+
+    expect(result.current.dialog).toBeNull()
+    expect(result.current.screen).toEqual({ name: 'ledger' })
+  })
+
+  it('적던 내용이 있어도 뒤로 버튼은 버릴까요보다 먼저 확인 창만 닫는다', () => {
+    const result = renderOpened({ name: 'edit-entry', id: 'a' })
+    act(() => result.current.confirmBeforeLeave(true))
+    act(() => result.current.openDialog('delete'))
+
+    pressBackButton()
+
+    expect(result.current.dialog).toBeNull()
+    expect(result.current.confirmingLeave).toBe(false)
+  })
+
+  it('편집 화면(선택 창 칸) 위에 확인 창을 열면 칸을 하나 더 쌓고, 뒤로 버튼은 확인 창만 닫아 편집 화면이 남는다', () => {
+    const result = renderOpened({ name: 'edit-entry', id: 'a' })
+    act(() => result.current.openSheet('settings-keep-restore'))
+    push.mockClear()
+
+    act(() => result.current.openDialog('keep-restore'))
+    expect(push).toHaveBeenCalledWith({ screen: 'edit-entry', sheet: 'settings-keep-restore', dialog: 'keep-restore' }, '')
+
+    pressBackButton()
+    expect(result.current.dialog).toBeNull()
+    expect(result.current.sheet).toBe('settings-keep-restore')
+  })
+
+  it('확인 창을 화면에서 닫으면([아니요]) 쌓은 칸을 되돌리고, 그 popstate 는 아무것도 바꾸지 않는다', () => {
+    const result = renderOpened({ name: 'edit-entry', id: 'a' })
+    const onBack = vi.fn()
+    act(() => result.current.openDialog('delete', onBack))
+
+    act(() => result.current.closeDialog())
+
+    expect(result.current.dialog).toBeNull()
+    expect(back).toHaveBeenCalledOnce()
+    pressBackButton()
+    expect(result.current.screen).toEqual({ name: 'edit-entry', id: 'a' })
+    expect(onBack).not.toHaveBeenCalled()
+  })
+
+  it('확인 창에서 바로 장부로 갈 때(지우기 뒤 backToLedger)는 확인 창 칸과 화면 칸을 한 번에 되돌린다', () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const result = renderOpened({ name: 'edit-entry', id: 'a' })
+    act(() => result.current.openDialog('delete'))
+
+    act(() => result.current.backToLedger())
+
+    expect(go).toHaveBeenCalledWith(-2)
+    expect(result.current.dialog).toBeNull()
+    pressBackButton()
+    expect(result.current.screen).toEqual({ name: 'ledger' })
+  })
+
+  it('장부 화면의 확인 창에서 장부로 갈 때(백업 불러온 뒤)는 확인 창 칸 하나만 되돌린다 (두 칸이면 앱이 닫힌다)', () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const { result } = renderHook(() => useScreenHistory())
+    act(() => result.current.openDialog('backup'))
+
+    act(() => result.current.backToLedger())
+
+    expect(back).toHaveBeenCalledOnce()
+    expect(go).not.toHaveBeenCalled()
+  })
+
+  it('선택 창을 확인 창으로 바꿔 끼우면(자동 보관 끄기) 뒤로 버튼은 바꿔 끼운 쪽의 onBack 을 부른다', () => {
+    const result = renderOpened({ name: 'edit-entry', id: 'a' })
+    const sheetBack = vi.fn()
+    const dialogBack = vi.fn()
+    act(() => result.current.openSheet('settings-keep', sheetBack))
+    push.mockClear()
+
+    act(() => result.current.openSheet('settings-keep-off', dialogBack))
+    expect(push).not.toHaveBeenCalled()
+
+    pressBackButton()
+    expect(result.current.sheet).toBeNull()
+    expect(dialogBack).toHaveBeenCalledOnce()
+    expect(sheetBack).not.toHaveBeenCalled()
+  })
+})
+

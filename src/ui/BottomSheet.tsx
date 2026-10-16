@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useModalLayer } from './modalLayer'
 import './ui.css'
 
 type BottomSheetProps = {
@@ -8,22 +10,18 @@ type BottomSheetProps = {
   // 바깥 누르기·Esc. 안드로이드 뒤로 버튼은 창을 여는 화면이 방문 기록으로 이어 준다
   onClose: () => void
   children: ReactNode
+  // 카탈로그 견본: 제자리에 그리고 뒤 화면을 잠그거나 포커스를 옮기지 않는다
+  inline?: boolean
 }
 
 // 아래에서 올라오는 선택 창: 여럿 중 하나를 고를 때 (열두 달 등). 평소엔 안 보이고 "바꾸기"를 누르면 올라온다
-export function BottomSheet({ open, title, onClose, children }: BottomSheetProps) {
+export function BottomSheet({ open, title, onClose, children, inline = false }: BottomSheetProps) {
   const titleId = useId()
   const sheetRef = useRef<HTMLDivElement>(null)
+  const layerRef = useRef<HTMLDivElement>(null)
 
-  // 열리면 창으로 포커스를 옮기고, 닫히면 연 자리로 돌려준다
-  useEffect(() => {
-    if (!open) return
-    const previous = document.activeElement
-    sheetRef.current?.focus({ preventScroll: true })
-    return () => {
-      if (previous instanceof HTMLElement) previous.focus()
-    }
-  }, [open])
+  // 떠 있는 동안 뒤 화면을 잠그고(#110) 창으로 포커스를 옮기고, 닫히면 연 자리로 돌려준다
+  useModalLayer(open, layerRef, sheetRef, !inline)
 
   useEffect(() => {
     if (!open) return
@@ -41,8 +39,8 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
     if (event.target === event.currentTarget) onClose()
   }
 
-  return (
-    <div className="ui-sheet-backdrop" data-testid="bottom-sheet" onClick={handleBackdropClick}>
+  const sheet = (
+    <div ref={layerRef} className="ui-sheet-backdrop" data-testid="bottom-sheet" onClick={handleBackdropClick}>
       <div ref={sheetRef} className="ui-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         <span className="ui-sheet__grab" aria-hidden="true" />
         <p className="ui-sheet__title" id={titleId}>
@@ -52,4 +50,5 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
       </div>
     </div>
   )
+  return inline ? sheet : createPortal(sheet, document.body)
 }

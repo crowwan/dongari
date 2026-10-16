@@ -32,6 +32,9 @@ const YEAR_SHEET = 'settings-year'
 const INSTALL_GUIDE_SHEET = 'settings-install-guide'
 const KEEP_SHEET = 'settings-keep'
 const KEEP_RESTORE_PAGE = 'settings-keep-restore'
+// 확인 창 (방문 기록 한 칸 — 뒤로 버튼은 확인 창만 닫는다, #110)
+const DELETE_BOOK_DIALOG = 'settings-delete-book'
+const KEEP_OFF_DIALOG = 'settings-keep-off' // 자동 보관 선택 창 칸에 바꿔 끼운다
 
 const KIND_QUESTION = '어떤 장부인가요?'
 const KIND_CHOICES: BookKind[] = ['club', 'household']
@@ -57,7 +60,7 @@ type SettingsScreenProps = {
   bookKind: BookKind
   carryoverWords: CarryoverWords // 이월금 줄 이름 (장부 종류·연도별, "작년 이월금" / "지금 남은 돈" …)
   canDeleteBook: boolean // 장부가 둘 이상일 때만 [이 장부 지우기] (빈 앱이 되지 않게)
-  onDeleteBook: () => void // 확인 창 [지우기]
+  onDeleteBook: () => boolean // 확인 창 [지우기]. 지웠으면 true (부른 쪽이 장부로 돌아간다), 저장하지 못했으면 false
   year: number
   yearChoices: number[] // 장부가 있는 연도 + 올해, 최신 순
   ledger: Ledger | undefined // 고른 연도 장부. 아직 없으면 undefined
@@ -111,11 +114,9 @@ export function SettingsScreen({
   install = browserInstallEnvironment(),
 }: SettingsScreenProps) {
   const installPrompt = useInstallPrompt(install.installPrompt)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [confirmingKeepOff, setConfirmingKeepOff] = useState(false)
 
   if (restoreByCode && sheets.sheet === KEEP_RESTORE_PAGE) {
-    return <KeepRestoreScreen {...restoreByCode} backLabel="설정" onBack={sheets.closeSheet} />
+    return <KeepRestoreScreen {...restoreByCode} dialogs={sheets} backLabel="설정" onBack={sheets.closeSheet} />
   }
 
   if (ledger && sheets.sheet === BOOK_NAME_PAGE) {
@@ -219,7 +220,7 @@ export function SettingsScreen({
       {/* 장부 지우기 (SPEC-005): 되돌릴 수 없어 맨 아래 위험 글자형으로 따로 두고, 확인을 받는다 */}
       {canDeleteBook && (
         <div className="settings__danger">
-          <Button variant="danger-text" onClick={() => setConfirmingDelete(true)}>
+          <Button variant="danger-text" onClick={() => sheets.openDialog(DELETE_BOOK_DIALOG)}>
             이 장부 지우기
           </Button>
         </div>
@@ -258,10 +259,13 @@ export function SettingsScreen({
             ]}
             value={keep.enabled ? 'on' : 'off'}
             onChange={(picked) => {
+              // 끄면 서버에 남은 사본을 어떻게 할지 묻는다: 선택 창 칸을 확인 창으로 바꿔 끼운다. 뒤로 버튼은 [남겨 두기] 와 같다
+              if (picked === 'off' && keep.enabled) {
+                sheets.openSheet(KEEP_OFF_DIALOG, () => keep.onTurnOff(false))
+                return
+              }
               sheets.closeSheet()
               if (picked === 'on' && !keep.enabled) keep.onTurnOn()
-              // 끄면 서버에 남은 사본을 어떻게 할지 묻는다
-              if (picked === 'off' && keep.enabled) setConfirmingKeepOff(true)
             }}
           />
         </BottomSheet>
@@ -273,32 +277,32 @@ export function SettingsScreen({
       </BottomSheet>
 
       <ConfirmDialog
-        open={confirmingDelete}
+        open={sheets.dialog === DELETE_BOOK_DIALOG}
         title={`‘${bookName}’ 장부와 기록을 모두 지울까요?`}
         description="되돌릴 수 없어요"
         confirmLabel="지우기"
         danger
         onConfirm={() => {
-          setConfirmingDelete(false)
-          onDeleteBook()
+          // 지웠으면 부른 쪽이 장부로 돌아가며 확인 창 칸까지 되돌린다
+          if (!onDeleteBook()) sheets.closeDialog()
         }}
-        onCancel={() => setConfirmingDelete(false)}
+        onCancel={sheets.closeDialog}
       />
 
-      {/* 자동 보관 끄기 (SPEC-006): 서버 사본을 남겨 둘지 지울지. 어느 쪽이든 끈다 (Esc·바깥은 남겨 두기) */}
+      {/* 자동 보관 끄기 (SPEC-006): 서버 사본을 남겨 둘지 지울지. 어느 쪽이든 끈다 (Esc·뒤로 버튼은 남겨 두기) */}
       <ConfirmDialog
-        open={confirmingKeepOff}
+        open={sheets.sheet === KEEP_OFF_DIALOG}
         title="보관해 둔 기록도 지울까요?"
         description="남겨 두면 나중에 복구 코드로 다시 불러올 수 있어요"
         cancelLabel="남겨 두기"
         confirmLabel="지우기"
         danger
         onConfirm={() => {
-          setConfirmingKeepOff(false)
+          sheets.closeSheet()
           keep?.onTurnOff(true)
         }}
         onCancel={() => {
-          setConfirmingKeepOff(false)
+          sheets.closeSheet()
           keep?.onTurnOff(false)
         }}
       />

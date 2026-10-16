@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { CURRENT_SCHEMA_VERSION, type StoredData } from '../../domain/types'
@@ -6,6 +6,7 @@ import { createBackup } from '../../storage/backup'
 import type { SaveResult } from '../../storage/LedgerRepository'
 import { book, ledger } from '../../test/ledgerFixtures'
 import { keepIdOf, sealKeep } from './keepCrypto'
+import { useScreenHistory } from '../useScreenHistory'
 import { KeepRestoreScreen } from './KeepRestoreScreen'
 import type { KeepGetResult, KeepServer } from './keepServer'
 
@@ -39,9 +40,19 @@ function answering(result: KeepGetResult): KeepServer {
 
 type Restore = (data: StoredData) => SaveResult
 
+type HarnessProps = { server: KeepServer; hasRecords: boolean; restore: Restore; onBack: () => void }
+
+// 확인 창은 App 처럼 방문 기록 훅이 연다
+function Harness({ server, hasRecords, restore, onBack }: HarnessProps) {
+  const dialogs = useScreenHistory()
+  return (
+    <KeepRestoreScreen server={server} hasRecords={hasRecords} onRestore={restore} backLabel="설정" onBack={onBack} dialogs={dialogs} />
+  )
+}
+
 function renderScreen(server: KeepServer, { hasRecords = true, restore = vi.fn<Restore>(() => ({ ok: true })) } = {}) {
   const onBack = vi.fn()
-  render(<KeepRestoreScreen server={server} hasRecords={hasRecords} onRestore={restore} backLabel="설정" onBack={onBack} />)
+  render(<Harness server={server} hasRecords={hasRecords} restore={restore} onBack={onBack} />)
   return { restore, onBack }
 }
 
@@ -138,5 +149,23 @@ describe('SPEC-006 복구 코드로 불러오기 화면', () => {
     const { onBack } = renderScreen(answering({ status: 'not-found' }))
     await userEvent.click(screen.getByRole('button', { name: '설정' }))
     expect(onBack).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('#110 접근성 점검 09 복구 코드 확인 창과 뒤로 버튼', () => {
+  it('확인 창에서 뒤로 버튼을 누르면 확인 창만 닫히고 불러오기 화면(넣은 코드)은 그대로다', async () => {
+    const { restore, onBack } = renderScreen(await serverWithKept())
+    await typeCode(CODE)
+    await userEvent.click(screen.getByRole('button', { name: '불러오기' }))
+    await screen.findByRole('alertdialog')
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    })
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveValue(CODE)
+    expect(restore).not.toHaveBeenCalled()
+    expect(onBack).not.toHaveBeenCalled()
   })
 })

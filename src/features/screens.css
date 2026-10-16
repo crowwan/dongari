@@ -56,6 +56,11 @@
   margin-right: calc(var(--space-3) * -1);
 }
 
+/* 화면이 바뀌면 제목(h1)에 포커스를 준다 (#110, useScreenHeading). 화면 읽기용이라 포커스 테두리는 그리지 않는다 */
+.app__main h1[tabindex='-1']:focus {
+  outline: none;
+}
+
 /* 화면 제목: 글자 위계 맨 위 (Title). 질문·카드 제목(Heading)보다 한 단계 크다 */
 .screen__title {
   margin: 0;

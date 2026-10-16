@@ -39,9 +39,12 @@ type EditEntryFormProps = {
   onBack: () => void
   // 처음 값에서 바뀐 것이 있는지 알린다. 바뀌었으면 닫기 전에 "적던 내용을 버릴까요?" 를 묻는다
   onDirtyChange?: (dirty: boolean) => void
-  // 맨 아래 [이 내역 지우기] → 확인 후 불린다
+  // 맨 아래 [이 내역 지우기] → 확인 후 불린다. 부른 쪽이 장부로 돌아간다 (backToLedger 가 확인 창 칸까지 되돌린다)
   onDelete: () => void
 }
+
+// 지우기 확인 창 이름 (방문 기록 한 칸 — 뒤로 버튼은 확인 창만 닫는다, #110)
+const DELETE_DIALOG = 'edit-entry-delete'
 
 // 내역 고치기 (SPEC-001): 값을 한눈에 봐야 해서 펼친 모양 — 날짜(제목 옆 [10월 ▾] + 날 숫자 칸, #80) / 수입·지출 스위치 /
 // 항목 목록(지금 이름 체크) + 직접 적기 칸 / 금액, 질문 사이 넓은 간격, 맨 아래 [이 내역 지우기], 아래 고정 [저장].
@@ -61,7 +64,6 @@ export function EditEntryForm({
   const [draft, setDraft] = useState(initial)
   const initialDayText = initial.day === undefined ? '' : String(initial.day)
   const [dayText, setDayText] = useState(initialDayText)
-  const [askingDelete, setAskingDelete] = useState(false)
   const dayCheck = checkDayText(year, draft.month, dayText)
   // 날짜 없는 예전 기록을 날 칸을 비운 채 저장 (AC-25)
   const keepsUndated = initial.day === undefined && dayText === ''
@@ -134,19 +136,16 @@ export function EditEntryForm({
 
       {/* 지우기는 적는 흐름과 다른 큰 구획이라 질문 묶음보다 더 띄운다 */}
       <div className="entry__danger-zone">
-        <Button variant="danger-text" onClick={() => setAskingDelete(true)}>
+        <Button variant="danger-text" onClick={() => sheets.openDialog(DELETE_DIALOG)}>
           이 내역 지우기
         </Button>
         <ConfirmDialog
-          open={askingDelete}
+          open={sheets.dialog === DELETE_DIALOG}
           title="이 내역을 정말 지울까요?"
           confirmLabel="지우기"
           danger
-          onConfirm={() => {
-            setAskingDelete(false)
-            onDelete()
-          }}
-          onCancel={() => setAskingDelete(false)}
+          onConfirm={onDelete}
+          onCancel={sheets.closeDialog}
         />
       </div>
 

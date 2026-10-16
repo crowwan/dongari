@@ -5,6 +5,7 @@ import { BottomActionBar } from '../../ui/BottomActionBar'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { TextField } from '../../ui/TextField'
 import { BackButton } from '../BackToLedger'
+import type { SheetHistory } from '../useScreenHistory'
 import { restoreFailureMessage } from '../backup/backupMessages'
 import { fetchKept, type FetchKeptResult } from './keepRestore'
 import type { KeepServer } from './keepServer'
@@ -19,7 +20,11 @@ type KeepRestoreScreenProps = {
   onRestore: (data: StoredData) => SaveResult
   backLabel: string // 맨 위 되돌아가기 글자 (설정에서 왔으면 "설정", 첫 실행이면 "뒤로")
   onBack: () => void
+  // 확인 창을 방문 기록 한 칸으로 연다 (설정 편집 화면 위에도 한 칸 더. 뒤로 버튼은 확인 창만 닫는다, #110)
+  dialogs: Pick<SheetHistory, 'dialog' | 'openDialog' | 'closeDialog'>
 }
+
+const CONFIRM_DIALOG = 'keep-restore'
 
 type Found = Extract<FetchKeptResult, { status: 'found' }>
 
@@ -34,7 +39,7 @@ const FETCH_FAILURE: Record<Exclude<FetchKeptResult['status'], 'found'>, string>
 
 // 복구 코드로 불러오기 (SPEC-006): 글 칸(4자씩 자동 끊기) → [불러오기] → 받아 와 풀기 → 확인 창(보관한 때·장부·기록 수) → 바꾸기.
 // 설정 "기록 지키기" 와 첫 실행(새 장부 만들기) 화면에서 연다
-export function KeepRestoreScreen({ server, hasRecords, onRestore, backLabel, onBack }: KeepRestoreScreenProps) {
+export function KeepRestoreScreen({ server, hasRecords, onRestore, backLabel, onBack, dialogs }: KeepRestoreScreenProps) {
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | undefined>()
@@ -46,14 +51,18 @@ export function KeepRestoreScreen({ server, hasRecords, onRestore, backLabel, on
     setError(undefined)
     const result = await fetchKept(server, code)
     setLoading(false)
-    if (result.status === 'found') setFound(result)
-    else setError(FETCH_FAILURE[result.status])
+    if (result.status === 'found') {
+      setFound(result)
+      dialogs.openDialog(CONFIRM_DIALOG, () => setFound(undefined))
+    } else setError(FETCH_FAILURE[result.status])
   }
 
   function replace(chosen: Found) {
     setFound(undefined)
+    // 바꿨으면 부른 쪽이 장부로 돌아가며 확인 창 칸까지 되돌린다
     const result = onRestore(chosen.data)
     if (result.ok) return
+    dialogs.closeDialog()
     const { title, description } = restoreFailureMessage(result.reason)
     setError(`${title}. ${description}`)
   }
@@ -89,13 +98,16 @@ export function KeepRestoreScreen({ server, hasRecords, onRestore, backLabel, on
       />
 
       <ConfirmDialog
-        open={found !== undefined}
+        open={dialogs.dialog === CONFIRM_DIALOG && found !== undefined}
         title="보관본으로 바꿀까요?"
         description={hasRecords ? '이 폰에 있던 기록은 지워져요' : undefined}
         confirmLabel="바꾸기"
         danger={hasRecords}
         onConfirm={() => found && replace(found)}
-        onCancel={() => setFound(undefined)}
+        onCancel={() => {
+          setFound(undefined)
+          dialogs.closeDialog()
+        }}
       >
         {found && (
           <KeptSummary
