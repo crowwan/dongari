@@ -55,7 +55,7 @@ type AddEntryFormProps = {
 
 // 내역 적기 (SPEC-001 기록 입력, ADR 004): 적는 내역 하나는 "지금 적는 내역" 카드 하나 — 답한 것은 카드 안 한 줄로 접히고,
 // 지금 할 질문 하나만 같은 카드 맨 아래에 펼쳐진다(AC-23).
-// 며칠인가요?(날 숫자 칸 + 빠른 칩, v2.2 #80) → 무엇인가요?(항목 목록 / 직접 적기 → 처음 쓰는 이름이면 수입·지출) → 얼마인가요? → [저장]. 단계 상태는 entrySteps 순수 함수
+// 며칠인가요?(날 숫자 칸 + 빠른 칩, v2.2 #80) → 무엇인가요?(항목 목록 / 직접 적기 → 처음 쓰는 이름이면 수입·지출, 누르면 바로 다음 #111) → 얼마인가요? → [저장]. 단계 상태는 entrySteps 순수 함수
 // 저장하면 장부로 가지 않고 "며칠인가요?" 부터 다음 내역을 묻는다(연달아 적기 v2.1, 날은 매번 빈칸에서 묻는다). 맨 위 "장부에 넣었어요 · N건" 목록 + 아래 [다 적었어요]
 export function AddEntryForm({
   year,
@@ -91,15 +91,13 @@ export function AddEntryForm({
       case 'custom-name':
         dispatch({ kind: 'submit-custom-name', knownType: lastUsedType(state.customName) })
         return
-      case 'custom-type':
-        dispatch({ kind: 'submit-type' })
-        return
       case 'amount': {
         const check = stepInput(state)
         if (check.ok) onSave(check.input)
         return
       }
       case 'item':
+      case 'custom-type':
         return
     }
   }

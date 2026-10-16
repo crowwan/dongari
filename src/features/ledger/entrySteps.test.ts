@@ -223,29 +223,12 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
 
       expect(state.step).toBe('custom-type')
       expect(state.draft).toMatchObject({ name: '꽃값', type: undefined })
-      expect(stepButton(state)).toEqual({ label: '다음', missing: '수입인지 지출인지 골라 주세요' })
+      // 항목 고르기처럼 누르면 바로 넘어가서 아래 [다음] 이 없다 (#111)
+      expect(stepButton(state)).toBeNull()
       // 묻는 동안 항목 줄은 이름만 (종류는 지금 묻는 값이라 카드에 올리지 않는다)
       expect(answerRows(state)).toEqual([
         { kind: 'date', month: 10, day: 7 },
         { kind: 'item', name: '꽃값', type: undefined },
-      ])
-    })
-
-    it('AC-4 새 이름의 종류를 골라도 [다음] 을 누르기 전에는 카드 항목 줄에 종류를 올리지 않는다', () => {
-      const state = afterDay(
-        { kind: 'start-custom' },
-        { kind: 'type-custom-name', name: '꽃값' },
-        { kind: 'submit-custom-name', knownType: undefined },
-        { kind: 'pick-type', entryType: 'expense' },
-      )
-
-      expect(answerRows(state)).toEqual([
-        { kind: 'date', month: 10, day: 7 },
-        { kind: 'item', name: '꽃값', type: undefined },
-      ])
-      expect(answerRows(stepReducer(state, { kind: 'submit-type' }))).toEqual([
-        { kind: 'date', month: 10, day: 7 },
-        { kind: 'item', name: '꽃값', type: 'expense' },
       ])
     })
 
@@ -255,24 +238,26 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
       expect(answerRows(state)).toEqual([{ kind: 'date', month: 10, day: 7 }])
     })
 
-    it('AC-15 새 이름의 종류를 고르고 [다음] 을 누르면 금액 단계로 간다', () => {
-      const asking = afterDay(
-        { kind: 'start-custom' },
-        { kind: 'type-custom-name', name: '꽃값' },
-        { kind: 'submit-custom-name', knownType: undefined },
-      )
-      expect(stepReducer(asking, { kind: 'submit-type' })).toBe(asking)
-
+    it('AC-15 새 이름의 수입/지출을 고르면 [다음] 없이 바로 금액 단계로 가고, 카드 항목 줄에 종류가 붙는다 (#111)', () => {
       const state = afterDay(
         { kind: 'start-custom' },
         { kind: 'type-custom-name', name: '꽃값' },
         { kind: 'submit-custom-name', knownType: undefined },
         { kind: 'pick-type', entryType: 'expense' },
-        { kind: 'submit-type' },
       )
 
       expect(state.step).toBe('amount')
       expect(state.draft).toMatchObject({ name: '꽃값', type: 'expense' })
+      expect(answerRows(state)).toEqual([
+        { kind: 'date', month: 10, day: 7 },
+        { kind: 'item', name: '꽃값', type: 'expense' },
+      ])
+    })
+
+    it('이름이 비어 있으면 수입/지출을 골라도 넘어가지 않는다 (#111)', () => {
+      const naming = afterDay({ kind: 'start-custom' })
+
+      expect(stepReducer(naming, { kind: 'pick-type', entryType: 'income' })).toBe(naming)
     })
 
     it('AC-15 예전에 쓴 이름이면 묻지 않고 그때 종류로 정해 금액 단계로 간다', () => {
