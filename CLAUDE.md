@@ -32,7 +32,7 @@
 - 저장: localStorage (버전 있는 스키마, 지금 v3 = 장부 여러 개, `docs/decisions/001-storage.md`)
 - 월 정리·올해 결산 사진: html2canvas (누를 때만 불러온다) → `canvas.toBlob` → Blob 주소 `<a download>`. 아이폰·아이패드는 공유 시트(`navigator.share`, "이미지 저장")로 사진 앱에 (#58)
 - 테스트: Vitest + Testing Library (v2.0 에서 도입)
-- 배포: GitHub Pages (`base: '/dongari/'`), 홈 화면 추가·오프라인은 vite-plugin-pwa (#10)
+- 배포: 본 주소 GitHub Pages (`base: '/dongari/'`), 미리보기 Cloudflare Pages (`base: '/'`, #128). 홈 화면 추가·오프라인은 vite-plugin-pwa (#10)
 
 ## 실행
 
@@ -41,38 +41,38 @@ npm install
 npm run dev -- --port 7777   # 개발 서버
 npm run lint
 npm run build
-npm run build:preview        # 미리보기 경로(/dongari/preview/)로 빌드
+npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌드
 ```
 
-- 빌드 경로는 환경변수 `APP_BASE`(기본 `/dongari/`) 하나로 정한다 (`vite.config.ts`). 화면 파일·아이콘 경로, manifest `id`·`start_url`·`scope`, 서비스 워커 범위가 모두 따라간다. `build:preview` 는 `APP_BASE=/dongari/preview/`.
-- 자동 보관 서버 주소는 빌드 환경변수 `VITE_KEEP_URL`(SPEC-006). 없으면 자동 보관이 꺼진다(설정 맨 위 복구 코드 카드·"다른 방법으로 옮기기" 없이 기록 파일 보내기·불러오기 두 줄만, 복구 코드로 불러오기 없음, v2.6 #120). 배포 워크플로는 저장소 변수(Settings → Secrets and variables → Actions → Variables) `KEEP_URL` 을 넘긴다. 로컬에서 보려면 `VITE_KEEP_URL=http://localhost:8787 npm run dev -- --port 7777` + `cd worker && npx wrangler dev --local --port 8787`(서버는 `crowwan.github.io` 출처만 받으니 로컬 화면 확인은 CORS 를 여는 가짜 서버로)
+- 빌드 경로는 환경변수 `APP_BASE`(기본 `/dongari/`) 하나로 정한다 (`vite.config.ts`). 화면 파일·아이콘 경로, manifest `id`·`start_url`·`scope`, 서비스 워커 범위가 모두 따라간다. `build:preview` 는 `APP_BASE=/`(미리보기는 따로 된 주소의 맨 위, #128).
+- 미리보기 빌드를 로컬에서 보기: `npm run build:preview && npx vite preview --port 7777` → `http://localhost:7777/` (manifest `scope`·서비스 워커 범위가 `/`)
+- 자동 보관 서버 주소는 빌드 환경변수 `VITE_KEEP_URL`(SPEC-006). 없으면 자동 보관이 꺼진다(설정 맨 위 복구 코드 카드·"다른 방법으로 옮기기" 없이 기록 파일 보내기·불러오기 두 줄만, 복구 코드로 불러오기 없음, v2.6 #120). 배포 워크플로는 저장소 변수(Settings → Secrets and variables → Actions → Variables) `KEEP_URL` 을 넘긴다. 로컬에서 보려면 `VITE_KEEP_URL=http://localhost:8787 npm run dev -- --port 7777` + `cd worker && npx wrangler dev --local --port 8787`(서버는 본 주소 `https://crowwan.github.io`·미리보기 `https://uri-jangbu-preview.pages.dev` 두 출처만 받으니 로컬 화면 확인은 CORS 를 여는 가짜 서버로)
 
-### 배포 (자동, `.github/workflows/deploy.yml`, #52)
+### 배포 (자동, `.github/workflows/deploy.yml`, #52·#128)
 
-GitHub Pages 는 `gh-pages` 브랜치를 그대로 보여 준다. 워크플로는 린트·타입 검사·테스트를 통과한 뒤 `gh-pages` 브랜치에만 쓴다(작성자 github-actions 봇).
+워크플로는 린트·타입 검사·테스트를 통과한 뒤 배포한다. 미리보기와 본 주소는 **다른 출처(origin)** 다 (#128, ADR 008).
 
-| 언제 | 어디로 | gh-pages 에서 바뀌는 것 |
+| 언제 | 어디로 | 바뀌는 것 |
 |---|---|---|
-| main 에 머지(push) | 미리보기 `https://crowwan.github.io/dongari/preview/` | `preview/` 폴더만 새로 채움(옛 해시 파일 정리). 본 주소·`lab/` 은 그대로 |
-| 태그 `v*` push (`/release`) | 본 주소 `https://crowwan.github.io/dongari/` | 브랜치 전체를 새 빌드로 바꿈 → 옛 해시 파일·`preview/`·`lab/` 이 지워진다(아래 이유). 미리보기는 다음 main 머지 때 다시 생긴다 |
+| main 에 머지(push) | 미리보기 `https://uri-jangbu-preview.pages.dev/` (Cloudflare Pages 프로젝트 `uri-jangbu-preview`, 빌드 `APP_BASE=/`) | `wrangler pages deploy dist --branch main` — 운영 브랜치 배포라 고정 주소가 새 빌드로 바뀐다. 본 주소(gh-pages)는 건드리지 않는다 |
+| 태그 `v*` push (`/release`) | 본 주소 `https://crowwan.github.io/dongari/` (GitHub Pages, `gh-pages` 브랜치) | 브랜치 전체를 새 빌드로 바꿈 → 옛 해시 파일·옛 `preview/`·`lab/` 이 지워진다 |
 
-- 두 배포는 같은 concurrency 그룹에서 차례로 돈다(진행 중인 배포는 끊지 않음). `/release` 는 릴리스 PR 머지(미리보기) 뒤 태그(본 주소) 순서라 마지막에 본 주소 배포가 미리보기를 지운다. 대기 중인 배포가 있을 때 또 하나가 오면 GitHub 이 대기 중인 쪽을 취소하니, 태그 배포가 취소됐으면 Actions 에서 다시 실행한다.
-- 본 주소 서비스 워커(범위 `/dongari/`)와 미리보기 (#54):
-  - v2.0.0 의 본 주소 서비스 워커는 `/dongari/preview/` 화면 요청도 받아 본 주소 `index.html` 로 답했다(navigateFallback, 제외 목록 없음). 그래서 본 주소를 한 번 연 폰에서는 미리보기가 안 열렸다.
-  - v2.1.0 부터 본 주소 빌드에만 `navigateFallbackDenylist`(`/dongari/preview`·`/dongari/lab` 아래, base 에서 만든다, `src/pwa/pwaOptions.ts`)를 넣어 그 화면 요청은 네트워크로 보낸다. 미리보기 빌드에는 넣지 않는다(범위가 `/dongari/preview/` 안이라 본 주소 화면·파일 요청을 받지 않는다).
-  - 효과는 새 본 주소 서비스 워커가 폰에 깔린 뒤부터다. 이미 v2.0.0 서비스 워커가 있는 폰은 v2.1.0 배포 뒤 본 주소를 한 번 열어 서비스 워커가 바뀐 다음부터(autoUpdate, 다음에 열 때) 미리보기가 열린다. 그 전까지는 v2.0.0 처럼 덮인다.
-  - 미리보기 화면의 js·css 요청은 본 주소 서비스 워커가 받지 않는다(미리보기 화면은 미리보기 서비스 워커 또는 네트워크가 답하고, 본 주소 미리 저장 목록에는 `/dongari/preview/` 파일이 없음. 런타임 캐시는 쓰지 않는다).
-  - 남은 간섭 하나: 본 주소 서비스 워커가 새로 깔릴 때(릴리스 뒤 처음 열 때) 옛 캐시 정리(`cleanupOutdatedCaches`)가 이름에 `/dongari/` 가 들어간 미리보기 미리 저장 캐시도 지운다. 미리보기는 온라인이면 네트워크로 받아 열리지만, 캐시는 다시 채워지지 않아(workbox 는 무결성 값이 있을 때만 채움) 다음 미리보기 배포로 미리보기 서비스 워커가 새로 깔릴 때까지 오프라인으로는 안 열린다. 본 주소 서비스 워커는 릴리스 때만 바뀌고 그때 미리보기도 지워졌다가 다음 main 머지 때 새로 깔리므로 지금 흐름에서는 QA 에 걸리지 않는다. 본 주소의 옛 캐시 정리를 끄는 쪽이 더 위험해 그대로 둔다.
-- 릴리스 때 미리보기를 계속 지운다 (#54 에서 다시 판단):
-  - 릴리스 순서가 릴리스 PR 머지(미리보기) → 태그(본 주소)라, 릴리스 직후 미리보기는 본 주소와 같은 내용이다. 남겨도 QA 할 거리가 없고 다음 main 머지 때 다시 채워진다.
-  - 남기려면 본 주소 배포를 통째 교체에서 "`preview/`·`lab/` 빼고 지우기"(gh-pages `--remove` 글롭)로 바꿔야 한다. 글롭이 틀리면 옛 해시 파일이 쌓이거나 미리보기가 섞이는데, 얻는 것(본 주소와 같은 화면)에 비해 위험이 크다.
-  - 위 캐시 정리 때문에 릴리스 뒤 남겨 둔 미리보기는 본 주소를 연 폰에서 오프라인으로 안 열린다. 지웠다가 다음 main 머지로 새로 까는 지금 흐름이 오히려 깔끔하다.
-  - 릴리스 뒤에도 미리보기 주소를 계속 열어 둬야 하는 일(예: 본 주소 핫픽스 전 QA)이 생기면 그때 바꾼다.
-  - 다음 버전 QA 는 main 머지로 다시 채워진 미리보기에서 한다. v2.1.0 서비스 워커가 깔린 폰이면 본 주소를 연 폰에서도 된다(그 전 폰은 본 주소를 안 연 테스트용 폰·브라우저로).
-- 수동 배포(비상용, Actions 가 막혔을 때만): `npm run deploy:preview`(= 워크플로 미리보기와 같은 동작), `npm run deploy`(= 태그 배포와 같은 동작). 내 git 계정으로 gh-pages 에 바로 push 한다.
+- 미리보기 배포는 레포 Secrets `CLOUDFLARE_API_TOKEN`·`CLOUDFLARE_ACCOUNT_ID`(보관 서버와 같은 값)를 쓴다. 토큰에 **Account · Cloudflare Pages · Edit** 권한이 있어야 한다.
+  - 배포 전에 "미리보기 프로젝트 확인" 단계가 Cloudflare API 로 프로젝트를 읽어 보고, 없으면 처음 한 번 만든다(운영 브랜치 `main`). 손으로 만들려면 `cd worker && npx wrangler pages project create uri-jangbu-preview --production-branch main`.
+  - 비밀값이 없으면 "미리보기 배포 비밀값 없음", 권한이 없으면 "미리보기 프로젝트 확인 실패"/"미리보기 프로젝트 만들기 실패"(HTTP 코드·Cloudflare 오류 코드와 토큰 권한 넣는 길 안내)로 끝난다 → 고치고 Actions 에서 Re-run.
+  - 프로젝트가 처음 생긴 뒤 `*.pages.dev` 주소가 열리기까지 몇 분 걸릴 수 있다.
+  - wrangler 는 `worker/` 에 잠근 버전을 쓴다(워크플로가 `worker/` 에서 `npm ci` 뒤 `npx wrangler`).
+- 미리보기는 `--branch main` 하나로만 올린다. 배포마다 생기는 배포별 주소(`https://<hash>.uri-jangbu-preview.pages.dev`)는 보관 서버가 받지 않으니(정확한 주소만 허용) QA 는 고정 주소에서 한다.
+- 두 배포는 같은 concurrency 그룹에서 차례로 돈다(진행 중인 배포는 끊지 않음). 대기 중인 배포가 있을 때 또 하나가 오면 GitHub 이 대기 중인 쪽을 취소하니, 태그 배포가 취소됐으면 Actions 에서 다시 실행한다.
+- gh-pages 의 옛 `preview/`(#128 전 미리보기 자리)는 더 채우지 않는다. 다음 릴리스(통째 교체) 때 정리된다. 실험 페이지 `lab/share-test` 는 #114 실기기 확인이 끝날 때까지 gh-pages 에 둔다(`npx gh-pages --add` 로 손으로 올린 것, 다음 릴리스 때 같이 지워진다 — `dev/active/114-share-validation/README.md`).
+- 본 주소 서비스 워커(범위 `/dongari/`)와 하위 폴더 (#54):
+  - v2.0.0 의 본 주소 서비스 워커는 `/dongari/preview/` 화면 요청도 받아 본 주소 `index.html` 로 답했다. v2.1.0 부터 본 주소 빌드에만 `navigateFallbackDenylist`(`/dongari/preview`·`/dongari/lab` 아래, `src/pwa/pwaOptions.ts`)를 넣어 그 화면 요청은 네트워크로 보낸다. `lab/` 이 남아 있어 그대로 둔다.
+  - **미리보기는 #128 부터 다른 출처라 이 간섭(서비스 워커 범위, 옛 캐시 정리가 미리보기 캐시를 지우던 일, 릴리스 때 미리보기가 지워지던 일)이 모두 해당 없다.** 미리보기 빌드(`/`)에는 제외 목록을 넣지 않는다(옆에 하위 폴더 화면이 없음).
+- 수동 배포(비상용, Actions 가 막혔을 때만): `npm run deploy:preview`(= 워크플로 미리보기와 같은 동작, `worker/` 의 wrangler 로 — `cd worker && npm install` 과 `npx wrangler login` 또는 `CLOUDFLARE_ACCOUNT_ID`·`CLOUDFLARE_API_TOKEN` 셸 변수가 먼저 필요), `npm run deploy`(= 태그 배포와 같은 동작, 내 계정으로 gh-pages 에 바로 push).
 - 미리보기 주의:
-  - 미리보기와 본 주소는 같은 출처(`crowwan.github.io`)라 localStorage(`dongari:v2`)를 같이 쓴다. 미리보기에서 적은 QA 기록이 본 주소 v2 에도 보인다 → QA 는 테스트용 폰·브라우저로 하거나 끝나고 지운다.
-  - `/dongari/preview/` 는 본 주소 서비스 워커 범위 안이다. v2.1.0 서비스 워커가 깔리기 전 폰에서는 미리보기가 본 주소 화면으로 열린다(위 #54). 미리보기는 릴리스 전 QA 에만 쓴다.
+  - 미리보기는 본 주소와 다른 출처라 localStorage(`dongari:v2`·`dongari:keep`·`dongari:guide`)·서비스 워커·홈 화면 앱이 따로다. 미리보기에서 적고 지운 것은 본 장부에 안 보인다.
+  - 보관 서버는 같은 서버(`VITE_KEEP_URL` 그대로)를 쓰지만, 미리보기 출처의 요청은 KV 의 다른 자리(`preview:keep:<id>`·`preview:status:<id>`)에 둔다. 미리보기에서 어머니 복구 코드로 불러오면 본 사본이 아니라 미리보기 자리(대개 "없음")를 보고, 미리보기 자동 보관은 본 사본을 덮어쓰지 않는다. 보관 지켜보기 요약(`/v1/report`)은 본 자리(`status:`)만 본다.
+  - 그래서 미리보기에서 본 장부 내용으로 QA 하려면 본 주소에서 기록 파일을 보내 미리보기에서 불러온다(복구 코드로는 못 가져온다). 기록 파일에는 복구 코드도 들어 있어 미리보기가 본 주소와 같은 코드를 쓰게 되지만, 서버 자리가 달라 본 사본을 덮지 않는다.
 
 ### 자동 보관 서버 배포 (Cloudflare Worker, `.github/workflows/worker.yml`, #97)
 
@@ -84,7 +84,7 @@ GitHub Pages 는 `gh-pages` 브랜치를 그대로 보여 준다. 워크플로�
 | main 에 `worker/**` 변경이 들어옴, 또는 Actions → "보관 서버" → Run workflow | 테스트 → `wrangler deploy` |
 
 - 이름 `uri-jangbu-keep`, KV 바인딩 `KEEP`(namespace id 는 `worker/wrangler.toml`). 계정 id 는 파일에 쓰지 않고 비밀값으로 넘긴다.
-- 레포 Secrets 두 개가 필요하다: `CLOUDFLARE_API_TOKEN`(Workers 편집·KV 쓰기 권한 토큰), `CLOUDFLARE_ACCOUNT_ID`. 없으면 배포 단계가 "보관 서버 배포 비밀값 없음" 오류로 끝난다 → 넣고 Run workflow 로 다시 돌린다.
+- 레포 Secrets 두 개가 필요하다: `CLOUDFLARE_API_TOKEN`(Workers 편집·KV 쓰기 권한 토큰. 미리보기 배포도 같은 토큰을 써서 Cloudflare Pages 편집 권한도 필요, #128), `CLOUDFLARE_ACCOUNT_ID`. 없으면 배포 단계가 "보관 서버 배포 비밀값 없음" 오류로 끝난다 → 넣고 Run workflow 로 다시 돌린다.
 - 주소: `https://uri-jangbu-keep.<계정 서브도메인>.workers.dev`. 확인 방법은 둘 중 하나
   - Actions 배포 로그의 `wrangler deploy` 출력 마지막 주소
   - Cloudflare 대시보드 → Workers & Pages → `uri-jangbu-keep` → Domains
@@ -94,7 +94,8 @@ GitHub Pages 는 `gh-pages` 브랜치를 그대로 보여 준다. 워크플로�
   curl -i -X OPTIONS -H 'Origin: https://crowwan.github.io' \
     "$KEEP_URL/v1/keep/$(printf x | shasum -a 256 | cut -c1-64)"   # 204 + Access-Control-Allow-Origin
   ```
-  출처(Origin) 없이 `/v1/keep/...` 를 부르면 403 이 맞다.
+  출처(Origin) 없이 `/v1/keep/...` 를 부르면 403 이 맞다. 미리보기 출처 `https://uri-jangbu-preview.pages.dev` 로 보내도 204 + 같은 출처(#128).
+- 받는 출처와 KV 자리(#128, `worker/src/keep.ts` `ORIGIN_KEY_PREFIXES`): 본 주소 `https://crowwan.github.io` → `keep:<id>`·`status:<id>`, 미리보기 `https://uri-jangbu-preview.pages.dev` → `preview:keep:<id>`·`preview:status:<id>`. 정확한 주소만(배포별 `<hash>.uri-jangbu-preview.pages.dev`·http 는 403). CORS `Access-Control-Allow-Origin` 은 요청 출처 그대로(`Vary: Origin`).
 - 요약 토큰(SPEC-007, #104): 보관 지켜보기 워크플로(#106)가 `GET /v1/report` 를 부를 때 쓴다. 넣지 않으면 요약은 늘 401.
   ```bash
   TOKEN=$(openssl rand -hex 32)

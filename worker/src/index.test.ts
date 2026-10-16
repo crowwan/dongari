@@ -508,3 +508,113 @@ describe('SPEC-007 자동 보관 지켜보기 서버 (Worker)', () => {
     })
   })
 })
+
+const PREVIEW_ORIGIN = 'https://uri-jangbu-preview.pages.dev'
+
+describe('SPEC-006·SPEC-007 미리보기 주소는 저장 자리를 나눈다 (#128)', () => {
+  let store: FakeKeepStore
+  const send = (req: Request, reportToken?: string) =>
+    worker.fetch(req, { KEEP: store, REPORT_TOKEN: reportToken })
+  const fromPreview = (method: string, options: { url?: string; body?: string } = {}) =>
+    send(request(method, { ...options, origin: PREVIEW_ORIGIN }))
+
+  beforeEach(() => {
+    store = new FakeKeepStore()
+  })
+
+  it('미리보기에서 올린 보관본은 preview:keep:<id> 에만 저장하고 본 사본(keep:<id>)은 그대로 둔다', async () => {
+    const main = keepBody({ data: 'bWFpbg==' })
+    store.values.set(`keep:${ID}`, main)
+    const preview = keepBody({ data: 'cHJldmlldw==' })
+
+    const res = await fromPreview('PUT', { body: preview })
+
+    expect(res.status).toBe(204)
+    expect(store.values.get(`preview:keep:${ID}`)).toBe(preview)
+    expect(store.values.get(`keep:${ID}`)).toBe(main)
+  })
+
+  it('미리보기에서 받으면 미리보기 자리의 것만 준다 (같은 복구 코드라도 본 사본을 주지 않는다)', async () => {
+    store.values.set(`keep:${ID}`, keepBody({ data: 'bWFpbg==' }))
+
+    expect((await fromPreview('GET')).status).toBe(404)
+
+    const preview = keepBody({ data: 'cHJldmlldw==' })
+    store.values.set(`preview:keep:${ID}`, preview)
+    const res = await fromPreview('GET')
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe(preview)
+  })
+
+  it('미리보기에서 지우면 미리보기 자리의 보관본·상태 신호만 지운다', async () => {
+    store.values.set(`keep:${ID}`, keepBody())
+    store.values.set(`status:${ID}`, statusBody())
+    store.values.set(`preview:keep:${ID}`, keepBody())
+    store.values.set(`preview:status:${ID}`, statusBody())
+
+    const res = await fromPreview('DELETE')
+
+    expect(res.status).toBe(204)
+    expect([...store.values.keys()].sort()).toEqual([`keep:${ID}`, `status:${ID}`])
+  })
+
+  it('미리보기에서 보낸 상태 신호는 preview:status:<id> 에 저장한다', async () => {
+    const res = await fromPreview('PUT', { url: STATUS_URL, body: statusBody() })
+
+    expect(res.status).toBe(204)
+    expect([...store.values.keys()]).toEqual([`preview:status:${ID}`])
+  })
+
+  it('본 주소 요청은 지금처럼 keep:<id>·status:<id> 에 저장한다', async () => {
+    await send(request('PUT', { body: keepBody() }))
+    await send(request('PUT', { url: STATUS_URL, body: statusBody() }))
+
+    expect([...store.values.keys()].sort()).toEqual([`keep:${ID}`, `status:${ID}`])
+  })
+
+  it('요약(/v1/report)은 본 자리(status:)만 보고 미리보기 신호는 넣지 않는다', async () => {
+    await send(request('PUT', { url: STATUS_URL, body: statusBody() }))
+    const PREVIEW_ONLY_ID = 'c'.repeat(64)
+    await fromPreview('PUT', {
+      url: `https://keep.example.workers.dev/v1/status/${PREVIEW_ONLY_ID}`,
+      body: statusBody(),
+    })
+    // 미리보기 신호가 실제로 저장된 뒤에도 요약에 안 들어가는지 본다
+    expect(store.values.has(`preview:status:${PREVIEW_ONLY_ID}`)).toBe(true)
+
+    const res = await send(
+      request('GET', { url: REPORT_URL, origin: null, authorization: `Bearer ${TOKEN}` }),
+      TOKEN,
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toHaveProperty('devices', [expect.objectContaining({ id: 'aaaaaaaa' })])
+  })
+
+  it('미리보기 출처에는 Access-Control-Allow-Origin 을 그 출처 그대로 준다 (미리 요청 포함)', async () => {
+    const options = await fromPreview('OPTIONS')
+    const put = await fromPreview('PUT', { body: keepBody() })
+
+    expect(options.status).toBe(204)
+    for (const res of [options, put]) {
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(PREVIEW_ORIGIN)
+      expect(res.headers.get('Vary')).toBe('Origin')
+    }
+  })
+
+  it('미리보기의 배포별 주소·비슷한 주소·http 는 403 으로 거부하고 저장하지 않는다', async () => {
+    const origins = [
+      'https://0a1b2c3d.uri-jangbu-preview.pages.dev',
+      'http://uri-jangbu-preview.pages.dev',
+      'https://uri-jangbu-preview.pages.dev.evil.example',
+      'https://uri-jangbu-preview.pages.dev/',
+      'https://evil-uri-jangbu-preview.pages.dev',
+    ]
+    for (const origin of origins) {
+      const res = await send(request('PUT', { origin, body: keepBody() }))
+      expect(res.status).toBe(403)
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    }
+    expect(store.values.size).toBe(0)
+  })
+})

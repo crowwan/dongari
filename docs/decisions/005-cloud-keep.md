@@ -37,5 +37,5 @@ date: 2026-10-12
 ## 구현 (2026-10-13, #97)
 
 - 서버는 `worker/`(Worker 이름 `uri-jangbu-keep`, KV 바인딩 `KEEP`). 동작은 올리기(`PUT`)·받기(`GET`)·지우기(`DELETE`, 자동 보관을 끌 때 서버 사본 지우기용) 셋이다. API 는 SPEC-006 기술 메모 "서버 API".
-- 서버는 형식(이름 64자 16진수, `{ v, savedAt, iv, data }`, 1MB 상한)과 출처(`https://crowwan.github.io`)만 본다. 받은 JSON 을 그대로 저장하므로 내용·복구 코드는 여전히 모른다.
+- 서버는 형식(이름 64자 16진수, `{ v, savedAt, iv, data }`, 1MB 상한)과 출처(`https://crowwan.github.io`, #128 부터 미리보기 출처도 — 저장 자리를 나눔, ADR 008)만 본다. 받은 JSON 을 그대로 저장하므로 내용·복구 코드는 여전히 모른다.
 - 배포는 `.github/workflows/worker.yml`(main 에 `worker/**` 변경 또는 수동 실행 → 테스트 → `wrangler deploy`). 계정 id·API 토큰은 레포 Secrets 에만 둔다. 주소 확인·수동 배포는 CLAUDE.md "자동 보관 서버 배포".

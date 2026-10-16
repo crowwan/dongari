@@ -2,10 +2,18 @@
 // 폰에서 암호화한 보관본을 이름(복구 코드에서 만든 SHA-256 해시)별로 KV 에 덮어쓴다.
 // 서버는 내용도 복구 코드도 모른다: 받은 JSON 을 형식만 보고 그대로 저장·전달한다.
 // SPEC-007(ADR 006): 같은 이름으로 폰의 보관 상태 신호를 받아 두고, 토큰을 가진 쪽(GitHub Actions)에 요약을 준다.
+// #128(ADR 008): 본 주소와 미리보기 주소를 받고, 미리보기 요청은 KV 의 다른 자리(preview:)에 둔다.
 
 export const MAX_BODY_BYTES = 1_048_576
 export const MAX_STATUS_BYTES = 4096
-export const ALLOWED_ORIGIN = 'https://crowwan.github.io'
+
+// 받는 출처(앱 주소)와 그 출처의 KV 저장 자리 (#128)
+// 미리보기(Cloudflare Pages)는 키 앞에 preview: 를 붙여, 같은 복구 코드로 불러오거나 보관해도 본 사본에 닿지 않게 한다.
+// 미리보기의 배포별 주소(<hash>.uri-jangbu-preview.pages.dev)는 받지 않는다: 미리보기 QA 는 고정 주소 하나로 한다
+const ORIGIN_KEY_PREFIXES: ReadonlyMap<string, string> = new Map([
+  ['https://crowwan.github.io', ''],
+  ['https://uri-jangbu-preview.pages.dev', 'preview:'],
+])
 
 // KV 에서 쓰는 동작만 (Cloudflare KVNamespace 가 이 모양을 만족한다, 테스트는 가짜)
 export interface KeepStore {
@@ -31,15 +39,21 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2}
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Access-Control-Max-Age': '86400',
   Vary: 'Origin',
 } as const
 
-function respond(status: number, body: string | null = null, contentType?: string): Response {
+// 출처 검사를 통과한 요청: 응답 CORS 에 돌려줄 출처와 KV 키 앞에 붙일 자리
+interface AppRequest {
+  origin: string
+  keyPrefix: string
+}
+
+function respond(app: AppRequest, status: number, body: string | null = null, contentType?: string): Response {
   const headers = new Headers(CORS_HEADERS)
+  headers.set('Access-Control-Allow-Origin', app.origin)
   if (contentType) headers.set('Content-Type', contentType)
   return new Response(body, { status, headers })
 }
@@ -105,55 +119,56 @@ function parseStatusBody(text: string): StatusSignal | null {
 }
 
 // JSON 본문을 크기 상한 안에서 읽는다. 못 받을 본문이면 돌려줄 응답을 준다
-async function readJsonBody(request: Request, maxBytes: number): Promise<string | Response> {
+async function readJsonBody(request: Request, app: AppRequest, maxBytes: number): Promise<string | Response> {
   // 크기는 먼저 Content-Length 로 거르고, 실제 받은 바이트로 한 번 더 본다
   const declaredLength = Number(request.headers.get('Content-Length') ?? '0')
-  if (declaredLength > maxBytes) return respond(413)
+  if (declaredLength > maxBytes) return respond(app, 413)
 
   const contentType = request.headers.get('Content-Type') ?? ''
-  if (!contentType.toLowerCase().startsWith('application/json')) return respond(400)
+  if (!contentType.toLowerCase().startsWith('application/json')) return respond(app, 400)
 
   const bytes = await request.arrayBuffer()
-  if (bytes.byteLength > maxBytes) return respond(413)
+  if (bytes.byteLength > maxBytes) return respond(app, 413)
 
   return new TextDecoder().decode(bytes)
 }
 
-async function putKeep(request: Request, env: Env, key: string): Promise<Response> {
-  const text = await readJsonBody(request, MAX_BODY_BYTES)
+async function putKeep(request: Request, env: Env, app: AppRequest, key: string): Promise<Response> {
+  const text = await readJsonBody(request, app, MAX_BODY_BYTES)
   if (text instanceof Response) return text
-  if (!isKeepBody(text)) return respond(400)
+  if (!isKeepBody(text)) return respond(app, 400)
 
   await env.KEEP.put(key, text)
-  return respond(204)
+  return respond(app, 204)
 }
 
-async function putStatus(request: Request, env: Env, id: string): Promise<Response> {
-  const text = await readJsonBody(request, MAX_STATUS_BYTES)
+async function putStatus(request: Request, env: Env, app: AppRequest, id: string): Promise<Response> {
+  const text = await readJsonBody(request, app, MAX_STATUS_BYTES)
   if (text instanceof Response) return text
   const signal = parseStatusBody(text)
-  if (!signal) return respond(400)
+  if (!signal) return respond(app, 400)
 
   // 받은 때는 폰 시계가 아니라 서버 시각
-  await env.KEEP.put(`${STATUS_PREFIX}${id}`, JSON.stringify({ ...signal, seenAt: new Date().toISOString() }))
-  return respond(204)
+  const key = `${app.keyPrefix}${STATUS_PREFIX}${id}`
+  await env.KEEP.put(key, JSON.stringify({ ...signal, seenAt: new Date().toISOString() }))
+  return respond(app, 204)
 }
 
-async function handleKeep(request: Request, env: Env, id: string): Promise<Response> {
-  const key = `keep:${id}`
+async function handleKeep(request: Request, env: Env, app: AppRequest, id: string): Promise<Response> {
+  const key = `${app.keyPrefix}keep:${id}`
   switch (request.method) {
     case 'PUT':
-      return putKeep(request, env, key)
+      return putKeep(request, env, app, key)
     case 'GET': {
       const stored = await env.KEEP.get(key)
-      return stored === null ? respond(404) : respond(200, stored, 'application/json')
+      return stored === null ? respond(app, 404) : respond(app, 200, stored, 'application/json')
     }
     case 'DELETE':
-      // 보관본을 지우면 그 기기의 상태 신호도 지운다 (SPEC-007)
-      await Promise.all([env.KEEP.delete(key), env.KEEP.delete(`${STATUS_PREFIX}${id}`)])
-      return respond(204)
+      // 보관본을 지우면 그 기기의 상태 신호도 지운다 (SPEC-007). 같은 자리(본/미리보기) 안에서만
+      await Promise.all([env.KEEP.delete(key), env.KEEP.delete(`${app.keyPrefix}${STATUS_PREFIX}${id}`)])
+      return respond(app, 204)
     default:
-      return respond(405)
+      return respond(app, 405)
   }
 }
 
@@ -209,6 +224,7 @@ async function handleReport(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'GET') return new Response(null, { status: 405 })
   if (!isAuthorized(request, env.REPORT_TOKEN)) return new Response(null, { status: 401 })
 
+  // 본 자리만 본다: KV list 는 앞부분 일치라 미리보기 신호(preview:status:…)는 잡히지 않는다 (#128)
   const { keys } = await env.KEEP.list({ prefix: STATUS_PREFIX })
   const summaries = await Promise.all(
     keys.map(async ({ name }) => toDeviceSummary(name, await env.KEEP.get(name))),
@@ -228,13 +244,16 @@ export async function handleKeepRequest(request: Request, env: Env): Promise<Res
   if (!match) return new Response(null, { status: 404 })
 
   // 허용한 출처(앱 주소)에서 온 요청만 받는다. 출처가 없는 요청도 거부
-  if (request.headers.get('Origin') !== ALLOWED_ORIGIN) return new Response(null, { status: 403 })
+  const origin = request.headers.get('Origin')
+  const keyPrefix = origin === null ? undefined : ORIGIN_KEY_PREFIXES.get(origin)
+  if (origin === null || keyPrefix === undefined) return new Response(null, { status: 403 })
+  const app: AppRequest = { origin, keyPrefix }
 
-  if (request.method === 'OPTIONS') return respond(204)
+  if (request.method === 'OPTIONS') return respond(app, 204)
 
   const [, kind, id] = match
-  if (!KEEP_ID.test(id)) return respond(400)
+  if (!KEEP_ID.test(id)) return respond(app, 400)
 
-  if (kind === 'keep') return handleKeep(request, env, id)
-  return request.method === 'PUT' ? putStatus(request, env, id) : respond(405)
+  if (kind === 'keep') return handleKeep(request, env, app, id)
+  return request.method === 'PUT' ? putStatus(request, env, app, id) : respond(app, 405)
 }
