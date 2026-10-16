@@ -3,8 +3,11 @@ import { useSyncExternalStore } from 'react'
 // 크롬·삼성 인터넷이 "이 사이트를 설치할 수 있다" 고 알려 주는 이벤트. 표준 DOM 타입에 없어 필요한 만큼만 적는다
 type InstallPromptEvent = Event & {
   prompt: () => Promise<unknown>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+  userChoice: Promise<{ outcome: InstallOutcome }>
 }
+
+// 설치 창에서 고른 것 (userChoice)
+export type InstallOutcome = 'accepted' | 'dismissed'
 
 function isInstallPromptEvent(event: Event): event is InstallPromptEvent {
   return 'prompt' in event && typeof event.prompt === 'function' && 'userChoice' in event
@@ -20,8 +23,9 @@ export type InstallPromptState = {
 export type InstallPromptStore = {
   subscribe: (listener: () => void) => () => void
   getSnapshot: () => InstallPromptState
-  // 브라우저 설치 창을 연다. 설치 제안은 한 번만 쓸 수 있어 취소하면 canInstall 이 false 로 돌아간다
-  install: () => Promise<void>
+  // 브라우저 설치 창을 연다. 설치 제안은 한 번만 쓸 수 있어 취소하면 canInstall 이 false 로 돌아간다.
+  // 고른 것을 돌려준다(개발 확인 화면이 적는다, SPEC-009). 제안이 없으면 undefined
+  install: () => Promise<InstallOutcome | undefined>
 }
 
 // beforeinstallprompt 는 페이지마다 한 번 온다. 설정 화면을 떠났다 와도(줄이 다시 그려져도) 잃지 않게 화면 밖에서 받아 둔다
@@ -55,12 +59,13 @@ export function createInstallPromptStore(target: EventTarget): InstallPromptStor
     getSnapshot: () => state,
     async install() {
       const event = promptEvent
-      if (!event) return
+      if (!event) return undefined
       promptEvent = null
       update({ canInstall: false })
       await event.prompt()
       const { outcome } = await event.userChoice
       if (outcome === 'accepted') update({ installed: true })
+      return outcome
     },
   }
 }
@@ -68,7 +73,7 @@ export function createInstallPromptStore(target: EventTarget): InstallPromptStor
 // 앱이 뜨기 전에 온 제안도 받도록 모듈을 읽을 때 바로 듣기 시작한다
 export const browserInstallPrompt = createInstallPromptStore(globalThis.window ?? new EventTarget())
 
-export function useInstallPrompt(store: InstallPromptStore): InstallPromptState & { install: () => Promise<void> } {
+export function useInstallPrompt(store: InstallPromptStore): InstallPromptState & Pick<InstallPromptStore, 'install'> {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
   return { ...state, install: store.install }
 }

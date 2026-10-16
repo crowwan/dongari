@@ -10,3 +10,6 @@ interface ImportMetaEnv {
 
 // 앱 버전 (빌드 때 vite define 이 package.json version 을 넣는다, SPEC-007 상태 신호)
 declare const __APP_VERSION__: string
+
+// 미리보기 빌드(APP_BASE=/)인지 (vite define, SPEC-009 #141). 개발 확인 화면 /#/dev/env 를 이 빌드와 개발 모드에서만 연다
+declare const __PREVIEW_BUILD__: boolean

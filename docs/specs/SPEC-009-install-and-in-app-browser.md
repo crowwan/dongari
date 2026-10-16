@@ -366,18 +366,21 @@ v2.6 에서 홈 화면에 추가하는 길은 두 곳이다. 설정 맨 아래 [
 
 ### 개발 확인 화면 `/#/dev/env`
 
-- **개발 모드와 미리보기 빌드에서만** 연다. 본 주소 빌드 번들에는 들어가지 않는다(지금 `/#/dev/catalog` 처럼 빌드 때 빠지게).
+- 주소: 미리보기 `https://uri-jangbu-preview.pages.dev/#/dev/env`, 개발 서버 `http://localhost:7777/dongari/#/dev/env`. 크롬 intent 로 넘어온 주소는 해시를 못 넘겨 `?dev=env` 로도 연다(#141).
+- **개발 모드와 미리보기 빌드에서만** 연다. 본 주소 빌드 번들에는 들어가지 않는다(지금 `/#/dev/catalog` 처럼 빌드 때 빠지게). 미리보기 빌드 = 빌드 경로 `APP_BASE=/` 인 빌드(`npm run build:preview`·배포 워크플로 미리보기 단계 둘 다, #141 에서 확정 — 기술 메모 "개발 확인 화면").
 - 미리보기 주소(`https://uri-jangbu-preview.pages.dev/#/dev/env`)를 카톡 나와의 채팅에 보내 눌러 카톡 안 브라우저로도 연다. 해시가 카톡 안에서 그대로 넘어오는지도 이때 본다.
-- 화면에 보여 주는 것(위에서 아래로, 큰 글씨 아닌 개발용 화면이라 줄글로 충분):
+- 화면에 보여 주는 것(위에서 아래로, 개발용 화면이지만 폰에서 읽기 쉽게 큰 글씨):
   - user agent 전체 문자열, `browserKind` 결과, 카톡 안 판단 결과(`KAKAOTALK` 포함 여부), 안드로이드·아이폰 구분.
   - `display-mode: standalone` 여부.
-  - `beforeinstallprompt` 를 받았는지와 받은 시각. 받았으면 [설치 창 열기] 버튼과 `userChoice` 결과.
+  - `beforeinstallprompt` 를 받았는지와 받은 시각(화면을 열기 전에 받았으면 "받음 (화면 열기 전)"). 받았으면 [설치 창 띄우기] 버튼과 `userChoice` 결과.
   - `appinstalled` 를 받았는지와 받은 시각. 메뉴로 설치하는 동안 이 화면을 열어 둔다.
-  - [클립보드 쓰기 시험] 버튼(시험 글자를 쓰고 성공/실패와 오류 이름), [클립보드 읽기 시험] 버튼(읽은 글자 또는 오류 이름).
-  - [openExternal 로 열기] 링크(`kakaotalk://web/openExternal?url=<이 화면 주소 + ?from=kakao>`), [크롬 intent 로 열기] 링크. 열린 쪽에서 이 화면이 `from` 을 읽었는지 보여 준다.
-  - 참고값: `navigator.storage.persisted()`, 지금 출처(origin), 앱 버전 줄 값.
-- [결과 복사] 버튼: 위 값을 글로 묶어 클립보드에 쓴다. 복사가 안 되는 곳(카톡 안 등)을 위해 [결과 보내기](폰 공유 창으로 글 보내기)와 고를 수 있는 글 상자도 둔다.
-- 이 화면은 localStorage 를 읽지도 쓰지도 않는다. 장부·자동으로 지키기와 상관없다.
+  - `navigator.share` 있음, `canShare({ files })` 결과.
+  - [복사 시험] 버튼(시험 글자를 쓰고 성공/실패와 오류 이름), [붙여넣기 시험] 버튼(읽은 글자 또는 오류 이름).
+  - [kakaotalk openExternal 로 열기] 링크(`kakaotalk://web/openExternal?url=<이 화면 주소 + ?from=kakao>`), [크롬 intent 로 열기] 링크(`intent://<주소>?from=intent&dev=env#Intent;scheme=https;package=com.android.chrome;end`). 열린 쪽에서 이 화면이 `from` 을 읽었는지 "들어온 길" 로 보여 준다.
+  - 참고값: `navigator.storage.persisted()`, 지금 출처(origin), 앱 버전 줄 값, 지금 주소.
+- 결과 기록: 시험·이벤트·링크 누름마다 한 줄(시각, 이름, 성공/실패/받음/누름, 오류 이름)을 목록에 쌓는다. sessionStorage(`dongari-dev:env-log`)에 두어 새로고침해도 남고, 탭을 닫으면 사라진다.
+- [결과 복사] 버튼: 위 값과 결과 기록을 글로 묶어 클립보드에 쓴다. 복사가 안 되는 곳(카톡 안 등)을 위해 [결과 보내기](폰 공유 창으로 글 보내기, 공유 창이 있을 때만)와 고를 수 있는 글 상자도 둔다.
+- 이 화면은 localStorage 를 읽지도 쓰지도 않는다. 장부·자동으로 지키기와 상관없다(장부 저장소를 읽기 전에 이 화면으로 갈린다).
 - 결과는 이슈 댓글에 브라우저마다 붙이고, 이 절의 표에 결과 칸을 채워 둔다. 그 뒤 본문의 (확인 필요) 를 지우고 변경 이력에 한 줄 남긴다.
 
 ## 수용 기준
@@ -483,9 +486,13 @@ C 카톡 안에서 열렸을 때
 
 ### 개발 확인 화면
 
-- `src/catalog/route.ts` 처럼 해시 `#/dev/env` 를 보고 동적 import 로 연다. 열리는 조건은 `import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === '1'` 같은 빌드 때 정해지는 값이다. 배포 워크플로 미리보기 빌드 단계에만 `VITE_DEV_TOOLS=1` 을 넘긴다(`VITE_BUILD_SHA` 와 같은 자리). 본 주소 태그 빌드는 이 값이 없어 동적 import 가 번들에서 빠진다. 정확한 이름은 구현 중 확정.
-- `beforeinstallprompt`·`appinstalled` 는 지금 `browserInstallPrompt` 가 모듈을 읽을 때부터 듣는다. 확인 화면은 같은 스토어를 보고, 받은 시각만 따로 적는다.
-- AC-35 는 빌드 결과물에 확인 화면 글자가 없는지(본 주소 빌드)로 본다. 무겁다면 라우트 함수 단위 테스트(`DEV`·`VITE_DEV_TOOLS` 값별)로 대신하고 빌드 확인은 PR 에서 손으로 한다 — 구현 중 확정.
+- `src/devtools/` (#141): `route.ts`(`isDevEnvRoute`·`isPreviewBase`), `envChecks.ts`(카톡 판단·openExternal/intent 주소·결과 기록·결과 글, 순수 함수), `DevEnvScreen.tsx`(화면), `devEnvironment.ts`(브라우저 값 모으기, 테스트는 바꿔 넣는다).
+- `src/catalog/route.ts` 처럼 `main.tsx` 가 해시 `#/dev/env`(또는 `?dev=env`)를 보고 동적 import 로 연다. 열리는 조건은 `import.meta.env.DEV || __PREVIEW_BUILD__` 다.
+  - `__PREVIEW_BUILD__` 는 `vite.config.ts` 의 `define` 이 `isPreviewBase(APP_BASE)`(= 빌드 경로가 `/`)로 넣는 빌드 때 값이다. 본 주소 태그 빌드(`/dongari/`)는 둘 다 false 라 동적 import 가 번들에서 빠진다.
+  - 이 기준을 고른 이유: 미리보기 빌드의 정의가 이미 `APP_BASE=/` 하나다(#128). 로컬 `npm run build:preview` 와 배포 워크플로 미리보기 단계가 같은 값으로 빌드돼 워크플로를 바꿀 일이 없다. `VITE_BUILD_SHA` 는 워크플로만 넘겨 로컬 미리보기 빌드에는 없고, 따로 `VITE_DEV_TOOLS` 를 두면 미리보기를 정하는 값이 둘로 갈린다.
+  - 개발 모드·미리보기 빌드는 주소창에서 해시만 바꿔도(`hashchange`) 새로 열어 화면을 다시 고른다. 앱 화면 이동은 해시를 쓰지 않는다.
+- `beforeinstallprompt`·`appinstalled` 는 지금 `browserInstallPrompt` 가 모듈을 읽을 때부터 듣는다. 확인 화면은 같은 스토어를 보고(화면을 열기 전에 온 제안도 보인다), 화면이 열린 뒤 받은 시각만 따로 `window` 에서 듣는다. [설치 창 띄우기] 는 스토어의 `install()` 이 돌려주는 `userChoice` 결과(`accepted`·`dismissed`)를 적는다.
+- AC-35 는 라우트 함수 단위 테스트(`route.test.ts`, 켬/끔·`isPreviewBase`)로 보고, 빌드 결과물 확인(본 주소 빌드 `dist` 에 확인 화면 글자 없음, 미리보기 빌드에는 `DevEnvScreen-*.js` 조각 있음)은 PR 에서 손으로 한다.
 
 ## 열린 질문
 
@@ -499,3 +506,4 @@ C 카톡 안에서 열렸을 때
 | 날짜 | 내용 |
 |---|---|
 | 2026-10-16 | 초안: v2.7 시안 https://claude.ai/artifact/DHKyo1y5u31KCDxNsTzZ16 (사용자 결정 2026-10-16 — A·C 추천값, D 넣지 않음, B 는 "연습 끝 화면 다음에 먼저 묻기" 로 바꿈: "홈 화면에 추가하시겠어요?" + 좋은 점 + [추가할게요]/[다음에 할게요], [추가할게요] 만 설치 따라 하기 → 설치 확인 → 여기서 새 장부, [다음에 할게요] 는 바로 새 장부·카드 안 띄움). 사용자 추가 "홈화면추가했을 때 어떻게 보이는지도 같이 안내에" → 홈 화면 모습 그림(묻는 화면·그림 안내 4장·설치 확인 화면). 실기기 확인 T-1~T-8 과 개발 확인 화면 `/#/dev/env`. AC-1~37. status approved(사용자 승인) |
+| 2026-10-16 | 개발 확인 화면 구현(#141): 주소(미리보기 `/#/dev/env`, intent 는 `?dev=env`), 열리는 기준 미리보기 빌드 = `APP_BASE=/`(`__PREVIEW_BUILD__`, `VITE_DEV_TOOLS` 안 씀), 버튼 이름([설치 창 띄우기]·[복사 시험]·[붙여넣기 시험]·[kakaotalk openExternal 로 열기]), `navigator.share`·`canShare(files)` 표시, 결과 기록 sessionStorage. 실기기 결과(T-1~T-8)는 다음 문서 PR |

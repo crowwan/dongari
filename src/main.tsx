@@ -2,6 +2,7 @@ import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { isCatalogRoute } from './catalog/route'
+import { isDevEnvRoute } from './devtools/route'
 import { AppRoot } from './features/practice/AppRoot'
 import { localGuideStore, settleExistingPhone } from './features/guide/guideStore'
 import { localInstallOfferStore } from './features/install/installOffer'
@@ -16,6 +17,15 @@ async function pickScreen(): Promise<ReactNode> {
   if (import.meta.env.DEV && isCatalogRoute(window.location.hash, import.meta.env.DEV)) {
     const { Catalog } = await import('./catalog/Catalog')
     return <Catalog />
+  }
+  // 개발 모드·미리보기 빌드에서 #/dev/env (크롬 intent 로는 ?dev=env) 면 개발 확인 화면을 연다 (SPEC-009 기술 확인).
+  // 본 주소 빌드는 둘 다 false 라 아래 동적 import 가 번들에서 빠진다. 장부 저장소를 읽기 전에 돌아가 장부를 건드리지 않는다
+  if ((import.meta.env.DEV || __PREVIEW_BUILD__) && isDevEnvRoute(window.location, import.meta.env.DEV || __PREVIEW_BUILD__)) {
+    const [{ DevEnvScreen }, { browserDevEnvironment }] = await Promise.all([
+      import('./devtools/DevEnvScreen'),
+      import('./devtools/devEnvironment'),
+    ])
+    return <DevEnvScreen env={browserDevEnvironment()} />
   }
   // 저장소는 앱 시작 때 여기서 한 번만 읽는다. 읽기에는 깨진 원본을 옮겨 두는 부작용이 있어 렌더 중에 하지 않는다
   const storage = new LocalStorageRepository()
@@ -43,8 +53,8 @@ async function pickScreen(): Promise<ReactNode> {
   )
 }
 
-if (import.meta.env.DEV) {
-  // 주소창에서 카탈로그 ↔ 앱을 오갈 때 다시 고른다
+if (import.meta.env.DEV || __PREVIEW_BUILD__) {
+  // 주소창에서 카탈로그·개발 확인 화면 ↔ 앱을 오갈 때 다시 고른다 (앱 화면 이동은 해시를 쓰지 않는다)
   window.addEventListener('hashchange', () => window.location.reload())
 }
 

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { isPreviewBase } from './src/devtools/route'
 import { pwaOptions } from './src/pwa/pwaOptions'
 
 // manifest 의 색은 tokens.css 에서 읽는다 (값의 유일한 기준)
@@ -23,7 +24,11 @@ function packageVersion(): string {
 // https://vite.dev/config/
 export default defineConfig({
   base,
-  define: { __APP_VERSION__: JSON.stringify(packageVersion()) },
+  define: {
+    __APP_VERSION__: JSON.stringify(packageVersion()),
+    // 미리보기 빌드(APP_BASE=/)인지. 개발 확인 화면 /#/dev/env 를 미리보기에만 넣는다 (SPEC-009, #141)
+    __PREVIEW_BUILD__: JSON.stringify(isPreviewBase(base)),
+  },
   plugins: [react(), VitePWA(pwaOptions(tokensCss, base))],
   test: {
     environment: 'jsdom',
