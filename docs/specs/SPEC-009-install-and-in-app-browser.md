@@ -301,6 +301,7 @@ v2.6 에서 홈 화면에 추가하는 길은 두 곳이다. 설정 맨 아래 [
   2. `kakaotalk://web/openExternal?url=<지금 주소 + ?from=kakao>` 로 연다.
   - 복사하지 못하면 코드 카드 아래에 "복사하지 못했어요. 코드를 적어 두세요" 를 보이고, 코드를 크게 보여 준 채로 그대로 연다.
   - **복구 코드는 주소에 넣지 않는다.** 기록을 여는 열쇠라서 브라우저 방문 기록·카톡 서버에 남으면 안 된다.
+  - 이 화면(복구 코드 순서)이 떠 있는 동안 지금 주소에도 `?from=kakao` 를 붙여 둔다(`history.replaceState`, 화면을 떠나면 지운다). openExternal 이 안 열려 메뉴 '다른 브라우저로 열기' 로 열어도 열린 곳에 ③ 카드가 뜨게 하려는 것이다(#144). 카톡 안에서 다시 열면 `from` 은 무시하고 지운다.
 - 자동으로 지키기를 쓸 수 없으면 기록 파일로 옮기는 순서로 바꿔 보인다. 서버 주소 없는 빌드, 자동으로 지키기 꺼짐, 읽기 전용이라 복구 코드 없음이 그런 경우다.
   - 글 "기록 파일을 먼저 보내 두고, 인터넷 앱에서 불러와요."
   - 주 [↗ 기록 파일 보내기](설정과 같은 동작, SPEC-002). 보내기에 성공하면 주 버튼이 [인터넷 앱으로 열기](`?from=kakao` 없이)로 바뀐다.
@@ -472,7 +473,7 @@ C 카톡 안에서 열렸을 때
 
 - `AppRoot` 의 `Mode` 에 두 상태를 더한다: `{ name: 'ask-install', sent }`(②), `{ name: 'installed', confirmed: boolean }`(③). 끝 화면(`PracticeEnd`)은 묻는 경우 `next` 버튼으로 ② 로 간다. 방문 기록은 지금 끝 화면 칸 위에 ② 칸 하나를 쌓는다(②에서 뒤로 버튼 → ①). ③ 은 ② 칸을 바꿔 끼운다(③ 에서 뒤로 버튼 = [새 장부 만들기]).
   - #143 구현: `Mode` 는 `{ name: 'install', end }` 하나(end 는 뒤로 버튼으로 돌아갈 끝 화면, 끝 화면 `Mode` 에 `asksInstall`). ②·③ 은 `features/practice/PracticeInstall` 한 부품이 방문 기록 한 칸을 같이 쓰고(③ 은 그 칸 그대로 = 바꿔 끼운 것과 같다), 그림 안내 창 칸과 뒤로 버튼(창이 떠 있으면 창만, 없으면 ② → 끝 화면 / ③ → 새 장부 만들기)도 그 부품이 다룬다. 설치 신호(`installed`)가 오면 어느 때든 ③ "추가했어요", [다 했어요] 만이면 "생겼나요?". 화면은 `PracticeScreens` 의 `InstallAsk`·`InstallCheck`.
-  - 묻는 조건 `features/practice/askInstall.ts` `asksInstallAfterPractice({ firstRun, standalone, installed, inApp })`(`stopped` 는 [그만하기] 가 끝 화면에 오지 않아 뺐다). 카톡 안 판단은 C(#144) 전이라 같은 파일 `opensInKakao`(UA `KAKAOTALK`) — C 의 판단이 생기면 그쪽 하나로 모은다.
+  - 묻는 조건 `features/practice/askInstall.ts` `asksInstallAfterPractice({ firstRun, standalone, installed, inApp })`(`stopped` 는 [그만하기] 가 끝 화면에 오지 않아 뺐다). 카톡 안 판단은 C 의 `inAppKind`(#144, 진입점이 한 번 보고 `AppRoot` 에 `inApp` 으로 넘긴다) 하나다. #143 의 임시 `opensInKakao` 는 #144 에서 지웠다.
   - 표시 저장소 `features/practice/practiceMark.ts`(`localPracticeMarkStore`), `main.tsx` 가 `AppRoot` 에 `practiceMarkStore` 로 넘긴다. `useInstallAction`·`InstallGuideSheet` 는 선택 창 부분(`GuideSheetHistory` = `sheet`·`openSheet`·`closeSheet`)만 받고, `InstallGuideSheet` 에 `onFinished` 를 더했다.
 - 묻는 조건은 순수 함수로(가칭 `asksInstallAfterPractice({ firstRun, stopped, standalone, installed, inApp })`) 단위 테스트한다.
 - ② 의 [추가할게요] 는 `useInstallAction` 의 `start` 를 그대로 쓰고, 설치 결과를 받으려고 `installPrompt` 스토어의 `installed` 를 지켜본다. 그림 안내 창의 [다 했어요] 는 B 에서만 콜백(가칭 `onFinished`)을 받아 ③ "생겼나요?" 로 간다.
@@ -481,9 +482,11 @@ C 카톡 안에서 열렸을 때
 
 ### C
 
-- 판단 순수 함수(가칭 `features/install/inAppBrowser.ts` `inAppKind(userAgent)` → `'kakao-android' | 'kakao-ios' | undefined`)와 표시 저장소(`dongari:in-app`). `main.tsx` 가 저장소를 읽은 뒤 `AppRoot` 에 넘기고, `AppRoot` 의 `Mode` 에 `{ name: 'in-app' }` 을 더해 물음·장부보다 먼저 그린다.
+- 판단 순수 함수(`features/install/inAppBrowser.ts` `inAppKind(userAgent)` → `'kakao-android' | 'kakao-ios' | undefined`, 안드로이드·아이폰이 아니면 `undefined`)와 표시 저장소(`dongari:in-app`, `localInAppStore`).
+  - #144 구현: 예상값(T-3 `KAKAO_OPEN_EXTERNAL`, T-4 `KAKAO_UA_MARK`, T-5 메뉴 문구 `IN_APP_WORDS.menu`)과 화면 문구는 모두 `inAppBrowser.ts` 한 곳(개발 확인 화면 `devtools/envChecks.ts` 도 같은 값을 쓴다). 화면 `features/install/InAppBrowserScreen.tsx`(`InAppBrowserScreen`·장부 없는 ① 틀 `InAppStartScreen`·③ 카드 `InAppImportCard`), 메뉴 그림은 #142 `BrowserPicture`·`BrowserPage`·`BrowserMenu place="bottom"`·`BrowserBar`(⋮ hot). ① 은 `AppRoot` 의 `{ name: 'in-app' }`, ② 는 `App` 이 장부 화면 대신 그린다(기록 파일 보내기·보관기가 App 에 있어서). 설정 줄은 설정 위 화면(`settings-in-app`).
+  - ③ [카톡에서 쓰던 장부 가져오기] 는 `AppRoot` 가 클립보드를 읽고 `App` 을 `restoreFromKakao` 로 그려 첫 실행 [복구 코드로 불러오기] 화면 칸 하나만 쌓는다(물음 칸 위, 뒤로 버튼 → 물음). 첫 실행 물음은 `topCard` 로 카드를 받는다. `main.tsx` 가 저장소를 읽은 뒤 `AppRoot` 에 넘기고, `AppRoot` 의 `Mode` 에 `{ name: 'in-app' }` 을 더해 물음·장부보다 먼저 그린다.
 - openExternal 주소 만들기도 순수 함수(가칭 `openExternalUrl(location.href, { fromKakao })`)로. 링크는 `<a href>` 로 둔다(누름 처리 안 `location.href` 대입보다 카톡 안에서 막힐 일이 적다 — T-3 에서 둘 다 확인).
-- ② 의 바로 올리기는 SPEC-006 보관기(`AutoKeeper`)에 "지금 올리기"(10초 모으기 건너뛰기)와 결과 알림을 더한다. 지금 보관기는 실패하면 혼자 다시 시도하지 않는다. ② 는 `online` 때 다시 부른다.
+- ② 의 바로 올리기는 SPEC-006 보관기(`AutoKeeper`)에 "지금 올리기"(10초 모으기 건너뛰기)와 결과 알림을 더한다(#144 `keepNow(data)` → 다 올라갔는지). 지금 보관기는 실패하면 혼자 다시 시도하지 않는다. ② 는 `online` 때 다시 부른다.
 - 클립보드 쓰기는 누름 처리 안에서 `navigator.clipboard.writeText`. 실패하면 옛 방식(`document.execCommand('copy')`)을 한 번 더 써 볼지, 바로 실패 안내를 할지는 T-7 결과로 정한다. 읽기는 ③ 카드를 누를 때 `navigator.clipboard.readText`(누름 처리 안), 실패·거절은 조용히 빈 칸.
 - `?from=kakao` 는 `main.tsx` 가 앱을 열 때 `URLSearchParams` 로 읽고 `history.replaceState` 로 지운다. manifest `start_url` 에는 영향이 없다(검색어 없는 주소).
 - 설정 "앱" 묶음: `SettingsScreen` 의 홈 화면에 추가 줄 자리에 카톡 안 + 표시 있음이면 [인터넷 앱으로 열기] 줄. 홈 화면 앱(standalone)은 카톡 안일 수 없으니 겹치지 않는다.
@@ -512,4 +515,5 @@ C 카톡 안에서 열렸을 때
 | 2026-10-16 | 초안: v2.7 시안 https://claude.ai/artifact/DHKyo1y5u31KCDxNsTzZ16 (사용자 결정 2026-10-16 — A·C 추천값, D 넣지 않음, B 는 "연습 끝 화면 다음에 먼저 묻기" 로 바꿈: "홈 화면에 추가하시겠어요?" + 좋은 점 + [추가할게요]/[다음에 할게요], [추가할게요] 만 설치 따라 하기 → 설치 확인 → 여기서 새 장부, [다음에 할게요] 는 바로 새 장부·카드 안 띄움). 사용자 추가 "홈화면추가했을 때 어떻게 보이는지도 같이 안내에" → 홈 화면 모습 그림(묻는 화면·그림 안내 4장·설치 확인 화면). 실기기 확인 T-1~T-8 과 개발 확인 화면 `/#/dev/env`. AC-1~37. status approved(사용자 승인) |
 | 2026-10-16 | 개발 확인 화면 구현(#141): 주소(미리보기 `/#/dev/env`, intent 는 `?dev=env`), 열리는 기준 미리보기 빌드 = `APP_BASE=/`(`__PREVIEW_BUILD__`, `VITE_DEV_TOOLS` 안 씀), 버튼 이름([설치 창 띄우기]·[복사 시험]·[붙여넣기 시험]·[kakaotalk openExternal 로 열기]), `navigator.share`·`canShare(files)` 표시, 결과 기록 sessionStorage. 실기기 결과(T-1~T-8)는 다음 문서 PR |
 | 2026-10-16 | B 연습 끝 묻기·설치 따라 하기 구현(#143): 기술 메모 B 에 구현 모양(`Mode` `install` 하나 + `PracticeInstall` 이 ②·③·그림 안내 창 방문 기록, `asksInstallAfterPractice` 에서 `stopped` 뺌, 카톡 판단 임시 `opensInKakao`, `practiceMark`, `GuideSheetHistory`·`onFinished`). 동작·문구는 본문 그대로. AC-24 실기기는 배포 뒤(qa-checklist) |
+| 2026-10-16 | C 카톡 안에서 열렸을 때 구현(#144): T-3·T-4·T-5·T-7·T-8 은 예상값 그대로, 실기기 확인은 배포 뒤(사용자 결정, 미리보기 `/#/dev/env`). 예상값·문구는 `inAppBrowser.ts` 한 곳. 더한 것: ② 복구 코드 화면이 떠 있는 동안 주소에도 `?from=kakao` 를 붙여 메뉴로 열어도 ③ 카드가 뜨게 함. 안드로이드·아이폰이 아닌 카톡(PC 등)은 C 없이 지금처럼. 아이폰 ② 는 [코드 복사하기]·[기록 파일 보내기] 를 보조 버튼으로. 자동으로 지키기가 "너무 큼" 이어도 기록 파일 순서. B 의 임시 카톡 판단 `opensInKakao` 를 `inAppKind` 하나로 모음 |
 | 2026-10-16 | A 그림 안내·홈 화면 모습 그림 구현(#142): 문구는 T-1·T-2 예상값 그대로, 실기기 확인은 배포 뒤(사용자 결정) — 열린 질문에 "배포 뒤 확인" 표시. 부품 이름 확정(`HomeScreenPreview`·`APP_SHORT_NAME`·`installGuideSteps`·`BrowserPicture`·`TapMark`·`SlideGuide`). 장 번호 "1 / 4" 는 글 줄 앞 알약, 화면 읽기는 "1 / 4, …". 창이 떠 있는 동안 `appinstalled` 가 오면 창을 닫는다(예외와 경계 그대로) |

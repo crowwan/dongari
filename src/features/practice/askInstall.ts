@@ -16,8 +16,3 @@ type AskCondition = {
 export function asksInstallAfterPractice({ firstRun, standalone, installed, inApp }: AskCondition): boolean {
   return firstRun && shouldOfferInstall({ standalone, installed }) && !inApp
 }
-
-// 카톡 안 브라우저 (SPEC-009 C 는 user agent 만 본다). C 의 판단이 생기면 그쪽 하나로 모은다
-export function opensInKakao(userAgent: string): boolean {
-  return userAgent.includes('KAKAOTALK')
-}

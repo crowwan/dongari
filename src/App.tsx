@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
@@ -6,6 +6,8 @@ import { NewBookScreen } from './features/books/NewBookScreen'
 import { FirstUseGuideMark } from './features/guide/FirstUseGuideMark'
 import type { GuideStore } from './features/guide/guideStore'
 import { useFirstUseGuide } from './features/guide/useFirstUseGuide'
+import type { InAppBrowser } from './features/install/inAppBrowser'
+import { InAppBrowserScreen, type LedgerMove } from './features/install/InAppBrowserScreen'
 import { useInstallAction } from './features/install/installAction'
 import { InstallGuideSheet } from './features/install/InstallGuideSheet'
 import { showsInstallOffer, type InstallOfferStore } from './features/install/installOffer'
@@ -65,6 +67,11 @@ type AppProps = {
   installOfferStore?: InstallOfferStore
   // 홈 화면에 추가 줄·권하기 카드가 보는 브라우저 상태 (기본은 지금 브라우저, 테스트에서 바꿔 넣는다)
   install?: InstallEnvironment
+  // 카톡 안 브라우저 (SPEC-009 C). 있으면 장부가 있을 때 장부보다 먼저 "카톡 안에서 열렸어요"(②, 표시가 없을 때),
+  // 설정 [홈 화면에 추가] 자리에 [인터넷 앱으로 열기], 장부 위 권하기 카드 없음
+  inApp?: InAppBrowser
+  // 카톡에서 옮겨 와 첫 실행 물음의 [카톡에서 쓰던 장부 가져오기] 로 열었다 (SPEC-009 C ③): 복구 코드로 불러오기부터 (클립보드에서 읽은 코드)
+  restoreFromKakao?: { code: string | undefined }
 }
 
 // 장부 위 권하기 카드 [홈 화면에 추가] 의 방법 안내 선택 창 (설정 줄은 settings-install-guide)
@@ -101,6 +108,8 @@ export default function App({
   onFirstRunChange,
   installOfferStore,
   install = browserInstallEnvironment(),
+  inApp,
+  restoreFromKakao,
 }: AppProps) {
   const ledger = useLedger(repository, loaded, options)
   const bookName = ledger.book?.name ?? ''
@@ -197,8 +206,8 @@ export default function App({
         // 처음 쓰는 분 안내는 이때만 켠다 (SPEC-008). 두 번째 장부를 만들 때는 켜지 않는다
         guide.activate()
         // 홈 화면에 추가 권하기도 첫 장부 직후에만 (SPEC-002 #135). 연습 장부에는 없다.
-        // 연습 끝 "홈 화면에 추가하시겠어요?" 에 이미 대답했으면(done) 덮지 않는다 (SPEC-009 B)
-        if (installOfferStore && !practice && installOfferStore.load() !== 'done') {
+        // 연습 끝 "홈 화면에 추가하시겠어요?" 에 이미 대답했으면(done) 덮지 않는다 (SPEC-009 B). 카톡 안에서는 설치가 안 돼 권하지 않는다 (SPEC-009 C)
+        if (installOfferStore && !practice && installOfferStore.load() !== 'done' && !inApp) {
           installOfferStore.save('waiting')
           setInstallOffer('waiting')
         }
@@ -224,6 +233,30 @@ export default function App({
 
   // 복구 코드로 불러오기 화면에 넘기는 것. 서버 주소가 없는 빌드면 없다
   const restoreByCode = keep && { server: keep.server, hasRecords: !ledger.isFirstRun, onRestore: restoreKept }
+
+  // 카톡에서 옮겨 와 [카톡에서 쓰던 장부 가져오기] 로 열었으면 복구 코드로 불러오기부터 (SPEC-009 C ③).
+  // 첫 실행 물음 칸 위에 그 화면 칸 하나만 쌓아, 뒤로 버튼은 물음으로 돌아간다(AppRoot)
+  const openedRestoreAtStart = useRef(false)
+  const openRestoreAtStart = useEffectEvent(() => {
+    if (openedRestoreAtStart.current || !restoreFromKakao || !restoreByCode || !ledger.isFirstRun) return
+    openedRestoreAtStart.current = true
+    navigation.open({ name: 'keep-restore' })
+  })
+  useEffect(() => openRestoreAtStart(), [])
+
+  // 카톡 안에 장부가 있으면 장부보다 먼저 "카톡 안에서 열렸어요" ② (SPEC-009 C). [그냥 여기서 쓸게요] 로 표시를 남기면 다시 묻지 않는다
+  const [inAppGate, setInAppGate] = useState(() => inApp !== undefined && !ledger.isFirstRun && !inApp.store.stays())
+  // ② 옮기는 길: 자동으로 지키기를 쓸 수 있으면 복구 코드, 아니면(서버 주소 없는 빌드·꺼짐·읽기 전용·너무 큼) 기록 파일
+  const keepUsableForMove =
+    keep !== undefined && keepState?.enabled === true && keepState.tooLarge !== true && ledger.startup.status !== 'read-only'
+  const ledgerMove: LedgerMove =
+    keepUsableForMove && recoveryCode
+      ? { by: 'code', code: recoveryCode, keepNow: () => keep.keeper.keepNow(ledger.data) }
+      : { by: 'file', sendFile: backup.send }
+  function stayInApp() {
+    inApp?.store.stay()
+    setInAppGate(false)
+  }
 
   function shareCode() {
     if (!recoveryCode) return
@@ -263,7 +296,7 @@ export default function App({
   const needsBackup = !practice && backupReminderFor(ledger.data, now())
   const showBackupReminder = needsBackup && storageNoticeList.length === 0
   // 홈 화면에 추가 권하기 (SPEC-002 #135): 띠 순서 맨 뒤 — 위 띠가 하나라도 있으면 뒤로 미룬다
-  const showInstallOffer = showsInstallOffer({
+  const showInstallOffer = !inApp && showsInstallOffer({
     status: installOffer,
     standalone: install.standalone,
     installed: installAction.installed,
@@ -298,9 +331,20 @@ export default function App({
   }
 
   function screenContent(): ReactNode {
+    if (inApp && inAppGate && !ledger.isFirstRun) {
+      return <InAppBrowserScreen kind={inApp.kind} move={ledgerMove} onStay={stayInApp} />
+    }
     if (ledger.isFirstRun) {
       if (restoreByCode && screen.name === 'keep-restore') {
-        return <KeepRestoreScreen {...restoreByCode} dialogs={navigation} backLabel="뒤로" onBack={navigation.backToLedger} />
+        return (
+          <KeepRestoreScreen
+            {...restoreByCode}
+            dialogs={navigation}
+            backLabel="뒤로"
+            onBack={navigation.backToLedger}
+            fromKakao={restoreFromKakao}
+          />
+        )
       }
       // 첫 실행은 새 장부 만들기 (SPEC-005). 새 폰으로 옮길 때는 장부를 만들지 않고 기록 파일(안내 띠에 같은 버튼이 있으면 하나만)이나
       // 복구 코드(SPEC-006)로 불러온다
@@ -377,6 +421,7 @@ export default function App({
             onBack={navigation.backToLedger}
             onPractice={onStartPractice && (() => onStartPractice(ledger.book?.kind ?? 'club', currentLoad(ledger)))}
             install={install}
+            inApp={inApp && { kind: inApp.kind, move: ledgerMove }}
           />
         )
       case 'month-summary':

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StoredData } from './domain/types'
 import { HOME_PREVIEW_CAPTION, HOME_PREVIEW_LABEL } from './features/install/HomeScreenPreview'
+import { inAppKind, type InAppBrowser } from './features/install/inAppBrowser'
 import { INSTALL_OFFER_KEY, localInstallOfferStore, type InstallOfferStore } from './features/install/installOffer'
 import type { InstallEnvironment } from './features/install/installPrompt'
 import { AppRoot } from './features/practice/AppRoot'
@@ -23,10 +24,11 @@ type OpenOptions = {
   offer?: InstallOfferStore
   mark?: PracticeMarkStore
   data?: StoredData
+  inApp?: InAppBrowser
 }
 
 // 첫 실행 폰을 연다. 결산 사진은 보내기까지 끝나는 기기
-function open({ install = fakeBrowser().install, offer = memoryOfferStore(), mark = localPracticeMarkStore(), data }: OpenOptions = {}) {
+function open({ install = fakeBrowser().install, offer = memoryOfferStore(), mark = localPracticeMarkStore(), data, inApp }: OpenOptions = {}) {
   const repository = new MemoryRepository(data)
   let seq = 0
   return render(
@@ -36,6 +38,7 @@ function open({ install = fakeBrowser().install, offer = memoryOfferStore(), mar
       install={install}
       installOfferStore={offer}
       practiceMarkStore={mark}
+      inApp={inApp}
       saver={fakeSaver(['shared']).saver}
       options={{ now: () => PRACTICE_TODAY, createId: () => `id-${++seq}` }}
     />,
@@ -104,7 +107,11 @@ describe('SPEC-009 B 연습 끝 화면', () => {
   })
 
   it('AC-13 카톡 안 브라우저면 끝 화면이 v2.6 그대로다', async () => {
-    open({ install: fakeBrowser({ userAgent: KAKAO_UA }).install })
+    // 진입점처럼 user agent 를 SPEC-009 C 판단(inAppKind)으로 한 번 본다. [그냥 여기서 쓸게요] 를 고른 카톡 안
+    const kind = inAppKind(KAKAO_UA)
+    if (!kind) throw new Error('카톡 안 user agent 가 아니다')
+    const inApp: InAppBrowser = { kind, store: { stays: () => true, stay: () => {} } }
+    open({ install: fakeBrowser({ userAgent: KAKAO_UA }).install, inApp })
     await finishPractice()
 
     expect(screen.getByText(V26_LEAD)).toBeInTheDocument()

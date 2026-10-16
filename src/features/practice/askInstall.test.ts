@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHROME_UA, KAKAO_UA } from '../../test/installFakes'
-import { asksInstallAfterPractice, opensInKakao } from './askInstall'
+import { asksInstallAfterPractice } from './askInstall'
 
 // 첫 실행 연습을 브라우저(홈 화면 앱·카톡 안 아님, 설치 전)에서 끝낸 기본 경우
 const ASKS = { firstRun: true, standalone: false, installed: false, inApp: false }
@@ -15,10 +14,5 @@ describe('SPEC-009 B 연습 끝에 홈 화면에 추가를 묻는 조건', () =>
     expect(asksInstallAfterPractice({ ...ASKS, standalone: true })).toBe(false)
     expect(asksInstallAfterPractice({ ...ASKS, installed: true })).toBe(false)
     expect(asksInstallAfterPractice({ ...ASKS, inApp: true })).toBe(false)
-  })
-
-  it('user agent 에 KAKAOTALK 이 있으면 카톡 안 브라우저다', () => {
-    expect(opensInKakao(KAKAO_UA)).toBe(true)
-    expect(opensInKakao(CHROME_UA)).toBe(false)
   })
 })

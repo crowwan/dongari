@@ -5,6 +5,7 @@ import { isCatalogRoute } from './catalog/route'
 import { isDevEnvRoute } from './devtools/route'
 import { AppRoot } from './features/practice/AppRoot'
 import { localGuideStore, settleExistingPhone } from './features/guide/guideStore'
+import { inAppKind, localInAppStore, readFromKakao } from './features/install/inAppBrowser'
 import { localInstallOfferStore } from './features/install/installOffer'
 import { createKeep, startKeep, withStartupRecoveryCode } from './features/keep/startKeep'
 import { localPracticeMarkStore } from './features/practice/practiceMark'
@@ -42,12 +43,18 @@ async function pickScreen(): Promise<ReactNode> {
   const installOfferStore = localInstallOfferStore()
   // 첫 실행 연습을 마쳤다는 표시 (SPEC-009 B): 장부 없이 다시 열면 물음 없이 새 장부 만들기로
   const practiceMarkStore = localPracticeMarkStore()
+  // 카톡 안에서 열렸을 때 (SPEC-009 C): 판단은 화면을 그리기 전에 user agent 로 한 번.
+  // 카톡에서 옮겨 왔다는 ?from=kakao 는 읽고 주소에서 지운다 (새로고침·홈 화면에 추가로 가져오기 카드가 다시 생기지 않게. 카톡 안이면 무시)
+  const kind = inAppKind(navigator.userAgent)
+  const inApp = kind && { kind, store: localInAppStore() }
+  const from = readFromKakao(window.location.href)
+  if (from.cleanHref) window.history.replaceState(window.history.state, '', from.cleanHref)
+  const stores = { guideStore, installOfferStore, practiceMarkStore, inApp, fromKakao: from.fromKakao }
 
   // 복구 코드 자동 보관 (SPEC-006): 서버 주소(VITE_KEEP_URL)가 있는 빌드에서만. 저장에 성공할 때마다 보관기에 알린다.
   // 앱을 열 때 올리고 상태 신호를 보낸다 (SPEC-007, 읽기 전용이면 둘 다 안 한다)
   // 장부가 없으면 첫 실행 물음부터, 연습 장부는 메모리에만 (SPEC-008, AppRoot)
   const keep = createKeep(import.meta.env.VITE_KEEP_URL)
-  const stores = { guideStore, installOfferStore, practiceMarkStore }
   if (!keep) return <AppRoot repository={storage} loaded={loaded} {...stores} />
   const repository = new NotifyingRepository(storage, (data) => keep.keeper.saved(data))
   void startKeep(keep.keeper, loaded)

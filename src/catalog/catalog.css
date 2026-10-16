@@ -131,6 +131,11 @@
   height: 560px;
 }
 
+/* 화면 하나 통째, 내용 높이대로 (카톡 안에서 열렸을 때, SPEC-009 C) */
+.catalog__frame--auto {
+  height: auto;
+}
+
 /* 안내 말풍선 (SPEC-008): 말풍선 + 가리키는 버튼이 다 보이게 */
 .catalog__frame--coach {
   height: 300px;

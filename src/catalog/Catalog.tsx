@@ -6,6 +6,7 @@ import type { EntryType } from '../domain/types'
 import { BookPicker } from '../features/books/BookPicker'
 import { BrowserBar, BrowserMenu, BrowserPage, BrowserPicture } from '../features/install/BrowserPicture'
 import { HomeScreenPreview } from '../features/install/HomeScreenPreview'
+import { InAppBrowserScreen, InAppImportCard } from '../features/install/InAppBrowserScreen'
 import { InstallGuide } from '../features/install/InstallGuide'
 import { InstallGuidePicture } from '../features/install/InstallGuidePicture'
 import type { GuidePicture } from '../features/install/installGuideSteps'
@@ -206,6 +207,9 @@ const EXPENSE_ONLY_REPORT = itemReport([
 ])
 
 const noop = () => {}
+
+// 카톡 안 ② 미리보기 복구 코드
+const CATALOG_CODE = 'HK7M-29QF-MX4P-8R2D'
 
 // 설치 안내 그림 장 (홈 화면 모습 그림 장은 위 HomeScreenPreview 로 본다)
 const GUIDE_PICTURES: GuidePicture[] = [
@@ -1021,6 +1025,59 @@ export function Catalog() {
                 <BrowserBar place="bottom" items={[{ icon: 'left' }, { icon: 'right' }, { icon: 'refresh' }, { icon: 'kebab' }]} />
               </BrowserPicture>
             </div>
+          </State>
+        </Section>
+
+        <Section title="카톡 안에서 열렸을 때 (SPEC-009 C InAppBrowserScreen)">
+          <State label="① 장부 없음 (안드로이드): [인터넷 앱으로 열기] 링크 + 안 열릴 때 메뉴 그림 + 작은 글자 버튼 [그냥 여기서 쓸게요]">
+            <div className="catalog__frame catalog__frame--auto">
+              <div className="app__main">
+                <InAppBrowserScreen kind="kakao-android" onStay={noop} />
+              </div>
+            </div>
+          </State>
+          <State label="② 장부 있음 · 복구 코드: 지켜 두는 중 (주 버튼 누를 수 없음)">
+            <div className="catalog__frame catalog__frame--auto">
+              <div className="app__main">
+                <InAppBrowserScreen kind="kakao-android" move={{ by: 'code', code: CATALOG_CODE, keepNow: () => new Promise(() => {}) }} onStay={noop} />
+              </div>
+            </div>
+          </State>
+          <State label="② 장부 있음 · 복구 코드: 지켜 두었음 → [코드 복사하고 인터넷 앱으로 열기] (설정에서 열면 [‹ 설정])">
+            <div className="catalog__frame catalog__frame--auto">
+              <div className="app__main">
+                <InAppBrowserScreen
+                  kind="kakao-android"
+                  move={{ by: 'code', code: CATALOG_CODE, keepNow: async () => true }}
+                  onStay={noop}
+                  back={{ label: '설정', onBack: noop }}
+                />
+              </div>
+            </div>
+          </State>
+          <State label="② 장부 있음 · 복구 코드: 올리지 못함 (인터넷에 연결되면 다시)">
+            <div className="catalog__frame catalog__frame--auto">
+              <div className="app__main">
+                <InAppBrowserScreen kind="kakao-android" move={{ by: 'code', code: CATALOG_CODE, keepNow: async () => false }} onStay={noop} />
+              </div>
+            </div>
+          </State>
+          <State label="② 장부 있음 · 자동으로 지키기를 쓸 수 없음: [기록 파일 보내기] → [인터넷 앱으로 열기]">
+            <div className="catalog__frame catalog__frame--auto">
+              <div className="app__main">
+                <InAppBrowserScreen kind="kakao-android" move={{ by: 'file', sendFile: async () => true }} onStay={noop} />
+              </div>
+            </div>
+          </State>
+          <State label="아이폰 카톡 ① (주 버튼 없이 메뉴 그림만)">
+            <div className="catalog__frame catalog__frame--auto">
+              <div className="app__main">
+                <InAppBrowserScreen kind="kakao-ios" onStay={noop} />
+              </div>
+            </div>
+          </State>
+          <State label="③ 인터넷 앱에서 열린 첫 화면(?from=kakao, 장부 없음) — 첫 실행 물음 위 카드">
+            <InAppImportCard onImport={noop} />
           </State>
         </Section>
 

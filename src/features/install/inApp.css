@@ -1,0 +1,250 @@
+/*
+ * 카톡 안에서 열렸을 때 (SPEC-009 C, 시안 C ①·②). 값은 tokens.css 변수만 쓴다.
+ * 위쪽 옅은 회청 동그라미 말풍선 → 제목 → 글 → 주 버튼(또는 ② 코드 카드) → 메뉴 그림 카드 → 작은 글자 버튼
+ */
+@import '../../styles/tokens.css';
+
+.in-app {
+  gap: var(--stack);
+  padding-bottom: var(--space-4);
+}
+
+/* 카톡 말풍선 동그라미 (끝 화면 체크와 같은 크기, 안내라 회청 짝) */
+.in-app__mark {
+  width: var(--practice-done);
+  height: var(--practice-done);
+  border-radius: var(--corner-pill);
+  background: var(--info-bg);
+  color: var(--info-ink);
+  display: grid;
+  place-items: center;
+}
+
+.in-app__mark > .ui-icon {
+  width: var(--practice-done-icon);
+  height: var(--practice-done-icon);
+}
+
+.in-app__title {
+  font-size: var(--text-title-size);
+  word-break: keep-all;
+}
+
+.in-app__lead {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--size-large);
+  line-height: var(--line-body);
+  word-break: keep-all;
+}
+
+/* 주 버튼 모양의 링크 ([인터넷 앱으로 열기]): Button 과 같은 .ui-button 모양에 밑줄만 뺀다 */
+.in-app__open {
+  box-sizing: border-box;
+  text-align: center;
+  text-decoration: none;
+  word-break: keep-all;
+}
+
+.in-app__open:active {
+  background: var(--primary-pressed);
+}
+
+/* ② 복구 코드 카드 / 기록 파일 안내 카드: 흰 면, 반경 20 */
+.in-app__card {
+  margin: 0;
+  padding: var(--card-pad-block) var(--card-pad-inline);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.in-app__card-text {
+  color: var(--ink);
+  font-size: var(--text-body-size);
+  line-height: var(--line-body);
+  word-break: keep-all;
+}
+
+.in-app__card-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+}
+
+/* 코드: 설정 기록 지키기 카드와 같은 Heading 20 Bold, 고정폭 숫자, 글자 띄움 */
+.in-app__code {
+  margin: 0;
+  color: var(--strong);
+  font-size: var(--text-heading-size);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-code);
+  line-height: var(--line-tight);
+  overflow-wrap: anywhere;
+}
+
+/* 상태 줄: 구름 아이콘 + 본문색 글자 (설정 상태 줄과 같은 모양). 누르는 곳이 아니다 */
+.in-app__status {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-body-size);
+  line-height: var(--line-body);
+  word-break: keep-all;
+}
+
+.in-app__status .ui-icon {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  margin-top: 0.1em;
+  color: var(--accent-ink);
+}
+
+.in-app__status[data-status='keeping'] .ui-icon,
+.in-app__status[data-status='failed'] .ui-icon {
+  color: var(--faint);
+}
+
+.in-app__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-body-size);
+  line-height: var(--line-body);
+  word-break: keep-all;
+}
+
+/* 복사하지 못했다: 오류 문장 색 */
+.in-app__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-body);
+  word-break: keep-all;
+}
+
+/* 안 열릴 때 메뉴 그림 카드: 흰 면 + 글 줄 SemiBold + 그림(가로가 조금 긴 판) */
+.in-app__help {
+  padding: var(--space-4);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.in-app__help-text {
+  margin: 0;
+  color: var(--strong);
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-body);
+  word-break: keep-all;
+}
+
+.in-app__help .browser-pic {
+  aspect-ratio: var(--in-app-picture-ratio);
+  /* 그림 속 글자는 px 라 좁은 화면에서도 메뉴 네 줄 + 도구 줄이 잘리지 않을 높이는 둔다 */
+  min-height: var(--in-app-picture-min);
+}
+
+/* [그냥 여기서 쓸게요]: 면 없는 글자 버튼 (Label 16, --ink). 누르는 곳은 56 이상이지만 주 버튼보다 훨씬 작게 보인다 */
+.in-app__stay {
+  align-self: center;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--corner-sm);
+  background: none;
+  color: var(--ink);
+  font-family: var(--typeface);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-label-weight);
+  letter-spacing: var(--letter-body);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.in-app__stay:active {
+  background: var(--pressed);
+}
+
+.in-app__stay:focus-visible {
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
+
+/* ③ 인터넷 앱 첫 화면의 "카톡에서 쓰던 장부 가져오기" 카드 (첫 실행 물음 위): 회청 안내 면 + 카드색 버튼 */
+.in-app-import {
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--corner-lg);
+  background: var(--info-bg);
+  color: var(--info-ink);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  word-break: keep-all;
+}
+
+.in-app-import__title {
+  margin: 0;
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+.in-app-import__text {
+  margin: 0;
+  font-size: var(--text-body-size);
+  line-height: var(--line-body);
+}
+
+.in-app-import__action {
+  margin-top: var(--space-1);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--corner-md);
+  background: var(--surface);
+  color: var(--strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--typeface);
+  font-size: var(--size-large);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--letter-body);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.in-app-import__action .ui-icon {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--accent-ink);
+}
+
+.in-app-import__action:active {
+  background: var(--pressed);
+}
+
+.in-app-import__action:focus-visible {
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
