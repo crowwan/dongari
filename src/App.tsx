@@ -196,8 +196,9 @@ export default function App({
         void requestPersistentStorage()
         // 처음 쓰는 분 안내는 이때만 켠다 (SPEC-008). 두 번째 장부를 만들 때는 켜지 않는다
         guide.activate()
-        // 홈 화면에 추가 권하기도 첫 장부 직후에만 (SPEC-002 #135). 연습 장부에는 없다
-        if (installOfferStore && !practice) {
+        // 홈 화면에 추가 권하기도 첫 장부 직후에만 (SPEC-002 #135). 연습 장부에는 없다.
+        // 연습 끝 "홈 화면에 추가하시겠어요?" 에 이미 대답했으면(done) 덮지 않는다 (SPEC-009 B)
+        if (installOfferStore && !practice && installOfferStore.load() !== 'done') {
           installOfferStore.save('waiting')
           setInstallOffer('waiting')
         }
