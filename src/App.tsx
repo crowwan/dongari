@@ -395,6 +395,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
           settingsNeedsBackup={needsBackup}
           onAddEntry={(entryMonth) => navigation.open({ name: 'add-entry', month: entryMonth })}
           onEditEntry={(id) => navigation.open({ name: 'edit-entry', id })}
+          unsavedEntryIds={ledger.unsavedEntryIds}
         />
       </>
     )

@@ -144,7 +144,7 @@ describe('SPEC-002 30일 백업 안내', () => {
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
-      expect(screen.getByText('저장하지 못했어요. 기록 파일을 보내 두세요')).toBeInTheDocument()
+      expect(screen.getByText('저장하지 못했어요. 방금 적은 내역은 앱을 닫으면 사라져요. 기록 파일을 보내 두세요')).toBeInTheDocument()
       expect(screen.queryByText(REMINDER)).not.toBeInTheDocument()
       expect(screen.getAllByRole('button', { name: '기록 파일 보내기' })).toHaveLength(1)
       expect(screen.getByRole('button', { name: '설정, 기록 파일 보내기 필요' })).toBeInTheDocument()

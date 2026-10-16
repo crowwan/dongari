@@ -60,6 +60,9 @@ export interface LedgerState {
   carryoverWords: CarryoverWords // 지금 장부·연도의 이월금 이름 (동아리 "작년 이월금", 가계부 첫 해 "지금 남은 돈")
   startup: StartupStatus
   saveFailure: SaveFailureReason | undefined // 마지막 저장이 실패했으면 그 이유
+  // 이 폰에 저장되지 않은 기록 id: 저장에 실패한 뒤 추가하거나 고친 기록 (SPEC-002 v2.6 "저장 안 됨").
+  // 화면에서만 쓰는 표시라 저장 데이터·기록 파일에는 넣지 않는다. 저장이 한 번 성공하면 비운다
+  unsavedEntryIds: ReadonlySet<string>
   data: StoredData // 모든 장부의 기록 전체 (백업 파일 내용)
   // 자주 쓴 항목 버튼 (지금 장부 기록에서): 종류를 고르기 전(type 없음)엔 두 종류를 섞어서
   frequentChoices: (type?: EntryType) => FrequentChoice[]
@@ -113,14 +116,30 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
   const [data, setData] = useState(loaded.data)
   const [year, setYear] = useState(() => now().getFullYear())
   const [saveFailure, setSaveFailure] = useState<SaveFailureReason | undefined>()
+  const [unsavedEntryIds, setUnsavedEntryIds] = useState<ReadonlySet<string>>(() => new Set())
   // 시작 상태. 백업 파일을 불러오면 시작 때의 문제(깨진 기록·저장 막힘)가 풀려 ok 가 된다
   const [startup, setStartup] = useState(() => toStartupStatus(loaded))
   // 같은 이벤트 안에서 여러 번 바꿔도 앞 변경을 잃지 않게 최신 데이터를 따로 들고 있는다
   const latest = useRef(loaded.data)
 
+  // 저장 결과를 화면 상태에 남긴다. 저장은 전체 데이터를 한 번에 쓰므로 성공하면 저장 안 된 기록이 모두 저장된 것이다.
+  // 실패했으면 이번에 추가하거나 고친 기록(entryId)을 저장 안 된 것으로 모은다 (읽기 전용 시작 상태는 늘 실패라 계속 모인다)
+  function noteSaveResult(result: SaveResult, entryId?: string) {
+    setSaveFailure(result.ok ? undefined : result.reason)
+    if (result.ok) {
+      setUnsavedEntryIds(new Set())
+    } else if (entryId !== undefined) {
+      setUnsavedEntryIds((current) => new Set(current).add(entryId))
+    }
+  }
+
   // 모든 변경은 즉시 저장한다. 실패해도 화면 데이터는 바뀐 대로 두고 이유를 알린다. 저장 성공 여부를 돌려준다.
-  // 기록을 바꾼 것이면 변경 시각을 남긴다(백업 안내용). 장부를 고른 것처럼 기록이 그대로면 남기지 않는다
-  function commit(change: (current: StoredData) => StoredData, { recordChange = true } = {}): boolean {
+  // 기록을 바꾼 것이면 변경 시각을 남긴다(백업 안내용). 장부를 고른 것처럼 기록이 그대로면 남기지 않는다.
+  // entryId: 이번 변경으로 추가하거나 고친 기록 (저장 안 됨 표시용)
+  function commit(
+    change: (current: StoredData) => StoredData,
+    { recordChange = true, entryId }: { recordChange?: boolean; entryId?: string } = {},
+  ): boolean {
     const changed = change(latest.current)
     const next: StoredData = recordChange
       ? { ...changed, settings: { ...changed.settings, lastChangedAt: now().toISOString() } }
@@ -128,7 +147,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     latest.current = next
     setData(next)
     const result = repository.save(next)
-    setSaveFailure(result.ok ? undefined : result.reason)
+    noteSaveResult(result, entryId)
     return result.ok
   }
 
@@ -138,23 +157,27 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     if (result.ok) {
       latest.current = next
       setData(next)
-      setSaveFailure(undefined)
+      noteSaveResult(result)
     }
     return result
   }
 
   // 지금 장부의 이 연도 장부를 바꾼다
-  function changeLedger(change: (ledger: Ledger, book: Book) => Book): boolean {
-    return commit((current) => {
-      const target = currentBook(current)
-      const ledger = target?.ledgers[String(year)]
-      if (!target || !ledger) throw new Error(`${year}년 장부가 없다`)
-      return replaceBook(current, change(ledger, target))
-    })
+  function changeLedger(change: (ledger: Ledger, book: Book) => Book, entryId?: string): boolean {
+    return commit(
+      (current) => {
+        const target = currentBook(current)
+        const ledger = target?.ledgers[String(year)]
+        if (!target || !ledger) throw new Error(`${year}년 장부가 없다`)
+        return replaceBook(current, change(ledger, target))
+      },
+      { entryId },
+    )
   }
 
-  function changeEntries(change: (ledger: Ledger) => Ledger): boolean {
-    return changeLedger((ledger, target) => withLedger(target, change(ledger)))
+  // entryId: 추가하거나 고친 기록 (지울 때는 표시할 줄이 없어 넘기지 않는다)
+  function changeEntries(change: (ledger: Ledger) => Ledger, entryId?: string): boolean {
+    return changeLedger((ledger, target) => withLedger(target, change(ledger)), entryId)
   }
 
   // 새 장부는 올해 장부 하나로 시작해 만든 순 맨 뒤에 들어가고 지금 장부가 된다 (같은 이름이어도 id 로 구분).
@@ -223,6 +246,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     carryoverWords: wordsFor(book?.kind ?? 'club', isFirstYear(book, year)),
     startup,
     saveFailure,
+    unsavedEntryIds,
     data,
     frequentChoices: (type) => pickFrequentChoices(entriesOldestFirst(book), type, { kind: book?.kind }),
     lastUsedType: (name) => findLastUsedType(entriesOldestFirst(book), name),
@@ -234,8 +258,12 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
         // 새 연도를 시작할 때 고친 이름은 장부 이름이 된다 (이름은 장부에 하나)
         return replaceBook(current, withLedger({ ...target, name: info.name.trim() }, createLedger(year, info.carryover)))
       }),
-    addEntry: (input) => changeEntries((item) => addEntryTo(item, input, { createId, now })),
-    updateEntry: (id, input) => changeEntries((item) => updateEntryIn(item, id, input)),
+    addEntry: (input) => {
+      // 저장 안 됨 표시에 쓰려고 새 기록 id 를 먼저 정한다
+      const id = createId()
+      return changeEntries((item) => addEntryTo(item, input, { createId: () => id, now }), id)
+    },
+    updateEntry: (id, input) => changeEntries((item) => updateEntryIn(item, id, input), id),
     deleteEntry: (id) => changeEntries((item) => deleteEntryFrom(item, id)),
     updateBookInfo: (setup) =>
       changeLedger((item, target) =>
@@ -255,7 +283,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
       // 저장하지 못하면 지운 것처럼 보였다가 새로고침 때 되살아나지 않게 화면도 그대로 둔다 (SPEC-005 예외)
       const result = replace(withoutBook(latest.current, id), (next) => repository.save(next))
       if (!result.ok) {
-        setSaveFailure(result.reason)
+        noteSaveResult(result)
         return false
       }
       openThisYear()

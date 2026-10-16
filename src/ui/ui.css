@@ -702,6 +702,30 @@ button.ui-row {
   white-space: nowrap;
 }
 
+/*
+ * 보조 줄 아래 노란 알약 "저장 안 됨" (SPEC-002 v2.6): 안내 띠와 같은 노란 면 + 제목색 SemiBold 보조 크기.
+ * 색만으로 알리지 않게 경고 아이콘과 글자가 함께 있다
+ */
+.ui-row__badge {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  padding: var(--hairline) var(--space-2);
+  border-radius: var(--corner-pill);
+  background: var(--warn-bg);
+  color: var(--strong);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ui-row__badge .ui-icon {
+  width: var(--icon-text);
+  height: var(--icon-text);
+}
+
 /* 줄 끝 › : 누르면 고칠 수 있다는 표시 (설정 줄 › 와 같은 크기·색) */
 .ui-row__chevron {
   flex: none;

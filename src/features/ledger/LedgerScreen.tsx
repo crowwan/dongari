@@ -25,6 +25,9 @@ const BOOK_SHEET = 'ledger-books'
 // 줄 보조 줄: 색만으로 구분하지 않게 수입/지출을 글자로도
 const TYPE_LABEL: Record<EntryType, string> = { income: '수입', expense: '지출' }
 
+// 이 폰에 저장되지 않은 줄의 알약 (SPEC-002 v2.6): 앱을 닫으면 사라질 내역
+const UNSAVED_BADGE = '저장 안 됨'
+
 // 줄 보조 줄: "7일 · 지출", 날짜 없는 예전 기록은 "지출"만 (AC-9)
 function rowDescription({ day, type }: Entry): string {
   return day === undefined ? TYPE_LABEL[type] : `${day}일 · ${TYPE_LABEL[type]}`
@@ -56,6 +59,8 @@ type LedgerScreenProps = {
   onAddEntry?: (month: number) => void
   // 기록 한 줄 → 그 기록의 고치기 화면을 연다 (#14)
   onEditEntry?: (id: string) => void
+  // 이 폰에 저장되지 않은 기록 id → 그 줄에 "저장 안 됨" 알약 (SPEC-002 v2.6)
+  unsavedEntryIds?: ReadonlySet<string>
 }
 
 // 잔액 카드 보조 줄: 작년 이월금이 잔액에 들어 있다는 것. 적자면 빼기표 대신 "적자", 0원이면 숨긴다.
@@ -89,6 +94,7 @@ export function LedgerScreen({
   settingsNeedsBackup = false,
   onAddEntry,
   onEditEntry,
+  unsavedEntryIds,
 }: LedgerScreenProps) {
   const group = monthGroup(ledger.entries, month)
 
@@ -148,7 +154,7 @@ export function LedgerScreen({
           </div>
         )}
 
-        <MonthCard group={group} onEditEntry={onEditEntry} />
+        <MonthCard group={group} onEditEntry={onEditEntry} unsavedEntryIds={unsavedEntryIds} />
       </div>
 
       <BottomActionBar icon="plus" label="내역 적기" onClick={() => onAddEntry?.(month)} />
@@ -182,10 +188,12 @@ export function LedgerScreen({
 type MonthCardProps = {
   group: MonthGroup
   onEditEntry?: (id: string) => void
+  unsavedEntryIds?: ReadonlySet<string>
 }
 
-// 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(날짜순, 원형 아이콘, 보조 줄 "7일 · 지출", 줄 끝 ›). 기록이 없으면 안내 한 줄만
-function MonthCard({ group, onEditEntry }: MonthCardProps) {
+// 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(날짜순, 원형 아이콘, 보조 줄 "7일 · 지출", 줄 끝 ›, 저장 안 된 줄은 "저장 안 됨" 알약).
+// 기록이 없으면 안내 한 줄만
+function MonthCard({ group, onEditEntry, unsavedEntryIds }: MonthCardProps) {
   const { month } = group
 
   return (
@@ -219,6 +227,7 @@ function MonthCard({ group, onEditEntry }: MonthCardProps) {
                 end={<AmountText type={entry.type} amount={entry.amount} />}
                 onClick={() => onEditEntry?.(entry.id)}
                 chevron
+                badge={unsavedEntryIds?.has(entry.id) ? UNSAVED_BADGE : undefined}
               />
             ))}
           </div>

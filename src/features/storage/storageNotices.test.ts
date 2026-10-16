@@ -35,7 +35,7 @@ describe('SPEC-002 시작 안내·저장 실패 안내', () => {
       { message: STORAGE_NOTICE.saveFailed, action: 'send-backup' },
     ])
     expect(storageNotices({ status: 'ok' }, 'unknown')).toEqual([
-      { message: '저장하지 못했어요. 기록 파일을 보내 두세요', action: 'send-backup' },
+      { message: '저장하지 못했어요. 방금 적은 내역은 앱을 닫으면 사라져요. 기록 파일을 보내 두세요', action: 'send-backup' },
     ])
   })
 

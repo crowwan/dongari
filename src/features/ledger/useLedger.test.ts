@@ -4,6 +4,7 @@ import type { Ledger, StoredData } from '../../domain/types'
 import type { LedgerRepository, LoadResult, SaveResult } from '../../storage/LedgerRepository'
 import { LocalStorageRepository, STORAGE_KEY } from '../../storage/LocalStorageRepository'
 import { MemoryRepository } from '../../storage/MemoryRepository'
+import { createBackup } from '../../storage/backup'
 import { book, savedLedger, storedWith } from '../../test/ledgerFixtures'
 import { useLedger, type UseLedgerOptions } from './useLedger'
 
@@ -747,5 +748,117 @@ describe('SPEC-006 useLedger 복구 코드', () => {
       created.result.current.restoreBackup(storedWith(ledger2026()))
     })
     expect(firstRun.load().data.settings.recoveryCode).toBe(CODE)
+  })
+})
+
+describe('SPEC-002 v2.6 useLedger 저장 안 된 기록', () => {
+  const ENTRY = { month: 10, day: 3, type: 'expense', name: '간식비', amount: 5_000 } as const
+
+  // 저장 실패를 켰다 껐다 할 수 있는 저장소
+  function switchable(data: StoredData) {
+    const memory = new MemoryRepository(data)
+    const state = { failing: true }
+    const repository: LedgerRepository = {
+      load: () => memory.load(),
+      save: (next) => (state.failing ? { ok: false, reason: 'quota-exceeded' } : memory.save(next)),
+      restore: (next) => (state.failing ? { ok: false, reason: 'quota-exceeded' } : memory.restore(next)),
+    }
+    return { repository, memory, state }
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('AC-9 저장에 실패한 뒤 추가하거나 고친 기록 id 를 모은다', () => {
+    const { result } = renderLedger(switchable(storedWith(ledger2026())).repository)
+
+    act(() => {
+      result.current.addEntry(ENTRY)
+    })
+    act(() => {
+      result.current.updateEntry('b', { month: 10, type: 'expense', name: '대관료', amount: 45_000 })
+    })
+
+    expect([...result.current.unsavedEntryIds]).toEqual(['id-1', 'b'])
+  })
+
+  it('AC-10 그 뒤 저장이 한 번 성공하면(기록이 아닌 변경이어도) 모두 비운다', () => {
+    const { repository, state } = switchable(storedWith(ledger2026()))
+    const { result } = renderLedger(repository)
+    act(() => {
+      result.current.addEntry(ENTRY)
+    })
+
+    state.failing = false
+    act(() => {
+      result.current.updateBookInfo({ name: '꽃동산', kind: 'club', carryover: 100_000 })
+    })
+
+    expect(result.current.unsavedEntryIds.size).toBe(0)
+  })
+
+  it('AC-10 기록 파일 보낸 시각을 저장하거나 불러오기에 성공해도 비운다', () => {
+    const { repository, state } = switchable(storedWith(ledger2026()))
+    const { result } = renderLedger(repository)
+    act(() => {
+      result.current.addEntry(ENTRY)
+    })
+    state.failing = false
+    act(() => {
+      result.current.recordBackup()
+    })
+    expect(result.current.unsavedEntryIds.size).toBe(0)
+
+    state.failing = true
+    act(() => {
+      result.current.addEntry(ENTRY)
+    })
+    state.failing = false
+    act(() => {
+      result.current.restoreBackup(storedWith(ledger2026()))
+    })
+    expect(result.current.unsavedEntryIds.size).toBe(0)
+  })
+
+  it('AC-11 읽기 전용으로 시작했으면(새 버전 기록) 적은 기록이 모두 저장 안 된 것으로 남는다', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 4 }))
+    const { result } = renderLedger(new LocalStorageRepository())
+    act(() => {
+      result.current.createBook({ name: '한랑드림', kind: 'club', carryover: 0 })
+    })
+
+    act(() => {
+      result.current.addEntry(ENTRY)
+    })
+    act(() => {
+      result.current.addEntry({ ...ENTRY, name: '꽃값' })
+    })
+
+    expect(result.current.unsavedEntryIds.size).toBe(2)
+  })
+
+  it('AC-12 "저장 안 됨" 은 저장 데이터·기록 파일에 들어가지 않는다', () => {
+    const { repository, memory, state } = switchable(storedWith(ledger2026()))
+    const { result } = renderLedger(repository)
+    act(() => {
+      result.current.addEntry(ENTRY)
+    })
+    expect(result.current.unsavedEntryIds.size).toBe(1)
+
+    const backupText = createBackup(result.current.data, TODAY).text
+    state.failing = false
+    act(() => {
+      result.current.addEntry({ ...ENTRY, name: '꽃값' })
+    })
+    const savedText = JSON.stringify(memory.load().data)
+
+    for (const text of [backupText, savedText]) {
+      expect(text).not.toMatch(/unsaved|저장 안 됨/i)
+    }
+    // 기록 한 줄은 원래 칸만 갖는다
+    expect(Object.keys(result.current.data.books[0]?.ledgers['2026']?.entries[2] ?? {}).sort()).toEqual(
+      ['amount', 'createdAt', 'day', 'id', 'month', 'name', 'type'],
+    )
   })
 })

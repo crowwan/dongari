@@ -5,9 +5,9 @@ import { NoticeBar } from './NoticeBar'
 
 describe('NoticeBar', () => {
   it('알아 둘 내용을 바로 읽히는 안내 띠로 보여준다', () => {
-    render(<NoticeBar message="저장하지 못했어요. 기록 파일을 보내 두세요" />)
+    render(<NoticeBar message="저장하지 못했어요. 방금 적은 내역은 앱을 닫으면 사라져요. 기록 파일을 보내 두세요" />)
 
-    expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 기록 파일을 보내 두세요')
+    expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 방금 적은 내역은 앱을 닫으면 사라져요. 기록 파일을 보내 두세요')
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
@@ -15,12 +15,12 @@ describe('NoticeBar', () => {
     const handleClick = vi.fn()
     render(
       <NoticeBar
-        message="저장하지 못했어요. 기록 파일을 보내 두세요"
+        message="저장하지 못했어요. 방금 적은 내역은 앱을 닫으면 사라져요. 기록 파일을 보내 두세요"
         action={{ label: '기록 파일 보내기', onClick: handleClick }}
       />,
     )
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/^저장하지 못했어요. 기록 파일을 보내 두세요$/)
+    expect(screen.getByRole('alert')).toHaveTextContent(/^저장하지 못했어요. 방금 적은 내역은 앱을 닫으면 사라져요. 기록 파일을 보내 두세요$/)
     await userEvent.click(screen.getByRole('button', { name: '기록 파일 보내기' }))
     expect(handleClick).toHaveBeenCalledOnce()
   })
