@@ -1,23 +1,27 @@
 name: 배포
 
-# GitHub Pages(gh-pages 브랜치) 자동 배포 (#52)
-# - main push(머지) → 미리보기 /dongari/preview/ : gh-pages 의 preview/ 만 교체, 본 주소는 그대로
-# - 태그 v* push(릴리스) → 본 주소 /dongari/ : gh-pages 를 통째로 교체. preview/ 와 lab/ 도 지워진다.
-#   미리보기는 다음 main push 때 다시 채워진다. 지우는 이유는 CLAUDE.md "배포" 절
-# 이 워크플로는 main 이 아니라 gh-pages 브랜치에만 쓴다
+# 앱 자동 배포 (#52, #128)
+# - main push(머지) → 미리보기 https://uri-jangbu-preview.pages.dev/ : Cloudflare Pages 프로젝트에 올린다.
+#   본 주소와 다른 출처라 localStorage·서비스 워커·보관 서버 저장 자리가 본 장부와 나뉜다 (#128, ADR 008)
+# - 태그 v* push(릴리스) → 본 주소 https://crowwan.github.io/dongari/ : gh-pages 를 통째로 교체.
+#   옛 preview/(#128 전 미리보기 자리)와 lab/ 도 지워진다. 지우는 이유는 CLAUDE.md "배포" 절
+# 이 워크플로는 main 에 쓰지 않는다 (태그 배포는 gh-pages 브랜치에만 쓴다)
 on:
   push:
     branches: [main]
     tags: ["v*"]
 
-# 두 배포가 gh-pages 에 동시에 쓰지 않게 한 줄로 세운다.
-# 진행 중인 배포를 끊으면 반쯤 바뀐 상태가 남을 수 있어 끊지 않고 기다린다
+# 배포를 한 줄로 세운다. 진행 중인 배포를 끊으면 반쯤 바뀐 상태가 남을 수 있어 끊지 않고 기다린다
 concurrency:
   group: deploy-gh-pages
   cancel-in-progress: false
 
 permissions:
   contents: write
+
+env:
+  # 미리보기 Cloudflare Pages 프로젝트 이름 (주소 https://<이름>.pages.dev/)
+  PREVIEW_PROJECT: uri-jangbu-preview
 
 jobs:
   deploy:
@@ -33,6 +37,9 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            worker/package-lock.json
 
       # 검사는 CI 워크플로(ci.yml)와 같은 단계를 그대로 반복한다
       - run: npm ci
@@ -44,8 +51,9 @@ jobs:
         run: npm test
 
       # 복구 코드 자동 보관 서버 주소 (SPEC-006): 저장소 변수(Settings → Variables) KEEP_URL.
-      # 없으면 빈 글자로 빌드돼 자동 보관이 꺼진다(설정에 "준비 중") — 서버 주소가 정해지기 전에도 배포는 그대로
-      - name: 빌드 (미리보기 /dongari/preview/)
+      # 없으면 빈 글자로 빌드돼 자동 보관이 꺼진다(설정에 "준비 중") — 서버 주소가 정해지기 전에도 배포는 그대로.
+      # 미리보기도 같은 서버를 쓴다. 서버가 미리보기 출처의 요청은 다른 자리(preview:)에 둔다 (#128)
+      - name: 빌드 (미리보기, 경로 /)
         if: github.ref_type == 'branch'
         env:
           VITE_KEEP_URL: ${{ vars.KEEP_URL }}
@@ -56,23 +64,86 @@ jobs:
           VITE_KEEP_URL: ${{ vars.KEEP_URL }}
         run: npm run build
 
+      # ── 미리보기: Cloudflare Pages ──
+
+      # wrangler 는 보관 서버 패키지(worker/)에 잠근 버전을 쓴다
+      - name: wrangler 설치 (worker/ 의 잠근 버전)
+        if: github.ref_type == 'branch'
+        working-directory: worker
+        run: npm ci
+
+      # 비밀값·권한을 배포 전에 확인하고, 프로젝트가 없으면 처음 한 번 만든다.
+      # 안 되면 무엇을 고칠지 알려 주고 멈춘다 (토큰 값은 출력하지 않는다)
+      - name: 미리보기 프로젝트 확인 (없으면 만들기)
+        if: github.ref_type == 'branch'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=""
+          [ -z "$CLOUDFLARE_API_TOKEN" ] && missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -z "$CLOUDFLARE_ACCOUNT_ID" ] && missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error title=미리보기 배포 비밀값 없음::레포 Settings → Secrets and variables → Actions 에 다음 비밀값을 넣은 뒤 이 실행을 다시 실행(Re-run)하세요:$missing"
+            exit 1
+          fi
+
+          permission_hint="토큰 권한 문제라면(보통 HTTP 401·403, 오류 10000): Cloudflare 대시보드 → My Profile → API Tokens → 레포 비밀값 CLOUDFLARE_API_TOKEN 으로 넣은 토큰 [Edit] → Permissions 에 'Account · Cloudflare Pages · Edit' 추가 → 저장 뒤 이 실행을 다시 실행(Re-run)하세요. 계정 id(CLOUDFLARE_ACCOUNT_ID)가 그 토큰의 계정과 같은지도 보세요"
+          api="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects"
+          response="$RUNNER_TEMP/pages-project.json"
+
+          # Cloudflare 가 준 오류 코드·글만 뽑는다 (본문이 JSON 이 아니면 빈 글자)
+          cloudflare_errors() {
+            jq -r '[.errors[]? | "\(.code) \(.message)"] | join("; ")' "$response" 2>/dev/null || true
+          }
+
+          status=$(curl -sS -o "$response" -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/$PREVIEW_PROJECT") || status=000
+
+          if [ "$status" = 200 ]; then
+            echo "Pages 프로젝트 $PREVIEW_PROJECT 있음"
+            exit 0
+          fi
+
+          # 8000007: 프로젝트 없음
+          if [ "$status" = 404 ] || cloudflare_errors | grep -qE '(^|; )8000007 '; then
+            echo "Pages 프로젝트 $PREVIEW_PROJECT 가 없어 만든다 (처음 한 번, 운영 브랜치 main)"
+            status=$(curl -sS -o "$response" -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' \
+              --data "{\"name\":\"$PREVIEW_PROJECT\",\"production_branch\":\"main\"}" "$api") || status=000
+            if [ "$status" = 200 ]; then
+              echo "Pages 프로젝트 $PREVIEW_PROJECT 를 만들었다"
+              exit 0
+            fi
+            echo "::error title=미리보기 프로젝트 만들기 실패::Cloudflare Pages 프로젝트 $PREVIEW_PROJECT 를 만들지 못했어요 (HTTP $status $(cloudflare_errors)). $permission_hint"
+            exit 1
+          fi
+
+          echo "::error title=미리보기 프로젝트 확인 실패::Cloudflare Pages 프로젝트 $PREVIEW_PROJECT 를 읽지 못했어요 (HTTP $status $(cloudflare_errors)). $permission_hint"
+          exit 1
+
+      # --branch main = 프로젝트의 운영 브랜치라 고정 주소(https://<이름>.pages.dev/)가 이 빌드로 바뀐다
+      - name: 미리보기 배포 (Cloudflare Pages)
+        if: github.ref_type == 'branch'
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler pages deploy ../dist --project-name "$PREVIEW_PROJECT" --branch main \
+            --commit-hash "$GITHUB_SHA" --commit-message "deploy: 미리보기 ${GITHUB_SHA::7}"
+          echo "미리보기: https://${PREVIEW_PROJECT}.pages.dev/ (${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"
+
+      # ── 본 주소: GitHub Pages (gh-pages 브랜치) ──
+
       # gh-pages 의 --user 는 주소의 [bot] 을 읽지 못해 git 설정으로 작성자를 정한다 (gh-pages 가 이 설정으로 커밋)
       - name: 배포 커밋 작성자를 github-actions 봇으로
+        if: github.ref_type == 'tag'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      # --add 없이 --dest preview: preview/ 안의 옛 파일만 지우고 새로 채운다. 본 주소·lab/ 은 그대로
-      - name: 미리보기 배포
-        if: github.ref_type == 'branch'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >-
-          npx gh-pages -d dist --dest preview --silent
-          --repo "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          --message "deploy: 미리보기 ${GITHUB_SHA::7}"
-
-      # --add 없이 루트: gh-pages 전체를 dist 로 바꾼다 (옛 해시 파일·preview/·lab/ 정리)
+      # --add 없이 루트: gh-pages 전체를 dist 로 바꾼다 (옛 해시 파일·옛 preview/·lab/ 정리)
       - name: 본 주소 배포
         if: github.ref_type == 'tag'
         env:

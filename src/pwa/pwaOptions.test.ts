@@ -22,13 +22,13 @@ describe('SPEC-002 홈 화면 추가 (PWA) 설정', () => {
     })
   })
 
-  it('빌드 경로를 바꾸면(QA 미리보기 /dongari/preview/) 홈 화면 앱도 그 경로에서 열린다', () => {
-    const preview = pwaOptions(tokensCss, '/dongari/preview/').manifest || undefined
+  it('빌드 경로를 바꾸면(QA 미리보기 / — Cloudflare Pages, #128) 홈 화면 앱도 그 경로에서 열린다', () => {
+    const preview = pwaOptions(tokensCss, '/').manifest || undefined
 
     expect(preview).toMatchObject({
-      start_url: '/dongari/preview/',
-      scope: '/dongari/preview/',
-      id: '/dongari/preview/',
+      start_url: '/',
+      scope: '/',
+      id: '/',
     })
   })
 
@@ -96,8 +96,14 @@ describe('SPEC-002 본 주소 서비스 워커가 미리보기 주소를 덮지 
     expect(isDenied(denylist, '/dongari/laboratory')).toBe(false)
   })
 
-  it('미리보기 빌드(/dongari/preview/)는 제외 목록을 두지 않는다 (서비스 워커 범위가 미리보기 안이라 본 주소에 닿지 않음)', () => {
+  it('하위 폴더 빌드(옛 미리보기 /dongari/preview/)는 제외 목록을 두지 않는다 (서비스 워커 범위가 그 폴더 안이라 본 주소에 닿지 않음)', () => {
     const preview = pwaOptions(tokensCss, '/dongari/preview/').workbox
+
+    expect(preview?.navigateFallbackDenylist).toBeUndefined()
+  })
+
+  it('미리보기 빌드(/, 따로 된 주소 #128)는 제외 목록을 두지 않는다 (옆에 사는 하위 폴더 화면이 없음)', () => {
+    const preview = pwaOptions(tokensCss, '/').workbox
 
     expect(preview?.navigateFallbackDenylist).toBeUndefined()
   })

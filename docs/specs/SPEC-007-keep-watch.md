@@ -73,8 +73,8 @@ SPEC-006 자동 보관은 실패해도 조용히 기다린다(사용자를 귀�
 ## 기술 메모
 
 - 서버 API 추가 (`worker/src/`)
-  - `PUT /v1/status/:id` — 출처·이름 검사는 `/v1/keep/:id` 와 같다. 본문 `{ "v": 1, "enabled": boolean, "pendingSince"?: ISO, "lastKeptAt"?: ISO, "tooLarge": boolean, "appVersion": string(1~32자) }`. 선택 칸은 빼서 보낸다(`null` 은 400). 정한 칸 말고 다른 칸이 있어도 400(평문으로 남는 것을 정한 만큼으로). 서버가 `seenAt`(서버 시각)을 붙여 KV `status:<id>` 에 저장 204. CORS 메서드에 맞춰 PUT 은 이미 허용. `/v1/status/:id` 에 PUT 말고(GET·DELETE)는 405.
-  - `GET /v1/report` — `Authorization: Bearer <REPORT_TOKEN>`(Worker 비밀값, `wrangler secret put REPORT_TOKEN`). KV `list({ prefix: 'status:' })` 로 키를 모으고 값은 키마다 `get` 으로 읽어 `{ now, devices: [{ id: 앞 8자, seenAt, enabled, pendingSince?, lastKeptAt?, tooLarge, appVersion }] }` 200. `list` 는 한 장(최대 1,000개)만 읽는다(기기는 가족 몇 대). 비교는 시간 일정 비교(길이 같을 때 바이트 XOR). `Origin` 검사 없음(GitHub Actions 에서 부른다), CORS 헤더 없음 — 라우팅에서 출처 검사보다 먼저 처리. 401·405 는 본문 없음.
+  - `PUT /v1/status/:id` — 출처·이름 검사는 `/v1/keep/:id` 와 같다. 본문 `{ "v": 1, "enabled": boolean, "pendingSince"?: ISO, "lastKeptAt"?: ISO, "tooLarge": boolean, "appVersion": string(1~32자) }`. 선택 칸은 빼서 보낸다(`null` 은 400). 정한 칸 말고 다른 칸이 있어도 400(평문으로 남는 것을 정한 만큼으로). 서버가 `seenAt`(서버 시각)을 붙여 KV `status:<id>` 에 저장 204. 미리보기 출처(`https://uri-jangbu-preview.pages.dev`)에서 온 신호는 `preview:status:<id>` 에 두고, 미리보기에서 보관본을 지우면 `preview:` 자리의 보관본·신호만 지운다(#128, SPEC-006 기술 메모 "출처와 KV 자리"). CORS 메서드에 맞춰 PUT 은 이미 허용. `/v1/status/:id` 에 PUT 말고(GET·DELETE)는 405.
+  - `GET /v1/report` — `Authorization: Bearer <REPORT_TOKEN>`(Worker 비밀값, `wrangler secret put REPORT_TOKEN`). KV `list({ prefix: 'status:' })` 로 키를 모으고(앞부분 일치라 미리보기 신호 `preview:status:…` 는 잡히지 않는다 — 요약은 본 주소 기기만, #128) 값은 키마다 `get` 으로 읽어 `{ now, devices: [{ id: 앞 8자, seenAt, enabled, pendingSince?, lastKeptAt?, tooLarge, appVersion }] }` 200. `list` 는 한 장(최대 1,000개)만 읽는다(기기는 가족 몇 대). 비교는 시간 일정 비교(길이 같을 때 바이트 XOR). `Origin` 검사 없음(GitHub Actions 에서 부른다), CORS 헤더 없음 — 라우팅에서 출처 검사보다 먼저 처리. 401·405 는 본문 없음.
   - 신호를 받는 것만으로 서버가 살아 있는지도 확인되므로 `/health` 는 따로 두지 않는다 — `/v1/report` 가 KV 를 읽으므로 그 응답이 곧 건강 확인이다.
 - 앱 (`src/features/keep/`)
   - `keepServer.ts` 에 `sendStatus(id, status)` (실패는 삼킨다).
@@ -101,3 +101,4 @@ SPEC-006 자동 보관은 실패해도 조용히 기다린다(사용자를 귀�
 | 2026-10-15 | 이슈 분해: #103 (하위 #104 서버, #105 앱 신호, #106 워크플로) |
 | 2026-10-15 | 서버 구현(#104): 상태 신호의 선택 칸은 빼서 보내고 정한 칸 밖은 400, `/v1/status/:id` 의 PUT 말고는 405, 요약은 `list` 한 장만 읽음 |
 | 2026-10-15 | 워크플로 구현(#106): 401 은 토큰 문구로 따로 실패, 서버 실패 문구에 까닭(연결 실패·HTTP 코드·형식) 덧붙임, 밀린 때는 KST, 판정은 `scripts/keepWatch.ts`(Node 24 타입 지우기로 실행), 경계 값은 문제 아님. 앱 메모를 `start` 의 올리기 시도 뒤로 맞춤(#105). deploy.yml 서버 주소 확인은 하지 않기로 |
+| 2026-10-16 | 기술 메모(#128): 미리보기 출처의 상태 신호는 `preview:status:<id>` 에, 요약은 본 자리(`status:`)만 |

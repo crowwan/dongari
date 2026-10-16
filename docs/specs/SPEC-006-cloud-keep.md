@@ -240,7 +240,7 @@ updated: 2026-10-16
 - [ ] AC-6 [보내기] 는 공유 화면을 열고, 안 되면 복사한다 (자동)
 - [ ] AC-7 백업 파일에 복구 코드가 들어가고, 불러오면 같은 코드를 쓴다 (자동)
 - [ ] AC-8 갤럭시에서 A 폰에 적고 B 폰(또는 다른 브라우저)에서 복구 코드로 불러오면 같은 기록이 보인다 (수동 QA)
-- [ ] AC-9 Worker: 같은 이름으로 올리면 덮어쓰고 받으면 마지막 것을 준다, 1MB 넘으면 거부, 허용한 출처(crowwan.github.io)만 받는다 (자동, Worker 테스트)
+- [ ] AC-9 Worker: 같은 이름으로 올리면 덮어쓰고 받으면 마지막 것을 준다, 1MB 넘으면 거부, 허용한 출처(본 주소 crowwan.github.io, 미리보기 uri-jangbu-preview.pages.dev — 미리보기는 저장 자리를 나눔, #128)만 받는다 (자동, Worker 테스트)
 
 #### v2.6 보강 (#120)
 
@@ -260,12 +260,13 @@ updated: 2026-10-16
 ## 기술 메모
 
 - 암호화: WebCrypto. 복구 코드 → HKDF(SHA-256)로 (a) 서버 이름용 해시, (b) AES-GCM 키를 따로 만든다. 서버는 이름과 암호문(+ 보관 시각)만 저장.
-- 서버: 같은 레포 `worker/`(Cloudflare Workers + KV, TypeScript). `PUT /v1/keep/:id`(본문 암호문, 1MB 상한), `GET /v1/keep/:id`. CORS 는 `https://crowwan.github.io` 만. 배포는 GitHub Actions(`CLOUDFLARE_API_TOKEN` 비밀값, 사용자가 Cloudflare 개인 계정·토큰을 만들어 레포 Secrets 에 넣는다).
+- 서버: 같은 레포 `worker/`(Cloudflare Workers + KV, TypeScript). `PUT /v1/keep/:id`(본문 암호문, 1MB 상한), `GET /v1/keep/:id`. CORS 는 앱 주소만(본 주소 `https://crowwan.github.io`, #128 부터 미리보기 `https://uri-jangbu-preview.pages.dev` 도). 배포는 GitHub Actions(`CLOUDFLARE_API_TOKEN` 비밀값, 사용자가 Cloudflare 개인 계정·토큰을 만들어 레포 Secrets 에 넣는다).
 - 서버 API (확정, #97 `worker/src/keep.ts`). 이름(`:id`)은 64자 소문자 16진수(SHA-256), KV 키 `keep:<id>`
   - `PUT /v1/keep/:id` — 본문 JSON `{ "v": 1, "savedAt": ISO 시각, "iv": base64, "data": base64 }`, `Content-Type: application/json`. 저장(덮어쓰기) 204, 받은 JSON 그대로 저장. 1MB(1,048,576 바이트) 초과 413, 이름·본문·Content-Type 형식이 틀리면 400
   - `GET /v1/keep/:id` — 있으면 200 + 저장한 JSON, 없으면 404
   - `DELETE /v1/keep/:id` — 204 (없어도 204)
-  - CORS: `Origin` 이 `https://crowwan.github.io` 일 때만 받고 `Access-Control-Allow-Origin` 을 그 값으로(메서드 GET·PUT·DELETE·OPTIONS, 헤더 Content-Type). OPTIONS 미리 요청 204. 다른 출처·출처 없음은 403
+  - CORS: `Origin` 이 허용한 출처일 때만 받고 `Access-Control-Allow-Origin` 을 요청 출처 그대로(`Vary: Origin`, 메서드 GET·PUT·DELETE·OPTIONS, 헤더 Content-Type). OPTIONS 미리 요청 204. 다른 출처·출처 없음은 403
+  - 출처와 KV 자리 (#128, ADR 008): 허용한 출처는 정확한 주소 둘 — 본 주소 `https://crowwan.github.io` → KV `keep:<id>`, 미리보기(Cloudflare Pages) `https://uri-jangbu-preview.pages.dev` → KV `preview:keep:<id>`. 같은 이름(같은 복구 코드)이라도 미리보기의 올리기·받기·지우기는 `preview:` 자리만 건드려, 미리보기에서 어머니 복구 코드로 불러오거나 기록 파일로 같은 코드를 갖게 돼도 본 사본을 읽거나 덮어쓰지 않는다. 미리보기 배포별 주소(`<hash>.uri-jangbu-preview.pages.dev`)·http·비슷한 주소는 403. 출처→자리 표는 `worker/src/keep.ts` `ORIGIN_KEY_PREFIXES`
   - 그 밖의 경로 404(출처와 상관없이), `/v1/keep/:id` 에 다른 메서드는 405
 - KV 무료 한도: 쓰기 하루 1,000회. 10초 묶음으로 사용자 몇 명이면 한참 남는다.
 - 앱 쪽 보관기는 `LedgerRepository` 저장 뒤 알림을 받아 동작(저장 계층과 분리, 테스트는 가짜 서버).
@@ -298,3 +299,4 @@ updated: 2026-10-16
 | 2026-10-16 | v2.6 보강 초안(시안 C, 사용자 결정 "추천대로 진행", 접근성 점검 06): 설정 맨 위 "새 폰으로 옮기려면 이 코드만 적어 두세요" 카드(복구 코드 + 주 버튼 [복구 코드 보내기] + 상태 줄), 파일·복구 코드 불러오기·자동 켜고 끄기는 "다른 방법으로 옮기기" 에 접기, 장부 정보는 아래로, 서버 없는 빌드는 "준비 중"·코드 숨김. 용어 "백업 파일" → "기록 파일", "자동 보관" → "자동으로 지키기"(작년 이월금·복구 코드·결산표 그대로), 바뀌는 문구와 다른 문서에 미치는 곳 목록. AC-10~16 추가 |
 | 2026-10-16 | v2.6 승인 (사용자: "승인, B 빼고 진행" — 결산 보내기 버튼 이름·갤럭시 공유 창 동작은 #114 기술 검증 뒤) |
 | 2026-10-16 | v2.6 보강 구현(#120): 상태 줄 글자 16(15 토큰 없음), 접기는 `aria-expanded` 버튼(접히면 안 줄 없음)·설정 위 화면에 다녀오면 펼친 채, 코드는 줄표 뒤에서만 줄바꿈(`<wbr>`), 읽기 전용 시작도 서버 없는 빌드처럼 기록 파일 두 줄만, `keepRowText` 대신 `keepStatusText`. 본문에 v2.5 모양 표시, 불러오기 안내·첫 실행 버튼 문구 v2.6 말로 |
+| 2026-10-16 | 기술 메모(#128): 미리보기를 다른 출처(Cloudflare Pages `https://uri-jangbu-preview.pages.dev`)로 옮기며 서버가 그 출처도 받고, 미리보기 요청은 KV `preview:` 자리에 둔다. CORS Allow-Origin 은 요청 출처 그대로 |
