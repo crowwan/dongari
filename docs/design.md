@@ -111,6 +111,10 @@ updated: 2026-10-13
 | `--dot` / `--grab-w` / `--grab-h` | 8 / 40 / 4 | 할 일 점 / 선택 창 손잡이 |
 | `--bar-thickness` | 6 | 비율 막대 굵기 (올해 결산 항목별 합계, #84) |
 | `--content-max` / `--dialog-max` | 480 / 400 | 화면 내용 / 확인 창 최대 폭 |
+| `--coach-inset` / `--coach-pad` | 20 / 16·16·12·18 | 안내 말풍선(SPEC-008): 화면 좌우에서 말풍선까지 / 말풍선 안쪽 여백(위·오른쪽·아래·왼쪽) |
+| `--coach-line` | 1.45 | 말풍선 글 줄 간격 (Body 16 SemiBold, 낱말 단위 줄바꿈) |
+| `--coach-tail` / `--coach-tail-corner` | 18 / 3 | 꼬리 마름모 한 변(45° 돌림) / 모서리 |
+| `--coach-ring-gap` / `--coach-gap` | 3 / 24 | 가리키는 버튼과 청록 둘레(`--focus-ring` 굵기 `--accent-ink`) 사이 / 버튼 가장자리에서 말풍선까지(둘레 + 꼬리 자리) |
 
 ### 모션
 
@@ -119,6 +123,7 @@ updated: 2026-10-13
 | `--motion-fast` | 알림 나타남, 눌림 색 바뀜 | 눌렀다는 느낌만 주고 기다리게 하지 않는다 |
 | `--motion-base` | 확인 창 나타남, 선택 창 올라옴 | 무엇이 새로 떴는지 눈으로 따라갈 시간 |
 | `--motion-curve` | 위 두 곳 | 빨리 시작해 부드럽게 멈춰 "튀는" 느낌을 줄인다 |
+| `--coach-rise` | 안내 말풍선 나타남(`--motion-base` 동안 6px 아래에서 제자리로, SPEC-008) | 화면 위에 새로 떴다는 것만 알린다. 동작 줄이기면 바로 나타난다 |
 
 ## 타이포 위계와 간격 규칙
 
@@ -214,6 +219,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `MoneyInput` / `TextField` | 흰 면 + 옅은 둘레(64) / 포커스 청록 둘레 / 오류 빨강 둘레 + 문장 / 비활성 점선. 이름 글자 역할 `labelRole`, `TextField` `autoFocus` (#47). `MoneyInput` 은 0원도 적는 칸(이월금)용: 처음 값 0 은 `0`, 다 지우면 빈칸(자리표시 0), 친 글자를 들고 있어 빈칸과 직접 친 0 을 가른다. 0원이 없는 내역 금액은 `AmountDisplay`(0 = 빈칸) (#59) |
 | `ConfirmDialog` | 기본 / 위험(빨강 확인), 아니요는 보조 버튼, 열리면 "아니요"에 포커스, Esc = 아니요. `body` 아래에 그리고 떠 있는 동안 뒤 화면 `inert`, 닫으면 연 자리로 포커스(#110, 카탈로그 견본은 `inline`). 뒤로 버튼은 아래 "선택 창과 뒤로 버튼"(`openDialog`). 설명 줄, `cancelLabel={null}` 이면 버튼 하나짜리 알림 창. `children` 은 설명 아래 버튼 위 자세한 내용(복구 코드로 불러오기의 보관본 요약 `KeptSummary`: 회색 면(`--fill`, 반경 12) 안 이름 `--muted` · 값 굵게 오른쪽, SPEC-006) |
 | `Toast` | 제목색 면 + 카드색 글자 알약 (2초, 긴 문장은 글자당 0.12초, `role="status"`) |
+| `CoachMark` (SPEC-008, #122) | 처음 쓰는 분 안내 말풍선: 뒤 화면 스크림(`--scrim`) + 가리키는 버튼 자리만 밝게 남기고 청록 둘레(`--focus-ring` `--accent-ink`, `--coach-ring-gap` 띄움) + 꼬리 달린 말풍선(알림과 같은 짝 `--strong` 면 + `--surface` 글자, 반경 16, 화면 좌우 `--coach-inset`). 글 오른쪽 위 [✕]("안내 닫기", 56×56, 면 없음) · 오른쪽 아래 [알겠어요](카드색 면 + 제목색 Bold, 반경 12, 높이 56). 버튼이 화면 아래쪽 절반이면 말풍선은 위(꼬리 아래), 위쪽 절반이면 아래(꼬리 위), 꼬리는 버튼 가운데 쪽. `body` 아래에 그리고 떠 있는 동안 말풍선·가리키는 버튼 밖 `inert`, 열면 가리키는 버튼에 포커스 + 그 버튼 설명(`aria-describedby`)에 말풍선 글, 닫으면 포커스는 그 버튼에. 말풍선 버튼 포커스 링은 짙은 면 위라 `--surface`. 루트 `data-testid="coach-mark"`·`data-state`(번호)·`data-side`, 카탈로그 견본 `inline` |
 | `NoticeBar` | 노란 면(반경 16) + SemiBold 문장(`role="alert"`, 낱말 단위 줄바꿈 `keep-all`), 할 일이 있으면 아래 흰 면 버튼 하나(왼쪽 정렬, 아이콘 `action.icon` 가능 — [공유 기록 파일 보내기]) |
 | `BalanceCard` | 이름(Caption Medium) → 큰 숫자(Display 30, "원" 60%) → 보조 줄(있을 때만), 적자는 `−` |
 | `AmountText` | 수입 `+` 밝은 청록 / 지출 `−` 제목색. 크기는 놓인 자리를 따른다 |
@@ -263,7 +269,8 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 
 ### 창이 뜨면 뒤 화면 잠금, 화면이 바뀌면 제목 알리기 (#110)
 
-- 화면 위에 뜨는 창(`ConfirmDialog`·`BottomSheet`, 앞으로 만들 안내 말풍선도)은 `ui/modalLayer` 의 `useModalLayer` 를 쓴다: `document.body` 아래에 그리고(`createPortal`), 떠 있는 동안 창 밖에 `inert`(Tab·화면 읽기·누르기가 창 밖으로 나가지 않음), 열면 정한 곳에 포커스, 닫으면 잠금을 풀고 연 자리로 포커스.
+- 화면 위에 뜨는 창(`ConfirmDialog`·`BottomSheet`·`CoachMark`)은 `ui/modalLayer` 의 `useModalLayer` 를 쓴다: `document.body` 아래에 그리고(`createPortal`), 떠 있는 동안 창 밖에 `inert`(Tab·화면 읽기·누르기가 창 밖으로 나가지 않음), 열면 정한 곳에 포커스, 닫으면 잠금을 풀고 연 자리로 포커스.
+- 안내 말풍선(SPEC-008)은 창 밖의 가리키는 버튼도 열어 둔다(`useModalLayer` 다섯째 인자 `keepOpen`: 창과 그 요소의 조상 줄은 남기고 그 줄의 형제만 잠금). 닫으면 포커스는 연 자리 대신 그 버튼에. 말풍선은 확인 창 칸(`openDialog('guide-N')`)이라 뒤로 버튼은 말풍선만 닫고, 가리키는 버튼이 화면을 열면 `open()` 이 그 칸을 화면 칸으로 바꿔 끼운다.
 - 화면이 바뀌면(`main` 안 h1 요소가 바뀌면) `useScreenHeading` 이 새 h1 에 포커스(`tabIndex=-1`, 포커스 테두리 없음 — 화면 읽기용)를 주고, `document.title` 을 "h1 글자 · 우리 장부" 로 바꾼다. 화면마다 h1 은 하나. 앱을 처음 열 때와 화면이 스스로 칸에 포커스를 준 때(내역 적기 날 칸 → 숫자 키패드)는 옮기지 않는다.
 
 공통 규칙: 누르는 곳 `--touch-min` 이상, 포커스 링 보임, 그림자 없음(스위치 손잡이 제외), 컴포넌트는 토큰 변수만 쓰고 `className`·`style` 을 받지 않는다. 루트에 `data-testid`, 상태가 있으면 `data-state`/`data-variant`/`data-kind`/`data-tone`.
@@ -321,3 +328,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-16 | 창 접근성(#110): `ConfirmDialog`·`BottomSheet` 를 `body` 아래에 그리고 떠 있는 동안 뒤 화면 `inert`(`ui/modalLayer`, 카탈로그 견본 `inline`), 확인 창 뒤로 버튼(`openDialog`), 화면이 바뀌면 h1 포커스·`document.title`(`useScreenHeading`) | |
 | 2026-10-16 | SPEC-006 v2.6 기록 지키기 정리(#120): 설정 맨 위 기록 지키기 카드(제목·코드·주 버튼 [복구 코드 보내기]·상태 줄) + "다른 방법으로 옮기기" 접기, 장부 정보는 아래로, 코드 없는 빌드는 기록 파일 두 줄만. 용어 "백업 파일" → "기록 파일", "자동 보관" → "자동으로 지키기"(익숙한 말 목록), `IconButton` 점 이름은 쉼표로 끊어 읽기("설정, 기록 파일 보내기 필요") | |
 | 2026-10-16 | 저장 안 됨 표시(SPEC-002 v2.6, #121): `ListRow` `badge`(보조 줄 아래 `--warn-bg` 노란 알약 + 경고 세모 `Icon` `alert`, 화면 읽기는 줄 이름 끝), 토큰 `--icon-text`, 저장 실패 띠 문구 ① "…방금 적은 내역은 앱을 닫으면 사라져요…". 카탈로그 ListRow 저장 안 됨 상태 | |
+| 2026-10-16 | 처음 쓰는 분 안내 말풍선(SPEC-008, #122): `CoachMark`(스크림 + 가리키는 버튼 둘레 + 꼬리 달린 말풍선, [✕]·[알겠어요] 56), 토큰 `--coach-*`, 아이콘 `close`, `IconButton` `ref`·`BottomActionBar` `buttonRef`(말풍선이 가리킬 버튼), `useModalLayer` `keepOpen`. 카탈로그 CoachMark 위·아래 견본 | |
