@@ -5,9 +5,9 @@ import { NoticeBar } from './NoticeBar'
 
 describe('NoticeBar', () => {
   it('알아 둘 내용을 바로 읽히는 안내 띠로 보여준다', () => {
-    render(<NoticeBar message="저장하지 못했어요. 백업 파일을 보내 두세요" />)
+    render(<NoticeBar message="저장하지 못했어요. 기록 파일을 보내 두세요" />)
 
-    expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+    expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 기록 파일을 보내 두세요')
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
@@ -15,20 +15,20 @@ describe('NoticeBar', () => {
     const handleClick = vi.fn()
     render(
       <NoticeBar
-        message="저장하지 못했어요. 백업 파일을 보내 두세요"
-        action={{ label: '백업 파일 보내기', onClick: handleClick }}
+        message="저장하지 못했어요. 기록 파일을 보내 두세요"
+        action={{ label: '기록 파일 보내기', onClick: handleClick }}
       />,
     )
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/^저장하지 못했어요. 백업 파일을 보내 두세요$/)
-    await userEvent.click(screen.getByRole('button', { name: '백업 파일 보내기' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(/^저장하지 못했어요. 기록 파일을 보내 두세요$/)
+    await userEvent.click(screen.getByRole('button', { name: '기록 파일 보내기' }))
     expect(handleClick).toHaveBeenCalledOnce()
   })
 
   it('버튼에 아이콘을 붙일 수 있고 이름은 글자로만 읽힌다', () => {
-    render(<NoticeBar message="한 달 넘게 백업하지 않았어요" action={{ label: '백업 파일 보내기', icon: 'share', onClick: () => {} }} />)
+    render(<NoticeBar message="한 달 넘게 기록 파일을 보내지 않았어요" action={{ label: '기록 파일 보내기', icon: 'share', onClick: () => {} }} />)
 
-    const button = screen.getByRole('button', { name: '백업 파일 보내기' })
+    const button = screen.getByRole('button', { name: '기록 파일 보내기' })
     expect(button.querySelector('[data-icon="share"]')).toHaveAttribute('aria-hidden', 'true')
   })
 })

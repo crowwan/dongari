@@ -5,7 +5,7 @@ function backupFile(): File {
   return new File(['{"schemaVersion": 2}'], '우리장부-백업-2026-10-06.txt', { type: 'text/plain' })
 }
 
-describe('SPEC-002 백업 파일 보내기 (공유·다운로드)', () => {
+describe('SPEC-002 기록 파일 보내기 (공유·다운로드)', () => {
   it('AC-6 파일 공유를 지원하면 공유 화면을 열고 shared 를 돌려준다', async () => {
     const file = backupFile()
     const share = vi.fn(() => Promise.resolve())

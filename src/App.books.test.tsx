@@ -94,9 +94,9 @@ describe('SPEC-005 여러 장부 저장 형식 (화면)', () => {
 
   it('AC-8 장부 여러 개가 든 백업 파일을 불러오면 모든 장부가 그대로 돌아오고 파일의 마지막에 본 장부가 열린다', async () => {
     const repository = renderApp(new MemoryRepository())
-    await userEvent.click(screen.getByRole('button', { name: '백업 불러오기' }))
+    await userEvent.click(screen.getByRole('button', { name: '기록 파일 불러오기' }))
     await userEvent.upload(
-      screen.getByLabelText('백업 파일 고르기'),
+      screen.getByLabelText('기록 파일 고르기'),
       new File([JSON.stringify(TWO_BOOKS)], '우리장부-백업-2026-10-03.txt', { type: 'text/plain' }),
     )
     await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '불러오기' }))

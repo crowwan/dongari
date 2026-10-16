@@ -13,7 +13,7 @@ export function BackupDialogs({ backup: { dialog, attachFileInput, onFileChosen,
         type="file"
         accept={BACKUP_FILE_ACCEPT}
         hidden
-        aria-label="백업 파일 고르기"
+        aria-label="기록 파일 고르기"
         data-testid="backup-file-input"
         onChange={onFileChosen}
       />

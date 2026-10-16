@@ -4,9 +4,9 @@ import type { StoredData } from '../../domain/types'
 export const BACKUP_REMINDER_DAYS = 30
 const REMINDER_MS = BACKUP_REMINDER_DAYS * 24 * 60 * 60 * 1000
 
-export const BACKUP_REMINDER_MESSAGE = '한 달 넘게 백업하지 않았어요'
-// [설정] 점 표시의 화면 읽기 이름 ("설정 백업 필요")
-export const BACKUP_DOT_LABEL = '백업 필요'
+export const BACKUP_REMINDER_MESSAGE = '한 달 넘게 기록 파일을 보내지 않았어요'
+// [설정] 점 표시의 화면 읽기 이름 ("설정, 기록 파일 보내기 필요")
+export const BACKUP_DOT_LABEL = '기록 파일 보내기 필요'
 
 type ReminderCondition = {
   lastBackupAt: string | undefined // 마지막으로 백업 파일을 보낸 시각
@@ -55,10 +55,10 @@ export function backupReminderFor(data: StoredData, now: Date): boolean {
   return needsBackupReminder({ lastBackupAt, lastChangedAt, firstRecordedAt: firstRecordedAt(data), now })
 }
 
-// 설정 "기록 백업" 카드의 한 줄. 날짜는 폰의 날짜로
+// 설정 [기록 파일 보내기] 줄의 보조 줄. 날짜는 폰의 날짜로
 export function lastBackupText(lastBackupAt: string | undefined): string {
   const time = toTime(lastBackupAt)
-  if (time === undefined) return '아직 백업하지 않았어요'
+  if (time === undefined) return '아직 보내지 않았어요'
   const date = new Date(time)
-  return `마지막 백업: ${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`
+  return `마지막: ${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`
 }

@@ -32,7 +32,7 @@ function isLocked(element: HTMLElement): boolean {
 }
 
 async function chooseFile(text: string) {
-  await userEvent.upload(screen.getByLabelText('백업 파일 고르기'), new File([text], '우리장부-백업.txt', { type: 'text/plain' }))
+  await userEvent.upload(screen.getByLabelText('기록 파일 고르기'), new File([text], '우리장부-백업.txt', { type: 'text/plain' }))
 }
 
 afterEach(() => {

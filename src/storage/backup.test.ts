@@ -41,12 +41,12 @@ function withBackupAt(data: StoredData, now: Date): StoredData {
 }
 
 describe('SPEC-002·SPEC-005 백업 파일 만들기', () => {
-  it('SPEC-005 파일 이름은 앱 이름(우리 장부)과 오늘 날짜가 붙은 우리장부-백업-YYYY-MM-DD.txt 이다', () => {
-    expect(createBackup(storedWith(ledger(2026, 1)), NOW).fileName).toBe('우리장부-백업-2026-10-06.txt')
+  it('SPEC-006 v2.6 파일 이름은 앱 이름(우리 장부)과 오늘 날짜가 붙은 우리장부-기록-YYYY-MM-DD.txt 이다', () => {
+    expect(createBackup(storedWith(ledger(2026, 1)), NOW).fileName).toBe('우리장부-기록-2026-10-06.txt')
   })
 
   it('한 자리 월·일은 0 을 붙인다', () => {
-    expect(createBackup(createEmptyData(), new Date(2026, 0, 5)).fileName).toBe('우리장부-백업-2026-01-05.txt')
+    expect(createBackup(createEmptyData(), new Date(2026, 0, 5)).fileName).toBe('우리장부-기록-2026-01-05.txt')
   })
 
   it('내용은 전체 저장 데이터(모든 장부)이고 사람이 열어도 읽히게 줄을 나눈다 (AC-8)', () => {

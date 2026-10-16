@@ -9,7 +9,7 @@ import { storedWith as storedWithLedgers } from './test/ledgerFixtures'
 
 // 오늘: 2026-10-06. 마지막 백업 2026-09-01 → 35일 지남
 const TODAY = new Date('2026-10-06T09:00:00.000+09:00')
-const REMINDER = '한 달 넘게 백업하지 않았어요'
+const REMINDER = '한 달 넘게 기록 파일을 보내지 않았어요'
 
 const LEDGER: Ledger = {
   year: 2026,
@@ -51,7 +51,7 @@ describe('SPEC-002 30일 백업 안내', () => {
     renderApp(new MemoryRepository(storedWith(OVERDUE)))
 
     expect(screen.getByText(REMINDER)).toBeInTheDocument()
-    const settings = screen.getByRole('button', { name: '설정 백업 필요' })
+    const settings = screen.getByRole('button', { name: '설정, 기록 파일 보내기 필요' })
     expect(settings).toHaveAttribute('data-dot', 'true')
   })
 
@@ -74,14 +74,14 @@ describe('SPEC-002 30일 백업 안내', () => {
     expect(screen.getByText(REMINDER)).toBeInTheDocument()
   })
 
-  it('띠의 [백업 파일 보내기] 는 설정의 보내기와 같이 공유 화면을 열고, 보내면 안내 띠와 점이 사라진다', async () => {
+  it('띠의 [기록 파일 보내기] 는 설정의 보내기와 같이 공유 화면을 열고, 보내면 안내 띠와 점이 사라진다', async () => {
     const shareMock = stubShare()
     const repository = renderApp(new MemoryRepository(storedWith(OVERDUE)))
 
-    await userEvent.click(within(screen.getByTestId('notice-bar')).getByRole('button', { name: '백업 파일 보내기' }))
+    await userEvent.click(within(screen.getByTestId('notice-bar')).getByRole('button', { name: '기록 파일 보내기' }))
 
     expect(shareMock).toHaveBeenCalledOnce()
-    expect(await screen.findByText('백업 파일을 보냈어요')).toBeInTheDocument()
+    expect(await screen.findByText('기록 파일을 보냈어요')).toBeInTheDocument()
     expect(screen.queryByText(REMINDER)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '설정' })).toHaveAttribute('data-dot', 'false')
     expect(repository.load().data.settings.lastBackupAt).toBe(TODAY.toISOString())
@@ -91,7 +91,7 @@ describe('SPEC-002 30일 백업 안내', () => {
     const shareMock = stubShare(() => Promise.reject(new DOMException('취소', 'AbortError')))
     renderApp(new MemoryRepository(storedWith(OVERDUE)))
 
-    await userEvent.click(screen.getByRole('button', { name: '백업 파일 보내기' }))
+    await userEvent.click(screen.getByRole('button', { name: '기록 파일 보내기' }))
 
     await vi.waitFor(() => expect(shareMock).toHaveBeenCalledOnce())
     expect(screen.getByText(REMINDER)).toBeInTheDocument()
@@ -100,7 +100,7 @@ describe('SPEC-002 30일 백업 안내', () => {
   it('점 표시를 보고 설정에 오면 설정 화면에도 같은 띠가 보이고, 월 정리·올해 결산에는 없다', async () => {
     renderApp(new MemoryRepository(storedWith(OVERDUE)))
 
-    await userEvent.click(screen.getByRole('button', { name: '설정 백업 필요' }))
+    await userEvent.click(screen.getByRole('button', { name: '설정, 기록 파일 보내기 필요' }))
     expect(screen.getByTestId('settings-screen')).toBeInTheDocument()
     expect(within(screen.getByTestId('notice-bar')).getByText(REMINDER)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '장부로' }))
@@ -125,54 +125,54 @@ describe('SPEC-002 30일 백업 안내', () => {
 
       expect(screen.getByText(REMINDER)).toBeInTheDocument()
 
-      await userEvent.click(screen.getByRole('button', { name: '백업 파일 보내기' }))
+      await userEvent.click(screen.getByRole('button', { name: '기록 파일 보내기' }))
 
       await vi.waitFor(() => expect(screen.queryByText(REMINDER)).not.toBeInTheDocument())
       expect(screen.queryByTestId('notice-bar')).not.toBeInTheDocument()
       expect(screen.queryByTestId('install-banner')).not.toBeInTheDocument()
     })
 
-    it('저장 실패 안내가 있으면 백업 안내 띠는 숨긴다 (같은 [백업 파일 보내기] 를 두 번 보이지 않게). 점 표시는 남는다', async () => {
+    it('저장 실패 안내가 있으면 백업 안내 띠는 숨긴다 (같은 [기록 파일 보내기] 를 두 번 보이지 않게). 점 표시는 남는다', async () => {
       const memory = new MemoryRepository(storedWith(OVERDUE))
       renderApp({ load: () => memory.load(), save: () => ({ ok: false, reason: 'quota-exceeded' }), restore: (data) => memory.restore(data) })
 
       // 기록 하나를 고쳐 저장 실패를 만든다
-      await userEvent.click(screen.getByRole('button', { name: '설정 백업 필요' }))
+      await userEvent.click(screen.getByRole('button', { name: '설정, 기록 파일 보내기 필요' }))
       await userEvent.click(screen.getByRole('button', { name: /^장부 이름/ }))
       await userEvent.clear(screen.getByLabelText('장부 이름'))
       await userEvent.type(screen.getByLabelText('장부 이름'), '새이름')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
-      expect(screen.getByText('저장하지 못했어요. 백업 파일을 보내 두세요')).toBeInTheDocument()
+      expect(screen.getByText('저장하지 못했어요. 기록 파일을 보내 두세요')).toBeInTheDocument()
       expect(screen.queryByText(REMINDER)).not.toBeInTheDocument()
-      expect(screen.getAllByRole('button', { name: '백업 파일 보내기' })).toHaveLength(1)
-      expect(screen.getByRole('button', { name: '설정 백업 필요' })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: '기록 파일 보내기' })).toHaveLength(1)
+      expect(screen.getByRole('button', { name: '설정, 기록 파일 보내기 필요' })).toBeInTheDocument()
     })
   })
 
-  describe('설정 > 기록 지키기 [백업 파일 보내기] 줄의 마지막 백업 날짜', () => {
+  describe('설정 > 기록 지키기 [기록 파일 보내기] 줄의 마지막 백업 날짜', () => {
     it('마지막 백업 날짜를 보여 준다', async () => {
       const lastBackupAt = new Date(2026, 8, 3, 10, 0).toISOString()
       renderApp(new MemoryRepository(storedWith({ lastBackupAt, lastChangedAt: lastBackupAt })))
       await userEvent.click(screen.getByRole('button', { name: '설정' }))
 
-      const card = within(screen.getByRole('region', { name: '기록 지키기' }))
-      expect(card.getByText('마지막 백업: 2026년 9월 3일')).toBeInTheDocument()
+      const card = within(screen.getByTestId('settings-block-files'))
+      expect(card.getByText('마지막: 2026년 9월 3일')).toBeInTheDocument()
     })
 
-    it('백업한 적이 없으면 "아직 백업하지 않았어요", 보내면 오늘 날짜로 바뀐다', async () => {
+    it('백업한 적이 없으면 "아직 보내지 않았어요", 보내면 오늘 날짜로 바뀐다', async () => {
       stubShare()
       renderApp(new MemoryRepository(storedWith({ lastChangedAt: '2026-10-01T00:00:00.000Z' })))
       // 처음 기록(8월 1일)부터 30일이 지나 점이 붙어 있다
-      await userEvent.click(screen.getByRole('button', { name: '설정 백업 필요' }))
+      await userEvent.click(screen.getByRole('button', { name: '설정, 기록 파일 보내기 필요' }))
 
-      const card = within(screen.getByRole('region', { name: '기록 지키기' }))
-      expect(card.getByText('아직 백업하지 않았어요')).toBeInTheDocument()
+      const card = within(screen.getByTestId('settings-block-files'))
+      expect(card.getByText('아직 보내지 않았어요')).toBeInTheDocument()
 
-      await userEvent.click(card.getByRole('button', { name: /^백업 파일 보내기/ }))
+      await userEvent.click(card.getByRole('button', { name: /^기록 파일 보내기/ }))
 
-      expect(await card.findByText('마지막 백업: 2026년 10월 6일')).toBeInTheDocument()
+      expect(await card.findByText('마지막: 2026년 10월 6일')).toBeInTheDocument()
     })
   })
 })

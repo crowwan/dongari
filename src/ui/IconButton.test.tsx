@@ -48,12 +48,13 @@ describe('IconButton', () => {
 
   it('점 표시: 점을 그리고 화면 읽기 이름에도 이유를 붙인다 (색만으로 알리지 않는다)', () => {
     render(
-      <IconButton icon="settings" dotLabel="백업 필요" onClick={() => {}}>
+      <IconButton icon="settings" dotLabel="기록 파일 보내기 필요" onClick={() => {}}>
         설정
       </IconButton>,
     )
 
-    const button = screen.getByRole('button', { name: '설정 백업 필요' })
+    // 글자와 이유 사이는 쉼표로 끊어 읽는다 ("설정, 기록 파일 보내기 필요", SPEC-006 v2.6)
+    const button = screen.getByRole('button', { name: '설정, 기록 파일 보내기 필요' })
     expect(button).toHaveAttribute('data-dot', 'true')
     expect(screen.getByTestId('icon-button-dot')).toHaveAttribute('aria-hidden', 'true')
   })
