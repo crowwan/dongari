@@ -17,11 +17,12 @@ import { BACKUP_REMINDER_MESSAGE, lastBackupText } from '../backup/backupReminde
 import { bookKindIcon } from '../books/bookKindIcon'
 import { KeepRestoreScreen } from '../keep/KeepRestoreScreen'
 import type { KeepServer } from '../keep/keepServer'
-import { InstallGuide } from '../install/InstallGuide'
-import { browserInstallEnvironment, useInstallPrompt, type InstallEnvironment } from '../install/installPrompt'
-import { browserKind, shouldOfferInstall } from '../install/installRules'
+import { useInstallAction } from '../install/installAction'
+import { InstallGuideSheet } from '../install/InstallGuideSheet'
+import { browserInstallEnvironment, type InstallEnvironment } from '../install/installPrompt'
 import { CarryoverField } from '../ledger/CarryoverField'
 import type { SheetHistory } from '../useScreenHistory'
+import { browserAppVersion, useUpdateReady, type AppVersion } from '../version/appVersion'
 import './settings.css'
 
 // 설정 화면 위에 뜨는 것들 (방문 기록 한 칸씩 — 뒤로 버튼은 이것만 닫는다)
@@ -83,6 +84,8 @@ type SettingsScreenProps = {
   onPractice?: () => void
   // 홈 화면에 추가 줄이 보는 브라우저 상태 (기본은 지금 브라우저, 테스트에서 바꿔 넣는다)
   install?: InstallEnvironment
+  // 버전 줄 값과 새 버전 받음 (기본은 이 빌드·지금 브라우저, 테스트에서 바꿔 넣는다)
+  version?: AppVersion
 }
 
 // 이월금 값: 적자는 빼기표 대신 "적자" (장부 잔액 카드와 같은 말)
@@ -116,9 +119,9 @@ export function SettingsScreen({
   onBack,
   onPractice,
   install = browserInstallEnvironment(),
+  version = browserAppVersion(),
 }: SettingsScreenProps) {
-  const installPrompt = useInstallPrompt(install.installPrompt)
-  const offersInstall = shouldOfferInstall({ standalone: install.standalone, installed: installPrompt.installed })
+  const installAction = useInstallAction(install, sheets, INSTALL_GUIDE_SHEET)
   // 다른 방법으로 옮기기: 설정을 열 때마다 처음엔 접혀 있다 (편집·불러오기 화면에 다녀와도 그대로)
   const [moreOpen, setMoreOpen] = useState(false)
 
@@ -221,21 +224,15 @@ export function SettingsScreen({
         <SettingRow icon="calendar" title="장부 연도" value={`${year}년`} onClick={() => sheets.openSheet(YEAR_SHEET)} />
       </SettingsGroup>
 
-      {/* 앱: 홈 화면에 추가 (SPEC-002, 설치 제안이 있으면 브라우저 설치 창, 없으면 방법 안내. 홈 화면 앱이면 없다) +
-          맨 아래 [연습해 보기] (SPEC-008, 홈 화면 앱에서도 있어 묶음은 늘 있다) */}
-      {(offersInstall || onPractice) && (
-        <SettingsGroup title="앱" testId="settings-block-app">
-          {offersInstall && (
-            <SettingRow
-              icon="phone"
-              title="홈 화면에 추가"
-              description="기록이 더 안전해요"
-              onClick={() => (installPrompt.canInstall ? void installPrompt.install() : sheets.openSheet(INSTALL_GUIDE_SHEET))}
-            />
-          )}
-          {onPractice && <SettingRow icon="play" title="연습해 보기" description="저장되지 않는 장부로 따라 해 봐요" onClick={onPractice} />}
-        </SettingsGroup>
-      )}
+      {/* 앱 (늘 있음): 홈 화면에 추가 (SPEC-002, 설치 제안이 있으면 브라우저 설치 창, 없으면 방법 안내. 홈 화면 앱이면 없다) →
+          [연습해 보기] (SPEC-008) → 맨 아래 누를 수 없는 버전 줄 (SPEC-002 #135, 새 버전을 받았으면 [지금 바꾸기]) */}
+      <SettingsGroup title="앱" testId="settings-block-app">
+        {installAction.offers && (
+          <SettingRow icon="phone" title="홈 화면에 추가" description="기록이 더 안전해요" onClick={installAction.start} />
+        )}
+        {onPractice && <SettingRow icon="play" title="연습해 보기" description="저장되지 않는 장부로 따라 해 봐요" onClick={onPractice} />}
+        <VersionRow version={version} />
+      </SettingsGroup>
 
       {/* 장부 지우기 (SPEC-005): 되돌릴 수 없어 맨 아래 위험 글자형으로 따로 두고, 확인을 받는다 */}
       {canDeleteBook && (
@@ -291,10 +288,7 @@ export function SettingsScreen({
         </BottomSheet>
       )}
 
-      <BottomSheet open={sheets.sheet === INSTALL_GUIDE_SHEET} title="홈 화면에 추가하는 방법" onClose={sheets.closeSheet}>
-        <InstallGuide browser={browserKind(install.userAgent)} />
-        <Button onClick={sheets.closeSheet}>확인</Button>
-      </BottomSheet>
+      <InstallGuideSheet install={install} sheets={sheets} guideSheet={INSTALL_GUIDE_SHEET} />
 
       <ConfirmDialog
         open={sheets.dialog === DELETE_BOOK_DIALOG}
@@ -436,6 +430,29 @@ function SettingRow({ icon, title, value, description, onClick }: SettingRowProp
       end={value !== undefined ? <span className="settings__value">{value}</span> : undefined}
       chevron
     />
+  )
+}
+
+// 버전 줄 (SPEC-002 #135): 누를 수 없다. 새 버전을 받아 두었으면 보조 줄 "새 버전을 받았어요" + 줄 아래 [지금 바꾸기](새로 열기).
+// 앱을 쓰는 중에는 다른 화면에 아무것도 띄우지 않고 여기서만 알린다
+function VersionRow({ version }: { version: AppVersion }) {
+  const updateReady = useUpdateReady(version.updates)
+  return (
+    <div className="settings__version" data-testid="settings-version">
+      <ListRow
+        icon="info"
+        title="버전"
+        description={updateReady ? '새 버전을 받았어요' : undefined}
+        end={<span className="settings__value">{version.label}</span>}
+      />
+      {updateReady && (
+        <div className="settings__version-action">
+          <Button variant="secondary" icon="refresh" onClick={version.reload}>
+            지금 바꾸기
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }
 

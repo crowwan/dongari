@@ -53,11 +53,13 @@ jobs:
       # 복구 코드 자동 보관 서버 주소 (SPEC-006): 저장소 변수(Settings → Variables) KEEP_URL.
       # 없으면 빈 글자로 빌드돼 자동 보관이 꺼진다(설정에 "준비 중") — 서버 주소가 정해지기 전에도 배포는 그대로.
       # 미리보기도 같은 서버를 쓴다. 서버가 미리보기 출처의 요청은 다른 자리(preview:)에 둔다 (#128)
+      # 미리보기 빌드에만 커밋 번호 7자를 넣어 설정 버전 줄에 "2.6.0 · 미리보기 abc1234" 로 보인다 (#135).
+      # 본 주소(태그) 빌드는 넣지 않아 버전만 보인다
       - name: 빌드 (미리보기, 경로 /)
         if: github.ref_type == 'branch'
         env:
           VITE_KEEP_URL: ${{ vars.KEEP_URL }}
-        run: npm run build:preview
+        run: VITE_BUILD_SHA="${GITHUB_SHA::7}" npm run build:preview
       - name: 빌드 (본 주소 /dongari/)
         if: github.ref_type == 'tag'
         env:

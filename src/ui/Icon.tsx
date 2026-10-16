@@ -24,6 +24,7 @@ import {
   Pencil,
   Plus,
   Receipt,
+  RefreshCw,
   Settings,
   Share2,
   ShoppingCart,
@@ -64,6 +65,7 @@ export type IconName =
   | 'play'
   | 'info'
   | 'circle'
+  | 'refresh'
 
 const ICONS: Record<IconName, LucideIcon> = {
   // 항목 (domain/itemIcon 이 이름으로 고른다)
@@ -109,6 +111,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   play: CirclePlay,
   info: Info,
   circle: Circle,
+  // 설정 버전 줄 (SPEC-002 #135): [지금 바꾸기] 새로 열기
+  refresh: RefreshCw,
 }
 
 // 꾸밈 아이콘: 화면 읽기에서 숨기고(뜻은 옆 글자가 전한다), 크기·색은 놓인 자리의 CSS 가 정한다

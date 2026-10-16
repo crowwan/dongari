@@ -26,3 +26,87 @@
   font-size: var(--text-body-size);
   line-height: var(--line-body);
 }
+
+/*
+ * 홈 화면에 추가 권하기 카드 (SPEC-002 #135): 장부 위 띠 자리(NoticeBar 와 같은 반경 16·안쪽 16·문장 SemiBold),
+ * 경고가 아니라 노란 면 대신 흰 카드. 버튼은 띠 버튼과 같은 모양(56, 반경 12) —
+ * [홈 화면에 추가] 는 옅은 청록 면 + 청록 글자, [나중에] 는 회색 면 + 보조 글자. 좁으면 아래 줄로 내려간다
+ */
+.install-offer {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--corner-md);
+  background: var(--surface);
+  color: var(--strong);
+  font-family: var(--typeface);
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-body);
+}
+
+.install-offer__message {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  word-break: keep-all;
+}
+
+/* 아이콘은 첫 줄 글자 가운데에 */
+.install-offer__message .ui-icon {
+  flex: none;
+  width: var(--icon-md);
+  height: calc(1em * var(--line-body));
+  color: var(--accent-ink);
+}
+
+.install-offer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.install-offer__action {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--corner-sm);
+  font-family: var(--typeface);
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--letter-body);
+  line-height: var(--line-tight);
+  cursor: pointer;
+}
+
+.install-offer__action[data-kind='install'] {
+  background: var(--primary-soft);
+  color: var(--accent-ink);
+}
+
+.install-offer__action[data-kind='later'] {
+  background: var(--fill);
+  color: var(--muted);
+}
+
+.install-offer__action:focus-visible {
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
+
+.install-offer__action[data-kind='install']:active {
+  background: var(--primary-soft-pressed);
+}
+
+.install-offer__action[data-kind='later']:active {
+  background: var(--pressed);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .install-offer__action {
+    transition: background-color var(--motion-fast);
+  }
+}

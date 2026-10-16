@@ -189,3 +189,14 @@
   display: flex;
   flex-direction: column;
 }
+
+/* 버전 줄 (SPEC-002 #135): 누를 수 없는 줄. 값(버전·미리보기 커밋 번호)은 말줄임 없이 다 보이게 줄바꿈을 허락하고,
+   새 버전을 받았으면 줄 아래 [지금 바꾸기] 보조 버튼을 줄 글자 시작선(카드 안쪽 여백)에 맞춘다 */
+.settings__version .settings__value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.settings__version-action {
+  padding: 0 var(--card-pad-inline) var(--space-3);
+}
