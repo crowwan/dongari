@@ -5,18 +5,15 @@
 @import '../screens.css';
 
 /*
- * 아래 고정 [사진으로 저장] 영역(BottomActionBar)만큼 끝을 띄워 마지막 줄이 가리지 않게 한다.
- * 고정 영역 높이 = 위 여백 + 주 버튼 + 아래 여백 + 위쪽 선 (ui.css .ui-bottom-bar, 장부 화면과 같은 계산)
+ * 아래 고정 [사진으로 저장]·[사진 보내기] 영역(BottomActionBar)만큼 끝을 띄워 마지막 줄이 가리지 않게 한다.
+ * 고정 영역이 알려 주는 실제 높이(--bottom-bar-height: 버튼이 두 줄로 쌓이거나 안내가 붙은 높이)를 쓰고,
+ * 알려 주기 전에는 버튼 한 줄 높이 = 위 여백 + 주 버튼 + 아래 여백 + 위쪽 선 (ui.css .ui-bottom-bar, 장부 화면과 같은 계산)
  */
 .report {
-  padding-bottom: calc(
-    var(--space-3) + var(--touch-primary) + var(--space-4) + var(--hairline) + env(safe-area-inset-bottom, 0px)
+  padding-bottom: var(
+    --bottom-bar-height,
+    calc(var(--space-3) + var(--touch-primary) + var(--space-4) + var(--hairline) + env(safe-area-inset-bottom, 0px))
   );
-}
-
-/* 올해 결산 [항목별 합계] 는 아래 고정 버튼이 없어 그만큼 띄우지 않는다 (앱 내용 칸 아래 여백만) */
-.report[data-view='items'] {
-  padding-bottom: 0;
 }
 
 /* 화면 제목("2026년 9월 정리", "2026년 결산"): 가장 강한 글자색 */
@@ -115,25 +112,111 @@
   letter-spacing: var(--letter-number);
 }
 
+/* ---------- 올해 결산 [단톡방용 요약]: 사진으로 저장되는 카드 셋 (v2.6, 시안 B 2안) ---------- */
+
+/* 요약 카드 → 수입 항목별 → 지출 항목별. 카드 사이는 한 묶음 안 간격 */
+.share-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
+  font-variant-numeric: tabular-nums;
+}
+
+.share-total {
+  gap: var(--space-3);
+}
+
+/* "2026년 한랑드림 결산": 카드 제목 Heading 20 Bold, 긴 장부 이름은 낱말 단위로 줄바꿈 */
+.share-total__title {
+  margin: 0;
+  color: var(--strong);
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+}
+
+/* 수입·지출·잔액 줄: 이름 18 SemiBold ··· 금액 24 Bold 한 덩어리. 한 줄에 안 들어가면 금액이 이름 아래 줄 오른쪽으로 */
+.share-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  line-height: var(--line-tight);
+}
+
+.share-line__label {
+  color: var(--strong);
+  font-size: var(--size-large);
+  font-weight: var(--weight-semibold);
+}
+
+.share-line__amount {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--strong);
+  font-size: var(--text-title-size);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--letter-number);
+}
+
+.share-line[data-kind='income'] .share-line__amount {
+  color: var(--income-amount);
+}
+
+.share-line[data-kind='expense'] .share-line__amount {
+  color: var(--expense-amount);
+}
+
+/* 잔액: 위 가는 구분선 + 금액 한 단계 크게(Display 30) */
+.share-line[data-kind='balance'] {
+  padding-top: var(--space-3);
+  border-top: var(--hairline) solid var(--line);
+}
+
+.share-line[data-kind='balance'] .share-line__amount {
+  font-size: var(--text-display-size);
+}
+
+/* 이월금 보조 줄 (장부 잔액 카드와 같은 말) */
+.share-total__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--line-tight);
+}
+
+/* 카드 아래 "이 화면 그대로 사진 한 장이 돼요" (사진에는 안 들어감) */
+.report__photo-note {
+  word-break: keep-all;
+  text-align: center;
+}
+
 /*
  * 사진으로 그리는 복사본(savePicture.ts 가 data-capturing + data-theme="light" 를 단다):
  * 글자색은 바깥(.app)에서 다크 값으로 물려받으므로 라이트 --ink 로 다시 정한다.
  * 흰 바탕에서는 흰 카드가 면으로 구분되지 않으므로 카드 둘레에만 옅은 선을 두르고, 사진 가장자리에 여백을 둔다.
  * html2canvas 는 자간이 있으면 글자를 한 자씩, 숫자 폭 맞춤(tabular-nums) 없이 그려 "1 40,000" 처럼 벌어지므로 사진에서만 둘 다 끈다
  */
-.summary[data-capturing] {
+.summary[data-capturing],
+.share-summary[data-capturing] {
   padding: var(--space-5);
   background: var(--surface);
   color: var(--ink);
 }
 
 .summary[data-capturing],
-.summary[data-capturing] * {
+.summary[data-capturing] *,
+.share-summary[data-capturing],
+.share-summary[data-capturing] * {
   letter-spacing: normal;
   font-variant-numeric: normal;
 }
 
-.summary[data-capturing] .summary-card {
+.summary[data-capturing] .summary-card,
+.share-summary[data-capturing] .summary-card,
+.share-summary[data-capturing] .item-totals {
   border: var(--hairline) solid var(--line);
 }
 
@@ -157,7 +240,7 @@
   transform: none;
 }
 
-/* ---------- 올해 결산 [항목별 합계]: 수입 카드·지출 카드 (v2.3, 사진으로 저장하지 않는다) ---------- */
+/* ---------- 항목별 합계 카드: 수입 카드·지출 카드 (v2.3, v2.6 부터 단톡방용 요약 안에서 사진에 들어간다) ---------- */
 
 .item-totals-cards {
   display: flex;
@@ -172,9 +255,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 카드 머리: "수입"/"지출"(카드 제목 Heading) ··· 그해 합계(같은 크기 Bold, 수입은 수입 금액색) */
+/* 카드 머리: "수입 항목별"/"지출 항목별"(카드 제목 Heading) ··· 그해 합계(같은 크기 Bold, 수입은 수입 금액색). 좁으면 합계가 아래 줄로 */
 .item-totals__head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
   gap: var(--space-3);
@@ -190,6 +274,7 @@
 }
 
 .item-totals__total {
+  margin-left: auto;
   white-space: nowrap;
   color: var(--expense-amount);
   font-size: var(--text-heading-size);
@@ -222,15 +307,20 @@
   padding-bottom: 0;
 }
 
-/* 이름(줄 이름 SemiBold) + 작은 "N건"(Caption) ··· 금액(Bold). 긴 이름은 줄을 바꾸고 금액은 한 줄 */
+/*
+ * 이름(줄 이름 SemiBold) + 작은 "N건"(Caption) ··· 금액(Bold). 금액은 줄바꿈 없이 한 덩어리이고,
+ * 한 줄에 안 들어가면 금액(과 N건)이 아래 줄로 내려간다. 이름은 낱말 단위로 줄을 바꾼다 (SPEC-003 v2.6, 시안 B 2안)
+ */
 .item-totals__line {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-2);
+  gap: var(--space-1) var(--space-2);
   line-height: var(--line-tight);
 }
 
 .item-totals__name {
+  flex: 1 1 5em;
   min-width: 0;
   word-break: keep-all;
   overflow-wrap: anywhere;

@@ -30,3 +30,8 @@ export function formatAmount(value: number): string {
   const digits = Math.abs(value).toLocaleString('ko-KR')
   return value < 0 ? `−${digits}` : digits
 }
+
+// 늘었는지 줄었는지가 보이게 부호를 붙인 금액 글자 (+41,720 / −40,000, 0 은 부호 없음). 월 정리 수입 − 지출, 결산 요약 수입·지출
+export function formatSignedAmount(value: number): string {
+  return `${value > 0 ? '+' : ''}${formatAmount(value)}`
+}

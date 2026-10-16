@@ -15,6 +15,7 @@ import { tidyDayText } from '../features/ledger/entryDraft'
 import type { BookChoice } from '../features/ledger/useLedger'
 import { ItemTotalsCards } from '../features/report/ItemTotalsCards'
 import { SavePictureBar } from '../features/report/SavePictureBar'
+import { YearShareSummary } from '../features/report/YearShareSummary'
 import { KeepCard } from '../features/settings/SettingsScreen'
 import { ItemTotalsTable } from '../features/report/sheet/ItemTotalsTable'
 import { sheetPaper } from '../features/report/sheet/sheetStyles'
@@ -818,20 +819,43 @@ export function Catalog() {
           </State>
         </Section>
 
-        <Section title="SavePictureBar (아이폰, #58)">
-          <State label="공유 시트에서 고를 것 안내">
+        <Section title="SavePictureBar (월 정리·올해 결산 아래, #58·#130)">
+          <State label="공유 창 있음: 보조 [사진으로 저장] + 주 [사진 보내기]">
             <div className="catalog__frame catalog__frame--note">
-              <SavePictureBar saving={false} sharesToPhotos onSave={noop} />
+              <SavePictureBar canSend onSave={noop} onSend={noop} />
             </div>
           </State>
-          <State label="사진 준비됨 → 한 번 더 누르기">
+          <State label="보내기 거부 → 한 번 더 눌러 보내기">
             <div className="catalog__frame catalog__frame--note">
-              <SavePictureBar saving={false} ready sharesToPhotos onSave={noop} />
+              <SavePictureBar canSend sendReady onSave={noop} onSend={noop} />
+            </div>
+          </State>
+          <State label="보내기 만드는 중 (두 버튼 모두 누를 수 없음)">
+            <div className="catalog__frame catalog__frame--note">
+              <SavePictureBar canSend busy="send" onSave={noop} onSend={noop} />
+            </div>
+          </State>
+          <State label="공유 창 없음(PC 등): [사진으로 저장] 하나">
+            <div className="catalog__frame catalog__frame--note">
+              <SavePictureBar onSave={noop} />
+            </div>
+          </State>
+          <State label="아이폰: 공유 시트에서 고를 것 안내">
+            <div className="catalog__frame catalog__frame--note">
+              <SavePictureBar canSend sharesToPhotos onSave={noop} onSend={noop} />
+            </div>
+          </State>
+          <State label="아이폰: 사진 준비됨 → 사진 앱에 저장">
+            <div className="catalog__frame catalog__frame--note">
+              <SavePictureBar canSend saveReady sharesToPhotos onSave={noop} onSend={noop} />
             </div>
           </State>
         </Section>
 
-        <Section title="ItemTotalsCards (올해 결산 [항목별 합계], #84)">
+        <Section title="ItemTotalsCards (올해 결산 단톡방용 요약의 항목별 카드, #84·#130)">
+          <State label="단톡방용 요약 카드 셋 (YearShareSummary, 이 영역이 사진 한 장)">
+            <YearShareSummary report={ITEM_REPORT} bookName="한랑드림" carryoverWords={carryoverWords('club', true)} targetRef={null} />
+          </State>
           <State label="수입·지출 카드 (금액 큰 순, 긴 이름 줄바꿈, 아주 작은 비율도 최소 막대)">
             <ItemTotalsCards report={ITEM_REPORT} />
           </State>

@@ -2,11 +2,11 @@ import { useId } from 'react'
 import type { CarryoverWords } from '../../domain/book'
 import { monthSummary, type OpeningBalance } from '../../domain/report'
 import type { Entry, Ledger } from '../../domain/types'
-import { formatAmount } from '../../ui/money'
+import { formatAmount, formatSignedAmount } from '../../ui/money'
 import { BackToLedger } from '../BackToLedger'
 import { monthPictureName, pictureSaver, type PictureSaver } from './savePicture'
 import { SavePictureBar } from './SavePictureBar'
-import { useSavePicture } from './useSavePicture'
+import { usePictureActions } from './usePictureActions'
 import './report.css'
 
 type MonthSummaryScreenProps = {
@@ -14,9 +14,9 @@ type MonthSummaryScreenProps = {
   month: number
   carryoverWords: CarryoverWords // 1월 전달까지 잔액 자리 이름 (장부 종류별, SPEC-005)
   onBack: () => void
-  // [사진으로 저장] 결과 알림
+  // [사진으로 저장]·[사진 보내기] 결과 알림
   onNotify: (message: string) => void
-  // 사진 만들기·내려받기 (테스트는 가짜를 넣는다)
+  // 사진 만들기·내려받기·공유 창 (테스트는 가짜를 넣는다)
   saver?: PictureSaver
 }
 
@@ -75,15 +75,11 @@ function openingLine(opening: OpeningBalance, words: CarryoverWords): SummaryLin
   return { label: words.opening, amount: `${formatAmount(opening.amount)}원` }
 }
 
-// 그 달 수입 − 지출은 늘었는지 줄었는지가 보이게 부호를 붙인다 (0 은 부호 없음)
-function signedAmount(value: number): string {
-  return `${value > 0 ? '+' : ''}${formatAmount(value)}원`
-}
-
-// 월 정리 (SPEC-003): 제목 → 수입 카드 → 지출 카드 → 잔액 카드, 아래 고정 [⬇ 사진으로 저장]. 사진은 제목부터 잔액 카드까지
+// 월 정리 (SPEC-003): 제목 → 수입 카드 → 지출 카드 → 잔액 카드, 아래 고정 [⬇ 사진으로 저장](+ 공유 창을 쓸 수 있으면 [↗ 사진 보내기], v2.6).
+// 사진은 제목부터 잔액 카드까지
 export function MonthSummaryScreen({ ledger, month, carryoverWords, onBack, onNotify, saver = pictureSaver }: MonthSummaryScreenProps) {
   const summary = monthSummary(ledger, month)
-  const { targetRef, saving, ready, sharesToPhotos, save } = useSavePicture({ fileName: monthPictureName(ledger.year, month), saver, onNotify })
+  const { targetRef, busy, saveReady, sendReady, sharesToPhotos, canSend, save, send } = usePictureActions({ fileName: monthPictureName(ledger.year, month), saver, onNotify })
 
   return (
     <div className="screen report" data-testid="month-summary-screen" data-month={month}>
@@ -96,11 +92,19 @@ export function MonthSummaryScreen({ ledger, month, carryoverWords, onBack, onNo
         <EntriesCard title="지출" entries={summary.expenseEntries} total={summary.expense} />
         <section className="summary-card" aria-label="잔액">
           <SummaryLine {...openingLine(summary.opening, carryoverWords)} />
-          <SummaryLine label={`${month}월 수입 − 지출`} amount={signedAmount(summary.net)} />
+          <SummaryLine label={`${month}월 수입 − 지출`} amount={`${formatSignedAmount(summary.net)}원`} />
           <SummaryLine label={`${month}월 말 잔액`} amount={`${formatAmount(summary.closing)}원`} total kind="closing" />
         </section>
       </div>
-      <SavePictureBar saving={saving} ready={ready} sharesToPhotos={sharesToPhotos} onSave={save} />
+      <SavePictureBar
+        busy={busy}
+        saveReady={saveReady}
+        sendReady={sendReady}
+        sharesToPhotos={sharesToPhotos}
+        canSend={canSend}
+        onSave={save}
+        onSend={send}
+      />
     </div>
   )
 }

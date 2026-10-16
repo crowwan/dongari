@@ -14,6 +14,7 @@ import { MonthPicker } from '../../ui/MonthPicker'
 import { MonthStepper } from '../../ui/MonthStepper'
 import { BACKUP_DOT_LABEL } from '../backup/backupReminder'
 import { BookPicker } from '../books/BookPicker'
+import { carryoverNote } from '../carryoverNote'
 import type { GuideTargets } from '../guide/useFirstUseGuide'
 import type { SheetHistory } from '../useScreenHistory'
 import type { BookChoice } from './useLedger'
@@ -64,14 +65,6 @@ type LedgerScreenProps = {
   unsavedEntryIds?: ReadonlySet<string>
   // 처음 쓰는 분 안내 말풍선이 가리키는 버튼들 (SPEC-008)
   guideTargets?: Pick<GuideTargets, 'addEntry' | 'monthSummary' | 'settings'>
-}
-
-// 잔액 카드 보조 줄: 작년 이월금이 잔액에 들어 있다는 것. 적자면 빼기표 대신 "적자", 0원이면 숨긴다.
-// 이름은 장부 종류를 따른다 (동아리 "작년 이월 N원 포함", 가계부 첫 해 "처음 남은 돈 N원 포함", SPEC-005)
-function carryoverNote(carryover: number, words: CarryoverWords): string | undefined {
-  if (carryover > 0) return `${words.surplus} ${formatAmount(carryover)}원 포함`
-  if (carryover < 0) return `${words.deficit} ${formatAmount(-carryover)}원 포함`
-  return undefined
 }
 
 // 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 [결산][설정] → 잔액 카드 → ‹ N월 ▾ › → [N월 정리 보기] → 그 달 카드 → 아래 고정 [+ 내역 적기].

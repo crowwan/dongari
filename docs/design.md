@@ -51,7 +51,7 @@ updated: 2026-10-13
 | `--accent-ink` | #2f5d57 / #8cc7bc | 고른 것 글자·체크, "바꾸기", 보조 버튼 글자, 이번 달·오늘 테두리, "지금 적는 내역" 카드 둘레·머리 글자, "방금", 포커스 링, 입력칸 포커스 테두리 | 시안의 `brand-ink`. 다크에서는 밝게 뒤집어 어두운 바탕에서 보인다 |
 | `--income-amount` | #1b705b / #5cc49e | 수입 금액 글자 | 시안의 `plus`(#1F7A63) 를 눌린 줄 위에서도 AA 가 되게 한 단계 진하게 |
 | `--expense-amount` | = `--strong` | 지출 금액 글자 | 지출은 일상이라 경고처럼 보이지 않게, 부호 `−` 로 구분 |
-| `--income-bar` / `--expense-bar` | #8cc7bc / #4a8f82, #b5b5b5 / #6b6b6b | 올해 결산 [항목별 합계] 비율 막대 채움(홈은 `--fill`) (#84) | 수입은 옅은 청록, 지출은 회색 — 금액 글자색(수입 청록·지출 제목색)과 같은 짝. 막대는 옆 숫자를 눈으로 비교하는 보조라 글자 대비 기준 대상이 아니고, 홈(`--fill`)과는 라이트·다크 모두 밝기로 구분된다. `--accent-ink`(다크 #8cc7bc)를 쓰지 않은 건 "고른 것" 색과 섞이지 않게 |
+| `--income-bar` / `--expense-bar` | #8cc7bc / #4a8f82, #b5b5b5 / #6b6b6b | 항목별 합계 카드(올해 결산 단톡방용 요약) 비율 막대 채움(홈은 `--fill`) (#84, #130) | 수입은 옅은 청록, 지출은 회색 — 금액 글자색(수입 청록·지출 제목색)과 같은 짝. 막대는 옆 숫자를 눈으로 비교하는 보조라 글자 대비 기준 대상이 아니고, 홈(`--fill`)과는 라이트·다크 모두 밝기로 구분된다. `--accent-ink`(다크 #8cc7bc)를 쓰지 않은 건 "고른 것" 색과 섞이지 않게 |
 | `--danger` / `--on-danger` | #b83232 / #ff8b8b, #ffffff / #2a0f0b | 위험 버튼 채움과 그 글자, 위험 글자형, 오류 문장·테두리, 점 표시 | 시안 #C93838 을 눌린 면 위 AA 가 되게 진하게. 금액에는 쓰지 않는다 |
 | `--warn-bg` | #fff4d8 / #3a3218 | 안내 띠 바탕, 장부 줄 "저장 안 됨" 알약(SPEC-002 v2.6) | 노란 면으로 "알아 둘 것", 글자는 `--strong` |
 | `--scrim` | 검정 60% / 70% | 확인 창·선택 창 뒤 가리기 | DS 규칙: 모달 스크림만 60~70% 투명도 허용 |
@@ -109,7 +109,7 @@ updated: 2026-10-13
 | `--icon-text` | 1em | 글자 크기를 따라가는 아이콘("저장 안 됨" 알약 ⚠, 글자 200% 에서 같이 커짐, #121) |
 | `--icon-circle` / `--icon-circle-sm` | 44 / 36 | 줄 앞 원형 아이콘 바탕 / 줄 선택 앞 |
 | `--dot` / `--grab-w` / `--grab-h` | 8 / 40 / 4 | 할 일 점 / 선택 창 손잡이 |
-| `--bar-thickness` | 6 | 비율 막대 굵기 (올해 결산 항목별 합계, #84) |
+| `--bar-thickness` | 6 | 비율 막대 굵기 (항목별 합계 카드, #84) |
 | `--content-max` / `--dialog-max` | 480 / 400 | 화면 내용 / 확인 창 최대 폭 |
 | `--coach-inset` / `--coach-pad` | 20 / 16·16·12·18 | 안내 말풍선(SPEC-008): 화면 좌우에서 말풍선까지 / 말풍선 안쪽 여백(위·오른쪽·아래·왼쪽) |
 | `--coach-line` | 1.45 | 말풍선 글 줄 간격 (Body 16 SemiBold, 낱말 단위 줄바꿈) |
@@ -224,14 +224,15 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `BalanceCard` | 이름(Caption Medium) → 큰 숫자(Display 30, "원" 60%) → 보조 줄(있을 때만), 적자는 `−` |
 | `AmountText` | 수입 `+` 밝은 청록 / 지출 `−` 제목색. 크기는 놓인 자리를 따른다 |
 | `MonthStepper` | [‹] 달 [›] 화살표 아이콘 56px 흰 면, 끝 달에서 비활성. `onPickMonth` 를 주면 가운데 "10월 ▾" 가 버튼("10월 달 고르기", `aria-haspopup="dialog"`). 폭이 모자라면 가운데 칸이 줄어 [›] 가 밀리지 않고, 화살표 사이에 달이 안 들어가면 달이 위 줄 가운데로 (SPEC-001 v2.6) |
-| `BottomActionBar` | 화면 아래 고정 바탕색 면 + 위쪽 가는 선 + 버튼 하나(`icon` 가능, 기본 주 버튼 / `variant="secondary"` 보조 — 연달아 적기 [다 적었어요], #64) × 기본·비활성·비활성 + 안내(버튼 위 본문 크기 한 줄), safe-area 만큼 띄움. 폰 키패드가 레이아웃을 줄이지 않는 브라우저(아이폰)에서 키패드가 떠 있는 동안은 고정을 풀고 지금 질문 바로 아래 흐름에(면·선 없이 안내 + 버튼, 아래 `--space-4`) 두고 키패드 바로 위로 스크롤 (`data-keyboard="open"`, `ui/keyboard`, #70) |
+| `BottomActionBar` | 화면 아래 고정 바탕색 면 + 위쪽 가는 선 + 버튼 하나(`icon` 가능, 기본 주 버튼 / `variant="secondary"` 보조 — 연달아 적기 [다 적었어요], #64) 또는 `secondary` 보조 + 주 둘(월 정리·결산 [⬇ 사진으로 저장] [↗ 사진 보내기], #130: 한 줄이면 보조는 글자 폭·Label 16·안쪽 `--space-3`, 주는 남은 폭 / 안 들어가면 `wrap-reverse` 로 주 위·보조 아래 둘 다 폭 채움, 간격 `--space-2`, 보조 ref `secondaryRef`) × 기본·비활성·비활성 + 안내(버튼 위 본문 크기 한 줄, `noteFor` 로 어느 버튼 설명인지), safe-area 만큼 띄움. 고정 영역 높이를 놓인 화면 요소에 `--bottom-bar-height` 로 알린다(월 정리·결산 아래 여백이 씀). 폰 키패드가 레이아웃을 줄이지 않는 브라우저(아이폰)에서 키패드가 떠 있는 동안은 고정을 풀고 지금 질문 바로 아래 흐름에(면·선 없이 안내 + 버튼, 아래 `--space-4`) 두고 키패드 바로 위로 스크롤 (`data-keyboard="open"`, `ui/keyboard`, #70) |
 | `CarryoverField` (`features/ledger`) | 이월금: 금액은 양수로 적고 한 몸통 스위치 [남았어요 \| 적자였어요] 로 부호를 고른다 (#46). 칸 이름 `label` 은 장부 종류별("작년 이월금" / "지금 남은 돈", SPEC-005) |
 | `BookPicker` (`features/books`, #88) | 장부 고르기 창 안 목록: 장부 줄(회색 면 `--fill`, 반경 16, 높이 72 이상) = 흰 원 44 안 종류 아이콘(동아리 `users` / 가계부 `home`) + 이름(Row 16 Bold, 두 줄까지 말줄임) · 작은 "동아리 · 잔액 N원"(Caption `--muted`). 지금 장부는 옅은 청록 면 + 청록 둘레(`--stroke` 안쪽 그림자 선) + ✓(`aria-pressed`). 맨 아래 [+ 새 장부 만들기]: 흰 면 + 점선 둘레(`--hairline` dashed `--line-strong`) + 청록 글자, 높이 60 — 장부 줄과 다른 일이라 모양을 갈랐다 | 장부 화면 이름 ▾ → `BottomSheet` "어느 장부를 볼까요?" |
 | `NewBookScreen` (`features/books`, #88) | 아래 "화면 조립" 새 장부 만들기 |
 | `InstallGuide` (`features/install`) | 홈 화면에 추가 방법: 브라우저 이름(Body Bold `--accent-ink`) + 번호 순서(Body). 설정 "앱" 묶음 [📱 홈 화면에 추가] 줄 → 설치 제안이 없을 때 `BottomSheet` "홈 화면에 추가하는 방법" 안 + [확인] (#10, #56. 장부 위 `InstallBanner` 띠는 #56 에서 지움) |
 | `AddEntryForm` / `EditEntryForm` (`features/ledger`) | 아래 "화면 조립" (#47) |
-| 월 정리 / 올해 결산 (`features/report`) | 카드 셋(수입·지출 카드 제목 Heading, 줄은 이름 본문 ··· 금액 제목색, 합계 줄만 구분선 + Bold, 수입 합계 수입 금액색, 잔액 카드 월말 잔액만 Heading 크기) + [⬇ 사진으로 저장] / 제목 아래 `SegmentedControl` [결산표 \| 항목별 합계](처음 결산표, 기록 없으면 없음) → v1 양식 한 장(화면 틀만 토큰) + [⬇ 사진으로 저장], 또는 `ItemTotalsCards` (#16, #48, #84) |
-| `ItemTotalsCards` (`features/report`, #84) | 올해 결산 [항목별 합계]: 흰 카드 둘(수입·지출, 사이 `--stack`). 머리 = 제목 Heading ··· 그해 합계(Heading 크기 Bold, 수입 `--income-amount`·지출 `--expense-amount`). 줄 = 이름(Row SemiBold, 긴 이름은 낱말 단위 줄바꿈) + "N건"(Caption `--muted`) ··· 금액(Bold `--strong`) → 아래 `--space-2` 비율 막대(`--bar-thickness`, 홈 `--fill`, 채움 `--income-bar`/`--expense-bar`, 아주 작은 비율도 막대 굵기만큼은 보임, `aria-hidden`). 줄 사이 선 없이 여백(`--space-3`). 누르는 곳 없음. 기록 없는 쪽은 "올해 적은 수입(지출)이 없어요"(`--muted`). 사진으로 저장하지 않아 아래 고정 버튼 자리를 비우지 않는다 |
+| 월 정리 / 올해 결산 (`features/report`) | 카드 셋(수입·지출 카드 제목 Heading, 줄은 이름 본문 ··· 금액 제목색, 합계 줄만 구분선 + Bold, 수입 합계 수입 금액색, 잔액 카드 월말 잔액만 Heading 크기) + `SavePictureBar` / 제목 아래 `SegmentedControl` [단톡방용 요약 \| 결산표(제출용)](처음 요약, 기록 없으면 없음) → `YearShareSummary` + 가운데 Caption "이 화면 그대로 사진 한 장이 돼요", 또는 v1 양식 한 장(화면 틀만 토큰). 두 화면 모두 아래 `SavePictureBar`: 공유 창이 되면 보조 [⬇ 사진으로 저장] + 주 [↗ 사진 보내기], 안 되면 [⬇ 사진으로 저장] 하나 (#16, #48, #84, #130) |
+| `YearShareSummary` (`features/report`, #130) | 올해 결산 [단톡방용 요약]: 흰 카드 셋(사이 `--stack`), 이 영역이 사진. 1 요약 카드(간격 `--space-3`): 제목 "N년 <장부> 결산" Heading 20 → 줄 셋 이름(18 `--size-large` SemiBold) ··· 금액(Title 24 Bold, 줄바꿈 없음, 안 들어가면 이름 아래 줄 오른쪽) — 수입 `--income-amount` "+", 지출 `--expense-amount` "−", 잔액은 위 `--line` 선 + Display 30 → 이월금 보조 줄 Caption `--muted`(0원이면 없음). 2·3 `ItemTotalsCards` |
+| `ItemTotalsCards` (`features/report`, #84) | 단톡방용 요약의 2·3번 카드(#130 전에는 [항목별 합계] 쪽): 흰 카드 둘(수입·지출, 사이 `--stack`). 머리 = 제목 "수입 항목별"/"지출 항목별" Heading ··· 그해 합계(좁으면 아래 줄)(Heading 크기 Bold, 수입 `--income-amount`·지출 `--expense-amount`). 줄 = 이름(Row SemiBold, 기본 폭 5em, 긴 이름은 낱말 단위 줄바꿈) + "N건"(Caption `--muted`) ··· 금액(Bold `--strong`, 줄바꿈 없음, 안 들어가면 N건과 함께 아래 줄로) → 아래 `--space-2` 비율 막대(`--bar-thickness`, 홈 `--fill`, 채움 `--income-bar`/`--expense-bar`, 아주 작은 비율도 막대 굵기만큼은 보임, `aria-hidden`). 줄 사이 선 없이 여백(`--space-3`). 누르는 곳 없음. 기록 없는 쪽은 "올해 적은 수입(지출)이 없어요"(`--muted`). 사진에 들어간다(사진에서는 카드 둘레 `--line`) |
 
 ### 화면 조립 (#46)
 
@@ -281,9 +282,10 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 
 ### 사진으로 저장할 때의 모양
 
-- 월 정리 사진은 화면 모양(토큰)을 그대로 쓰되, 사진으로 그리는 복사본에만 `data-theme="light"` + `data-capturing` 을 단다. 흰 바탕 위에서는 흰 카드가 면으로 구분되지 않으므로 사진에서만 카드 둘레에 `--line` 선을 두른다 (`report.css`).
+- 월 정리·결산 단톡방용 요약 사진은 화면 모양(토큰)을 그대로 쓰되, 사진으로 그리는 복사본에만 `data-theme="light"` + `data-capturing` 을 단다. 흰 바탕 위에서는 흰 카드가 면으로 구분되지 않으므로 사진에서만 카드 둘레에 `--line` 선을 두른다 (`report.css`).
 - 사진에서는 자간(`letter-spacing`)과 숫자 폭 맞춤(`tabular-nums`)을 끈다. html2canvas 1.4 는 자간이 있으면 글자를 한 자씩 그리면서 숫자 폭 맞춤을 읽지 못해 "1 40,000" 처럼 숫자 사이가 벌어진다 (#48).
-- 올해 결산 사진은 화면에서 줄여 보이던 양식을 줄이지 않은 360px 그대로 2배로 그린다.
+- 요약 사진은 화면 폭 그대로 2배(390 폭 폰이면 684px 폭)로 그린다. 폰 폭(360)으로 보면 가장 작은 글씨(N건·보조 줄 14px)가 약 14.7px 로 보인다 (#130).
+- 결산표(제출용) 사진은 화면에서 줄여 보이던 양식을 줄이지 않은 360px 그대로 2배로 그린다.
 
 ## 접근성
 
@@ -328,4 +330,5 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-16 | 창 접근성(#110): `ConfirmDialog`·`BottomSheet` 를 `body` 아래에 그리고 떠 있는 동안 뒤 화면 `inert`(`ui/modalLayer`, 카탈로그 견본 `inline`), 확인 창 뒤로 버튼(`openDialog`), 화면이 바뀌면 h1 포커스·`document.title`(`useScreenHeading`) | |
 | 2026-10-16 | SPEC-006 v2.6 기록 지키기 정리(#120): 설정 맨 위 기록 지키기 카드(제목·코드·주 버튼 [복구 코드 보내기]·상태 줄) + "다른 방법으로 옮기기" 접기, 장부 정보는 아래로, 코드 없는 빌드는 기록 파일 두 줄만. 용어 "백업 파일" → "기록 파일", "자동 보관" → "자동으로 지키기"(익숙한 말 목록), `IconButton` 점 이름은 쉼표로 끊어 읽기("설정, 기록 파일 보내기 필요") | |
 | 2026-10-16 | 저장 안 됨 표시(SPEC-002 v2.6, #121): `ListRow` `badge`(보조 줄 아래 `--warn-bg` 노란 알약 + 경고 세모 `Icon` `alert`, 화면 읽기는 줄 이름 끝), 토큰 `--icon-text`, 저장 실패 띠 문구 ① "…방금 적은 내역은 앱을 닫으면 사라져요…". 카탈로그 ListRow 저장 안 됨 상태 | |
+| 2026-10-16 | 결산 보내기(SPEC-003 v2.6, #130): `BottomActionBar` 보조 + 주 두 버튼(`secondary`·`secondaryRef`·`noteFor`, 쌓이면 주 위)·`--bottom-bar-height`, `SavePictureBar` [사진 보내기]·[한 번 더 눌러 보내기], `YearShareSummary`, `ItemTotalsCards` 제목 "수입/지출 항목별"·금액 아래 줄로, 결산 전환 [단톡방용 요약 \| 결산표(제출용)], 결산표 빈 머리 칸 화면 읽기 "월". 카탈로그 상태 | |
 | 2026-10-16 | 처음 쓰는 분 안내 말풍선(SPEC-008, #122): `CoachMark`(스크림 + 가리키는 버튼 둘레 + 꼬리 달린 말풍선, [✕]·[알겠어요] 56), 토큰 `--coach-*`, 아이콘 `close`, `IconButton` `ref`·`BottomActionBar` `buttonRef`(말풍선이 가리킬 버튼), `useModalLayer` `keepOpen`. 카탈로그 CoachMark 위·아래 견본 | |
