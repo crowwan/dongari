@@ -1,0 +1,43 @@
+/*
+ * 넘겨 보는 안내 틀 (SPEC-009). 값은 tokens.css 변수만 쓴다.
+ * 그림 → 장 번호 알약 + 큰 글씨 한 줄(Body 18 SemiBold, 따라 하며 읽는 글) → [이전 1 : 다음 2].
+ * 글 줄은 장마다 길이가 달라도 버튼이 들썩이지 않게 두 줄 높이를 잡아 둔다
+ */
+.ui-slides {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
+}
+
+.ui-slides__text {
+  margin: 0;
+  min-height: calc(2em * var(--line-tight));
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--strong);
+  font-size: var(--size-large);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+}
+
+/* "1 / 4": 옅은 청록 알약, 글자와 같은 크기 흐름(큰 글씨에서 같이 커진다) */
+.ui-slides__count {
+  flex: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--corner-pill);
+  background: var(--primary-soft);
+  color: var(--accent-ink);
+  font-size: var(--text-label-size);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-tight);
+  white-space: nowrap;
+}
+
+.ui-slides__buttons {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-2);
+}

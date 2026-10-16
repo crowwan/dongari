@@ -100,7 +100,7 @@ describe('SPEC-002 첫 장부 뒤 홈 화면에 추가 권하기 (#135)', () => 
     expect(offerCard()).toBeInTheDocument()
   })
 
-  it('설치 제안이 없으면 [홈 화면에 추가] 가 설정 줄과 같은 방법 안내 선택 창을 연다', async () => {
+  it('설치 제안이 없으면 [홈 화면에 추가] 가 설정 줄과 같은 방법 안내 선택 창을 연다 (SPEC-009 AC-3 그림 1 / 4 장)', async () => {
     renderApp(undefined, memoryOfferStore())
     await createFirstBook()
 
@@ -108,6 +108,8 @@ describe('SPEC-002 첫 장부 뒤 홈 화면에 추가 권하기 (#135)', () => 
 
     const sheet = screen.getByRole('dialog', { name: '홈 화면에 추가하는 방법' })
     expect(within(sheet).getByTestId('install-guide')).toHaveAttribute('data-browser', 'chrome')
+    expect(within(sheet).getByTestId('slide-guide-text')).toHaveTextContent('1 / 4, 화면 위 오른쪽 [⋮] 메뉴를 누르세요')
+    expect(within(sheet).getByRole('button', { name: '이전' })).toBeDisabled()
   })
 
   it('설치 제안이 있으면 [홈 화면에 추가] 가 브라우저 설치 창을 열고, 설치하면 카드가 사라져 다시 뜨지 않는다', async () => {

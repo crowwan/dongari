@@ -151,6 +151,18 @@
   height: 400px;
 }
 
+/* 그림 넘기기 방법 안내 창 (SPEC-009): 그림 + 글 줄 + [이전]·[다음] 이 다 보이게 */
+.catalog__frame--guide {
+  height: 760px;
+}
+
+/* 설치 안내 그림 장 모아 보기: 좁으면 한 줄에 하나 */
+.catalog__pictures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-3);
+}
+
 /* 줄 목록을 담는 흰 카드 (장부의 그 달 카드처럼) */
 .catalog__card {
   padding: var(--space-1) 0;

@@ -59,6 +59,7 @@ updated: 2026-10-13
 | `--knob` / `--knob-shadow` | #ffffff / #3a3a3a, 그림자 10% / 없음 | 스위치 손잡이 | 앱에서 그림자를 쓰는 유일한 곳 (다크는 면 색 차이로 충분) |
 | `--pressed` | #ebebeb / #333333 | 눌린 동안의 면(줄, 글자 버튼, 월 넘기기, 빠른 더하기 등) | 폰엔 hover 가 없어 눌림 색이 유일한 신호. 위 글자 AA 유지 |
 | `--primary-pressed` / `--primary-soft-pressed` / `--danger-pressed` | | 눌린 동안의 채움 | 라이트는 한 단계 진하게, 다크는 밝게 |
+| `--browser-page` / `--browser-bar` / `--browser-field` / `--browser-menu` / `--browser-ink` / `--browser-dim` | `--bg` / `--line` / `--surface` / `--surface` / `--ink` / `--faint` (값 없이 앱 색을 빌림) | 그림 속 브라우저 화면(SPEC-009 설치 안내·카톡 메뉴 그림): 웹 화면 자리 / 주소창 줄·도구 줄·흐린 덩어리 / 주소 칸 / 떠 있는 메뉴·확인 창 / 그림 속 글자 / 흐린 메뉴 줄 글자 | 로고 없는 회색 면. 새 색을 만들지 않고 앱 면 색을 빌려 다크에서 같이 뒤집힌다. 세 테마 블록에 모두 다시 적는다(`var()` 는 정한 자리에서 값이 정해져, `data-theme` 상자 안에서도 따라 바뀌게). 흐린 줄 글자(`--faint`)는 그림이라 화면 읽기에서 숨기고 같은 뜻은 그림 밖 글 줄(AA)이 전한다. 누를 곳은 `--primary-soft` 면 + `--accent-ink` 진한 글자·둘레. 메뉴·확인 창은 그림자 대신 `--line-strong` 가는 둘레 |
 
 이전의 푸른 회색 값과 `--size-title`·`--size-balance`·`--weight-strong` 은 #45 에서 지웠다.
 
@@ -120,6 +121,10 @@ updated: 2026-10-13
 | `--practice-row-min` / `--practice-number` | 52 / 32 | 첫 실행 물음 "따라 해 볼 것"·끝 화면 "배운 것" 한 줄 / 번호 동그라미 |
 | `--practice-done` / `--practice-done-icon` | 72 / 36 | 끝 화면 위쪽 체크 동그라미 / 그 안 체크 |
 | `--coach-ring-gap` / `--coach-gap` | 3 / 24 | 가리키는 버튼과 청록 둘레(`--focus-ring` 굵기 `--accent-ink`) 사이 / 버튼 가장자리에서 말풍선까지(둘레 + 꼬리 자리) |
+| `--picture-text` / `--picture-text-sm` | 14px / 12px | 그림 속 글자(SPEC-009 브라우저 화면 모형): 메뉴 줄·확인 창 / 주소 칸·칸 이름. **글자 크기 토큰 중 유일한 px** — 그림 틀(정사각)에 묶여 있어 폰 글자 크기를 따라 커지면 메뉴 줄이 그림 밖으로 넘친다. 같은 뜻은 그림 밖 글 줄이 rem 글자로 전한다(`--text-*-size` 규칙 밖 이름) |
+| `--browser-bar-h` / `--browser-button` / `--browser-line` / `--browser-block` | 44 / 32 / 10 / 44 | 그림 속 주소창·도구 줄 높이 / 줄 안 둥근 단추 / 흐린 글 줄 막대 / 흐린 덩어리 |
+| `--tap-arrow` | 32 | 누를 곳을 가리키는 청록 굵은 화살표 (`TapMark`) |
+| `--home-icon` / `--home-name-bar` | 48 / 8 | 홈 화면 모습 그림의 앱 아이콘 / 다른 앱 이름 자리 막대 |
 
 ### 모션
 
@@ -129,6 +134,7 @@ updated: 2026-10-13
 | `--motion-base` | 확인 창 나타남, 선택 창 올라옴 | 무엇이 새로 떴는지 눈으로 따라갈 시간 |
 | `--motion-curve` | 위 두 곳 | 빨리 시작해 부드럽게 멈춰 "튀는" 느낌을 줄인다 |
 | `--coach-rise` | 안내 말풍선 나타남(`--motion-base` 동안 6px 아래에서 제자리로, SPEC-008) | 화면 위에 새로 떴다는 것만 알린다. 동작 줄이기면 바로 나타난다 |
+| `--motion-blink` | 그림 속 누를 곳 화살표·둘레 깜빡임 한 번(1.6s, 투명도 1 → 0.25 → 1 되풀이, SPEC-009) | 작은 그림 속 ⋮·≡ 가 눈에 띄게 천천히. 동작 줄이기면 멈춘 채(진하게) 보인다 |
 
 ## 타이포 위계와 간격 규칙
 
@@ -227,6 +233,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `Toast` | 제목색 면 + 카드색 글자 알약 (2초, 긴 문장은 글자당 0.12초, `role="status"`) |
 | `CoachMark` (SPEC-008, #122) | 안내 말풍선(진짜 장부 복구 코드 안내 4번, 연습 단계 말풍선 공통): 뒤 화면 스크림(`--scrim`) + 가리키는 버튼 자리만 밝게 남기고 청록 둘레(`--focus-ring` `--accent-ink`, `--coach-ring-gap` 띄움) + 꼬리 달린 말풍선(알림과 같은 짝 `--strong` 면 + `--surface` 글자, 반경 16, 화면 좌우 `--coach-inset`). 글 오른쪽 위 [✕]("안내 닫기", 56×56, 면 없음) · 오른쪽 아래 [알겠어요](카드색 면 + 제목색 Bold, 반경 12, 높이 56). 버튼이 화면 아래쪽 절반이면 말풍선은 위(꼬리 아래), 위쪽 절반이면 아래(꼬리 위), 꼬리는 버튼 가운데 쪽. `body` 아래에 그리고 떠 있는 동안 말풍선·가리키는 버튼 밖 `inert`, 열면 가리키는 버튼에 포커스 + 그 버튼 설명(`aria-describedby`)에 말풍선 글, 닫으면 포커스는 그 버튼에. 말풍선 버튼 포커스 링은 짙은 면 위라 `--surface`. 루트 `data-testid="coach-mark"`·`data-state`(번호)·`data-side`, 카탈로그 견본 `inline` |
 | `CoachMark` 연습 모양 (SPEC-008, #132) | `onDismiss` 없이 쓰면 [✕]·[알겠어요] 가 없고(`data-kind="practice"`), 아래 줄에 `progress`("연습 N / 4", 14 SemiBold 80% 진하기 고정폭 숫자)와 갈래의 `action`([다음에 할게요], [알겠어요] 와 같은 짝, 높이 56). 가리키는 버튼 설명은 말풍선 글 + 진행. `alsoOpen`(같이 열어 둘 날 칸·금액 칸·연습 띠), `spotlight`(가리키는 버튼과 함께 밝힐 바로 옆 칸 — 둘레·말풍선 자리는 합친 상자로, 꼬리는 버튼 가운데로). 가리키는 버튼이 화면 밖이거나 아래 고정 영역 등에 가렸으면 먼저 가운데로 스크롤 |
+| `SlideGuide` (`ui`, SPEC-009 #142) | 넘겨 보는 안내 틀: 그림 한 장 → 장 번호 알약("1 / 4", `--primary-soft` 면 Label Bold `--accent-ink`) + 큰 글씨 한 줄(18 SemiBold `--strong`, 두 줄 높이 잡아 둠, `aria-live` — 화면 읽기 "2 / 4, …") → [이전](`Button secondary`, 첫 장 비활성 — 첫 장으로 돌아오면 포커스는 [다음]) [다음](주, 1:2 폭) · 마지막 장은 [다음] 자리가 `finishLabel`. 손으로만 넘긴다(자동 넘김 없음). 장 번호는 부품 안 상태라 다시 그리면 1장부터. 쓰는 곳: 설치 방법 안내 창(`InstallGuide`) |
 | 연습 띠·첫 실행 물음·끝 화면 (`features/practice`, SPEC-008 #132) | 띠: 모든 연습 화면 맨 위 `position: sticky`, `--info-bg` 면 + `--info-ink` 글자, ⓘ + "연습 중이에요"(Bold)/"저장되지 않아요"(14), [그만하기](`--surface` 면 + `--strong` SemiBold, 56, 반경 12, 줄바꿈 없음). 말풍선이 떠 있으면 스크림(40) 위 41 로 올라 밝게 남고, 확인 창이 뜨면 내려가 같이 어두워진다. 첫 실행 물음·끝 화면은 버튼을 아래 고정 대신 화면 흐름 맨 아래(글자를 키워도 글을 가리지 않게), 번호·체크는 `--primary-soft` 면 + `--accent-ink`. 연습 결산 띠 "연습 · 진짜 결산이 아니에요"는 요약 카드 위 `--strong` 면 + `--surface` Bold(사진은 라이트 고정이라 검은 띠), 결산표는 인라인 양식색 |
 | `NoticeBar` | 노란 면(반경 16) + SemiBold 문장(`role="alert"`, 낱말 단위 줄바꿈 `keep-all`), 할 일이 있으면 아래 흰 면 버튼 하나(왼쪽 정렬, 아이콘 `action.icon` 가능 — [공유 기록 파일 보내기]) |
 | `BalanceCard` | 이름(Caption Medium) → 큰 숫자(Display 30, "원" 60%) → 보조 줄(있을 때만), 적자는 `−` |
@@ -237,7 +244,9 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `BookPicker` (`features/books`, #88) | 장부 고르기 창 안 목록: 장부 줄(회색 면 `--fill`, 반경 16, 높이 72 이상) = 흰 원 44 안 종류 아이콘(동아리 `users` / 가계부 `home`) + 이름(Row 16 Bold, 두 줄까지 말줄임) · 작은 "동아리 · 잔액 N원"(Caption `--muted`). 지금 장부는 옅은 청록 면 + 청록 둘레(`--stroke` 안쪽 그림자 선) + ✓(`aria-pressed`). 맨 아래 [+ 새 장부 만들기]: 흰 면 + 점선 둘레(`--hairline` dashed `--line-strong`) + 청록 글자, 높이 60 — 장부 줄과 다른 일이라 모양을 갈랐다 | 장부 화면 이름 ▾ → `BottomSheet` "어느 장부를 볼까요?" |
 | `NewBookScreen` (`features/books`, #88) | 아래 "화면 조립" 새 장부 만들기 |
 | `InstallOfferCard` (`features/install`, SPEC-002 #135) | 첫 장부 뒤 장부 위 띠 자리(띠 순서 맨 뒤) 홈 화면에 추가 권하기: `NoticeBar` 와 같은 반경 16·안쪽 16·SemiBold 문장(`keep-all`)이지만 경고가 아니라 흰 면(`--surface`) + 📱(`--accent-ink`), `role="alert"` 없음. 아래 버튼 둘(56, 반경 12, 좁으면 아래 줄로): [홈 화면에 추가] 옅은 청록 면(`--primary-soft`) + `--accent-ink`, [나중에] 회색 면(`--fill`) + `--muted`. [홈 화면에 추가] 는 설정 줄과 같은 `useInstallAction` + `InstallGuideSheet` |
-| `InstallGuide` (`features/install`) | 홈 화면에 추가 방법: 브라우저 이름(Body Bold `--accent-ink`) + 번호 순서(Body). 설정 "앱" 묶음 [📱 홈 화면에 추가] 줄 → 설치 제안이 없을 때 `BottomSheet` "홈 화면에 추가하는 방법" 안 + [확인] (#10, #56. 장부 위 `InstallBanner` 띠는 #56 에서 지움) |
+| `InstallGuide` (`features/install`, SPEC-009 A #142) | 홈 화면에 추가 방법 그림 넘기기: 지금 브라우저(크롬·삼성 인터넷)의 네 장을 `SlideGuide` 로(1~3장 `InstallGuidePicture` 브라우저 그림, 4장 `HomeScreenPreview`). 모르는 브라우저면 맨 위 "지금 쓰는 앱을 골라 주세요"(Body SemiBold) + `SegmentedControl` [인터넷(삼성) \| 크롬](낱말 단위 줄바꿈), 고르면 그 브라우저 1장. 문구·순서는 `installGuideSteps.ts` 한 곳. 설정 "앱" 묶음 줄·장부 위 권하기 카드 → 설치 제안이 없을 때 `InstallGuideSheet`(`BottomSheet` "홈 화면에 추가하는 방법", [확인] 없음 — 마지막 장 [다 했어요] 로 닫힘, 떠 있는 동안 설치를 마치면 닫힘) (#10, #56, #142) |
+| `HomeScreenPreview` (`features/install`, SPEC-009 #142) | 홈 화면 모습 그림: `--fill` 면 반경 16 안 두 줄 × 네 칸, 다른 앱 일곱은 `--line-strong` 둥근 네모(48, 반경 12) + 이름 자리 막대, 아랫줄 셋째 칸만 실제 `icons/icon-192.png`(못 읽으면 `--primary` 면) + `--accent-ink` 3px 둘레 + 이름 "우리 장부"(`APP_SHORT_NAME`, Caption SemiBold `--strong`). 아래 줄 "누르면 바로 장부가 열려요"(Body 가운데). 화면 읽기는 그림 한 줄 "홈 화면에 '우리 장부' 아이콘이 생겨요"(`role=img`), `decorative` 면 그림은 숨기고 아래 줄만. 쓰는 곳: 그림 안내 4장, (B #143) 묻는 화면·설치 확인 화면 |
+| `BrowserPicture` · `BrowserBar` · `BrowserPage` · `BrowserMenu` · `BrowserDialog` · `TapMark` (`features/install`, SPEC-009 #142) | 브라우저 화면 모형(정사각, `--browser-*` 회색 면, 반경 12, `aria-hidden`): 위·아래 줄(둥근 단추·주소 칸), 흐린 웹 화면, 떠 있는 메뉴(위 오른쪽 목록·아래 줄 위 목록·아래에서 올라오는 칸 `grid`, 제목 줄), 확인 창(스크림 + 앱 아이콘·이름·주소 + [취소] [누를 버튼]). `hot` 인 곳만 `--primary-soft` 면 + `--accent-ink` 굵은 글자 + `TapMark` 둘레(놓인 곳 모양 따라), 줄 단추는 화살표도(위 줄은 아래에서 위로, 아래 줄은 위에서 아래로). 둘레·화살표만 `--motion-blink` 로 깜빡이고 동작 줄이기면 멈춤. 쓰는 곳: 설치 안내 그림 6장, (C #144) 카톡 메뉴 그림 |
 | `AddEntryForm` / `EditEntryForm` (`features/ledger`) | 아래 "화면 조립" (#47) |
 | 월 정리 / 올해 결산 (`features/report`) | 카드 셋(수입·지출 카드 제목 Heading, 줄은 이름 본문 ··· 금액 제목색, 합계 줄만 구분선 + Bold, 수입 합계 수입 금액색, 잔액 카드 월말 잔액만 Heading 크기) + `SavePictureBar` / 제목 아래 `SegmentedControl` [단톡방용 요약 \| 결산표(제출용)](처음 요약, 기록 없으면 없음) → `YearShareSummary` + 가운데 Caption "이 화면 그대로 사진 한 장이 돼요", 또는 v1 양식 한 장(화면 틀만 토큰). 두 화면 모두 아래 `SavePictureBar`: 공유 창이 되면 보조 [⬇ 사진으로 저장] + 주 [↗ 사진 보내기], 안 되면 [⬇ 사진으로 저장] 하나 (#16, #48, #84, #130) |
 | `YearShareSummary` (`features/report`, #130) | 올해 결산 [단톡방용 요약]: 흰 카드 셋(사이 `--stack`), 이 영역이 사진. 1 요약 카드(간격 `--space-3`): 제목 "N년 <장부> 결산" Heading 20 → 줄 셋 이름(18 `--size-large` SemiBold) ··· 금액(Title 24 Bold, 줄바꿈 없음, 안 들어가면 이름 아래 줄 오른쪽) — 수입 `--income-amount` "+", 지출 `--expense-amount` "−", 잔액은 위 `--line` 선 + Display 30 → 이월금 보조 줄 Caption `--muted`(0원이면 없음). 2·3 `ItemTotalsCards` |
@@ -343,3 +352,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-10-16 | 처음 쓰는 분 안내 말풍선(SPEC-008, #122): `CoachMark`(스크림 + 가리키는 버튼 둘레 + 꼬리 달린 말풍선, [✕]·[알겠어요] 56), 토큰 `--coach-*`, 아이콘 `close`, `IconButton` `ref`·`BottomActionBar` `buttonRef`(말풍선이 가리킬 버튼), `useModalLayer` `keepOpen`. 카탈로그 CoachMark 위·아래 견본 | |
 | 2026-10-16 | 처음 쓰는 분 연습 장부(SPEC-008 재설계, #132): 토큰 `--info-bg`·`--info-ink`·`--corner-xs`·`--practice-*`, 연습 띠·첫 실행 물음·끝 화면, `CoachMark` 연습 모양(`progress`·`action`·`alsoOpen`·`spotlight`, 버튼 없는 말풍선), `useModalLayer` `keepOpen` 목록, 연습 결산 띠, 아이콘 `play`·`info`·`circle`, 설정 "앱" 묶음 [연습해 보기](늘 있음). 진짜 장부 말풍선은 4번만(`LedgerScreen` `settingsRef`, `SavePictureBar` `buttonRef` 없앰). 카탈로그 CoachMark 연습 견본 | |
 | 2026-10-16 | 설정 버전 줄·새 버전 바꾸기·홈 화면에 추가 권하기(SPEC-002 v2.6 보강, #135): `InstallOfferCard`(흰 면 띠 자리, 버튼 둘), "앱" 묶음 늘 있음 + 버전 줄(누를 수 없는 `ListRow`, [지금 바꾸기] `Button secondary`), 아이콘 `refresh`(RefreshCw), `useInstallAction`·`InstallGuideSheet` 로 설정 줄과 권하기 카드가 같은 동작 | |
+| 2026-10-16 | 그림으로 따라 하는 홈 화면 추가 안내(SPEC-009 A, #142): `InstallGuide` 글 세 줄 → 그림 넘기기, 새 부품 `SlideGuide`(ui)·`HomeScreenPreview`·`BrowserPicture` 묶음·`TapMark`, 토큰 `--browser-*`(앱 색 빌림)·`--picture-text*`(그림 속 px 글자)·`--browser-bar-h` 등 크기·`--tap-arrow`·`--home-icon`·`--home-name-bar`·`--motion-blink`, 아이콘 `kebab`·`menu`·`star`·`arrow-up`·`arrow-down`. 카탈로그 홈 화면 모습 그림·방법 안내 창(크롬·삼성·고르기)·그림 장 모아 보기·부품 조합 예·SlideGuide | |

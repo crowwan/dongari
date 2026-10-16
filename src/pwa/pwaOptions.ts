@@ -1,4 +1,5 @@
 import type { VitePWAOptions } from 'vite-plugin-pwa'
+import { APP_SHORT_NAME } from './appName'
 
 // tokens.css 맨 앞 라이트 블록(:root, [data-theme='light'])의 값을 읽는다. manifest 는 CSS 변수를 못 써 빌드 때 옮겨 적는다
 export function lightToken(tokensCss: string, name: string): string {
@@ -42,7 +43,7 @@ export function pwaOptions(tokensCss: string, base: string): Partial<VitePWAOpti
       id: base,
       // 앱 이름 "우리 장부" (SPEC-005). id·start_url·scope 는 그대로라 이미 설치한 홈 화면 앱이 같은 앱으로 열린다
       name: '우리 장부',
-      short_name: '우리 장부',
+      short_name: APP_SHORT_NAME,
       description: '동아리·모임 회비와 집안 살림의 수입·지출을 한 줄씩 적으면 월 정리와 올해 결산을 만들어 주는 장부',
       lang: 'ko',
       start_url: base,

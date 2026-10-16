@@ -1,6 +1,7 @@
 /*
- * 홈 화면에 추가 방법 안내 (SPEC-002, 설정의 선택 창 안). 값은 tokens.css 변수만 쓴다.
- * 따라 하며 읽으니 본문 크기 그대로, 브라우저 이름은 청록 글자로 순서 묶음을 나눈다.
+ * 홈 화면에 추가 방법 안내 (SPEC-009 A, 설정·권하기 카드의 선택 창 안). 값은 tokens.css 변수만 쓴다.
+ * 그림 넘기기는 SlideGuide(ui/slideGuide.css)·BrowserPicture(browserPicture.css)가 그린다.
+ * 모르는 브라우저면 맨 위에 "지금 쓰는 앱을 골라 주세요" + [인터넷(삼성) | 크롬] 을 두고, 고른 뒤에도 남겨 바꿀 수 있게 한다
  */
 .install-guide {
   display: flex;
@@ -8,23 +9,23 @@
   gap: var(--stack);
 }
 
-.install-guide__browser-name {
-  margin: 0 0 var(--space-2);
-  color: var(--accent-ink);
-  font-size: var(--text-body-size);
-  font-weight: var(--weight-bold);
-  line-height: var(--line-tight);
-}
-
-.install-guide__steps {
-  margin: 0;
-  padding-left: var(--space-6);
+.install-guide__choose {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--stack-tight);
+}
+
+.install-guide__question {
+  margin: 0;
   color: var(--ink);
   font-size: var(--text-body-size);
+  font-weight: var(--weight-semibold);
   line-height: var(--line-body);
+}
+
+/* 큰 글씨에서 "인터넷(삼성)" 이 낱말 가운데서 끊기지 않게 */
+.install-guide__choose .ui-segment__option {
+  word-break: keep-all;
 }
 
 /*

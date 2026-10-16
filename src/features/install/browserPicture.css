@@ -1,0 +1,321 @@
+/*
+ * 브라우저 화면 모형 (SPEC-009 설치 안내 그림·카톡 메뉴 그림). 값은 tokens.css 변수만 쓴다.
+ * 로고 없는 회색 면(--browser-*), 흐린 줄은 --line-strong, 누를 곳만 옅은 청록 면 + --accent-ink 진한 글자 + 둘레·화살표.
+ * 그림 속 글자는 그림 틀에 묶여 px 토큰(--picture-text)이고, 다크·라이트는 --browser-* 가 따라 바뀐다.
+ * 메뉴·확인 창은 그림자 대신 --line-strong 가는 둘레로 띄운다(앱에서 그림자는 스위치 손잡이에만)
+ */
+.browser-pic {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--corner-sm);
+  background: var(--browser-page);
+  color: var(--browser-ink);
+  font-family: var(--typeface);
+  font-size: var(--picture-text);
+  font-weight: var(--weight-medium);
+  line-height: var(--line-tight);
+  letter-spacing: 0;
+}
+
+/* 주소창 줄(위) · 도구 줄(아래) */
+.browser-pic__bar {
+  flex: none;
+  height: var(--browser-bar-h);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  background: var(--browser-bar);
+}
+
+.browser-pic__bar[data-place='bottom'] {
+  order: 1;
+  justify-content: space-around;
+}
+
+.browser-pic__address {
+  flex: 1;
+  min-width: 0;
+  height: var(--browser-button);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-radius: var(--corner-pill);
+  background: var(--browser-field);
+  color: var(--browser-dim);
+  font-size: var(--picture-text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.browser-pic__button {
+  position: relative;
+  flex: none;
+  width: var(--browser-button);
+  height: var(--browser-button);
+  display: grid;
+  place-items: center;
+  border-radius: var(--corner-pill);
+  color: var(--browser-ink);
+}
+
+.browser-pic__button > .ui-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+/* 웹 화면 자리 */
+.browser-pic__page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.browser-pic__title {
+  color: var(--browser-ink);
+  font-weight: var(--weight-bold);
+}
+
+.browser-pic__block {
+  flex: none;
+  height: var(--browser-block);
+  border-radius: var(--corner-sm);
+  background: var(--browser-bar);
+}
+
+.browser-pic__line {
+  flex: none;
+  height: var(--browser-line);
+  border-radius: var(--corner-pill);
+  background: var(--line-strong);
+}
+
+.browser-pic__line[data-length='long'] {
+  width: 80%;
+}
+
+.browser-pic__line[data-length='short'] {
+  width: 55%;
+}
+
+/* 떠 있는 메뉴: 위(위 줄을 덮고 오른쪽 위) / 아래(아래 줄 바로 위 오른쪽) */
+.browser-pic__menu {
+  position: absolute;
+  z-index: 2;
+  right: var(--space-2);
+  width: 64%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1) 0;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--corner-sm);
+  background: var(--browser-menu);
+}
+
+.browser-pic__menu[data-place='top'] {
+  top: var(--space-2);
+}
+
+.browser-pic__menu[data-place='bottom'] {
+  bottom: calc(var(--browser-bar-h) + var(--space-2));
+}
+
+.browser-pic__menu-title {
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  color: var(--browser-ink);
+  font-weight: var(--weight-bold);
+}
+
+.browser-pic__item {
+  position: relative;
+  padding: var(--space-1) var(--space-3);
+  color: var(--browser-dim);
+  white-space: nowrap;
+}
+
+/* 아래에서 올라오는 칸 목록 (삼성 인터넷 ≡): 아래 줄 바로 위 가로 꽉 채움, 네 칸씩 */
+.browser-pic__menu[data-layout='grid'] {
+  left: 0;
+  right: 0;
+  bottom: var(--browser-bar-h);
+  width: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-1);
+  padding: var(--space-3) var(--space-2);
+  border-width: var(--hairline) 0 0;
+  border-radius: var(--corner-sm) var(--corner-sm) 0 0;
+}
+
+.browser-pic__menu[data-layout='grid'] .browser-pic__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) 0;
+  border-radius: var(--corner-xs);
+  font-size: var(--picture-text-sm);
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+/* 칸 아이콘 자리: 흐린 둥근 네모 */
+.browser-pic__menu[data-layout='grid'] .browser-pic__item::before {
+  content: '';
+  width: var(--icon-md);
+  height: var(--icon-md);
+  border-radius: var(--corner-xs);
+  background: var(--line-strong);
+}
+
+/* 확인 창 */
+.browser-pic__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--scrim);
+}
+
+.browser-pic__dialog {
+  position: absolute;
+  z-index: 3;
+  left: var(--space-4);
+  right: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--corner-md);
+  background: var(--browser-menu);
+}
+
+.browser-pic__dialog-title {
+  font-weight: var(--weight-bold);
+}
+
+.browser-pic__app {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* 아이콘을 못 읽으면 청록 면이 보인다 */
+.browser-pic__app-icon {
+  flex: none;
+  width: var(--browser-button);
+  height: var(--browser-button);
+  border-radius: var(--corner-xs);
+  background: var(--primary);
+}
+
+.browser-pic__app-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.browser-pic__app-name {
+  font-weight: var(--weight-bold);
+}
+
+.browser-pic__app-site {
+  color: var(--browser-dim);
+  font-size: var(--picture-text-sm);
+}
+
+.browser-pic__dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.browser-pic__dialog-button {
+  position: relative;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--corner-pill);
+  color: var(--accent-ink);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+/* 누를 곳: 옅은 청록 면 + 청록 진한 글자 */
+.browser-pic__button[data-hot],
+.browser-pic__item[data-hot],
+.browser-pic__dialog-button[data-hot] {
+  background: var(--primary-soft);
+  color: var(--accent-ink);
+  font-weight: var(--weight-bold);
+}
+
+.browser-pic__menu[data-layout='list'] .browser-pic__item[data-hot] {
+  margin: 0 var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--corner-xs);
+}
+
+.browser-pic__menu[data-layout='grid'] .browser-pic__item[data-hot]::before {
+  background: var(--accent-ink);
+}
+
+/* 누를 곳 표시: 둘레(놓인 곳 모양을 따라 둥글게)와 굵은 화살표 */
+.tap-mark {
+  position: absolute;
+  pointer-events: none;
+}
+
+.tap-mark[data-mark='ring'] {
+  inset: calc(-1 * var(--space-1));
+  border: var(--focus-ring) solid var(--accent-ink);
+  border-radius: inherit;
+}
+
+.tap-mark[data-mark='arrow'] {
+  z-index: 3;
+  left: 50%;
+  width: var(--tap-arrow);
+  height: var(--tap-arrow);
+  margin-left: calc(var(--tap-arrow) / -2);
+  color: var(--accent-ink);
+}
+
+.tap-mark[data-direction='up'] {
+  top: calc(100% + var(--space-2));
+}
+
+.tap-mark[data-direction='down'] {
+  bottom: calc(100% + var(--space-2));
+}
+
+.tap-mark > .ui-icon {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+/* 깜빡임: 동작 줄이기를 켜지 않은 사람에게만. 켰으면 멈춘 채(진하게)로 보인다 */
+@media (prefers-reduced-motion: no-preference) {
+  .tap-mark {
+    animation: tap-blink var(--motion-blink) ease-in-out infinite;
+  }
+}
+
+@keyframes tap-blink {
+  50% {
+    opacity: 0.25;
+  }
+}

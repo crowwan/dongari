@@ -1,0 +1,70 @@
+/*
+ * 홈 화면 모습 그림 (SPEC-009 A·B 공통). 값은 tokens.css 변수만 쓴다.
+ * 폰 홈 화면 모형: --fill 면 반경 16, 두 줄 × 네 칸. 다른 앱은 --line-strong 둥근 네모 + 이름 자리 막대(로고·글자 없음),
+ * 우리 앱만 실제 아이콘 + --accent-ink 3px 둘레 + 이름 --strong SemiBold. 이름은 폰 글자 크기를 따라 커지고 낱말 단위로 줄바꿈
+ */
+.home-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+.home-preview__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-2);
+  justify-items: center;
+  align-items: start;
+  padding: var(--space-5) var(--space-3);
+  border-radius: var(--corner-md);
+  background: var(--fill);
+}
+
+.home-preview__app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.home-preview__icon {
+  display: block;
+  width: var(--home-icon);
+  height: var(--home-icon);
+  border-radius: var(--corner-sm);
+  background: var(--line-strong);
+}
+
+.home-preview__name-bar {
+  width: calc(var(--home-icon) * 0.75);
+  height: var(--home-name-bar);
+  border-radius: var(--corner-pill);
+  background: var(--line-strong);
+}
+
+/* 우리 앱: 실제 아이콘(못 읽으면 청록 면)에 청록 둘레 */
+.home-preview__app[data-app='ours'] .home-preview__icon {
+  background: var(--primary);
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
+
+.home-preview__name {
+  color: var(--strong);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+  text-align: center;
+  word-break: keep-all;
+}
+
+.home-preview__caption {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--line-body);
+  text-align: center;
+  word-break: keep-all;
+}

@@ -1,4 +1,6 @@
 import {
+  ArrowBigDown,
+  ArrowBigUp,
   Building,
   Calendar,
   ChartColumn,
@@ -13,6 +15,7 @@ import {
   CirclePlus,
   Coffee,
   Download,
+  EllipsisVertical,
   Flower2,
   FolderDown,
   Gift,
@@ -21,6 +24,7 @@ import {
   Info,
   KeyRound,
   Landmark,
+  Menu,
   Pencil,
   Plus,
   Receipt,
@@ -29,6 +33,7 @@ import {
   Share2,
   ShoppingCart,
   Smartphone,
+  Star,
   TriangleAlert,
   Users,
   Wallet,
@@ -66,6 +71,11 @@ export type IconName =
   | 'info'
   | 'circle'
   | 'refresh'
+  | 'kebab'
+  | 'menu'
+  | 'star'
+  | 'arrow-up'
+  | 'arrow-down'
 
 const ICONS: Record<IconName, LucideIcon> = {
   // 항목 (domain/itemIcon 이 이름으로 고른다)
@@ -113,6 +123,12 @@ const ICONS: Record<IconName, LucideIcon> = {
   circle: Circle,
   // 설정 버전 줄 (SPEC-002 #135): [지금 바꾸기] 새로 열기
   refresh: RefreshCw,
+  // 설치 안내 그림 속 브라우저 단추 (SPEC-009): 크롬 ⋮, 삼성 인터넷 ≡, 북마크 ☆. 누를 곳을 가리키는 굵은 화살표
+  kebab: EllipsisVertical,
+  menu: Menu,
+  star: Star,
+  'arrow-up': ArrowBigUp,
+  'arrow-down': ArrowBigDown,
 }
 
 // 꾸밈 아이콘: 화면 읽기에서 숨기고(뜻은 옆 글자가 전한다), 크기·색은 놓인 자리의 CSS 가 정한다

@@ -409,7 +409,7 @@ describe('SPEC-001·002 설정 화면', () => {
       expect(installRow()).not.toBeInTheDocument()
     })
 
-    it('설치 창에서 취소하면 줄은 남고, 다시 누르면 방법 안내가 뜬다 (설치 제안은 한 번만 쓸 수 있다)', async () => {
+    it('SPEC-009 AC-9 설치 창에서 취소하면 줄은 남고, 다시 누르면 그림 안내가 뜬다 (설치 제안은 한 번만 쓸 수 있다)', async () => {
       const { store, prompt } = installPromptWith('dismissed')
       render(<Harness install={{ installPrompt: store }} />)
 
@@ -418,7 +418,8 @@ describe('SPEC-001·002 설정 화면', () => {
       expect(installRow()).toBeInTheDocument()
 
       await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
-      expect(screen.getByRole('dialog', { name: '홈 화면에 추가하는 방법' })).toBeInTheDocument()
+      const sheet = screen.getByRole('dialog', { name: '홈 화면에 추가하는 방법' })
+      expect(within(sheet).getByTestId('slide-guide-text')).toHaveTextContent('1 / 4,')
     })
 
     it('다른 경로로 설치가 끝나면(appinstalled) 줄을 숨긴다', () => {
@@ -432,58 +433,91 @@ describe('SPEC-001·002 설정 화면', () => {
       expect(installRow()).not.toBeInTheDocument()
     })
 
-    describe('방법 안내 (설치 제안이 없을 때)', () => {
-      it('삼성 인터넷이면 아래 메뉴에서 추가하는 순서를 선택 창으로 보인다', async () => {
+    describe('SPEC-009 A 그림 안내 (설치 제안이 없을 때)', () => {
+      const guideSheet = () => screen.getByRole('dialog', { name: '홈 화면에 추가하는 방법' })
+      const stepText = () => within(guideSheet()).getByTestId('slide-guide-text')
+
+      it('AC-3 삼성 인터넷이면 방법 안내 창에 아래 메뉴 1 / 4 그림과 글 줄이 보이고 [이전] 은 누를 수 없다', async () => {
         render(<Harness install={{ userAgent: SAMSUNG_UA }} />)
 
         await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
 
-        const sheet = screen.getByRole('dialog', { name: '홈 화면에 추가하는 방법' })
-        const guide = within(sheet).getByTestId('install-guide')
+        const guide = within(guideSheet()).getByTestId('install-guide')
         expect(guide).toHaveAttribute('data-browser', 'samsung')
-        expect(guide).toHaveTextContent('화면 아래 오른쪽 [≡] 메뉴')
-        expect(guide).toHaveTextContent('[현재 페이지 추가]')
-        expect(guide).not.toHaveTextContent('[⋮]')
+        expect(stepText()).toHaveTextContent('1 / 4, 화면 아래 오른쪽 [≡] 메뉴를 누르세요')
+        expect(within(guide).getByTestId('browser-picture')).toBeInTheDocument()
+        expect(within(guideSheet()).getByRole('button', { name: '이전' })).toBeDisabled()
+        expect(within(guideSheet()).queryByRole('button', { name: '확인' })).toBe(null)
       })
 
-      it('크롬이면 위쪽 메뉴에서 추가하는 순서를 보인다', async () => {
+      it('AC-3 크롬이면 위쪽 메뉴 1 / 4 그림과 글 줄이 보인다', async () => {
         render(<Harness install={{ userAgent: CHROME_UA }} />)
 
         await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
 
-        const guide = within(screen.getByRole('dialog')).getByTestId('install-guide')
-        expect(guide).toHaveAttribute('data-browser', 'chrome')
-        expect(guide).toHaveTextContent('화면 위 오른쪽 [⋮] 메뉴')
-        expect(guide).not.toHaveTextContent('[≡]')
+        expect(within(guideSheet()).getByTestId('install-guide')).toHaveAttribute('data-browser', 'chrome')
+        expect(stepText()).toHaveTextContent('1 / 4, 화면 위 오른쪽 [⋮] 메뉴를 누르세요')
       })
 
-      it('그 밖의 브라우저면 삼성 인터넷과 크롬 순서를 둘 다 보인다', async () => {
+      it('AC-6 그 밖의 브라우저면 지금 쓰는 앱부터 고르게 한다', async () => {
         render(<Harness install={{ userAgent: 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0' }} />)
 
         await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
 
-        const guide = within(screen.getByRole('dialog')).getByTestId('install-guide')
-        expect(guide).toHaveTextContent('[≡]')
-        expect(guide).toHaveTextContent('[⋮]')
+        expect(within(guideSheet()).getByRole('group', { name: '지금 쓰는 앱을 골라 주세요' })).toBeInTheDocument()
+        await userEvent.click(within(guideSheet()).getByRole('button', { name: '크롬' }))
+        expect(stepText()).toHaveTextContent('1 / 4, 화면 위 오른쪽 [⋮] 메뉴를 누르세요')
       })
 
-      it('[확인] 을 누르면 창이 닫히고 설정에 남는다', async () => {
+      it('AC-4 4장의 [다 했어요] 를 누르면 창이 닫히고 설정에 남는다', async () => {
         render(<Harness />)
         await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
 
-        await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '확인' }))
+        for (let step = 0; step < 3; step += 1) {
+          await userEvent.click(within(guideSheet()).getByRole('button', { name: '다음' }))
+        }
+        await userEvent.click(within(guideSheet()).getByRole('button', { name: '다 했어요' }))
 
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
         expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
       })
 
-      it('안드로이드 뒤로 버튼을 누르면 창만 닫힌다', async () => {
+      it('AC-10 안드로이드 뒤로 버튼을 누르면 창만 닫히고, 다시 열면 1장부터다', async () => {
         render(<Harness />)
         await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+        await userEvent.click(within(guideSheet()).getByRole('button', { name: '다음' }))
 
         pressBackButton()
 
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
+        await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+        expect(stepText()).toHaveTextContent('1 / 4,')
+      })
+
+      it('AC-10 창 바깥을 누르면 창만 닫히고, 다시 열면 1장부터다', async () => {
+        render(<Harness />)
+        await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+        await userEvent.click(within(guideSheet()).getByRole('button', { name: '다음' }))
+
+        await userEvent.click(screen.getByTestId('bottom-sheet'))
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+        expect(stepText()).toHaveTextContent('1 / 4,')
+      })
+
+      it('창이 떠 있는 동안 브라우저 메뉴로 설치를 마치면(appinstalled) 창이 닫히고 줄이 사라진다', async () => {
+        const events = new EventTarget()
+        render(<Harness install={{ installPrompt: createInstallPromptStore(events) }} />)
+        await userEvent.click(screen.getByRole('button', { name: /홈 화면에 추가/ }))
+
+        act(() => {
+          events.dispatchEvent(new Event('appinstalled'))
+        })
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(installRow()).not.toBeInTheDocument()
         expect(screen.getByRole('heading', { level: 1, name: '설정' })).toBeInTheDocument()
       })
     })

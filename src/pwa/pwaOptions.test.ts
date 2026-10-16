@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { APP_SHORT_NAME } from './appName'
 import { lightToken, pwaOptions } from './pwaOptions'
 
 // vite.config.ts 처럼 파일을 그대로 읽는다 (Vitest 는 CSS import 를 빈 글자로 바꾼다). 경로는 레포 루트 기준
@@ -153,5 +154,14 @@ describe('SPEC-005 앱 이름 "우리 장부"', () => {
       start_url: '/dongari/',
       scope: '/dongari/',
     })
+  })
+})
+
+describe('SPEC-009 홈 화면 모습 그림의 앱 이름', () => {
+  it('AC-1 manifest short_name 은 그림이 쓰는 이름 상수(APP_SHORT_NAME)와 같은 값 "우리 장부" 다', () => {
+    const manifest = pwaOptions(tokensCss, '/dongari/').manifest || undefined
+
+    expect(APP_SHORT_NAME).toBe('우리 장부')
+    expect(manifest).toMatchObject({ short_name: APP_SHORT_NAME })
   })
 })
