@@ -15,7 +15,7 @@ import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
 import type { SheetHistory } from '../useScreenHistory'
 import { EntryMonthSheet } from './EntryMonthSheet'
-import { ENTRY_MONTH_SHEET, itemOptions, TYPE_LABELS, TYPE_SEGMENTS } from './entryOptions'
+import { ENTRY_MONTH_SHEET, itemOptions, olderItems, TYPE_LABELS, TYPE_SEGMENTS } from './entryOptions'
 import {
   answerRows,
   isStepDirty,
@@ -44,6 +44,8 @@ type AddEntryFormProps = {
   currentDay?: number
   // 자주 쓴 항목. 종류를 고르기 전이라 두 종류를 섞어서 받는다
   frequentChoices: (type?: EntryType) => FrequentChoice[]
+  // 예전에 쓴 항목 (frequentChoices 에 없는 실제로 쓴 이름, 최근 사용 순). 목록 [더 보기] 를 누르면 펼친다 (v2.7)
+  olderChoices: () => FrequentChoice[]
   // 직접 적은 이름을 예전에 쓴 종류. 처음 쓰는 이름이면 undefined (AC-15)
   lastUsedType: (name: string) => EntryType | undefined
   sheets: SheetHistory
@@ -66,6 +68,7 @@ export function AddEntryForm({
   currentMonth,
   currentDay,
   frequentChoices,
+  olderChoices,
   lastUsedType,
   sheets,
   onSave,
@@ -142,6 +145,7 @@ export function AddEntryForm({
             <StepQuestion
               state={state}
               frequentChoices={frequentChoices}
+              olderChoices={olderChoices}
               dispatch={dispatch}
               onSubmit={pressButton}
               onPickMonth={() => sheets.openSheet(ENTRY_MONTH_SHEET)}
@@ -182,6 +186,7 @@ export function AddEntryForm({
 type StepQuestionProps = {
   state: StepState
   frequentChoices: (type?: EntryType) => FrequentChoice[]
+  olderChoices: () => FrequentChoice[]
   dispatch: (action: StepAction) => void
   onSubmit: () => void
   // "며칠인가요?" 제목 옆 [10월 ▾] → 열두 달 선택 창
@@ -193,7 +198,7 @@ type StepQuestionProps = {
 const QUICK_DAY_TAGS = { today: '오늘', recent: '방금' } as const
 
 // 지금 단계의 질문 하나와 답하는 자리
-function StepQuestion({ state, frequentChoices, dispatch, onSubmit, onPickMonth, quickDays }: StepQuestionProps) {
+function StepQuestion({ state, frequentChoices, olderChoices, dispatch, onSubmit, onPickMonth, quickDays }: StepQuestionProps) {
   const { draft } = state
   switch (state.step) {
     case 'day':
@@ -224,15 +229,19 @@ function StepQuestion({ state, frequentChoices, dispatch, onSubmit, onPickMonth,
       )
     case 'item': {
       const choices = frequentChoices()
+      const older = olderChoices()
+      // 펼친 예전 항목도 처음 6개와 똑같이 고르면 바로 다음으로 (AC-36). 펼친 상태는 이 질문이 다시 그려지면 접힌다 (AC-37)
+      const all = [...choices, ...older]
       return (
         <>
           <h2 className="entry__question">무엇인가요?</h2>
           <OptionList
             label="자주 쓴 항목"
             options={itemOptions(choices)}
-            value={choices.some((choice) => choice.name === draft.name) ? draft.name : null}
+            more={olderItems(older)}
+            value={all.some((choice) => choice.name === draft.name) ? draft.name : null}
             onChange={(name) => {
-              const choice = choices.find((item) => item.name === name)
+              const choice = all.find((item) => item.name === name)
               if (choice) dispatch({ kind: 'pick-item', choice })
             }}
             action={{ label: '직접 적기', icon: 'pen', onClick: () => dispatch({ kind: 'start-custom' }) }}

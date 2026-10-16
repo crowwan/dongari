@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { frequentChoices, lastUsedType, type EntryInput } from '../../domain/ledger'
+import { frequentChoices, lastUsedType, olderChoices, type EntryInput } from '../../domain/ledger'
 import type { Entry, EntryType } from '../../domain/types'
 import { useScreenHistory } from '../useScreenHistory'
 import { AddEntryForm } from './AddEntryForm'
@@ -38,6 +38,7 @@ function Harness({ year, month, saved, handlers }: HarnessProps) {
       currentMonth={10}
       currentDay={7}
       frequentChoices={(type?: EntryType) => frequentChoices(HISTORY, type)}
+      olderChoices={() => olderChoices(HISTORY)}
       lastUsedType={(name) => lastUsedType(HISTORY, name)}
       sheets={sheets}
       onSave={handlers.onSave}

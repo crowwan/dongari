@@ -11,6 +11,7 @@ import {
   lastUsedType,
   monthGroup,
   newLedgerDefaults,
+  olderChoices,
   updateCarryover,
   updateEntry,
   type EntryInput,
@@ -380,6 +381,49 @@ describe('SPEC-001 장부 계산', () => {
 
         expect(names(frequentChoices(entries, 'expense', { kind: 'household' }))).toEqual(['외식', '장보기', '관리비', '병원비'])
       })
+    })
+  })
+
+  describe('v2.7 예전에 쓴 항목 더 보기', () => {
+    const names = (choices: { name: string }[]) => choices.map((choice) => choice.name)
+    // 가 → 하 순으로 14가지 이름을 썼다 (가장 최근 = 하)
+    const FOURTEEN = ['가', '나', '다', '라', '마', '바', '사', '아', '자', '차', '카', '타', '파', '하']
+    const usedAll = FOURTEEN.map((name, index) => entry({ id: String(index), type: index % 3 === 0 ? 'income' : 'expense', name }))
+
+    it('AC-35 처음 6개(최근 사용 순)에 없는 실제로 쓴 이름을 최근 사용 순으로 돌려준다', () => {
+      expect(names(frequentChoices(usedAll))).toEqual(['하', '파', '타', '카', '차', '자'])
+      expect(names(olderChoices(usedAll))).toEqual(['아', '사', '바', '마', '라', '다', '나', '가'])
+    })
+
+    it('AC-36 수입·지출을 섞고, 각 이름의 종류는 마지막으로 쓴 기록의 종류다', () => {
+      const entries = [
+        // 맨 처음엔 "사" 를 지출로 썼다 (나중에 수입으로 다시 씀)
+        entry({ id: 'first', type: 'expense', name: '사' }),
+        ...usedAll,
+        // 가장 오래된 "가" 를 한 번 더 쓰면 최근으로 올라와 처음 6개에 들어간다
+        entry({ id: 'again', type: 'expense', name: '가' }),
+      ]
+
+      expect(names(frequentChoices(entries))).toEqual(['가', '하', '파', '타', '카', '차'])
+      expect(olderChoices(entries).slice(0, 3)).toEqual([
+        { name: '자', type: 'expense' },
+        { name: '아', type: 'expense' },
+        { name: '사', type: 'income' },
+      ])
+      expect(names(olderChoices(entries)).at(-1)).toBe('나')
+    })
+
+    it('AC-35 실제로 쓴 이름이 6개 이하면 더 볼 것이 없다', () => {
+      expect(olderChoices(usedAll.slice(0, 6))).toEqual([])
+      expect(olderChoices([])).toEqual([])
+    })
+
+    it('AC-37 기본 항목은 처음 6개를 채울 때만 쓰고 더 보기에는 넣지 않는다', () => {
+      const sevenUsed = usedAll.slice(0, 7)
+
+      expect(names(olderChoices(sevenUsed))).toEqual(['가'])
+      expect(names(olderChoices(usedAll.slice(0, 3)))).toEqual([])
+      expect(names(olderChoices([], { kind: 'household' }))).toEqual([])
     })
   })
 

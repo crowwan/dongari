@@ -22,7 +22,7 @@ import {
   type DraftCheck,
   type EntryDraft,
 } from './entryDraft'
-import { ENTRY_MONTH_SHEET, itemOptions, TYPE_SEGMENTS } from './entryOptions'
+import { ENTRY_MONTH_SHEET, itemOptions, olderItems, TYPE_SEGMENTS } from './entryOptions'
 import './entry.css'
 
 type EditEntryFormProps = {
@@ -34,6 +34,8 @@ type EditEntryFormProps = {
   currentMonth?: number
   // 자주 쓴 항목 목록 (수입·지출 함께, 내역 적기와 같다)
   frequentChoices: () => FrequentChoice[]
+  // 예전에 쓴 항목 (목록 [더 보기], v2.7). 고치는 내역 이름은 맨 위에 있으니 빼고 보인다 (AC-38)
+  olderChoices: () => FrequentChoice[]
   sheets: SheetHistory
   onSave: (input: EntryInput) => void
   onBack: () => void
@@ -63,6 +65,7 @@ export function EditEntryForm({
   initial,
   currentMonth,
   frequentChoices,
+  olderChoices,
   sheets,
   onSave,
   onBack,
@@ -87,6 +90,8 @@ export function EditEntryForm({
     dayCheck.ok || keepsUndated ? checkDraft({ ...checked, day: dayCheck.ok ? dayCheck.day : undefined }) : dayCheck
   const dirty = isDraftChanged(initial, answered) || dayText !== initialDayText
   const choices = choicesWithInitial(frequentChoices(), initial)
+  const older = olderChoices().filter((choice) => !choices.some((shown) => shown.name === choice.name))
+  const all = [...choices, ...older]
   const pickedName = draft.name.trim()
 
   useEffect(() => {
@@ -116,11 +121,12 @@ export function EditEntryForm({
         <OptionList
           label="자주 쓴 항목"
           options={itemOptions(choices)}
+          more={olderItems(older)}
           // 직접 적기 칸이 열려 있는 동안은 체크를 지운다 (같은 이름이 두 번 보이지 않게, 점검 12)
-          value={custom === null && choices.some((choice) => choice.name === pickedName) ? pickedName : null}
+          value={custom === null && all.some((choice) => choice.name === pickedName) ? pickedName : null}
           onChange={(name) => {
             // 이름과 함께 그 항목을 마지막으로 쓴 종류를 고른다 (AC-4, AC-32). 직접 적기 칸은 닫고 적던 글자는 지운다
-            const choice = choices.find((item) => item.name === name)
+            const choice = all.find((item) => item.name === name)
             if (choice) change({ name: choice.name, type: choice.type })
             setCustom(null)
           }}

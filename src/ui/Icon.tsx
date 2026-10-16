@@ -19,6 +19,7 @@ import {
   Flower2,
   FolderDown,
   Gift,
+  History,
   Hospital,
   House,
   Info,
@@ -76,6 +77,7 @@ export type IconName =
   | 'star'
   | 'arrow-up'
   | 'arrow-down'
+  | 'history'
 
 const ICONS: Record<IconName, LucideIcon> = {
   // 항목 (domain/itemIcon 이 이름으로 고른다)
@@ -129,6 +131,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   star: Star,
   'arrow-up': ArrowBigUp,
   'arrow-down': ArrowBigDown,
+  // 항목 목록 "예전에 쓴 항목" 구분 글자 (SPEC-001 v2.7): 시계 되감기
+  history: History,
 }
 
 // 꾸밈 아이콘: 화면 읽기에서 숨기고(뜻은 옆 글자가 전한다), 크기·색은 놓인 자리의 CSS 가 정한다

@@ -2,7 +2,7 @@
 import { itemIcon } from '../../domain/itemIcon'
 import type { FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
-import type { Option } from '../../ui/OptionList'
+import type { Option, OptionListMore } from '../../ui/OptionList'
 import type { SegmentOptions } from '../../ui/SegmentedControl'
 
 export const TYPE_LABELS: Readonly<Record<EntryType, string>> = { income: '수입', expense: '지출' }
@@ -22,6 +22,11 @@ export function itemOptions(choices: readonly FrequentChoice[]): Option<string>[
     note: TYPE_LABELS[choice.type],
     tone: choice.type === 'income' ? 'income' : undefined,
   }))
+}
+
+// 예전에 쓴 항목 → 목록 [⌄ 예전에 쓴 항목 N개 더 보기] 줄과 펼친 줄들 (SPEC-001 v2.7). 없으면 OptionList 가 줄을 그리지 않는다
+export function olderItems(choices: readonly FrequentChoice[]): OptionListMore<string> {
+  return { label: `예전에 쓴 항목 ${choices.length}개 더 보기`, heading: '예전에 쓴 항목', options: itemOptions(choices) }
 }
 
 // 내역 적기 달 선택 창 이름 (방문 기록 한 칸, useScreenHistory)

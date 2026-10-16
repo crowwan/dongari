@@ -186,6 +186,26 @@ describe('SPEC-001 useLedger', () => {
         { name: '간식비', type: 'expense' },
       ])
     })
+
+    it('v2.7 예전에 쓴 항목은 지난 연도 기록까지 포함해 처음 6개에 없는 이름을 최근 사용 순으로 준다', () => {
+      // 지난해 가·나·다 → 올해 회비·대관료 + 라·마·바·사 (실제로 쓴 이름 9가지)
+      const named = (year: number, names: string[]): Ledger['entries'] =>
+        names.map((name, index) => ({
+          id: `${year}-${name}`,
+          month: 9,
+          type: 'expense',
+          name,
+          amount: 1_000,
+          createdAt: `${year}-09-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`,
+        }))
+      const lastYear: Ledger = { year: 2025, carryover: 0, entries: named(2025, ['가', '나', '다']) }
+      const thisYear = ledger2026()
+      const withMore: Ledger = { ...thisYear, entries: [...thisYear.entries, ...named(2026, ['라', '마', '바', '사'])] }
+      const { result } = renderLedger(new MemoryRepository(storedWith(lastYear, withMore)))
+
+      expect(result.current.frequentChoices().map((choice) => choice.name)).toEqual(['사', '바', '마', '라', '대관료', '회비'])
+      expect(result.current.olderChoices().map((choice) => choice.name)).toEqual(['다', '나', '가'])
+    })
   })
 
   describe('연도', () => {

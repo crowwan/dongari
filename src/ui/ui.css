@@ -992,6 +992,40 @@ button.ui-row {
   font-weight: var(--weight-semibold);
 }
 
+/* [⌄ 예전에 쓴 항목 N개 더 보기] (SPEC-001 v2.7): [직접 적기] 처럼 청록 글자 + 청록 원, 위에 옅은 선으로 처음 줄들과 나눈다 */
+.ui-options__more {
+  border-top: var(--hairline) solid var(--line);
+}
+
+.ui-options__more .ui-options__icon {
+  background: var(--primary-soft);
+  color: var(--accent-ink);
+}
+
+/* 큰 글씨에서 두 줄로 나뉠 때 "8개" 가 "8 / 개" 로 갈리지 않게 낱말 단위로 */
+.ui-options__more .ui-options__label {
+  word-break: keep-all;
+}
+
+/* 펼친 뒤 더 보기 줄 자리의 "🕘 예전에 쓴 항목" 구분 글자: 고르는 줄이 아니라 작은 회색 글자 */
+.ui-options__divider {
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  border-top: var(--hairline) solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-semibold);
+  line-height: var(--line-tight);
+}
+
+.ui-options__divider .ui-icon {
+  width: var(--icon-xs);
+  height: var(--icon-xs);
+}
+
 /* 펼치는 줄 아래 칸 (고치기 [직접 적기] → 이름 칸 + 수입·지출 스위치): 같은 흰 면 안, 줄 글자 왼쪽 선에 맞춘다 */
 .ui-options__panel {
   padding: var(--space-1) var(--space-4) var(--space-4);

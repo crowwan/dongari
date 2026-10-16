@@ -105,4 +105,57 @@ describe('OptionList', () => {
     const field = within(screen.getByRole('group', { name: '항목' })).getByRole('textbox', { name: '이름 칸' })
     expect(toggle).toHaveAttribute('aria-controls', field.parentElement?.id)
   })
+
+  describe('더 보기 줄 (SPEC-001 v2.7)', () => {
+    const RECENT = [{ value: '대관료', label: '대관료' }]
+    const OLDER = [
+      { value: '꽃값', label: '꽃값', note: '지출' },
+      { value: '찬조금', label: '찬조금', note: '수입' },
+    ]
+    const more = { label: '예전에 쓴 항목 2개 더 보기', heading: '예전에 쓴 항목', options: OLDER }
+    const action = { label: '직접 적기', icon: 'pen', onClick: vi.fn() } as const
+
+    it('처음엔 접힌 채 처음 줄들 뒤, 따로 하는 일 줄 앞에 더 보기 줄이 있고 펼침 상태를 읽힌다', () => {
+      render(<OptionList label="항목" options={RECENT} value={null} onChange={vi.fn()} more={more} action={action} />)
+
+      const buttons = within(screen.getByRole('group', { name: '항목' })).getAllByRole('button')
+      expect(buttons.map((button) => button.textContent)).toEqual(['대관료', '예전에 쓴 항목 2개 더 보기', '직접 적기'])
+      expect(buttons[1]).toHaveAttribute('aria-expanded', 'false')
+      expect(buttons[1]).not.toHaveAttribute('aria-pressed')
+      expect(screen.queryByRole('button', { name: '꽃값 지출' })).not.toBeInTheDocument()
+    })
+
+    it('누르면 그 자리에 구분 글자와 나머지 줄이 펼쳐지고 포커스가 첫 예전 줄로 간다', async () => {
+      const onChange = vi.fn()
+      render(<OptionList label="항목" options={RECENT} value={null} onChange={onChange} more={more} action={action} />)
+
+      await userEvent.click(screen.getByRole('button', { name: '예전에 쓴 항목 2개 더 보기' }))
+
+      const group = screen.getByRole('group', { name: '항목' })
+      expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual([
+        '대관료',
+        '꽃값 지출',
+        '찬조금 수입',
+        '직접 적기',
+      ])
+      expect(within(group).getByText('예전에 쓴 항목')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '꽃값 지출' })).toHaveFocus()
+
+      await userEvent.click(screen.getByRole('button', { name: '찬조금 수입' }))
+      expect(onChange).toHaveBeenCalledWith('찬조금')
+    })
+
+    it('펼친 줄에서 고른 값은 체크로 보이고, 고른 값이 예전 줄이면 펼친 채 시작한다', () => {
+      render(<OptionList label="항목" options={RECENT} value="꽃값" onChange={vi.fn()} more={more} />)
+
+      expect(screen.getByRole('button', { name: '꽃값 지출' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.queryByRole('button', { name: '예전에 쓴 항목 2개 더 보기' })).not.toBeInTheDocument()
+    })
+
+    it('더 볼 줄이 없으면 더 보기 줄도 없다', () => {
+      render(<OptionList label="항목" options={RECENT} value={null} onChange={vi.fn()} more={{ ...more, options: [] }} />)
+
+      expect(within(screen.getByRole('group', { name: '항목' })).getAllByRole('button')).toHaveLength(1)
+    })
+  })
 })

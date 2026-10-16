@@ -153,11 +153,28 @@ export function frequentChoices(
 ): FrequentChoice[] {
   const ofType = (choice: FrequentChoice) => type === undefined || choice.type === type
   const recentFirst = [...entries].reverse().map((entry) => ({ name: entry.name, type: entry.type }))
+  return uniqueByName([...recentFirst.filter(ofType), ...DEFAULT_CHOICES[kind].filter(ofType)]).slice(0, limit)
+}
+
+// 예전에 쓴 항목 더 보기 (SPEC-001 v2.7). entries 는 오래된 것부터 입력 순
+// - 실제로 쓴 이름 중 처음 목록(frequentChoices, 두 종류 섞음)에 없는 것을 최근 사용 순으로. 종류는 그 이름을 마지막으로 쓴 기록의 종류
+// - 기본 항목은 처음 목록을 채울 때만 쓰고 여기에는 넣지 않는다
+export function olderChoices(
+  entries: readonly Entry[],
+  { kind = 'club', limit = FREQUENT_CHOICES_LIMIT }: { kind?: BookKind; limit?: number } = {},
+): FrequentChoice[] {
+  const shown = new Set(frequentChoices(entries, undefined, { kind, limit }).map((choice) => choice.name))
+  const recentFirst = [...entries].reverse().map((entry) => ({ name: entry.name, type: entry.type }))
+  return uniqueByName(recentFirst).filter((choice) => !shown.has(choice.name))
+}
+
+// 같은 이름은 처음 나온 것 하나만 (앞에 둔 것이 이긴다)
+function uniqueByName(choices: readonly FrequentChoice[]): FrequentChoice[] {
   const byName = new Map<string, FrequentChoice>()
-  for (const choice of [...recentFirst.filter(ofType), ...DEFAULT_CHOICES[kind].filter(ofType)]) {
+  for (const choice of choices) {
     if (!byName.has(choice.name)) byName.set(choice.name, choice)
   }
-  return [...byName.values()].slice(0, limit)
+  return [...byName.values()]
 }
 
 // 직접 적은 이름을 예전에 썼으면 그 이름을 마지막으로 쓴 기록의 종류, 처음 쓰는 이름이면 undefined (AC-15)

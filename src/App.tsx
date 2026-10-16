@@ -416,6 +416,7 @@ export default function App({
             currentMonth={currentMonth}
             currentDay={currentDay}
             frequentChoices={ledger.frequentChoices}
+            olderChoices={ledger.olderChoices}
             lastUsedType={ledger.lastUsedType}
             sheets={navigation}
             onSave={(input) => {
@@ -444,6 +445,7 @@ export default function App({
             initial={{ month: entryMonth, day, type, name, amount }}
             currentMonth={currentMonth}
             frequentChoices={ledger.frequentChoices}
+            olderChoices={ledger.olderChoices}
             sheets={navigation}
             onSave={(input) => returnToLedger(ledger.updateEntry(id, input), '고쳤어요', input.month)}
             onBack={navigation.requestBack}
