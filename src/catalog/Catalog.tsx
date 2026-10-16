@@ -317,13 +317,14 @@ export function Catalog() {
               <ListRow icon={itemIcon('간식비')} title="간식비" description="지출" end={<AmountText type="expense" amount={58280} />} />
             </div>
           </State>
-          <State label="누르는 줄 (눌러 보기) · 보조 줄 없음 · 긴 이름">
+          <State label="누르는 줄 (눌러 보기, 줄 끝 ›) · 보조 줄 없음 · 긴 이름 (금액이 모자라면 이름 아래 줄)">
             <div className="catalog__card">
               <ListRow
                 icon={itemIcon('행사비')}
                 title="행사비"
                 onClick={noop}
                 end={<AmountText type="expense" amount={1200000} />}
+                chevron
               />
               <ListRow
                 icon={itemIcon('꽃값')}
@@ -331,6 +332,7 @@ export function Catalog() {
                 description="5월 · 지출"
                 onClick={noop}
                 end={<AmountText type="expense" amount={58000} />}
+                chevron
               />
             </div>
           </State>
@@ -613,9 +615,9 @@ export function Catalog() {
         </Section>
 
         <Section title="IconButton">
-          <State label="면 없는 글자 버튼 (위쪽 [결산] [설정] + 점 표시)">
+          <State label="위쪽 [결산] 흰 면 · [설정] 면 없는 글자 버튼 + 점 표시">
             <div className="catalog__top">
-              <IconButton icon="chart" onClick={noop}>
+              <IconButton icon="chart" variant="surface" onClick={noop}>
                 결산
               </IconButton>
               <IconButton icon="settings" dotLabel="백업 필요" onClick={noop}>
@@ -630,12 +632,12 @@ export function Catalog() {
               </IconButton>
             </div>
           </State>
-          <State label="회색 면 (카드 안 [10월 정리 보기]) · 기본 / 눌림">
-            <IconButton icon="receipt" variant="fill" onClick={noop}>
+          <State label="흰 면 (달 넘기기 아래 [10월 정리 보기]) · 기본 / 눌림">
+            <IconButton icon="receipt" variant="surface" onClick={noop}>
               10월 정리 보기
             </IconButton>
             <div data-preview-pressed="">
-              <IconButton icon="receipt" variant="fill" onClick={noop}>
+              <IconButton icon="receipt" variant="surface" onClick={noop}>
                 10월 정리 보기
               </IconButton>
             </div>

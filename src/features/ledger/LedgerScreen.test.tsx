@@ -263,7 +263,7 @@ describe('SPEC-001 장부 화면', () => {
       renderScreen(SAMPLE, 9, { onOpenMonthSummary })
 
       const summary = screen.getByRole('button', { name: '9월 정리 보기' })
-      expect(summary).toHaveAttribute('data-variant', 'fill')
+      expect(summary).toHaveAttribute('data-variant', 'surface')
       await userEvent.click(summary)
 
       expect(onOpenMonthSummary).toHaveBeenCalledWith(9)
@@ -290,6 +290,47 @@ describe('SPEC-001 장부 화면', () => {
 
       expect(onAddEntry).toHaveBeenCalledWith(10)
     })
+  })
+})
+
+describe('SPEC-001 v2.6 장부 화면 (큰 글씨 배치·줄 끝 ›·정리 보기 위치)', () => {
+  it('AC-26 장부 화면 위쪽 [결산] 은 흰 면 버튼, [설정] 은 면 없는 버튼이다', () => {
+    renderScreen(SAMPLE)
+
+    expect(screen.getByRole('button', { name: '결산' })).toHaveAttribute('data-variant', 'surface')
+    expect(screen.getByRole('button', { name: '설정' })).toHaveAttribute('data-variant', 'plain')
+  })
+
+  it('AC-27 [N월 정리 보기] 는 달 넘기기 바로 아래, 그 달 카드 위에 있다', () => {
+    renderScreen(SAMPLE, 9)
+
+    const stepper = screen.getByTestId('month-stepper')
+    const summary = screen.getByRole('button', { name: '9월 정리 보기' })
+    // 그 달 카드 안이 아니라 카드 밖, 달 넘기기와 카드 사이
+    expect(monthCard()).not.toContainElement(summary)
+    expect(stepper.nextElementSibling).toContainElement(summary)
+    expect(stepper.nextElementSibling?.nextElementSibling).toBe(monthCard())
+  })
+
+  it('AC-27 그 달 기록이 없으면 [N월 정리 보기] 가 없고 달 넘기기 바로 아래가 그 달 카드다', () => {
+    renderScreen(SAMPLE, 8)
+
+    expect(screen.queryByRole('button', { name: /정리 보기/ })).not.toBeInTheDocument()
+    expect(screen.getByTestId('month-stepper').nextElementSibling).toBe(monthCard())
+  })
+
+  it('AC-28 장부 기록 줄 끝에 › 가 있고, 화면 읽기 이름은 "이름 종류 금액" 그대로다', () => {
+    renderScreen(SAMPLE, 9)
+
+    const rows = within(monthCard()).getAllByTestId('list-row')
+    for (const row of rows) {
+      const chevron = row.querySelector('[data-testid="list-row-chevron"]')
+      expect(chevron?.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'right')
+      // › 는 줄의 맨 끝 (금액 뒤)
+      expect(chevron?.nextElementSibling).toBeNull()
+      expect(chevron?.previousElementSibling).toHaveTextContent('원')
+    }
+    expect(within(monthCard()).getByRole('button', { name: '회비 수입 +140,000원' })).toBeInTheDocument()
   })
 })
 

@@ -52,4 +52,23 @@ describe('ListRow', () => {
 
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
+
+  it('chevron 을 주면 줄 맨 끝(오른쪽 내용 뒤)에 › 를 그리고, 화면 읽기 이름에는 넣지 않는다', () => {
+    render(
+      <ListRow icon="users" title="회비" description="수입" end={<AmountText type="income" amount={140000} />} chevron onClick={vi.fn()} />,
+    )
+
+    const row = screen.getByRole('button', { name: '회비 수입 +140,000원' })
+    const chevron = row.querySelector('[data-testid="list-row-chevron"]')
+    expect(chevron?.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'right')
+    expect(chevron).toHaveAttribute('aria-hidden', 'true')
+    expect(chevron?.nextElementSibling).toBeNull()
+    expect(chevron?.previousElementSibling).toHaveTextContent('원')
+  })
+
+  it('chevron 이 없으면 › 를 그리지 않는다', () => {
+    render(<ListRow icon="users" title="회비" onClick={vi.fn()} />)
+
+    expect(screen.getByTestId('list-row').querySelector('[data-testid="list-row-chevron"]')).toBeNull()
+  })
 })
