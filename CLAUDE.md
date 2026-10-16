@@ -45,7 +45,10 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
 ```
 
 - 빌드 경로는 환경변수 `APP_BASE`(기본 `/dongari/`) 하나로 정한다 (`vite.config.ts`). 화면 파일·아이콘 경로, manifest `id`·`start_url`·`scope`, 서비스 워커 범위가 모두 따라간다. `build:preview` 는 `APP_BASE=/`(미리보기는 따로 된 주소의 맨 위, #128).
-- 미리보기 빌드를 로컬에서 보기: `npm run build:preview && npx vite preview --port 7777` → `http://localhost:7777/` (manifest `scope`·서비스 워커 범위가 `/`)
+- 미리보기 빌드를 로컬에서 보기: `npm run build:preview && APP_BASE=/ npx vite preview --port 7777` → `http://localhost:7777/` (manifest `scope`·서비스 워커 범위가 `/`. `vite preview` 도 설정의 `base` 를 따르므로 `APP_BASE=/` 를 같이 준다 — 없으면 `/dongari/` 에서만 열린다)
+- 개발 확인 화면 `/#/dev/env` (SPEC-009 기술 확인, #141): 브라우저 값(user agent·카톡 안·standalone·설치 이벤트·공유)과 클립보드·openExternal·크롬 intent 시험, [결과 복사]. **개발 모드와 미리보기 빌드(`APP_BASE=/` → vite define `__PREVIEW_BUILD__`)에서만** 열리고 본 주소 빌드 번들에는 없다.
+  - 여는 법: 미리보기 `https://uri-jangbu-preview.pages.dev/#/dev/env`(폰에서는 카톡 나와의 채팅에 이 주소를 보내 누르면 카톡 안에서도 열린다), 개발 서버 `http://localhost:7777/dongari/#/dev/env`, 로컬 미리보기 빌드 `http://localhost:7777/#/dev/env`. 크롬 intent 로 넘어온 주소는 해시 대신 `?dev=env`.
+  - 장부(localStorage)는 건드리지 않는다. 결과 기록은 그 탭의 sessionStorage(`dongari-dev:env-log`)에만.
 - 자동 보관 서버 주소는 빌드 환경변수 `VITE_KEEP_URL`(SPEC-006). 없으면 자동 보관이 꺼진다(설정 맨 위 복구 코드 카드·"다른 방법으로 옮기기" 없이 기록 파일 보내기·불러오기 두 줄만, 복구 코드로 불러오기 없음, v2.6 #120). 배포 워크플로는 저장소 변수(Settings → Secrets and variables → Actions → Variables) `KEEP_URL` 을 넘긴다. 로컬에서 보려면 `VITE_KEEP_URL=http://localhost:8787 npm run dev -- --port 7777` + `cd worker && npx wrangler dev --local --port 8787`(서버는 본 주소 `https://crowwan.github.io`·미리보기 `https://uri-jangbu-preview.pages.dev` 두 출처만 받으니 로컬 화면 확인은 CORS 를 여는 가짜 서버로)
 
 ### 배포 (자동, `.github/workflows/deploy.yml`, #52·#128)
@@ -132,7 +135,7 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
 docs/          기획(prd, specs, decisions, design, qa-checklist)
 dev/active/    이슈별 작업 메모 (머지 후 dev/archive/)
 src/
-├── main.tsx     진입점: 저장소를 한 번 읽어(LoadResult) AppRoot(features/practice: 첫 실행 물음·연습 장부·진짜 App 갈아 끼우기)에 넘김, 개발 모드 카탈로그 분기
+├── main.tsx     진입점: 저장소를 한 번 읽어(LoadResult) AppRoot(features/practice: 첫 실행 물음·연습 장부·진짜 App 갈아 끼우기)에 넘김, 개발 모드 카탈로그·개발 모드/미리보기 개발 확인 화면 분기
 ├── App.tsx      앱 뼈대: 첫 실행(새 장부 만들기) / 장부(첫 화면)·내역 적기·고치기·설정·월 정리·올해 결산·새 장부 만들기 화면 전환(탭 없음, features/useScreenHistory: 뒤로 버튼·닫기 전 확인·선택 창 openSheet/closeSheet·확인 창 openDialog/closeDialog, features/useScreenHeading: 화면이 바뀌면 h1 포커스·브라우저 제목) + 저장 상태 안내
 ├── domain/      v2 데이터 타입과 계산 순수 함수 (Entry, Ledger, Book, StoredData(schemaVersion 3, 장부 여러 개), book.ts 지금 장부·장부 잔액·종류별 이월금 문구, ledger.ts 장부, report.ts 월 정리·올해 결산, entryDate.ts 날짜(일) 검증·날짜순)
 ├── storage/     v2 저장 계층 (LedgerRepository, LocalStorage·Memory 구현, 저장 성공 알림 NotifyingRepository(자동 보관용), 스키마 가드, 마이그레이션(v2 → v3 장부 하나로, 옛 원본 보관), 백업 파일 만들기·읽기)
@@ -141,6 +144,7 @@ src/
 ├── ui/          기본 컴포넌트 (Button, Icon, ListRow, OptionList, SegmentedControl, BottomSheet, MonthPicker, DayInput, MonthButton, EntryCard, SavedEntries, AmountDisplay, IconButton, NoticeBar, BalanceCard, MonthStepper, …, keyboard: 아이폰 키패드가 뜬 동안 아래 고정 버튼을 질문 바로 아래로, modalLayer: 창이 떠 있는 동안 뒤 화면 inert·포커스 옮기기/돌려주기, CoachMark: 꼬리 달린 안내 말풍선)
 ├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준), font.css + fonts/ (Pretendard 가변 서브셋, scripts/subset-font.py 로 만든다)
 ├── catalog/     디자인 카탈로그 `/#/dev/catalog` (개발 모드 전용, 프로덕션 번들 제외)
+├── devtools/    개발 확인 화면 `/#/dev/env` (개발 모드·미리보기 빌드 전용, 본 주소 번들 제외, SPEC-009 #141)
 └── test/        Vitest 설정, 여러 테스트가 같이 쓰는 장부 기록(ledgerFixtures: v1 예시 1년치, 장부·저장 데이터 만들기)
 public/icons/  앱 아이콘 (scripts/make-icons.mjs 가 토큰 색으로 만든다)
 scripts/       아이콘·글꼴 만들기, 보관 지켜보기(keep-watch.mjs + 판정 keepWatch.ts, 워크플로 keep-watch.yml 이 돌린다)
