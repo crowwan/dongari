@@ -363,3 +363,20 @@
 .item-totals[data-kind='income'] .item-totals__bar {
   background: var(--income-bar);
 }
+
+/* ---------- 연습 장부 결산 띠 (SPEC-008) ---------- */
+
+/* "연습 · 진짜 결산이 아니에요": 사진 글자색 면 + 흰 굵은 글자, 가운데, 반경 4. 요약 카드 위 폭 그대로라 사진 맨 위에도 찍힌다.
+   다크 화면에서는 짝이 뒤집혀(밝은 면 + 짙은 글자) 보이고, 사진은 라이트로 고정돼 검은 띠다 */
+.practice-ribbon {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--corner-xs);
+  background: var(--strong);
+  color: var(--surface);
+  text-align: center;
+  font-size: var(--text-body-size);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+}

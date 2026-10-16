@@ -1,10 +1,11 @@
 import type { CSSProperties } from 'react'
 import type { YearReport } from '../../../domain/report'
 import { formatAmount } from '../../../ui/money'
+import { PRACTICE_RIBBON } from '../practiceRibbon'
 import { ExpenseDetailTable } from './ExpenseDetailTable'
 import { IncomeExpenseTable } from './IncomeExpenseTable'
 import { ItemTotalsTable } from './ItemTotalsTable'
-import { sheetPaper } from './sheetStyles'
+import { SHEET_COLOR, sheetPaper } from './sheetStyles'
 import { SummaryBox } from './SummaryBox'
 
 // 인라인 hex 이유는 sheetStyles.ts. 글자 크기·여백은 v1 양식 그대로
@@ -17,16 +18,29 @@ const styles = {
   summary: { width: '128px' },
   // 지출내역 표의 합계라 표 바로 아래에 둔다 (v1 은 수입내역 목록 다음이었다, v2.3)
   expenseTotal: { textAlign: 'right', fontSize: '11px', fontWeight: 'bold', marginTop: '8px' },
+  // 연습 장부 결산 표시 (SPEC-008): 양식 글자색 면 + 흰 굵은 글자, 가운데
+  practice: {
+    margin: '0 0 16px',
+    padding: '5px 8px',
+    borderRadius: '4px',
+    backgroundColor: SHEET_COLOR.ink,
+    color: SHEET_COLOR.paper,
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: '13px',
+  },
 } satisfies Record<string, CSSProperties>
 
 // 올해 결산 양식 한 장 (v1 연말 양식, PLANS.md 6장. v1 수입내역 목록 자리는 항목별 합계 표, v2.3). 값은 domain/report.ts yearReport 가 다 계산해 온다.
 // 제목의 이름은 장부 이름, 이월금 이름은 장부 종류를 따른다 (SPEC-005)
-type YearReportSheetProps = { report: YearReport; bookName: string; carryoverLabel: string }
+// practice: 연습 장부 결산이면 맨 위에 "연습" 띠 (SPEC-008, 사진에도 찍힌다)
+type YearReportSheetProps = { report: YearReport; bookName: string; carryoverLabel: string; practice?: boolean }
 
-export function YearReportSheet({ report, bookName, carryoverLabel }: YearReportSheetProps) {
+export function YearReportSheet({ report, bookName, carryoverLabel, practice = false }: YearReportSheetProps) {
   const { year, carryover, months, totals, expenseRows, incomeItems, expenseItems } = report
   return (
     <div style={styles.paper} data-testid="year-report-sheet">
+      {practice && <p style={styles.practice}>{PRACTICE_RIBBON}</p>}
       <section style={styles.section}>
         <h2 style={styles.title}>
           &lt;{year}년 {bookName} 수입 지출 내역&gt;

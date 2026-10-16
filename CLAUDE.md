@@ -20,7 +20,7 @@
 - 최신 릴리스: v2.5.0 (2026-10-13, 복구 코드 자동 보관 — 서버 https://uri-jangbu-keep.crowwan.workers.dev). 다음 마일스톤 v2.6
 - 끝난 스펙: SPEC-001 한 줄 장부 입력, SPEC-002 안전한 저장과 백업, SPEC-003 월 정리와 올해 결산
 - v2.0.0 은 갤럭시 실기기 QA(홈 화면 추가·오프라인, 사진 저장 Download 앨범, 백업 보내기·불러오기)와 어머니 사용성 테스트(SPEC-001 AC-13) 전에 배포했다. 남은 확인은 릴리스 이슈 #40 체크리스트
-- 다음 마일스톤 v2.6: SPEC-007 자동 보관 지켜보기 (approved, ADR 006 — 상태 신호 + GitHub Actions 일일 점검)
+- 다음 마일스톤 v2.6: SPEC-007 자동 보관 지켜보기 (approved, ADR 006 — 상태 신호 + GitHub Actions 일일 점검), SPEC-008 처음 쓰는 분 연습 장부 (#132 — 첫 실행 물음, 메모리 연습 장부, 진짜 장부 말풍선은 복구 코드 하나)
 - backlog 스펙: SPEC-004 적어 둔 글로 한 번에 적기 (draft — 1단계: 글 붙여넣기·공유 받기 → 확인 화면, 사진 인식기는 엔진 비교 후 2단계. 사진 → 글 추출이 동작할 때 다시 본다)
 - GitHub Project: crowwan #3
 - v2 는 거래 기록 모델이다 (`docs/prd.md` 데이터 모델). v1 코드는 #16 에서 모두 정리했다 (v1 연말 양식은 `features/report/sheet` 로 옮겨 `YearReport` 를 그린다).
@@ -131,11 +131,11 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
 docs/          기획(prd, specs, decisions, design, qa-checklist)
 dev/active/    이슈별 작업 메모 (머지 후 dev/archive/)
 src/
-├── main.tsx     진입점: 저장소를 한 번 읽어(LoadResult) App 에 넘김, 개발 모드 카탈로그 분기
+├── main.tsx     진입점: 저장소를 한 번 읽어(LoadResult) AppRoot(features/practice: 첫 실행 물음·연습 장부·진짜 App 갈아 끼우기)에 넘김, 개발 모드 카탈로그 분기
 ├── App.tsx      앱 뼈대: 첫 실행(새 장부 만들기) / 장부(첫 화면)·내역 적기·고치기·설정·월 정리·올해 결산·새 장부 만들기 화면 전환(탭 없음, features/useScreenHistory: 뒤로 버튼·닫기 전 확인·선택 창 openSheet/closeSheet·확인 창 openDialog/closeDialog, features/useScreenHeading: 화면이 바뀌면 h1 포커스·브라우저 제목) + 저장 상태 안내
 ├── domain/      v2 데이터 타입과 계산 순수 함수 (Entry, Ledger, Book, StoredData(schemaVersion 3, 장부 여러 개), book.ts 지금 장부·장부 잔액·종류별 이월금 문구, ledger.ts 장부, report.ts 월 정리·올해 결산, entryDate.ts 날짜(일) 검증·날짜순)
 ├── storage/     v2 저장 계층 (LedgerRepository, LocalStorage·Memory 구현, 저장 성공 알림 NotifyingRepository(자동 보관용), 스키마 가드, 마이그레이션(v2 → v3 장부 하나로, 옛 원본 보관), 백업 파일 만들기·읽기)
-├── features/    화면 단위 (books: 장부 고르기 창 목록·새 장부 만들기, ledger: 장부·새 연도 시작·내역 적기(하나씩 채우기 entrySteps)·고치기·useLedger, settings, report: 월 정리·올해 결산(단톡방용 요약·결산표)·사진으로 저장·사진 보내기, report/sheet: v1 연말 양식(인라인 hex 예외), storage: 저장 안내 문구, backup: 백업 보내기·불러오기 흐름, install: 설정 [홈 화면에 추가] 줄 규칙·설치 제안·방법 안내, keep: 복구 코드·암호화·자동 보관기·복구 코드로 불러오기(SPEC-006), guide: 처음 쓰는 분 안내 말풍선 규칙·기기 상태 dongari:guide(SPEC-008), useScreenHistory·BackToLedger)
+├── features/    화면 단위 (books: 장부 고르기 창 목록·새 장부 만들기, ledger: 장부·새 연도 시작·내역 적기(하나씩 채우기 entrySteps)·고치기·useLedger, settings, report: 월 정리·올해 결산(단톡방용 요약·결산표)·사진으로 저장·사진 보내기, report/sheet: v1 연말 양식(인라인 hex 예외), storage: 저장 안내 문구, backup: 백업 보내기·불러오기 흐름, install: 설정 [홈 화면에 추가] 줄 규칙·설치 제안·방법 안내, keep: 복구 코드·암호화·자동 보관기·복구 코드로 불러오기(SPEC-006), guide: 진짜 장부 복구 코드 안내 말풍선(4번) 규칙·기기 상태 dongari:guide(SPEC-008), practice: 첫 실행 물음·연습 장부(메모리 저장소로 그린 App + 연습 띠·단계 말풍선 practiceSteps·끝 화면, SPEC-008 #132), useScreenHistory·BackToLedger)
 ├── pwa/         홈 화면 추가·오프라인 설정 (vite-plugin-pwa 옵션, manifest 색은 tokens.css 에서)
 ├── ui/          기본 컴포넌트 (Button, Icon, ListRow, OptionList, SegmentedControl, BottomSheet, MonthPicker, DayInput, MonthButton, EntryCard, SavedEntries, AmountDisplay, IconButton, NoticeBar, BalanceCard, MonthStepper, …, keyboard: 아이폰 키패드가 뜬 동안 아래 고정 버튼을 질문 바로 아래로, modalLayer: 창이 떠 있는 동안 뒤 화면 inert·포커스 옮기기/돌려주기, CoachMark: 꼬리 달린 안내 말풍선)
 ├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준), font.css + fonts/ (Pretendard 가변 서브셋, scripts/subset-font.py 로 만든다)

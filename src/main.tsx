@@ -1,8 +1,8 @@
 import { StrictMode, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
 import { isCatalogRoute } from './catalog/route'
+import { AppRoot } from './features/practice/AppRoot'
 import { localGuideStore, settleExistingPhone } from './features/guide/guideStore'
 import { createKeep, startKeep, withStartupRecoveryCode } from './features/keep/startKeep'
 import { LocalStorageRepository } from './storage/LocalStorageRepository'
@@ -23,18 +23,19 @@ async function pickScreen(): Promise<ReactNode> {
   // 브라우저가 공간이 모자랄 때 이 사이트 기록을 먼저 지우지 않게 요청한다 (SPEC-002). 결과를 기다리지 않는다.
   // 지킬 장부가 있을 때만. 첫 실행이면 첫 장부를 만든 직후 App 이 요청한다 (크롬은 쓴 흔적·설치 여부로 허락을 정한다)
   if (loaded.data.books.length > 0) void requestPersistentStorage()
-  // 처음 쓰는 분 안내 (SPEC-008): 장부가 이미 있는 폰(v2.6 전부터 쓰던 폰)은 안내를 하지 않는다
+  // 복구 코드 안내 말풍선 (SPEC-008): 장부가 이미 있는 폰(v2.6 전부터 쓰던 폰)은 안내를 하지 않는다
   const guideStore = localGuideStore()
   settleExistingPhone(guideStore, loaded.data.books.length > 0)
 
   // 복구 코드 자동 보관 (SPEC-006): 서버 주소(VITE_KEEP_URL)가 있는 빌드에서만. 저장에 성공할 때마다 보관기에 알린다.
   // 앱을 열 때 올리고 상태 신호를 보낸다 (SPEC-007, 읽기 전용이면 둘 다 안 한다)
+  // 장부가 없으면 첫 실행 물음부터, 연습 장부는 메모리에만 (SPEC-008, AppRoot)
   const keep = createKeep(import.meta.env.VITE_KEEP_URL)
-  if (!keep) return <App repository={storage} loaded={loaded} guideStore={guideStore} />
+  if (!keep) return <AppRoot repository={storage} loaded={loaded} guideStore={guideStore} />
   const repository = new NotifyingRepository(storage, (data) => keep.keeper.saved(data))
   void startKeep(keep.keeper, loaded)
   keep.keeper.listen(window, document, () => document.visibilityState)
-  return <App repository={repository} loaded={loaded} keep={keep} guideStore={guideStore} />
+  return <AppRoot repository={repository} loaded={loaded} keep={keep} guideStore={guideStore} />
 }
 
 if (import.meta.env.DEV) {

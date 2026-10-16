@@ -19,6 +19,7 @@ type Handlers = {
   onSendBackup?: () => void
   onImportBackup?: () => void
   onShareCode?: () => void
+  onPractice?: () => void
 }
 
 const SAMSUNG_UA =
@@ -82,6 +83,7 @@ function Harness({
       onShareCode={handlers.onShareCode ?? vi.fn()}
       restoreByCode={keepServer && { server: keepServer, hasRecords: true, onRestore: () => ({ ok: true }) }}
       onBack={vi.fn()}
+      onPractice={handlers.onPractice ?? vi.fn()}
       install={{ standalone: install.standalone ?? false, userAgent: install.userAgent ?? CHROME_UA, installPrompt }}
     />
   )
@@ -376,16 +378,15 @@ describe('SPEC-001·002 설정 화면', () => {
 
       const groups = screen.getAllByRole('region')
       expect(groups.map((group) => group.querySelector('h2')?.textContent)).toEqual(['장부 정보', '앱'])
-      const row = within(screen.getByRole('region', { name: '앱' })).getByTestId('list-row')
+      const [row] = within(screen.getByRole('region', { name: '앱' })).getAllByTestId('list-row')
       expect(row.textContent?.trim()).toBe('홈 화면에 추가 기록이 더 안전해요')
       expect(row.querySelector('[data-icon="phone"]')).toBeInTheDocument()
       expect(row.querySelector('[data-icon="right"]')).toBeInTheDocument()
     })
 
-    it('홈 화면 앱으로 열었으면 줄(묶음째)이 없다', () => {
+    it('홈 화면 앱으로 열었으면 [홈 화면에 추가] 줄이 없다', () => {
       render(<Harness install={{ standalone: true }} />)
 
-      expect(screen.queryByRole('region', { name: '앱' })).not.toBeInTheDocument()
       expect(installRow()).not.toBeInTheDocument()
     })
 
@@ -753,5 +754,35 @@ describe('#110 접근성 점검 09 설정 확인 창과 뒤로 버튼', () => {
 
     expect(onDeleteBook).toHaveBeenCalledOnce()
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('SPEC-008 설정 [연습해 보기]', () => {
+  const appRows = () =>
+    within(screen.getByRole('region', { name: '앱' }))
+      .getAllByTestId('list-row')
+      .map((row) => row.textContent?.trim())
+
+  it('AC-24 "앱" 묶음 맨 아래에 [연습해 보기](보조 "저장되지 않는 장부로 따라 해 봐요") 줄이 있다', () => {
+    render(<Harness />)
+
+    expect(appRows()).toEqual(['홈 화면에 추가 기록이 더 안전해요', '연습해 보기 저장되지 않는 장부로 따라 해 봐요'])
+    const row = screen.getByRole('button', { name: /연습해 보기/ })
+    expect(row.querySelector('[data-icon="right"]')).toBeInTheDocument()
+  })
+
+  it('AC-24 홈 화면 앱에서도 "앱" 묶음에 [연습해 보기] 한 줄이 있다', () => {
+    render(<Harness install={{ standalone: true }} />)
+
+    expect(appRows()).toEqual(['연습해 보기 저장되지 않는 장부로 따라 해 봐요'])
+  })
+
+  it('[연습해 보기] 를 누르면 연습을 연다', async () => {
+    const onPractice = vi.fn()
+    render(<Harness handlers={{ onPractice }} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /연습해 보기/ }))
+
+    expect(onPractice).toHaveBeenCalledOnce()
   })
 })

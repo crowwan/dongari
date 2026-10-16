@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { useScreenHistory, type Screen } from './useScreenHistory'
+import { entriesAboveLedger, useScreenHistory, type Screen } from './useScreenHistory'
 
 // 안드로이드 뒤로 버튼: 브라우저가 방문 기록을 하나 빼고 popstate 를 보낸다
 function pressBackButton() {
@@ -435,3 +435,54 @@ describe('SPEC-008 말풍선(확인 창 칸)에서 화면 열기', () => {
   })
 })
 
+
+describe('SPEC-008 연습 장부: 뒤로 버튼은 [그만하기] 와 같다 (backOpensDialog)', () => {
+  function renderPractice(screen?: Screen) {
+    const { result } = renderHook(() => useScreenHistory({ backOpensDialog: 'practice-stop' }))
+    if (screen) act(() => result.current.open(screen))
+    push.mockClear()
+    return result
+  }
+
+  it('AC-9 장부 화면에서 뒤로 버튼을 누르면 빠진 칸을 다시 쌓고 그만할까요 확인 창을 연다', () => {
+    const result = renderPractice()
+
+    pressBackButton()
+
+    expect(result.current.screen).toEqual({ name: 'ledger' })
+    expect(result.current.dialog).toBe('practice-stop')
+    expect(push).toHaveBeenNthCalledWith(1, { screen: 'ledger' }, '')
+    expect(push).toHaveBeenNthCalledWith(2, { screen: 'ledger', dialog: 'practice-stop' }, '')
+  })
+
+  it('AC-9 다른 화면(내역 적기, 적던 내용 있음)에서도 화면을 닫지 않고 그만할까요 확인 창을 연다', () => {
+    const result = renderPractice({ name: 'add-entry', month: 10 })
+    act(() => result.current.confirmBeforeLeave(true))
+
+    pressBackButton()
+
+    expect(result.current.screen).toEqual({ name: 'add-entry', month: 10 })
+    expect(result.current.confirmingLeave).toBe(false)
+    expect(result.current.dialog).toBe('practice-stop')
+  })
+
+  it('확인 창이 떠 있으면 뒤로 버튼은 확인 창만 닫는다 ([계속하기] 와 같다)', () => {
+    const result = renderPractice()
+    pressBackButton()
+
+    pressBackButton()
+
+    expect(result.current.dialog).toBeNull()
+    expect(result.current.screen).toEqual({ name: 'ledger' })
+  })
+})
+
+describe('장부까지 되돌릴 칸 수 (entriesAboveLedger)', () => {
+  it('화면 칸·선택 창 칸·확인 창 칸을 센다', () => {
+    expect(entriesAboveLedger(null)).toBe(0)
+    expect(entriesAboveLedger({ screen: 'ledger' })).toBe(0)
+    expect(entriesAboveLedger({ screen: 'ledger', dialog: 'practice-stop' })).toBe(1)
+    expect(entriesAboveLedger({ screen: 'year-summary', dialog: 'practice-stop' })).toBe(2)
+    expect(entriesAboveLedger({ screen: 'settings', sheet: 'year', dialog: 'delete' })).toBe(3)
+  })
+})
