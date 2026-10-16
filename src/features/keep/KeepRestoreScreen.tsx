@@ -7,6 +7,7 @@ import { TextField } from '../../ui/TextField'
 import { BackButton } from '../BackToLedger'
 import type { SheetHistory } from '../useScreenHistory'
 import { restoreFailureMessage } from '../backup/backupMessages'
+import { IN_APP_WORDS } from '../install/inAppBrowser'
 import { fetchKept, type FetchKeptResult } from './keepRestore'
 import type { KeepServer } from './keepServer'
 import { keptAtText } from './keepStatus'
@@ -22,6 +23,8 @@ type KeepRestoreScreenProps = {
   onBack: () => void
   // 확인 창을 방문 기록 한 칸으로 연다 (설정 편집 화면 위에도 한 칸 더. 뒤로 버튼은 확인 창만 닫는다, #110)
   dialogs: Pick<SheetHistory, 'dialog' | 'openDialog' | 'closeDialog'>
+  // 카톡에서 옮겨 와 열었을 때 (SPEC-009 C ③): 클립보드에서 읽은 코드를 미리 넣는다. 못 읽었으면 붙여 넣는 법을 한 줄 더한다
+  fromKakao?: { code: string | undefined }
 }
 
 const CONFIRM_DIALOG = 'keep-restore'
@@ -39,8 +42,8 @@ const FETCH_FAILURE: Record<Exclude<FetchKeptResult['status'], 'found'>, string>
 
 // 복구 코드로 불러오기 (SPEC-006): 글 칸(4자씩 자동 끊기) → [불러오기] → 받아 와 풀기 → 확인 창(보관한 때·장부·기록 수) → 바꾸기.
 // 설정 "기록 지키기" 와 첫 실행(새 장부 만들기) 화면에서 연다
-export function KeepRestoreScreen({ server, hasRecords, onRestore, backLabel, onBack, dialogs }: KeepRestoreScreenProps) {
-  const [code, setCode] = useState('')
+export function KeepRestoreScreen({ server, hasRecords, onRestore, backLabel, onBack, dialogs, fromKakao }: KeepRestoreScreenProps) {
+  const [code, setCode] = useState(fromKakao?.code ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const [found, setFound] = useState<Found | undefined>()
@@ -87,6 +90,7 @@ export function KeepRestoreScreen({ server, hasRecords, onRestore, backLabel, on
           }}
         />
         <p className="screen__note">예전 폰 설정 맨 위에 있던 16자예요. 4자마다 줄표는 저절로 들어가요.</p>
+        {fromKakao && fromKakao.code === undefined && <p className="screen__note">{IN_APP_WORDS.pasteHint}</p>}
       </div>
 
       <BottomActionBar

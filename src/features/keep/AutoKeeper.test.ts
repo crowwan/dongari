@@ -444,3 +444,51 @@ describe('SPEC-007 앱을 열 때 보관 상태 신호', () => {
     expect(__APP_VERSION__).toMatch(/^\d+\.\d+\.\d+/)
   })
 })
+
+describe('SPEC-009 C 카톡 안 장부 옮기기: 지금 올리기 (keepNow)', () => {
+  const NOW = new Date('2026-10-16T00:00:00.000Z')
+
+  it('10초를 기다리지 않고 바로 올리고, 다 올라가면 true 와 함께 밀린 것이 없다', async () => {
+    const fake = fakeServer()
+    const store = memoryStore({ enabled: true, lastKeptAt: START.toISOString() })
+    const keeper = new AutoKeeper({ server: fake.server, store, now: () => NOW, delayMs: 60_000 })
+
+    await expect(keeper.keepNow(stored('지금'))).resolves.toBe(true)
+
+    expect(fake.puts).toHaveLength(1)
+    expect((await uploaded(fake.puts[0]?.envelope)).books[0]?.ledgers['2026']?.entries[0]?.name).toBe('지금')
+    expect(keeper.getState().pendingSince).toBeUndefined()
+  })
+
+  it('올리지 못하면(인터넷 없음·서버 오류) false 이고 밀린 채로 남는다', async () => {
+    const fake = fakeServer()
+    fake.answer('failed')
+    const keeper = new AutoKeeper({ server: fake.server, store: memoryStore(), now: () => NOW })
+
+    await expect(keeper.keepNow(stored())).resolves.toBe(false)
+
+    expect(keeper.getState().pendingSince).toBe(NOW.toISOString())
+  })
+
+  it('다른 올리기가 진행 중이면 그것이 끝난 뒤 이 기록을 한 번 더 올린다', async () => {
+    const fake = fakeServer()
+    const keeper = new AutoKeeper({ server: fake.server, store: memoryStore(), now: () => NOW })
+    keeper.saved(stored('먼저'))
+    const earlier = keeper.flush()
+
+    await expect(keeper.keepNow(stored('나중'))).resolves.toBe(true)
+    await earlier
+
+    expect(fake.puts).toHaveLength(2)
+    expect((await uploaded(fake.puts[1]?.envelope)).books[0]?.ledgers['2026']?.entries[0]?.name).toBe('나중')
+  })
+
+  it('자동으로 지키기가 꺼져 있으면 올리지 않고 false', async () => {
+    const fake = fakeServer()
+    const keeper = new AutoKeeper({ server: fake.server, store: memoryStore({ enabled: false }), now: () => NOW })
+
+    await expect(keeper.keepNow(stored())).resolves.toBe(false)
+
+    expect(fake.puts).toHaveLength(0)
+  })
+})

@@ -13,7 +13,7 @@ export type BackupDialog =
   | { kind: 'notice'; title: string; description: string }
 
 export interface BackupFlow {
-  send: () => void // [기록 파일 보내기]
+  send: () => Promise<boolean> // [기록 파일 보내기]. 보냈거나 내려받았으면 true (공유 화면을 그냥 닫았으면 false)
   startImport: () => void // [기록 파일 불러오기]: 파일 고르기 창을 연다
   attachFileInput: (input: HTMLInputElement | null) => void // 숨은 파일 고르기 칸 (callback ref)
   onFileChosen: (event: ChangeEvent<HTMLInputElement>) => void
@@ -99,11 +99,12 @@ export function useBackup(
       // 공유 화면은 누른 순간에만 열리므로 파일을 만들자마자 바로 보낸다
       const backup = createBackup(ledger.data, now())
       const file = new File([backup.text], backup.fileName, { type: 'text/plain' })
-      void sendFile(file).then((result) => {
+      return sendFile(file).then((result) => {
         // 공유 화면을 그냥 닫았으면 보낸 것이 아니다: 백업 시각을 남기지 않고 조용히 둔다
-        if (result === 'cancelled') return
+        if (result === 'cancelled') return false
         ledger.recordBackup()
         onSent(result === 'shared' ? '기록 파일을 보냈어요' : '기록 파일을 다운로드 폴더에 저장했어요')
+        return true
       })
     },
     startImport: () => fileInput?.click(),

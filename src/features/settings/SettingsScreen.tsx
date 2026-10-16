@@ -17,6 +17,8 @@ import { BACKUP_REMINDER_MESSAGE, lastBackupText } from '../backup/backupReminde
 import { bookKindIcon } from '../books/bookKindIcon'
 import { KeepRestoreScreen } from '../keep/KeepRestoreScreen'
 import type { KeepServer } from '../keep/keepServer'
+import { IN_APP_WORDS, type InAppKind } from '../install/inAppBrowser'
+import { InAppBrowserScreen, type LedgerMove } from '../install/InAppBrowserScreen'
 import { useInstallAction } from '../install/installAction'
 import { InstallGuideSheet } from '../install/InstallGuideSheet'
 import { browserInstallEnvironment, type InstallEnvironment } from '../install/installPrompt'
@@ -33,6 +35,7 @@ const YEAR_SHEET = 'settings-year'
 const INSTALL_GUIDE_SHEET = 'settings-install-guide'
 const KEEP_SHEET = 'settings-keep'
 const KEEP_RESTORE_PAGE = 'settings-keep-restore'
+const IN_APP_PAGE = 'settings-in-app'
 // 확인 창 (방문 기록 한 칸 — 뒤로 버튼은 확인 창만 닫는다, #110)
 const DELETE_BOOK_DIALOG = 'settings-delete-book'
 const KEEP_OFF_DIALOG = 'settings-keep-off' // 자동으로 지키기 선택 창 칸에 바꿔 끼운다
@@ -84,6 +87,8 @@ type SettingsScreenProps = {
   onPractice?: () => void
   // 홈 화면에 추가 줄이 보는 브라우저 상태 (기본은 지금 브라우저, 테스트에서 바꿔 넣는다)
   install?: InstallEnvironment
+  // 카톡 안 브라우저 (SPEC-009 C): [홈 화면에 추가] 줄 자리에 [인터넷 앱으로 열기] → 설정 위 "카톡 안에서 열렸어요" ②
+  inApp?: { kind: InAppKind; move: LedgerMove }
   // 버전 줄 값과 새 버전 받음 (기본은 이 빌드·지금 브라우저, 테스트에서 바꿔 넣는다)
   version?: AppVersion
 }
@@ -119,6 +124,7 @@ export function SettingsScreen({
   onBack,
   onPractice,
   install = browserInstallEnvironment(),
+  inApp,
   version = browserAppVersion(),
 }: SettingsScreenProps) {
   const installAction = useInstallAction(install, sheets, INSTALL_GUIDE_SHEET)
@@ -132,6 +138,18 @@ export function SettingsScreen({
       <SettingRow icon="folder" title="기록 파일 불러오기" description="받아 둔 파일로 기록 되살리기" onClick={onImportBackup} />
     </>
   )
+
+  // [그냥 여기서 쓸게요] 는 [‹ 설정] 과 같다 (표시는 이미 있다)
+  if (inApp && sheets.sheet === IN_APP_PAGE) {
+    return (
+      <InAppBrowserScreen
+        kind={inApp.kind}
+        move={inApp.move}
+        onStay={sheets.closeSheet}
+        back={{ label: '설정', onBack: sheets.closeSheet }}
+      />
+    )
+  }
 
   if (restoreByCode && sheets.sheet === KEEP_RESTORE_PAGE) {
     return <KeepRestoreScreen {...restoreByCode} dialogs={sheets} backLabel="설정" onBack={sheets.closeSheet} />
@@ -224,11 +242,21 @@ export function SettingsScreen({
         <SettingRow icon="calendar" title="장부 연도" value={`${year}년`} onClick={() => sheets.openSheet(YEAR_SHEET)} />
       </SettingsGroup>
 
-      {/* 앱 (늘 있음): 홈 화면에 추가 (SPEC-002, 설치 제안이 있으면 브라우저 설치 창, 없으면 방법 안내. 홈 화면 앱이면 없다) →
+      {/* 앱 (늘 있음): 홈 화면에 추가 (SPEC-002, 설치 제안이 있으면 브라우저 설치 창, 없으면 방법 안내. 홈 화면 앱이면 없다.
+          카톡 안이면 그 자리에 [인터넷 앱으로 열기], SPEC-009 C) →
           [연습해 보기] (SPEC-008) → 맨 아래 누를 수 없는 버전 줄 (SPEC-002 #135, 새 버전을 받았으면 [지금 바꾸기]) */}
       <SettingsGroup title="앱" testId="settings-block-app">
-        {installAction.offers && (
-          <SettingRow icon="phone" title="홈 화면에 추가" description="기록이 더 안전해요" onClick={installAction.start} />
+        {inApp ? (
+          <SettingRow
+            icon="open"
+            title={IN_APP_WORDS.settingsRow}
+            description={IN_APP_WORDS.settingsRowNote}
+            onClick={() => sheets.openSheet(IN_APP_PAGE)}
+          />
+        ) : (
+          installAction.offers && (
+            <SettingRow icon="phone" title="홈 화면에 추가" description="기록이 더 안전해요" onClick={installAction.start} />
+          )
         )}
         {onPractice && <SettingRow icon="play" title="연습해 보기" description="저장되지 않는 장부로 따라 해 봐요" onClick={onPractice} />}
         <VersionRow version={version} />

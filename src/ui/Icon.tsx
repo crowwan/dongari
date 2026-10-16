@@ -15,7 +15,9 @@ import {
   CirclePlus,
   Coffee,
   Download,
+  Ellipsis,
   EllipsisVertical,
+  ExternalLink,
   Flower2,
   FolderDown,
   Gift,
@@ -26,6 +28,7 @@ import {
   KeyRound,
   Landmark,
   Menu,
+  MessageCircle,
   Pencil,
   Plus,
   Receipt,
@@ -78,6 +81,9 @@ export type IconName =
   | 'arrow-up'
   | 'arrow-down'
   | 'history'
+  | 'talk'
+  | 'open'
+  | 'more'
 
 const ICONS: Record<IconName, LucideIcon> = {
   // 항목 (domain/itemIcon 이 이름으로 고른다)
@@ -133,6 +139,10 @@ const ICONS: Record<IconName, LucideIcon> = {
   'arrow-down': ArrowBigDown,
   // 항목 목록 "예전에 쓴 항목" 구분 글자 (SPEC-001 v2.7): 시계 되감기
   history: History,
+  // 카톡 안에서 열렸을 때 (SPEC-009 C): 화면 위 말풍선, [인터넷 앱으로 열기] 다른 앱으로 열기, 아이폰 카톡 메뉴 ⋯
+  talk: MessageCircle,
+  open: ExternalLink,
+  more: Ellipsis,
 }
 
 // 꾸밈 아이콘: 화면 읽기에서 숨기고(뜻은 옆 글자가 전한다), 크기·색은 놓인 자리의 CSS 가 정한다

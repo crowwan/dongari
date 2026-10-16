@@ -102,6 +102,20 @@ export class AutoKeeper {
     return this.upload()
   }
 
+  // 지금 기록을 10초 모으기 없이 바로 올린다 (SPEC-009 C 카톡 안 장부 옮기기). 다 올라갔는지.
+  // 실패하면 밀린 채로 두고 혼자 다시 하지 않는다 — 부른 쪽이 연결 회복(online) 때 다시 부른다
+  async keepNow(data: StoredData): Promise<boolean> {
+    if (!this.state.enabled) return false
+    this.latest = data
+    this.markPending()
+    // 올리는 중이던 것을 기다리기만 했으면 이 기록은 아직 밀려 있다 → 끝난 뒤 한 번 더
+    const waitedOther = this.uploading !== undefined
+    if (waitedOther) this.savedDuringUpload ??= this.now().toISOString()
+    await this.upload()
+    if (waitedOther && this.state.pendingSince !== undefined) await this.upload()
+    return this.state.enabled && this.state.pendingSince === undefined
+  }
+
   setEnabled(enabled: boolean): void {
     if (enabled === this.state.enabled) return
     if (!enabled) {

@@ -26,12 +26,15 @@ const PRACTICE_PLAN = ['회비 한 줄 적기', '이번 달 정리 보기', '잘
 type FirstRunQuestionProps = {
   onPractice: () => void
   onStart: () => void
+  // 제목 위 카드 (SPEC-009 C ③ 카톡에서 옮겨 온 첫 화면의 "카톡에서 쓰던 장부 가져오기"). 있으면 그 카드가 주 버튼이라 [연습해 보기] 는 보조로
+  topCard?: ReactNode
 }
 
 // 첫 실행 물음 (SPEC-008 컷 0): 장부가 하나도 없는 폰에서 새 장부 만들기보다 먼저 한 번 뜬다
-export function FirstRunQuestion({ onPractice, onStart }: FirstRunQuestionProps) {
+export function FirstRunQuestion({ onPractice, onStart, topCard }: FirstRunQuestionProps) {
   return (
     <StandaloneScreen testId="first-run-question">
+      {topCard}
       <h1 className="screen__title practice-screen__title">처음이세요?</h1>
       <p className="practice-screen__lead">돈 적는 법을 한 번 따라 해 볼까요? 연습 장부는 저장되지 않아서 마음대로 눌러 봐도 괜찮아요.</p>
       <section className="practice-card" aria-labelledby="practice-plan-title">
@@ -50,7 +53,7 @@ export function FirstRunQuestion({ onPractice, onStart }: FirstRunQuestionProps)
         </ol>
       </section>
       <div className="practice-actions">
-        <Button icon="play" onClick={onPractice}>
+        <Button icon="play" variant={topCard ? 'secondary' : 'primary'} onClick={onPractice}>
           연습해 보기
         </Button>
         <Button variant="secondary" onClick={onStart}>

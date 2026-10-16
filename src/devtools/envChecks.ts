@@ -1,10 +1,11 @@
 // 개발 확인 화면이 보여 주는 값과 시험 결과 기록 (SPEC-009 기술 확인 T-1~T-8)
+import { KAKAO_UA_MARK, openExternalUrl as kakaoOpenExternalUrl } from '../features/install/inAppBrowser'
 import { isRecord } from '../storage/schema'
 import { DEV_ENV_PARAM, DEV_ENV_PARAM_VALUE } from './route'
 
-// 카톡 안 브라우저 판단 (T-4 에서 실제 user agent 로 확인한다)
+// 카톡 안 브라우저 판단 (T-4 에서 실제 user agent 로 확인한다). 앱이 쓰는 글자와 같은 곳(features/install/inAppBrowser)에서
 export function hasKakaoTalk(userAgent: string): boolean {
-  return userAgent.includes('KAKAOTALK')
+  return userAgent.includes(KAKAO_UA_MARK)
 }
 
 export type Platform = 'android' | 'ios' | 'other'
@@ -16,10 +17,9 @@ export function platformOf(userAgent: string): Platform {
 }
 
 // 카톡 안에서 폰 기본 인터넷 앱으로 열기 (T-3). 열린 쪽이 알 수 있게 ?from=kakao 를 붙인다. 해시도 그대로 넘어가는지 본다
+// 앱의 [코드 복사하고 인터넷 앱으로 열기] 와 같은 주소
 export function openExternalUrl(href: string): string {
-  const url = new URL(href)
-  url.searchParams.set('from', 'kakao')
-  return `kakaotalk://web/openExternal?url=${encodeURIComponent(url.toString())}`
+  return kakaoOpenExternalUrl(href, { fromKakao: true })
 }
 
 // 크롬으로 열기 (T-3 이 안 될 때의 대안). # 뒤는 intent 설정 자리라 해시 대신 ?dev=env 로 확인 화면을 연다

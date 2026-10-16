@@ -4,14 +4,18 @@ import type { BookKind } from '../../domain/types'
 import type { LoadResult } from '../../storage/LedgerRepository'
 import { isRecord } from '../../storage/schema'
 import { browserInstallEnvironment } from '../install/installPrompt'
+import { readClipboardCode, type InAppKind } from '../install/inAppBrowser'
+import { InAppImportCard, InAppStartScreen } from '../install/InAppBrowserScreen'
 import { entriesAboveLedger } from '../useScreenHistory'
-import { asksInstallAfterPractice, opensInKakao } from './askInstall'
+import { asksInstallAfterPractice } from './askInstall'
 import { PracticeInstall } from './PracticeInstall'
 import type { PracticeMarkStore } from './practiceMark'
 import { FirstRunQuestion, PracticeEnd } from './PracticeScreens'
 import { PracticeRun } from './PracticeRun'
 
-type AppRootProps = Omit<ComponentProps<typeof App>, 'practice' | 'onStartPractice' | 'onFirstRunChange'> & {
+type AppRootProps = Omit<ComponentProps<typeof App>, 'practice' | 'onStartPractice' | 'onFirstRunChange' | 'restoreFromKakao'> & {
+  // 카톡에서 인터넷 앱으로 옮겨 열었다 (?from=kakao, SPEC-009 C ③). 진입점이 주소에서 읽고 지운다
+  fromKakao?: boolean
   // 첫 실행 연습을 마쳤다는 표시 (SPEC-009 B, 이 폰에만). 없으면 표시를 남기지도 보지도 않는다
   practiceMarkStore?: PracticeMarkStore
 }
@@ -23,8 +27,9 @@ type PracticeOrigin = { firstRun: true } | { firstRun: false; back: LoadResult }
 type EndMode = { name: 'end'; origin: PracticeOrigin; sent: boolean; month: number; asksInstall: boolean }
 
 type Mode =
+  | { name: 'in-app'; kind: InAppKind } // 카톡 안에서 열렸어요 ① (장부 없음, SPEC-009 C): 물음보다 먼저
   | { name: 'ask' } // 첫 실행 물음
-  | { name: 'app'; loaded: LoadResult } // 진짜 App
+  | { name: 'app'; loaded: LoadResult; restore?: { code: string | undefined } } // 진짜 App (restore: 카톡에서 쓰던 장부 가져오기로 열었다)
   | { name: 'practice'; origin: PracticeOrigin; kind: BookKind; now: Date } // 연습 장부
   | EndMode
   | { name: 'install'; end: EndMode } // 홈 화면에 추가하시겠어요?·설치 확인 (SPEC-009 B ②③, 첫 실행 연습만). end: 뒤로 버튼으로 돌아갈 끝 화면
@@ -39,16 +44,17 @@ type HistoryTask = { steps: number; then?: () => void }
 // 방문 기록: 물음 위에 이 앱 표시가 붙은 칸(장부 칸 모양)을 하나 쌓고 그 위에서 진짜 App·연습이 제 칸을 쌓는다.
 // - 첫 실행 새 장부 만들기에서 뒤로 버튼으로 이 칸이 빠지면 물음으로 돌아온다 (물음에서 뒤로 버튼은 앱을 닫는다)
 // - 연습이 끝나면 연습이 쌓은 칸을 표시 칸까지 되돌린다(첫 실행은 그 칸이 새 장부 만들기 칸, 설정에서 열었으면 그 칸도 뺀다)
-// - 끝 화면 다음 홈 화면에 추가를 물으면(SPEC-009 B) 표시 칸 위에 그 화면 칸을 하나 쌓는다. 뒤로 버튼은 끝 화면으로,
-//   설치 확인(③)에서는 [새 장부 만들기] 와 같다
-export function AppRoot({ practiceMarkStore, ...props }: AppRootProps) {
-  const { loaded, options, saver, installOfferStore, install = browserInstallEnvironment() } = props
+export function AppRoot({ practiceMarkStore, fromKakao = false, ...props }: AppRootProps) {
+  const { loaded, options, saver, installOfferStore, install = browserInstallEnvironment(), inApp, keep } = props
   const rootMark = useId()
   // 첫 실행 연습을 마쳤는데 아직 장부가 없으면 물음 없이 새 장부 만들기로 연다 (SPEC-009 B, 설치 확인에서 아이콘으로 먼저 연 경우)
   const [startsAtNewBook] = useState(() => loaded.data.books.length === 0 && (practiceMarkStore?.load() ?? false))
-  const [mode, setMode] = useState<Mode>(() =>
-    loaded.data.books.length === 0 && !startsAtNewBook ? { name: 'ask' } : { name: 'app', loaded },
-  )
+  const [mode, setMode] = useState<Mode>(() => {
+    if (loaded.data.books.length > 0) return { name: 'app', loaded }
+    // 카톡 안이면 물음·새 장부 만들기보다 먼저 "카톡 안에서 열렸어요" ① (SPEC-009 C, "그냥 여기서 쓰기" 표시가 없을 때)
+    if (inApp && !inApp.store.stays()) return { name: 'in-app', kind: inApp.kind }
+    return startsAtNewBook ? { name: 'app', loaded } : { name: 'ask' }
+  })
   // 진짜 App 이 장부 없는 첫 실행 화면인지 (App 이 알린다)
   const firstRunApp = useRef(loaded.data.books.length === 0)
   // 화면을 갈아 끼운 뒤 할 방문 기록 일, 그 되돌리기가 끝나면(popstate) 할 일
@@ -123,7 +129,8 @@ export function AppRoot({ practiceMarkStore, ...props }: AppRootProps) {
       firstRun: origin.firstRun,
       standalone: install.standalone,
       installed: install.installPrompt.getSnapshot().installed,
-      inApp: opensInKakao(install.userAgent),
+      // 카톡 안 판단은 진입점이 inAppKind(user agent) 로 한 번 한 것 (SPEC-009 C, features/install/inAppBrowser)
+      inApp: inApp !== undefined,
     })
     setMode({ name: 'end', origin, sent, month, asksInstall })
   }
@@ -146,10 +153,31 @@ export function AppRoot({ practiceMarkStore, ...props }: AppRootProps) {
     return () => window.removeEventListener('popstate', listener)
   }, [])
 
+  // 카톡 밖에서 ?from=kakao 로 장부 없이 열었으면 물음 위에 가져오기 카드 (SPEC-009 C ③). 받아 올 서버가 있는 빌드에서만.
+  // 누른 순간 클립보드를 읽어(복구 코드 모양이면 칸에 미리) 복구 코드로 불러오기를 연다. 물음 칸 위에 그 화면 칸만 쌓여 뒤로 버튼은 물음으로
+  const importCard = fromKakao && !inApp && keep && (
+    <InAppImportCard
+      onImport={() => {
+        void readClipboardCode().then((code) => setMode({ name: 'app', loaded, restore: { code } }))
+      }}
+    />
+  )
+
   switch (mode.name) {
+    case 'in-app':
+      return (
+        <InAppStartScreen
+          kind={mode.kind}
+          onStay={() => {
+            inApp?.store.stay()
+            setMode({ name: 'ask' })
+          }}
+        />
+      )
     case 'ask':
       return (
         <FirstRunQuestion
+          topCard={importCard}
           onPractice={() => {
             window.history.pushState(markedEntry, '')
             setMode({ name: 'practice', origin: { firstRun: true }, kind: 'club', now: now() })
@@ -165,6 +193,7 @@ export function AppRoot({ practiceMarkStore, ...props }: AppRootProps) {
         <App
           {...props}
           loaded={mode.loaded}
+          restoreFromKakao={mode.restore}
           onFirstRunChange={(firstRun) => {
             firstRunApp.current = firstRun
           }}
