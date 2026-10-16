@@ -471,6 +471,9 @@ C 카톡 안에서 열렸을 때
 ### B
 
 - `AppRoot` 의 `Mode` 에 두 상태를 더한다: `{ name: 'ask-install', sent }`(②), `{ name: 'installed', confirmed: boolean }`(③). 끝 화면(`PracticeEnd`)은 묻는 경우 `next` 버튼으로 ② 로 간다. 방문 기록은 지금 끝 화면 칸 위에 ② 칸 하나를 쌓는다(②에서 뒤로 버튼 → ①). ③ 은 ② 칸을 바꿔 끼운다(③ 에서 뒤로 버튼 = [새 장부 만들기]).
+  - #143 구현: `Mode` 는 `{ name: 'install', end }` 하나(end 는 뒤로 버튼으로 돌아갈 끝 화면, 끝 화면 `Mode` 에 `asksInstall`). ②·③ 은 `features/practice/PracticeInstall` 한 부품이 방문 기록 한 칸을 같이 쓰고(③ 은 그 칸 그대로 = 바꿔 끼운 것과 같다), 그림 안내 창 칸과 뒤로 버튼(창이 떠 있으면 창만, 없으면 ② → 끝 화면 / ③ → 새 장부 만들기)도 그 부품이 다룬다. 설치 신호(`installed`)가 오면 어느 때든 ③ "추가했어요", [다 했어요] 만이면 "생겼나요?". 화면은 `PracticeScreens` 의 `InstallAsk`·`InstallCheck`.
+  - 묻는 조건 `features/practice/askInstall.ts` `asksInstallAfterPractice({ firstRun, standalone, installed, inApp })`(`stopped` 는 [그만하기] 가 끝 화면에 오지 않아 뺐다). 카톡 안 판단은 C(#144) 전이라 같은 파일 `opensInKakao`(UA `KAKAOTALK`) — C 의 판단이 생기면 그쪽 하나로 모은다.
+  - 표시 저장소 `features/practice/practiceMark.ts`(`localPracticeMarkStore`), `main.tsx` 가 `AppRoot` 에 `practiceMarkStore` 로 넘긴다. `useInstallAction`·`InstallGuideSheet` 는 선택 창 부분(`GuideSheetHistory` = `sheet`·`openSheet`·`closeSheet`)만 받고, `InstallGuideSheet` 에 `onFinished` 를 더했다.
 - 묻는 조건은 순수 함수로(가칭 `asksInstallAfterPractice({ firstRun, stopped, standalone, installed, inApp })`) 단위 테스트한다.
 - ② 의 [추가할게요] 는 `useInstallAction` 의 `start` 를 그대로 쓰고, 설치 결과를 받으려고 `installPrompt` 스토어의 `installed` 를 지켜본다. 그림 안내 창의 [다 했어요] 는 B 에서만 콜백(가칭 `onFinished`)을 받아 ③ "생겼나요?" 로 간다.
 - 연습을 마쳤다는 표시: `features/practice` 에 작은 저장소(가칭 `practiceMark`, `dongari:practice` `{ v: 1, done: true }`, `installOffer.ts` 와 같은 방식 — 깨졌으면 없는 것으로, 쓰기 실패는 조용히). `AppRoot` 가 첫 화면을 고를 때 `books.length === 0 && 표시 있음` 이면 `ask` 대신 `app`(첫 실행 새 장부 만들기, 물음 칸 위에 표시 칸 쌓기)로 시작한다.
@@ -508,4 +511,5 @@ C 카톡 안에서 열렸을 때
 |---|---|
 | 2026-10-16 | 초안: v2.7 시안 https://claude.ai/artifact/DHKyo1y5u31KCDxNsTzZ16 (사용자 결정 2026-10-16 — A·C 추천값, D 넣지 않음, B 는 "연습 끝 화면 다음에 먼저 묻기" 로 바꿈: "홈 화면에 추가하시겠어요?" + 좋은 점 + [추가할게요]/[다음에 할게요], [추가할게요] 만 설치 따라 하기 → 설치 확인 → 여기서 새 장부, [다음에 할게요] 는 바로 새 장부·카드 안 띄움). 사용자 추가 "홈화면추가했을 때 어떻게 보이는지도 같이 안내에" → 홈 화면 모습 그림(묻는 화면·그림 안내 4장·설치 확인 화면). 실기기 확인 T-1~T-8 과 개발 확인 화면 `/#/dev/env`. AC-1~37. status approved(사용자 승인) |
 | 2026-10-16 | 개발 확인 화면 구현(#141): 주소(미리보기 `/#/dev/env`, intent 는 `?dev=env`), 열리는 기준 미리보기 빌드 = `APP_BASE=/`(`__PREVIEW_BUILD__`, `VITE_DEV_TOOLS` 안 씀), 버튼 이름([설치 창 띄우기]·[복사 시험]·[붙여넣기 시험]·[kakaotalk openExternal 로 열기]), `navigator.share`·`canShare(files)` 표시, 결과 기록 sessionStorage. 실기기 결과(T-1~T-8)는 다음 문서 PR |
+| 2026-10-16 | B 연습 끝 묻기·설치 따라 하기 구현(#143): 기술 메모 B 에 구현 모양(`Mode` `install` 하나 + `PracticeInstall` 이 ②·③·그림 안내 창 방문 기록, `asksInstallAfterPractice` 에서 `stopped` 뺌, 카톡 판단 임시 `opensInKakao`, `practiceMark`, `GuideSheetHistory`·`onFinished`). 동작·문구는 본문 그대로. AC-24 실기기는 배포 뒤(qa-checklist) |
 | 2026-10-16 | A 그림 안내·홈 화면 모습 그림 구현(#142): 문구는 T-1·T-2 예상값 그대로, 실기기 확인은 배포 뒤(사용자 결정) — 열린 질문에 "배포 뒤 확인" 표시. 부품 이름 확정(`HomeScreenPreview`·`APP_SHORT_NAME`·`installGuideSteps`·`BrowserPicture`·`TapMark`·`SlideGuide`). 장 번호 "1 / 4" 는 글 줄 앞 알약, 화면 읽기는 "1 / 4, …". 창이 떠 있는 동안 `appinstalled` 가 오면 창을 닫는다(예외와 경계 그대로) |

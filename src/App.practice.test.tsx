@@ -2,7 +2,6 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookKind, StoredData } from './domain/types'
-import type { ShareResult } from './features/backup/sendFile'
 import { ACTIVE_GUIDE } from './features/guide/guideRules'
 import { GUIDE_KEY, localGuideStore } from './features/guide/guideStore'
 import { AutoKeeper } from './features/keep/AutoKeeper'
@@ -15,22 +14,26 @@ import type { LedgerRepository } from './storage/LedgerRepository'
 import { LocalStorageRepository, STORAGE_KEY } from './storage/LocalStorageRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
 import { NotifyingRepository } from './storage/NotifyingRepository'
+import { fakeBrowser } from './test/installFakes'
 import { book, ledger, type EntrySpec } from './test/ledgerFixtures'
+import {
+  button,
+  click,
+  deleteExpense,
+  fakeSaver,
+  HOUSEHOLD,
+  lookAtMonth,
+  pressBack,
+  PRACTICE_TODAY,
+  reachYear,
+  startPracticeFromQuestion,
+  writeTwoLines,
+} from './test/practiceFlow'
 
-// 오늘은 2026년 10월 16일 (스펙 기본 흐름과 같은 날)
-const TODAY = new Date('2026-10-16T09:00:00.000+09:00')
+const TODAY = PRACTICE_TODAY
 const PHONE_CODE = 'HK7M-29QF-MX4P-8R2D'
 const RIBBON = '연습 · 진짜 결산이 아니에요'
 const SEND_MESSAGE = "결산은 사진으로 보낼 수 있어요. [사진 보내기]를 눌러 카톡 '나와의 채팅'에 보내 보세요"
-
-// 사진 만들기·내려받기는 가짜, 공유 창은 결과를 차례로 돌려주는 흉내 (없으면 공유를 못 쓰는 기기)
-function fakeSaver(shareResults?: ShareResult[]) {
-  const results = [...(shareResults ?? [])]
-  const send = vi.fn(async (): Promise<ShareResult> => results.shift() ?? 'shared')
-  const make = vi.fn(async (element: HTMLElement) => new Blob([element.textContent ?? ''], { type: 'image/png' }))
-  const saver: PictureSaver = { make, download: vi.fn(), send: shareResults ? send : undefined }
-  return { saver, send, make }
-}
 
 // 진짜 폰처럼: localStorage 저장소 + 저장 알림을 듣는 자동으로 지키기(서버는 부름만 센다) + dongari:guide
 function phone({ saver = fakeSaver([]).saver, withKeep = true }: { saver?: PictureSaver; withKeep?: boolean } = {}) {
@@ -58,10 +61,14 @@ function phone({ saver = fakeSaver([]).saver, withKeep = true }: { saver?: Pictu
   return { server, ...view }
 }
 
-// 메모리 저장소로 연다 (localStorage 와 상관없는 흐름 확인)
+// 메모리 저장소로 연다 (localStorage 와 상관없는 흐름 확인).
+// 홈 화면 앱으로 연 폰이라 끝 화면이 SPEC-008 모양 그대로다 (브라우저면 SPEC-009 B 가 홈 화면에 추가를 묻는다 — App.practiceInstall.test)
 function openWith(data: StoredData | undefined, saver: PictureSaver = fakeSaver([]).saver) {
   const repository = new MemoryRepository(data)
-  return render(<AppRoot repository={repository} loaded={repository.load()} saver={saver} options={{ now: () => TODAY }} />)
+  const install = fakeBrowser({ standalone: true }).install
+  return render(
+    <AppRoot repository={repository} loaded={repository.load()} install={install} saver={saver} options={{ now: () => TODAY }} />,
+  )
 }
 
 // 10월 기록이 든 진짜 장부 (기록 파일을 막 보내 30일 안내가 없다)
@@ -74,11 +81,9 @@ function realPhone(kind: BookKind = 'club', count = 2): StoredData {
   }
 }
 
-const button = (name: string | RegExp) => screen.getByRole('button', { name })
 const coach = () => screen.queryByTestId('coach-mark')
 const band = () => screen.queryByTestId('practice-band')
 const isLocked = (element: HTMLElement) => element.closest('[inert]') !== null
-const click = (name: string | RegExp) => userEvent.click(button(name))
 
 // 가리키는 곳의 설명 끝이 말풍선 글 + "연습 N / 4" (버튼 자기 안내가 앞에 있을 수 있다)
 function expectCoachOn(target: HTMLElement, message: string, stage: number) {
@@ -88,62 +93,6 @@ function expectCoachOn(target: HTMLElement, message: string, stage: number) {
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-// 안드로이드 뒤로 버튼 (방문 기록을 실제로 하나 빼고 popstate 를 기다린다)
-async function pressBack() {
-  await act(async () => {
-    window.history.back()
-    await new Promise((resolve) => setTimeout(resolve, 20))
-  })
-}
-
-async function startPracticeFromQuestion() {
-  await click('연습해 보기')
-  await screen.findByTestId('ledger-screen')
-}
-
-type Example = { income: string; expense: string }
-const CLUB: Example = { income: '회비', expense: '간식비' }
-const HOUSEHOLD: Example = { income: '용돈', expense: '장보기' }
-
-// ① 수입 10,000원 → 지출 5,000원 → [다 적었어요]
-async function writeTwoLines({ income, expense }: Example = CLUB) {
-  await click('내역 적기')
-  await click('오늘 16일')
-  await click(new RegExp(`^${income}`))
-  await click('1만 원 더하기')
-  await click('저장')
-  await click('방금 16일')
-  await click(new RegExp(`^${expense}`))
-  await userEvent.type(screen.getByRole('textbox', { name: '얼마인가요?' }), '5000')
-  await click('저장')
-  await click('다 적었어요')
-  await screen.findByTestId('ledger-screen')
-}
-
-// ② 월 정리를 열고 1초쯤 뒤 말풍선이 뜨면 [‹ 장부로]
-async function lookAtMonth() {
-  await click('10월 정리 보기')
-  await screen.findByText('다 봤으면 여기를 눌러 장부로 돌아가요', {}, { timeout: 3000 })
-  await click(/장부로/)
-  await screen.findByTestId('ledger-screen')
-}
-
-// ③ 지출 줄 → [이 내역 지우기] → [지우기]
-async function deleteExpense({ expense }: Example = CLUB) {
-  await click(new RegExp(`^${expense}`))
-  await click('이 내역 지우기')
-  await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '지우기' }))
-  await screen.findByTestId('ledger-screen')
-}
-
-async function reachYear(example: Example = CLUB) {
-  await writeTwoLines(example)
-  await lookAtMonth()
-  await deleteExpense(example)
-  await click('결산')
-  await screen.findByTestId('year-summary-screen')
 }
 
 beforeEach(() => {

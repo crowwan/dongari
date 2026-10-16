@@ -185,6 +185,18 @@
   color: var(--faint);
 }
 
+/* 추가하면 좋은 점 (SPEC-009 B): 두 줄로 접히는 줄은 체크를 첫 줄에 맞춘다 */
+.practice-learned__row[data-wrap] {
+  min-height: 0;
+  align-items: flex-start;
+  padding-block: var(--space-3);
+  line-height: var(--line-body);
+}
+
+.practice-learned__row[data-wrap] > .ui-icon {
+  margin-top: calc((1lh - var(--icon-sm)) / 2);
+}
+
 /* 끝 화면 위쪽 청록 동그라미 체크 (72, 옅은 청록 면 + 청록) */
 .practice-done {
   width: var(--practice-done);

@@ -1,47 +1,16 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import App from './App'
 import type { StoredData } from './domain/types'
-import type { InstallOfferStatus, InstallOfferStore } from './features/install/installOffer'
-import { createInstallPromptStore, type InstallEnvironment } from './features/install/installPrompt'
+import type { InstallOfferStore } from './features/install/installOffer'
 import { MemoryRepository } from './storage/MemoryRepository'
+import { fakeBrowser, memoryOfferStore } from './test/installFakes'
 import { ledger, storedWith } from './test/ledgerFixtures'
 
 const TODAY = new Date('2026-10-13T09:00:00.000+09:00')
-const CHROME_UA =
-  'Mozilla/5.0 (Linux; Android 14; SM-S921N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36'
-
-// 기기의 권하기 상태 (dongari:install-offer 대신 메모리)
-function memoryOfferStore(initial?: InstallOfferStatus) {
-  const store = {
-    saved: initial,
-    load: () => store.saved,
-    save: (next: InstallOfferStatus) => {
-      store.saved = next
-    },
-  }
-  return store
-}
-
-// 테스트마다 따로 듣는 곳을 두어 앞 테스트의 설치 제안이 섞이지 않게 한다
-function browser(overrides: Partial<InstallEnvironment> = {}): InstallEnvironment {
-  return { standalone: false, userAgent: CHROME_UA, installPrompt: createInstallPromptStore(new EventTarget()), ...overrides }
-}
-
-// 크롬·삼성 인터넷이 설치할 수 있을 때 보내는 이벤트를 흉내 낸다
-function browserWithPrompt(outcome: 'accepted' | 'dismissed') {
-  const events = new EventTarget()
-  const installPrompt = createInstallPromptStore(events)
-  const prompt = vi.fn(async () => {})
-  events.dispatchEvent(
-    Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
-      prompt,
-      userChoice: Promise.resolve({ outcome, platform: 'web' }),
-    }),
-  )
-  return { install: browser({ installPrompt }), prompt }
-}
+// 브라우저(크롬, 설치 제안 없음)로 연 폰
+const browser = (options: Parameters<typeof fakeBrowser>[0] = {}) => fakeBrowser(options).install
 
 function renderApp(data: StoredData | undefined, installOfferStore: InstallOfferStore, install = browser()) {
   const repository = new MemoryRepository(data)
@@ -114,7 +83,7 @@ describe('SPEC-002 첫 장부 뒤 홈 화면에 추가 권하기 (#135)', () => 
 
   it('설치 제안이 있으면 [홈 화면에 추가] 가 브라우저 설치 창을 열고, 설치하면 카드가 사라져 다시 뜨지 않는다', async () => {
     const store = memoryOfferStore()
-    const { install, prompt } = browserWithPrompt('accepted')
+    const { install, prompt } = fakeBrowser({ prompt: 'accepted' })
     renderApp(undefined, store, install)
     await createFirstBook()
 
@@ -157,5 +126,15 @@ describe('SPEC-002 첫 장부 뒤 홈 화면에 추가 권하기 (#135)', () => 
 
     expect(screen.getByTestId('notice-bar')).toHaveTextContent('기록 파일')
     expect(offerCard()).not.toBeInTheDocument()
+  })
+
+  it('SPEC-009 AC-23 권하기 상태가 이미 done 이면(연습 끝에 대답함) 첫 장부를 만들 때 waiting 으로 덮지 않고 카드도 없다', async () => {
+    const store = memoryOfferStore('done')
+    renderApp(undefined, store)
+
+    await createFirstBook()
+
+    expect(offerCard()).not.toBeInTheDocument()
+    expect(store.saved).toBe('done')
   })
 })
