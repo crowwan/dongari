@@ -11,6 +11,7 @@ import {
   frequentChoices as pickFrequentChoices,
   lastUsedType as findLastUsedType,
   newLedgerDefaults as defaultsFor,
+  olderChoices as pickOlderChoices,
   updateCarryover,
   updateEntry as updateEntryIn,
   type BookInfo,
@@ -66,6 +67,8 @@ export interface LedgerState {
   data: StoredData // 모든 장부의 기록 전체 (백업 파일 내용)
   // 자주 쓴 항목 버튼 (지금 장부 기록에서): 종류를 고르기 전(type 없음)엔 두 종류를 섞어서
   frequentChoices: (type?: EntryType) => FrequentChoice[]
+  // 예전에 쓴 항목 더 보기 (SPEC-001 v2.7): 실제로 쓴 이름 중 frequentChoices() 에 없는 것, 최근 사용 순(지난 연도 포함)
+  olderChoices: () => FrequentChoice[]
   // 직접 적은 이름을 예전에 쓴 종류. 처음 쓰는 이름이면 undefined (AC-15)
   lastUsedType: (name: string) => EntryType | undefined
   // 지금 장부에 이 연도 장부를 시작한다 (새 연도). 장부가 없으면(첫 실행) createBook 을 쓴다
@@ -249,6 +252,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     unsavedEntryIds,
     data,
     frequentChoices: (type) => pickFrequentChoices(entriesOldestFirst(book), type, { kind: book?.kind }),
+    olderChoices: () => pickOlderChoices(entriesOldestFirst(book), { kind: book?.kind }),
     lastUsedType: (name) => findLastUsedType(entriesOldestFirst(book), name),
     startLedger: (info) =>
       commit((current) => {

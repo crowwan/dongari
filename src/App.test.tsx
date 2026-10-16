@@ -927,6 +927,146 @@ describe('SPEC-001 앱 뼈대', () => {
   })
 })
 
+describe('SPEC-001 v2.7 예전에 쓴 항목 더 보기', () => {
+  // 실제로 쓴 이름 14가지: 지난해 3가지 → 올해 11가지 순으로 썼다 (가장 최근 = 대관료)
+  const used = (year: number, names: [string, 'income' | 'expense'][], month: number): Ledger['entries'] =>
+    names.map(([name, type], index) => ({
+      id: `${year}-${index}`,
+      month,
+      day: index + 1,
+      type,
+      name,
+      amount: 10_000,
+      createdAt: `${year}-${String(month).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`,
+    }))
+  const LAST_YEAR: Ledger = {
+    year: 2025,
+    carryover: 0,
+    entries: used(2025, [['꽃값', 'expense'], ['찬조금', 'income'], ['현수막', 'expense']], 5),
+  }
+  const THIS_YEAR: Ledger = {
+    year: 2026,
+    carryover: 0,
+    entries: used(
+      2026,
+      [
+        ['보험료', 'expense'],
+        ['기념품', 'expense'],
+        ['우편료', 'expense'],
+        ['인쇄비', 'expense'],
+        ['교통비', 'expense'],
+        ['다과비', 'expense'],
+        ['강사료', 'expense'],
+        ['식대', 'expense'],
+        ['회비', 'income'],
+        ['간식비', 'expense'],
+        ['대관료', 'expense'],
+      ],
+      10,
+    ),
+  }
+  const RECENT_SIX = ['대관료 지출', '간식비 지출', '회비 수입', '식대 지출', '강사료 지출', '다과비 지출']
+  const OLDER_EIGHT = ['교통비 지출', '인쇄비 지출', '우편료 지출', '기념품 지출', '보험료 지출', '현수막 지출', '찬조금 수입', '꽃값 지출']
+  const itemButtons = () => within(itemList()).getAllByRole('button').map((button) => button.textContent)
+  const moreButton = (count: number) => within(itemList()).getByRole('button', { name: `예전에 쓴 항목 ${count}개 더 보기` })
+
+  it('AC-35 실제로 쓴 이름이 7개 이상이면 최근 6개 뒤 "예전에 쓴 항목 N개 더 보기" 가 있고, [직접 적기] 는 맨 아래 그대로다', async () => {
+    renderApp(new MemoryRepository(storedWith(LAST_YEAR, THIS_YEAR)))
+    await openEntryForm()
+    await pickDay(3)
+
+    expect(itemButtons()).toEqual([...RECENT_SIX, '예전에 쓴 항목 8개 더 보기', '직접 적기'])
+  })
+
+  it('AC-35 AC-37 실제로 쓴 이름이 6개 이하면 더 보기 줄이 없다 (기본 항목은 더 보기에 들어가지 않는다)', async () => {
+    renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
+    await openEntryForm()
+    await pickDay(3)
+
+    expect(itemButtons()).toEqual(['대관료 지출', '회비 수입', '간식비 지출', '직접 적기'])
+    expect(within(itemList()).queryByRole('button', { name: /더 보기/ })).not.toBeInTheDocument()
+  })
+
+  it('AC-36 AC-39 더 보기를 누르면 펼침 상태를 알리던 줄 자리에 나머지 이름이 최근 사용 순(지난 연도 포함)으로 펼쳐지고 첫 예전 항목으로 포커스가 간다', async () => {
+    renderApp(new MemoryRepository(storedWith(LAST_YEAR, THIS_YEAR)))
+    await openEntryForm()
+    await pickDay(3)
+    expect(moreButton(8)).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.click(moreButton(8))
+
+    expect(itemButtons()).toEqual([...RECENT_SIX, ...OLDER_EIGHT, '직접 적기'])
+    expect(within(itemList()).getByText('예전에 쓴 항목')).toBeInTheDocument()
+    expect(within(itemList()).getByRole('button', { name: '교통비 지출' })).toHaveFocus()
+  })
+
+  it('AC-36 펼친 이름을 고르면 바로 금액 단계로 넘어가고 그 이름·종류가 답 줄에 들어간다', async () => {
+    const repository = renderApp(new MemoryRepository(storedWith(LAST_YEAR, THIS_YEAR)))
+    await openEntryForm()
+    await pickDay(3)
+    await userEvent.click(moreButton(8))
+
+    await userEvent.click(within(itemList()).getByRole('button', { name: '찬조금 수입' }))
+
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('얼마인가요?')
+    expect(screen.getAllByTestId('entry-card-value').map((value) => value.textContent)).toEqual(['10월 3일', '찬조금 · 수입'])
+    await userEvent.type(screen.getByLabelText('얼마인가요?'), '50000')
+    await userEvent.click(screen.getByRole('button', { name: '저장' }))
+    expect(savedLedger(repository, 2026)?.entries.at(-1)).toMatchObject({ name: '찬조금', type: 'income', amount: 50_000 })
+  })
+
+  it('AC-37 연달아 적는 다음 내역은 접힌 채 시작한다', async () => {
+    renderApp(new MemoryRepository(storedWith(LAST_YEAR, THIS_YEAR)))
+    await openEntryForm()
+    await pickDay(3)
+    await userEvent.click(moreButton(8))
+    await userEvent.click(within(itemList()).getByRole('button', { name: '꽃값 지출' }))
+    await userEvent.type(screen.getByLabelText('얼마인가요?'), '20000')
+    await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+    await pickDay(4)
+
+    // 방금 쓴 꽃값이 맨 위로 올라오고, 6개에서 밀린 다과비가 더 보기로 들어간다
+    expect(itemButtons()).toEqual([
+      '꽃값 지출',
+      '대관료 지출',
+      '간식비 지출',
+      '회비 수입',
+      '식대 지출',
+      '강사료 지출',
+      '예전에 쓴 항목 8개 더 보기',
+      '직접 적기',
+    ])
+  })
+
+  it('AC-38 고치기 항목 목록도 더 보기가 있고, 고치는 내역 이름은 맨 위 체크 그대로이며 더 보기 수에서 빠진다', async () => {
+    renderApp(new MemoryRepository(storedWith(LAST_YEAR, THIS_YEAR)))
+    await openEditForm('인쇄비')
+
+    expect(itemButtons()).toEqual(['인쇄비 지출', ...RECENT_SIX, '예전에 쓴 항목 7개 더 보기', '직접 적기'])
+    expect(within(itemList()).getByRole('button', { name: '인쇄비 지출' })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(moreButton(7))
+    expect(itemButtons()).toEqual(['인쇄비 지출', ...RECENT_SIX, ...OLDER_EIGHT.filter((name) => name !== '인쇄비 지출'), '직접 적기'])
+
+    // 고치기는 고르면 체크만 옮겨 간다
+    await userEvent.click(within(itemList()).getByRole('button', { name: '찬조금 수입' }))
+    expect(within(itemList()).getByRole('button', { name: '찬조금 수입' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(itemList()).getByRole('button', { name: '인쇄비 지출' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('AC-39 펼치기만 하고 나가면 버릴까요가 뜨지 않고, 펼치기는 방문 기록에 쌓이지 않는다', async () => {
+    renderApp(new MemoryRepository(storedWith(LAST_YEAR, THIS_YEAR)))
+    await openEditForm('인쇄비')
+    await userEvent.click(moreButton(7))
+
+    pressBackButton()
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
+  })
+})
+
 // 읽기는 되지만 저장은 늘 실패하는 저장소 (용량 초과)
 function alwaysFailing(data: StoredData): LedgerRepository {
   const memory = new MemoryRepository(data)

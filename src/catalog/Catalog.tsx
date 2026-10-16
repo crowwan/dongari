@@ -486,6 +486,26 @@ export function Catalog() {
               />
             </div>
           </State>
+          <State label="[⌄ 예전에 쓴 항목 N개 더 보기]: 처음 줄들 뒤 청록 글자 + 위 옅은 선, 누르면 그 자리에 구분 글자 + 나머지 줄 (눌러 보기, SPEC-001 v2.7)">
+            <OptionList
+              label="자주 쓴 항목"
+              options={[
+                { value: '대관료', label: '대관료', icon: itemIcon('대관료'), note: '지출' },
+                { value: '회비', label: '회비', icon: itemIcon('회비'), note: '수입', tone: 'income' },
+              ]}
+              more={{
+                label: '예전에 쓴 항목 2개 더 보기',
+                heading: '예전에 쓴 항목',
+                options: [
+                  { value: '꽃값', label: '꽃값', icon: itemIcon('꽃값'), note: '지출' },
+                  { value: '찬조금', label: '찬조금', icon: itemIcon('찬조금'), note: '수입', tone: 'income' },
+                ],
+              }}
+              value={pickedItem}
+              onChange={setPickedItem}
+              action={{ label: '직접 적기', icon: 'pen', onClick: noop }}
+            />
+          </State>
           <State label="[직접 적기] 펼침: 줄 아래 같은 면에 이름 칸 + 수입·지출 스위치, 체크 지움 (내역 고치기, SPEC-001 v2.6)">
             <OptionList
               label="자주 쓴 항목"
