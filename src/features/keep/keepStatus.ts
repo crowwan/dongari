@@ -1,4 +1,4 @@
-// 자동 보관 상태 문구와 7일 안내 (SPEC-006). 시각을 받는 순수 함수
+// 자동으로 지키기 상태 문구와 7일 안내 (SPEC-006). 시각을 받는 순수 함수
 import type { KeepState } from './AutoKeeper'
 
 const MINUTE = 60 * 1000
@@ -31,12 +31,14 @@ function agoText(time: number, now: Date): string {
   return `${Math.floor(elapsed / DAY)}일 전`
 }
 
-// 설정 "자동 보관" 줄 오른쪽 값: "켜짐 · 3분 전" / "켜짐" / "꺼짐" / "준비 중"(서버 주소가 정해지기 전 빌드)
-export function keepRowText(keep: KeepState | undefined, now: Date): string {
-  if (!keep) return '준비 중'
-  if (!keep.enabled) return '꺼짐'
+// 설정 맨 위 카드 상태 줄 (SPEC-006 v2.6): "자동으로 지키기 켜짐 · 3분 전에 보관했어요" / "… 방금 보관했어요" /
+// 아직 보관한 적이 없으면 "자동으로 지키기 켜짐" / 끄면 "자동으로 지키기 꺼짐"
+export function keepStatusText(keep: KeepState, now: Date): string {
+  if (!keep.enabled) return '자동으로 지키기 꺼짐'
   const keptAt = timeOf(keep.lastKeptAt)
-  return keptAt === undefined ? '켜짐' : `켜짐 · ${agoText(keptAt, now)}`
+  if (keptAt === undefined) return '자동으로 지키기 켜짐'
+  const ago = agoText(keptAt, now)
+  return `자동으로 지키기 켜짐 · ${ago === '방금' ? ago : `${ago}에`} 보관했어요`
 }
 
 // 보관한 때 (폰 시각): "10월 12일 오후 3:20"

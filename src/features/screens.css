@@ -49,9 +49,11 @@
   margin-left: calc(var(--space-3) * -1);
 }
 
-/* 위쪽 오른쪽 아이콘 버튼 하나 (첫 실행 [백업 불러오기], 새 연도 시작 화면의 [설정]) */
+/* 위쪽 오른쪽 아이콘 버튼 (첫 실행 [기록 파일 불러오기] [복구 코드로 불러오기], 새 연도 시작 화면의 [설정]).
+   큰 글씨에서 한 줄에 안 들어가면 아래 줄로 내린다 (SPEC-006 v2.6) */
 .screen__top-end {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   margin-right: calc(var(--space-3) * -1);
 }

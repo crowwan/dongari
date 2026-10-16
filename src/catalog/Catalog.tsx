@@ -14,7 +14,7 @@ import { tidyDayText } from '../features/ledger/entryDraft'
 import type { BookChoice } from '../features/ledger/useLedger'
 import { ItemTotalsCards } from '../features/report/ItemTotalsCards'
 import { SavePictureBar } from '../features/report/SavePictureBar'
-import { RecoveryCode } from '../features/settings/SettingsScreen'
+import { KeepCard } from '../features/settings/SettingsScreen'
 import { ItemTotalsTable } from '../features/report/sheet/ItemTotalsTable'
 import { sheetPaper } from '../features/report/sheet/sheetStyles'
 import { AmountDisplay } from '../ui/AmountDisplay'
@@ -113,7 +113,7 @@ const ACTION_ICONS: { icon: IconName; label: string }[] = [
   { icon: 'left', label: '장부로' },
   { icon: 'users', label: '동아리·모임 장부' },
   { icon: 'home', label: '개인 가계부 장부' },
-  { icon: 'cloud', label: '자동 보관' },
+  { icon: 'cloud', label: '자동으로 지키기' },
   { icon: 'key', label: '복구 코드로 불러오기' },
 ]
 
@@ -620,7 +620,7 @@ export function Catalog() {
               <IconButton icon="chart" variant="surface" onClick={noop}>
                 결산
               </IconButton>
-              <IconButton icon="settings" dotLabel="백업 필요" onClick={noop}>
+              <IconButton icon="settings" dotLabel="기록 파일 보내기 필요" onClick={noop}>
                 설정
               </IconButton>
             </div>
@@ -656,9 +656,9 @@ export function Catalog() {
           </State>
           <State label="보조 · 기본 / 비활성">
             <div className="catalog__pair">
-              <Button variant="secondary">백업 파일 보내기</Button>
+              <Button variant="secondary">기록 파일 보내기</Button>
               <Button variant="secondary" disabled>
-                백업 파일 보내기
+                기록 파일 보내기
               </Button>
             </div>
           </State>
@@ -836,16 +836,16 @@ export function Catalog() {
 
         <Section title="NoticeBar">
           <State label="저장 실패">
-            <NoticeBar message="저장하지 못했어요. 백업 파일을 보내 두세요" />
+            <NoticeBar message="저장하지 못했어요. 기록 파일을 보내 두세요" />
           </State>
           <State label="긴 문장 (시작 안내)">
             <NoticeBar message="저장된 기록을 읽지 못해 새 장부로 시작해요. 예전 기록은 따로 보관해 두었어요" />
           </State>
-          <State label="버튼 붙음 (저장 실패 → 백업 파일 보내기)">
-            <NoticeBar message="저장하지 못했어요. 백업 파일을 보내 두세요" action={{ label: '백업 파일 보내기', onClick: noop }} />
+          <State label="버튼 붙음 (저장 실패 → 기록 파일 보내기)">
+            <NoticeBar message="저장하지 못했어요. 기록 파일을 보내 두세요" action={{ label: '기록 파일 보내기', onClick: noop }} />
           </State>
-          <State label="30일 백업 안내 → 백업 파일 보내기 (#9)">
-            <NoticeBar message="한 달 넘게 백업하지 않았어요" action={{ label: '백업 파일 보내기', icon: 'share', onClick: noop }} />
+          <State label="30일 안내 → 기록 파일 보내기 (#9)">
+            <NoticeBar message="한 달 넘게 기록 파일을 보내지 않았어요" action={{ label: '기록 파일 보내기', icon: 'share', onClick: noop }} />
           </State>
           <State label="7일 보관 안내 (SPEC-006, 버튼 없음)">
             <NoticeBar message={KEEP_REMINDER_MESSAGE} />
@@ -854,18 +854,18 @@ export function Catalog() {
             <div data-preview-pressed="">
               <NoticeBar
                 message="저장된 기록을 읽지 못했어요. 지금 적는 내용은 저장되지 않아요"
-                action={{ label: '백업 파일 불러오기', onClick: noop }}
+                action={{ label: '기록 파일 불러오기', onClick: noop }}
               />
             </div>
           </State>
         </Section>
 
         <Section title="기록 지키기 (SPEC-006)">
-          <State label="설정 복구 코드 칸 (자동 보관 줄 아래, 같은 카드. [복구 코드 보내기] 는 아래 한 줄)">
-            <div className="settings__list">
-              <ListRow icon="cloud" title="자동 보관" end={<span className="settings__value">켜짐 · 3분 전</span>} />
-              <RecoveryCode code="HK7M-29QF-MX4P-8R2D" onShare={noop} />
-            </div>
+          <State label="설정 맨 위 카드 (v2.6: 제목 · 복구 코드 · 안내 · 주 버튼 [복구 코드 보내기] · 상태 줄)">
+            <KeepCard code="HK7M-29QF-MX4P-8R2D" statusText="자동으로 지키기 켜짐 · 3분 전에 보관했어요" tooLarge={false} onShare={noop} />
+          </State>
+          <State label="맨 위 카드: 보관본이 너무 큼 (상태 줄 다음 줄)">
+            <KeepCard code="HK7M-29QF-MX4P-8R2D" statusText="자동으로 지키기 켜짐" tooLarge onShare={noop} />
           </State>
           <State label="복구 코드로 불러오기 화면 (16자를 넣고 [불러오기] — 이 미리보기는 늘 '없음')">
             <div className="catalog__frame catalog__frame--screen">
@@ -913,7 +913,7 @@ export function Catalog() {
           <div className="catalog__stack" data-preview-pressed="">
             <div className="catalog__pair">
               <Button>저장</Button>
-              <Button variant="secondary">백업 파일 보내기</Button>
+              <Button variant="secondary">기록 파일 보내기</Button>
             </div>
             <div className="catalog__pair">
               <Button variant="danger">지우기</Button>
@@ -975,7 +975,7 @@ export function Catalog() {
               />
             </div>
           </State>
-          <State label="설명 붙음 + 위험 (백업 불러오기)">
+          <State label="설명 붙음 + 위험 (기록 파일 불러오기)">
             <div className="catalog__frame">
               <ConfirmDialog
                 inline
@@ -1016,7 +1016,7 @@ export function Catalog() {
                 inline
                 open
                 title="이 파일은 열 수 없어요"
-                description="우리 장부에서 보낸 백업 파일인지 확인해 주세요"
+                description="우리 장부에서 보낸 기록 파일인지 확인해 주세요"
                 cancelLabel={null}
                 onConfirm={noop}
                 onCancel={noop}

@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react'
+import { Fragment, useId, useState, type ReactNode } from 'react'
 import { BOOK_KIND_LABELS, type CarryoverWords } from '../../domain/book'
 import type { BookSetup } from '../../domain/ledger'
 import type { BookKind, Ledger, StoredData } from '../../domain/types'
@@ -34,15 +34,15 @@ const KEEP_SHEET = 'settings-keep'
 const KEEP_RESTORE_PAGE = 'settings-keep-restore'
 // 확인 창 (방문 기록 한 칸 — 뒤로 버튼은 확인 창만 닫는다, #110)
 const DELETE_BOOK_DIALOG = 'settings-delete-book'
-const KEEP_OFF_DIALOG = 'settings-keep-off' // 자동 보관 선택 창 칸에 바꿔 끼운다
+const KEEP_OFF_DIALOG = 'settings-keep-off' // 자동으로 지키기 선택 창 칸에 바꿔 끼운다
 
 const KIND_QUESTION = '어떤 장부인가요?'
 const KIND_CHOICES: BookKind[] = ['club', 'household']
 
-// 기록 지키기 (SPEC-006) 자동 보관 줄
+// 기록 지키기 (SPEC-006) 자동으로 지키기
 export interface KeepRow {
-  status: string // 오른쪽 값 "켜짐 · 3분 전" / "꺼짐"
-  enabled: boolean
+  statusText: string // 맨 위 카드 상태 줄 "자동으로 지키기 켜짐 · 3분 전에 보관했어요" (keepStatusText)
+  enabled: boolean // 접기 안 [자동으로 지키기] 줄 값 켜짐·꺼짐
   tooLarge: boolean // 보관본이 1MB 를 넘어 올리지 못했다
   onTurnOn: () => void
   onTurnOff: (forgetCopy: boolean) => void // forgetCopy: 서버에 보관해 둔 사본도 지운다
@@ -66,17 +66,17 @@ type SettingsScreenProps = {
   ledger: Ledger | undefined // 고른 연도 장부. 아직 없으면 undefined
   // 편집 화면·연도 선택 창을 여닫는 방문 기록
   sheets: SheetHistory
-  // 한 달 넘게 백업하지 않았으면 제목 아래 안내 띠 (SPEC-002, 장부 화면과 같은 띠)
+  // 한 달 넘게 기록 파일을 보내지 않았으면 제목 아래 안내 띠 (SPEC-002, 장부 화면과 같은 띠)
   needsBackup?: boolean
   onChangeYear: (year: number) => void // 고르면 장부 화면으로 돌아가 그 해를 보여 준다
   onSaveBookInfo: (setup: BookSetup) => void
-  lastBackupAt?: string // 마지막으로 백업 파일을 보낸 시각 (백업 보내기 줄에 날짜로)
+  lastBackupAt?: string // 마지막으로 기록 파일을 보낸 시각 ([기록 파일 보내기] 줄에 날짜로)
   onSendBackup: () => void
   onImportBackup: () => void
-  // 자동 보관 줄. 없으면 서버 주소가 정해지기 전 빌드라 "준비 중" (SPEC-006)
+  // 자동으로 지키기. 없으면 서버 주소가 정해지기 전 빌드 (SPEC-006)
   keep?: KeepRow
-  recoveryCode?: string // 복구 코드. 아직 없으면(읽기 전용 등) 코드 칸을 숨긴다
-  onShareCode: () => void // 복구 코드 [보내기]
+  recoveryCode?: string // 복구 코드. 아직 없으면(읽기 전용 시작) 없다
+  onShareCode: () => void // [복구 코드 보내기]
   restoreByCode?: RestoreByCode // 있으면 [복구 코드로 불러오기] 줄
   onBack: () => void
   // 홈 화면에 추가 줄이 보는 브라우저 상태 (기본은 지금 브라우저, 테스트에서 바꿔 넣는다)
@@ -88,8 +88,9 @@ function carryoverText(carryover: number): string {
   return carryover < 0 ? `적자 ${formatAmount(-carryover)}원` : `${formatAmount(carryover)}원`
 }
 
-// 설정 (SPEC-001 화면 구성, SPEC-002 백업, SPEC-005 장부 정보, SPEC-006 기록 지키기): 묶음 제목 + 아이콘·이름·값·화살표 줄 목록.
-// 이름·이월금 줄은 그 값 하나만 고치는 편집 화면을, 종류·연도·자동 보관 줄은 선택 창을 연다. 맨 아래 [이 장부 지우기]
+// 설정 (SPEC-001 화면 구성, SPEC-002 기록 파일, SPEC-005 장부 정보, SPEC-006 기록 지키기 v2.6):
+// 맨 위 기록 지키기 카드 → "다른 방법으로 옮기기" 접기 → 장부 정보 → 앱 → [이 장부 지우기].
+// 이름·이월금 줄은 그 값 하나만 고치는 편집 화면을, 종류·연도·자동으로 지키기 줄은 선택 창을 연다
 export function SettingsScreen({
   bookName,
   bookKind,
@@ -114,6 +115,16 @@ export function SettingsScreen({
   install = browserInstallEnvironment(),
 }: SettingsScreenProps) {
   const installPrompt = useInstallPrompt(install.installPrompt)
+  // 다른 방법으로 옮기기: 설정을 열 때마다 처음엔 접혀 있다 (편집·불러오기 화면에 다녀와도 그대로)
+  const [moreOpen, setMoreOpen] = useState(false)
+
+  // 기록 파일 보내기·불러오기 두 줄 (SPEC-002): 맨 위(코드 없을 때) 또는 접기 안 처음 두 줄
+  const fileRows = (
+    <>
+      <SettingRow icon="share" title="기록 파일 보내기" description={lastBackupText(lastBackupAt)} onClick={onSendBackup} />
+      <SettingRow icon="folder" title="기록 파일 불러오기" description="받아 둔 파일로 기록 되살리기" onClick={onImportBackup} />
+    </>
+  )
 
   if (restoreByCode && sheets.sheet === KEEP_RESTORE_PAGE) {
     return <KeepRestoreScreen {...restoreByCode} dialogs={sheets} backLabel="설정" onBack={sheets.closeSheet} />
@@ -150,10 +161,40 @@ export function SettingsScreen({
       <BackToLedger onBack={onBack} />
       <h1 className="screen__title">설정</h1>
       {needsBackup && (
-        <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={{ label: '백업 파일 보내기', icon: 'share', onClick: onSendBackup }} />
+        <NoticeBar message={BACKUP_REMINDER_MESSAGE} action={{ label: '기록 파일 보내기', icon: 'share', onClick: onSendBackup }} />
       )}
 
-      <SettingsGroup title="장부 정보">
+      {/* 기록 지키기 (SPEC-006 v2.6). 복구 코드가 있으면 맨 위 카드 + 나머지는 접기,
+          없으면(서버 주소 없는 빌드·읽기 전용 시작) 받아 올 곳 없는 코드·"준비 중" 대신 기록 파일 두 줄만 맨 위에 */}
+      {keep && recoveryCode ? (
+        <>
+          <KeepCard code={recoveryCode} statusText={keep.statusText} tooLarge={keep.tooLarge} onShare={onShareCode} />
+          <MoreWays open={moreOpen} onToggle={() => setMoreOpen((open) => !open)}>
+            {fileRows}
+            {restoreByCode && (
+              <SettingRow
+                icon="key"
+                title="복구 코드로 불러오기"
+                description="다른 폰의 코드를 넣기"
+                onClick={() => sheets.openSheet(KEEP_RESTORE_PAGE)}
+              />
+            )}
+            <SettingRow
+              icon="cloud"
+              title="자동으로 지키기"
+              value={keep.enabled ? '켜짐' : '꺼짐'}
+              onClick={() => sheets.openSheet(KEEP_SHEET)}
+            />
+          </MoreWays>
+        </>
+      ) : (
+        <div className="settings__list" data-testid="settings-block-files">
+          {fileRows}
+        </div>
+      )}
+
+      {/* 장부 정보 (SPEC-005): 처음 만들 때 정한 값이라 자주 열지 않아 기록 지키기 아래 */}
+      <SettingsGroup title="장부 정보" testId="settings-block-book">
         {ledger ? (
           <>
             <SettingRow icon="pen" title="장부 이름" value={bookName} onClick={() => sheets.openSheet(BOOK_NAME_PAGE)} />
@@ -176,38 +217,9 @@ export function SettingsScreen({
         <SettingRow icon="calendar" title="장부 연도" value={`${year}년`} onClick={() => sheets.openSheet(YEAR_SHEET)} />
       </SettingsGroup>
 
-      {/* 기록 지키기 (SPEC-006, 전 "기록 백업"): 자동 보관 + 복구 코드 카드, 파일 백업·불러오기 카드 */}
-      <SettingsGroup
-        title="기록 지키기"
-        testId="settings-keep"
-        more={
-          <>
-            <SettingRow icon="share" title="백업 파일 보내기" description={lastBackupText(lastBackupAt)} onClick={onSendBackup} />
-            <SettingRow icon="folder" title="백업 파일 불러오기" description="새 폰으로 옮길 때" onClick={onImportBackup} />
-            {restoreByCode && (
-              <SettingRow icon="key" title="복구 코드로 불러오기" onClick={() => sheets.openSheet(KEEP_RESTORE_PAGE)} />
-            )}
-          </>
-        }
-      >
-        {keep ? (
-          <SettingRow
-            icon="cloud"
-            title="자동 보관"
-            value={keep.status}
-            description={keep.tooLarge ? '기록이 너무 많아 보관하지 못했어요. 백업 파일을 보내 두세요' : undefined}
-            onClick={() => sheets.openSheet(KEEP_SHEET)}
-          />
-        ) : (
-          // 서버 주소가 정해지기 전 빌드: 누를 것이 없다
-          <ListRow icon="cloud" title="자동 보관" end={<span className="settings__value">준비 중</span>} />
-        )}
-        {recoveryCode && <RecoveryCode code={recoveryCode} onShare={onShareCode} />}
-      </SettingsGroup>
-
       {/* 홈 화면에 추가 (SPEC-002): 설치 제안이 있으면 브라우저 설치 창, 없으면 방법 안내. 홈 화면 앱이면 묶음째 없다 */}
       {shouldOfferInstall({ standalone: install.standalone, installed: installPrompt.installed }) && (
-        <SettingsGroup title="앱">
+        <SettingsGroup title="앱" testId="settings-block-app">
           <SettingRow
             icon="phone"
             title="홈 화면에 추가"
@@ -219,7 +231,7 @@ export function SettingsScreen({
 
       {/* 장부 지우기 (SPEC-005): 되돌릴 수 없어 맨 아래 위험 글자형으로 따로 두고, 확인을 받는다 */}
       {canDeleteBook && (
-        <div className="settings__danger">
+        <div className="settings__danger" data-testid="settings-block-delete">
           <Button variant="danger-text" onClick={() => sheets.openDialog(DELETE_BOOK_DIALOG)}>
             이 장부 지우기
           </Button>
@@ -250,9 +262,9 @@ export function SettingsScreen({
       </BottomSheet>
 
       {keep && (
-        <BottomSheet open={sheets.sheet === KEEP_SHEET} title="자동 보관" onClose={sheets.closeSheet}>
+        <BottomSheet open={sheets.sheet === KEEP_SHEET} title="자동으로 지키기" onClose={sheets.closeSheet}>
           <OptionList
-            label="자동 보관"
+            label="자동으로 지키기"
             options={[
               { value: 'on', label: '켜기' },
               { value: 'off', label: '끄기' },
@@ -289,7 +301,7 @@ export function SettingsScreen({
         onCancel={sheets.closeDialog}
       />
 
-      {/* 자동 보관 끄기 (SPEC-006): 서버 사본을 남겨 둘지 지울지. 어느 쪽이든 끈다 (Esc·뒤로 버튼은 남겨 두기) */}
+      {/* 자동으로 지키기 끄기 (SPEC-006): 서버 사본을 남겨 둘지 지울지. 어느 쪽이든 끈다 (Esc·뒤로 버튼은 남겨 두기) */}
       <ConfirmDialog
         open={sheets.sheet === KEEP_OFF_DIALOG}
         title="보관해 둔 기록도 지울까요?"
@@ -310,22 +322,68 @@ export function SettingsScreen({
   )
 }
 
-// 복구 코드 칸: 이름 + 큰 코드(고정폭 숫자, 한 줄) + 안내 + [복구 코드 보내기] (SPEC-006 시안 KeepSettings).
-// 시안은 코드 오른쪽에 [보내기] 를 두었지만 390 폭에서 코드가 두 줄로 갈려 버튼을 아래 한 줄로 내렸다
-export function RecoveryCode({ code, onShare }: { code: string; onShare: () => void }) {
-  const labelId = useId()
+type KeepCardProps = {
+  code: string
+  statusText: string
+  tooLarge: boolean // 보관본이 1MB 를 넘어 올리지 못했다
+  onShare: () => void
+}
+
+// 기록 지키기 맨 위 카드 (SPEC-006 v2.6 시안 C): 제목 → 큰 복구 코드 → 안내 → 주 버튼 [복구 코드 보내기] → 상태 줄.
+// 묶음 제목 "기록 지키기" 대신 카드 제목이 그 자리다. 상태 줄은 누르는 곳이 아니다 (켜고 끄기는 접기 안)
+export function KeepCard({ code, statusText, tooLarge, onShare }: KeepCardProps) {
+  const titleId = useId()
   return (
-    <div className="settings__code" role="group" aria-labelledby={labelId}>
-      <span className="settings__code-label" id={labelId}>
-        복구 코드
-      </span>
+    <section className="settings__keep" aria-labelledby={titleId} data-testid="settings-block-keep">
+      <h2 className="settings__keep-title" id={titleId}>
+        새 폰으로 옮기려면 이 코드만 적어 두세요
+      </h2>
+      {/* 큰 글씨에서 한 줄에 안 들어가면 4자 묶음 사이(줄표 뒤)에서만 줄을 바꾼다 */}
       <span className="settings__code-value" data-testid="recovery-code-value">
-        {code}
+        {code.split('-').map((part, index) => (
+          <Fragment key={index}>
+            {index > 0 && (
+              <>
+                -<wbr />
+              </>
+            )}
+            {part}
+          </Fragment>
+        ))}
       </span>
       <p className="settings__code-note">새 폰에서 이 코드를 넣으면 기록이 돌아와요. 가족에게도 보내 두세요.</p>
-      <Button variant="secondary" icon="share" onClick={onShare}>
+      <Button icon="share" onClick={onShare}>
         복구 코드 보내기
       </Button>
+      <p className="settings__keep-status" data-testid="keep-status">
+        <Icon name="cloud" />
+        <span>{statusText}</span>
+      </p>
+      {tooLarge && <p className="settings__keep-warning">기록이 너무 많아 보관하지 못했어요. 기록 파일을 보내 두세요</p>}
+    </section>
+  )
+}
+
+type MoreWaysProps = {
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}
+
+// 다른 방법으로 옮기기 (SPEC-006 v2.6): 흰 카드 머리 줄을 누르면 펼쳐진다. 펼침 상태는 aria-expanded 로 읽힌다
+function MoreWays({ open, onToggle, children }: MoreWaysProps) {
+  const bodyId = useId()
+  return (
+    <div className="settings__more" data-testid="settings-block-more">
+      <button type="button" className="settings__more-head" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
+        다른 방법으로 옮기기
+        <Icon name="down" />
+      </button>
+      {open && (
+        <div className="settings__more-body" id={bodyId} data-testid="settings-more-body">
+          {children}
+        </div>
+      )}
     </div>
   )
 }
@@ -334,12 +392,10 @@ type SettingsGroupProps = {
   title: string
   testId?: string
   children: ReactNode
-  // 같은 묶음 안 두 번째 카드 (기록 지키기: 자동 보관·복구 코드 카드 아래 파일 백업 카드)
-  more?: ReactNode
 }
 
 // 묶음: 작은 묶음 제목 + 흰 카드 안 줄 목록
-function SettingsGroup({ title, testId, children, more }: SettingsGroupProps) {
+function SettingsGroup({ title, testId, children }: SettingsGroupProps) {
   const titleId = useId()
   return (
     <section className="settings__group" aria-labelledby={titleId} data-testid={testId}>
@@ -347,7 +403,6 @@ function SettingsGroup({ title, testId, children, more }: SettingsGroupProps) {
         {title}
       </h2>
       <div className="settings__list">{children}</div>
-      {more && <div className="settings__list">{more}</div>}
     </section>
   )
 }
@@ -362,7 +417,7 @@ type SettingRowProps = {
   onClick: () => void
 }
 
-// 설정 줄: 원형 아이콘 + 이름(+ 보조 줄) + 값 + 화살표. 줄 전체가 버튼이라 "장부 이름 한랑드림" 으로 읽힌다
+// 설정 줄: 원형 아이콘 + 이름(+ 보조 줄) + 값 + 줄 끝 › (ListRow chevron — 큰 글씨에서 값이 아래 줄로 내려가도 › 는 줄 끝에 남는다). 줄 전체가 버튼이라 "장부 이름 한랑드림" 으로 읽힌다
 function SettingRow({ icon, title, value, description, onClick }: SettingRowProps) {
   return (
     <ListRow
@@ -370,12 +425,8 @@ function SettingRow({ icon, title, value, description, onClick }: SettingRowProp
       title={title}
       description={description}
       onClick={onClick}
-      end={
-        <span className="settings__end">
-          {value !== undefined && <span className="settings__value">{value}</span>}
-          <Icon name="right" />
-        </span>
-      }
+      end={value !== undefined ? <span className="settings__value">{value}</span> : undefined}
+      chevron
     />
   )
 }

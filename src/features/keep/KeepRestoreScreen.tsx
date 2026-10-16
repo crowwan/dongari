@@ -86,7 +86,7 @@ export function KeepRestoreScreen({ server, hasRecords, onRestore, backLabel, on
             setError(undefined)
           }}
         />
-        <p className="screen__note">예전 폰 설정 › 기록 지키기에 있던 16자예요. 4자마다 줄표는 저절로 들어가요.</p>
+        <p className="screen__note">예전 폰 설정 맨 위에 있던 16자예요. 4자마다 줄표는 저절로 들어가요.</p>
       </div>
 
       <BottomActionBar

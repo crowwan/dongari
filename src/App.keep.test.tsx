@@ -77,6 +77,11 @@ async function openSettings() {
   await userEvent.click(screen.getByRole('button', { name: /^설정/ }))
 }
 
+// 설정 "다른 방법으로 옮기기" 를 펼친다 (v2.6: 처음엔 접혀 있다)
+async function openMoreWays() {
+  await userEvent.click(screen.getByRole('button', { name: '다른 방법으로 옮기기' }))
+}
+
 async function restoreWithCode(code: string) {
   await userEvent.type(screen.getByRole('textbox', { name: '복구 코드를 넣어 주세요' }), code)
   await userEvent.click(screen.getByRole('button', { name: '불러오기' }))
@@ -88,23 +93,26 @@ describe('SPEC-006 복구 코드로 자동 보관 (화면)', () => {
     vi.restoreAllMocks()
   })
 
-  it('AC-1 설정 "기록 지키기" 에 복구 코드와 자동 보관(켜짐 · 마지막 보관)이 보인다', async () => {
+  it('AC-1 설정 맨 위 카드에 복구 코드와 자동으로 지키기 상태(켜짐 · 마지막 보관)가 보인다', async () => {
     const { server } = fakeServer()
     renderApp(new MemoryRepository(phoneData()), keepWith(server, { enabled: true, lastKeptAt: new Date(TODAY.getTime() - 3 * 60_000).toISOString() }))
     await openSettings()
 
-    const group = within(screen.getByRole('region', { name: '기록 지키기' }))
-    expect(group.getByTestId('recovery-code-value')).toHaveTextContent(PHONE_CODE)
-    expect(group.getByRole('button', { name: /^자동 보관/ })).toHaveTextContent('켜짐 · 3분 전')
+    const card = within(screen.getByRole('region', { name: '새 폰으로 옮기려면 이 코드만 적어 두세요' }))
+    expect(card.getByTestId('recovery-code-value')).toHaveTextContent(PHONE_CODE)
+    expect(card.getByTestId('keep-status')).toHaveTextContent('자동으로 지키기 켜짐 · 3분 전에 보관했어요')
+    await openMoreWays()
+    expect(screen.getByRole('button', { name: /^자동으로 지키기/ })).toHaveTextContent('켜짐')
   })
 
-  it('서버 주소가 없는 빌드면 자동 보관은 "준비 중", 복구 코드는 보이고 [복구 코드로 불러오기] 는 없다', async () => {
+  it('AC-14 서버 주소가 없는 빌드면 복구 코드·"준비 중"·[복구 코드로 불러오기] 없이 기록 파일 두 줄만 맨 위에 있다', async () => {
     renderApp(new MemoryRepository(phoneData()))
     await openSettings()
 
-    expect(screen.getByText('준비 중')).toBeInTheDocument()
-    expect(screen.getByTestId('recovery-code-value')).toHaveTextContent(PHONE_CODE)
-    expect(screen.queryByRole('button', { name: '복구 코드로 불러오기' })).not.toBeInTheDocument()
+    expect(screen.queryByText('준비 중')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('recovery-code-value')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /복구 코드/ })).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('settings-block-files')).getAllByTestId('list-row')).toHaveLength(2)
   })
 
   it('AC-4 7일 넘게 보관하지 못했으면 장부 위에 안내 띠가 뜬다', () => {
@@ -127,7 +135,8 @@ describe('SPEC-006 복구 코드로 자동 보관 (화면)', () => {
     const { server } = await serverWithKept()
     const repository = renderApp(new MemoryRepository(phoneData()), keepWith(server))
     await openSettings()
-    await userEvent.click(screen.getByRole('button', { name: '복구 코드로 불러오기' }))
+    await openMoreWays()
+    await userEvent.click(screen.getByRole('button', { name: /^복구 코드로 불러오기/ }))
     await restoreWithCode(KEPT_CODE.toLowerCase())
 
     const dialog = await screen.findByRole('alertdialog', { name: '보관본으로 바꿀까요?' })
@@ -145,7 +154,8 @@ describe('SPEC-006 복구 코드로 자동 보관 (화면)', () => {
     const { server } = await serverWithKept()
     const repository = renderApp(new MemoryRepository(phoneData()), keepWith(server))
     await openSettings()
-    await userEvent.click(screen.getByRole('button', { name: '복구 코드로 불러오기' }))
+    await openMoreWays()
+    await userEvent.click(screen.getByRole('button', { name: /^복구 코드로 불러오기/ }))
     await restoreWithCode('AB2C-DE3F-GH4J-KM5P')
 
     expect(await screen.findByText('이 코드로 보관된 기록이 없어요. 코드를 다시 확인해 주세요')).toBeInTheDocument()
@@ -156,7 +166,7 @@ describe('SPEC-006 복구 코드로 자동 보관 (화면)', () => {
     const { server } = await serverWithKept()
     const repository = renderApp(new MemoryRepository(), keepWith(server))
 
-    expect(screen.getByRole('button', { name: '백업 불러오기' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '기록 파일 불러오기' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '복구 코드로 불러오기' }))
     expect(screen.getByRole('heading', { level: 1, name: '복구 코드로 불러오기' })).toBeInTheDocument()
 
@@ -187,7 +197,7 @@ describe('SPEC-006 복구 코드로 자동 보관 (화면)', () => {
   it('AC-6 [보내기] 는 공유 화면을 열고 보냈다고 알린다', async () => {
     const share = vi.fn(() => Promise.resolve())
     Object.defineProperty(navigator, 'share', { value: share, configurable: true })
-    renderApp(new MemoryRepository(phoneData()))
+    renderApp(new MemoryRepository(phoneData()), keepWith(fakeServer().server))
     await openSettings()
     await userEvent.click(screen.getByRole('button', { name: '복구 코드 보내기' }))
 
@@ -197,7 +207,7 @@ describe('SPEC-006 복구 코드로 자동 보관 (화면)', () => {
 
   it('AC-6 공유가 안 되면 복사하고 "복사했어요"', async () => {
     const user = userEvent.setup()
-    renderApp(new MemoryRepository(phoneData()))
+    renderApp(new MemoryRepository(phoneData()), keepWith(fakeServer().server))
     await user.click(screen.getByRole('button', { name: /^설정/ }))
     await user.click(screen.getByRole('button', { name: '복구 코드 보내기' }))
 
@@ -205,20 +215,22 @@ describe('SPEC-006 복구 코드로 자동 보관 (화면)', () => {
     expect(await navigator.clipboard.readText()).toBe(`우리 장부 복구 코드: ${PHONE_CODE}`)
   })
 
-  it('자동 보관을 끄며 [지우기] 를 고르면 서버 사본을 지우고 줄이 "꺼짐" 이 된다', async () => {
+  it('자동으로 지키기를 끄며 [지우기] 를 고르면 서버 사본을 지우고 줄이 "꺼짐" 이 된다', async () => {
     const { server, removed } = fakeServer()
     const keep = keepWith(server)
     keep.keeper.start(phoneData())
     await keep.keeper.idle()
     renderApp(new MemoryRepository(phoneData()), keep)
     await openSettings()
+    await openMoreWays()
 
-    await userEvent.click(screen.getByRole('button', { name: /^자동 보관/ }))
-    await userEvent.click(within(screen.getByRole('group', { name: '자동 보관' })).getByRole('button', { name: '끄기' }))
+    await userEvent.click(screen.getByRole('button', { name: /^자동으로 지키기/ }))
+    await userEvent.click(within(screen.getByRole('group', { name: '자동으로 지키기' })).getByRole('button', { name: '끄기' }))
     await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '지우기' }))
 
-    expect(await screen.findByText('자동 보관을 끄고 보관해 둔 기록을 지웠어요')).toBeInTheDocument()
+    expect(await screen.findByText('자동으로 지키기를 끄고 보관해 둔 기록을 지웠어요')).toBeInTheDocument()
     expect(removed).toEqual([await keepIdOf(PHONE_CODE)])
-    expect(screen.getByRole('button', { name: /^자동 보관/ })).toHaveTextContent('꺼짐')
+    expect(screen.getByRole('button', { name: /^자동으로 지키기/ })).toHaveTextContent('꺼짐')
+    expect(screen.getByTestId('keep-status')).toHaveTextContent('자동으로 지키기 꺼짐')
   })
 })

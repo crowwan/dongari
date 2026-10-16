@@ -39,8 +39,9 @@ function localDate(now: Date): string {
 export function createBackup(data: StoredData, now: Date): BackupFile {
   const contents: StoredData = { ...data, settings: { ...data.settings, lastBackupAt: now.toISOString() } }
   return {
-    // 앱 이름 기준 (SPEC-005 "우리 장부"). 파일 이름이라 띄어쓰기 없이
-    fileName: `우리장부-백업-${localDate(now)}.txt`,
+    // 앱 이름 기준 (SPEC-005 "우리 장부") + 화면 말 "기록 파일" (SPEC-006 v2.6). 파일 이름이라 띄어쓰기 없이.
+    // 불러오기는 파일 이름을 보지 않아 예전 이름(우리장부-백업-…)도 그대로 열린다
+    fileName: `우리장부-기록-${localDate(now)}.txt`,
     text: JSON.stringify(contents, null, 2),
   }
 }

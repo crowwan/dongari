@@ -9,12 +9,12 @@ describe('SPEC-002 백업 불러오기 문구', () => {
   })
 
   it('장부가 없는 백업 파일이면 그렇다고 알리고 묻는다', () => {
-    expect(importConfirmTitle({ bookCount: 0, entryCount: 0 })).toBe('장부가 없는 백업 파일이에요. 불러올까요?')
+    expect(importConfirmTitle({ bookCount: 0, entryCount: 0 })).toBe('장부가 없는 기록 파일이에요. 불러올까요?')
   })
 
   it.each<[BackupReadFailure, string]>([
-    ['broken', '우리 장부에서 보낸 백업 파일인지 확인해 주세요'],
-    ['not-backup', '우리 장부에서 보낸 백업 파일인지 확인해 주세요'],
+    ['broken', '우리 장부에서 보낸 기록 파일인지 확인해 주세요'],
+    ['not-backup', '우리 장부에서 보낸 기록 파일인지 확인해 주세요'],
     ['newer-version', '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
   ])('AC-4 %s 파일은 "이 파일은 열 수 없어요" 와 할 일을 알린다', (reason, description) => {
     expect(importFailureMessage(reason)).toEqual({ title: '이 파일은 열 수 없어요', description })

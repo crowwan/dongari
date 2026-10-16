@@ -64,32 +64,32 @@ function stubShare(share: (data: ShareData) => Promise<void> = () => Promise.res
   return { shareMock, sharedFiles }
 }
 
-function textFile(text: string, name = '우리장부-백업-2026-10-03.txt'): File {
+function textFile(text: string, name = '우리장부-기록-2026-10-03.txt'): File {
   return new File([text], name, { type: 'text/plain' })
 }
 
 async function chooseFile(file: File) {
-  await userEvent.upload(screen.getByLabelText('백업 파일 고르기'), file)
+  await userEvent.upload(screen.getByLabelText('기록 파일 고르기'), file)
 }
 
 async function openSettings() {
   await userEvent.click(screen.getByRole('button', { name: '설정' }))
 }
 
-describe('SPEC-002 백업 파일 보내기·불러오기', () => {
+describe('SPEC-002 기록 파일 보내기·불러오기', () => {
   afterEach(() => {
     Reflect.deleteProperty(navigator, 'canShare')
     Reflect.deleteProperty(navigator, 'share')
     vi.restoreAllMocks()
   })
 
-  it('설정에 기록 지키기 묶음과 [백업 파일 보내기] [백업 파일 불러오기] 가 있다', async () => {
+  it('설정 맨 위에 [기록 파일 보내기] [기록 파일 불러오기] 가 있다 (서버 주소 없는 빌드)', async () => {
     renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
     await openSettings()
 
-    const card = within(screen.getByRole('region', { name: '기록 지키기' }))
-    expect(card.getByRole('button', { name: /^백업 파일 보내기/ })).toBeInTheDocument()
-    expect(card.getByRole('button', { name: /^백업 파일 불러오기/ })).toBeInTheDocument()
+    const card = within(screen.getByTestId('settings-block-files'))
+    expect(card.getByRole('button', { name: /^기록 파일 보내기/ })).toBeInTheDocument()
+    expect(card.getByRole('button', { name: /^기록 파일 불러오기/ })).toBeInTheDocument()
   })
 
   describe('보내기', () => {
@@ -98,14 +98,14 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openSettings()
 
-      await userEvent.click(screen.getByRole('button', { name: /^백업 파일 보내기/ }))
+      await userEvent.click(screen.getByRole('button', { name: /^기록 파일 보내기/ }))
 
       expect(shareMock).toHaveBeenCalledOnce()
-      expect(sharedFiles.map((file) => file.name)).toEqual(['우리장부-백업-2026-10-03.txt'])
+      expect(sharedFiles.map((file) => file.name)).toEqual(['우리장부-기록-2026-10-03.txt'])
       // 파일 안 마지막 백업 시각은 그 파일을 만든 시각 (#38)
       // 복구 코드도 파일에 든다 (SPEC-006 AC-7)
       expect(JSON.parse(await sharedFiles[0].text())).toEqual(backedUpAt(storedWith(LEDGER_2026), TODAY))
-      expect(await screen.findByText('백업 파일을 보냈어요')).toBeInTheDocument()
+      expect(await screen.findByText('기록 파일을 보냈어요')).toBeInTheDocument()
       expect(repository.load().data.settings).toEqual({
         lastChangedAt: '2026-10-01T00:00:00.000Z',
         lastBackupAt: TODAY.toISOString(),
@@ -118,7 +118,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openSettings()
 
-      await userEvent.click(screen.getByRole('button', { name: /^백업 파일 보내기/ }))
+      await userEvent.click(screen.getByRole('button', { name: /^기록 파일 보내기/ }))
 
       await vi.waitFor(() => expect(shareMock).toHaveBeenCalledOnce())
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
@@ -133,16 +133,16 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openSettings()
 
-      await userEvent.click(screen.getByRole('button', { name: /^백업 파일 보내기/ }))
+      await userEvent.click(screen.getByRole('button', { name: /^기록 파일 보내기/ }))
 
       expect(click).toHaveBeenCalledOnce()
-      expect(await screen.findByText('백업 파일을 다운로드 폴더에 저장했어요')).toBeInTheDocument()
+      expect(await screen.findByText('기록 파일을 다운로드 폴더에 저장했어요')).toBeInTheDocument()
       expect(repository.load().data.settings.lastBackupAt).toBe(TODAY.toISOString())
       Reflect.deleteProperty(URL, 'createObjectURL')
       Reflect.deleteProperty(URL, 'revokeObjectURL')
     })
 
-    it('저장 실패 안내 띠의 [백업 파일 보내기] 로도 보낸다', async () => {
+    it('저장 실패 안내 띠의 [기록 파일 보내기] 로도 보낸다', async () => {
       const { shareMock } = stubShare()
       const memory = new MemoryRepository(storedWith(LEDGER_2026))
       renderApp({ load: () => memory.load(), save: () => ({ ok: false, reason: 'quota-exceeded' }), restore: (data) => memory.restore(data) })
@@ -151,7 +151,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       await userEvent.type(screen.getByLabelText('장부 이름'), '2')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
-      await userEvent.click(within(screen.getByTestId('notice-bar')).getByRole('button', { name: '백업 파일 보내기' }))
+      await userEvent.click(within(screen.getByTestId('notice-bar')).getByRole('button', { name: '기록 파일 보내기' }))
 
       expect(shareMock).toHaveBeenCalledOnce()
     })
@@ -163,14 +163,14 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const { sharedFiles } = stubShare()
       renderApp(new MemoryRepository(original))
       await openSettings()
-      await userEvent.click(screen.getByRole('button', { name: /^백업 파일 보내기/ }))
-      await screen.findByText('백업 파일을 보냈어요')
+      await userEvent.click(screen.getByRole('button', { name: /^기록 파일 보내기/ }))
+      await screen.findByText('기록 파일을 보냈어요')
       const backupFile = sharedFiles[0]
       cleanup()
 
-      // 데이터를 지운 새 폰: 첫 실행 화면 위쪽 [백업 불러오기]
+      // 데이터를 지운 새 폰: 첫 실행 화면 위쪽 [기록 파일 불러오기]
       const fresh = renderApp(new MemoryRepository())
-      await userEvent.click(screen.getByRole('button', { name: '백업 불러오기' }))
+      await userEvent.click(screen.getByRole('button', { name: '기록 파일 불러오기' }))
       await chooseFile(backupFile)
 
       const dialog = await screen.findByRole('alertdialog', { name: '장부 1개, 기록 3건으로 바꿀까요?' })
@@ -183,6 +183,18 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('210,000원')
       expect(screen.getByRole('status')).toHaveTextContent('불러왔어요')
       expect(fresh.load().data).toEqual(backedUpAt(original, TODAY))
+    })
+
+    it('SPEC-006 v2.6 이름이 바뀌기 전에 보낸 파일(우리장부-백업-…)도 그대로 불러온다', async () => {
+      const original = storedWith(LEDGER_2025, LEDGER_2026)
+      const fresh = renderApp(new MemoryRepository())
+
+      await userEvent.click(screen.getByRole('button', { name: '기록 파일 불러오기' }))
+      await chooseFile(textFile(JSON.stringify(original), '우리장부-백업-2026-09-03.txt'))
+      await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '불러오기' }))
+
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('꽃동산')
+      expect(fresh.load().data).toEqual(original)
     })
 
     it('지금 기록이 있으면 바뀐다고 알리는 위험 확인 창을 띄우고, [아니요] 면 아무것도 바꾸지 않는다', async () => {
@@ -217,8 +229,8 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
     })
 
     it.each([
-      ['깨진 JSON', '{"schemaVersion": 2,', '우리 장부에서 보낸 백업 파일인지 확인해 주세요'],
-      ['다른 형식', JSON.stringify({ name: '가계부' }), '우리 장부에서 보낸 백업 파일인지 확인해 주세요'],
+      ['깨진 JSON', '{"schemaVersion": 2,', '우리 장부에서 보낸 기록 파일인지 확인해 주세요'],
+      ['다른 형식', JSON.stringify({ name: '가계부' }), '우리 장부에서 보낸 기록 파일인지 확인해 주세요'],
       ['상위 버전', JSON.stringify({ schemaVersion: 4, books: [], settings: {} }), '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
     ])('AC-4 %s 파일은 불러오지 않고 "이 파일은 열 수 없어요" 를 알리며 기존 데이터를 유지한다', async (_label, text, description) => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
@@ -256,7 +268,7 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       localStorage.clear()
     })
 
-    it('원본을 옮기지 못해 저장을 막았으면 안내 띠의 [백업 파일 불러오기] 로 풀고 이후 기록이 저장된다', async () => {
+    it('원본을 옮기지 못해 저장을 막았으면 안내 띠의 [기록 파일 불러오기] 로 풀고 이후 기록이 저장된다', async () => {
       localStorage.setItem(STORAGE_KEY, 'not json')
       const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
         throw new DOMException('용량 초과', 'QuotaExceededError')
@@ -269,9 +281,9 @@ describe('SPEC-002 백업 파일 보내기·불러오기', () => {
       const notice = screen.getByTestId('notice-bar')
       expect(within(notice).getByRole('alert')).toHaveTextContent('저장된 기록을 읽지 못했어요. 지금 적는 내용은 저장되지 않아요')
       // 같은 버튼이 안내 띠에 있으니 첫 실행 화면 위쪽 버튼은 숨긴다
-      expect(screen.queryByRole('button', { name: '백업 불러오기' })).not.toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: '기록 파일 불러오기' })).toEqual([within(notice).getByRole('button', { name: '기록 파일 불러오기' })])
 
-      await userEvent.click(within(notice).getByRole('button', { name: '백업 파일 불러오기' }))
+      await userEvent.click(within(notice).getByRole('button', { name: '기록 파일 불러오기' }))
       await chooseFile(textFile(JSON.stringify(storedWith(LEDGER_2026))))
       await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '불러오기' }))
 

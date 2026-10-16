@@ -12,6 +12,7 @@
 - 테스트: 스펙 ID 를 테스트 묶음 이름에, AC 내용을 테스트 이름에 한글로.
 - 릴리스: `/release v2.0`
 - 디자인 기준(큰 글씨·쉬운 말)은 `docs/design.md`. 대상 기기는 갤럭시(삼성 인터넷·크롬).
+- 화면 말(v2.6 #120): "백업 파일" → **기록 파일**, "자동 보관" → **자동으로 지키기**. 화면 문구·화면 읽기 이름에만 쓰고, 코드 이름(`backup.ts`·`useBackup`·`AutoKeeper` 등)·저장 키·개발 문서는 옛 말 그대로 둔다(SPEC-006 v2.6 "용어 바꾸기").
 - 개발 서버는 3000 포트 금지 → `npm run dev -- --port 7777`.
 
 ## 현재 상태
@@ -44,7 +45,7 @@ npm run build:preview        # 미리보기 경로(/dongari/preview/)로 빌드
 ```
 
 - 빌드 경로는 환경변수 `APP_BASE`(기본 `/dongari/`) 하나로 정한다 (`vite.config.ts`). 화면 파일·아이콘 경로, manifest `id`·`start_url`·`scope`, 서비스 워커 범위가 모두 따라간다. `build:preview` 는 `APP_BASE=/dongari/preview/`.
-- 자동 보관 서버 주소는 빌드 환경변수 `VITE_KEEP_URL`(SPEC-006). 없으면 자동 보관이 꺼진다(설정 "준비 중", 복구 코드로 불러오기 없음). 배포 워크플로는 저장소 변수(Settings → Secrets and variables → Actions → Variables) `KEEP_URL` 을 넘긴다. 로컬에서 보려면 `VITE_KEEP_URL=http://localhost:8787 npm run dev -- --port 7777` + `cd worker && npx wrangler dev --local --port 8787`(서버는 `crowwan.github.io` 출처만 받으니 로컬 화면 확인은 CORS 를 여는 가짜 서버로)
+- 자동 보관 서버 주소는 빌드 환경변수 `VITE_KEEP_URL`(SPEC-006). 없으면 자동 보관이 꺼진다(설정 맨 위 복구 코드 카드·"다른 방법으로 옮기기" 없이 기록 파일 보내기·불러오기 두 줄만, 복구 코드로 불러오기 없음, v2.6 #120). 배포 워크플로는 저장소 변수(Settings → Secrets and variables → Actions → Variables) `KEEP_URL` 을 넘긴다. 로컬에서 보려면 `VITE_KEEP_URL=http://localhost:8787 npm run dev -- --port 7777` + `cd worker && npx wrangler dev --local --port 8787`(서버는 `crowwan.github.io` 출처만 받으니 로컬 화면 확인은 CORS 를 여는 가짜 서버로)
 
 ### 배포 (자동, `.github/workflows/deploy.yml`, #52)
 

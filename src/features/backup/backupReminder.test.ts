@@ -111,13 +111,13 @@ describe('SPEC-002 저장 데이터로 백업 안내 판단', () => {
 })
 
 describe('SPEC-002 설정 카드 마지막 백업 문구', () => {
-  it('마지막 백업 날짜를 폰 날짜로 "마지막 백업: YYYY년 M월 D일" 로 보여 준다', () => {
+  it('마지막 백업 날짜를 폰 날짜로 "마지막: YYYY년 M월 D일" 로 보여 준다', () => {
     const local = new Date(2026, 8, 3, 23, 30).toISOString()
-    expect(lastBackupText(local)).toBe('마지막 백업: 2026년 9월 3일')
+    expect(lastBackupText(local)).toBe('마지막: 2026년 9월 3일')
   })
 
-  it('백업한 적이 없거나 시각이 깨졌으면 "아직 백업하지 않았어요"', () => {
-    expect(lastBackupText(undefined)).toBe('아직 백업하지 않았어요')
-    expect(lastBackupText('깨짐')).toBe('아직 백업하지 않았어요')
+  it('백업한 적이 없거나 시각이 깨졌으면 "아직 보내지 않았어요"', () => {
+    expect(lastBackupText(undefined)).toBe('아직 보내지 않았어요')
+    expect(lastBackupText('깨짐')).toBe('아직 보내지 않았어요')
   })
 })

@@ -38,7 +38,7 @@ describe('SPEC-001 앱 뼈대', () => {
       expect(screen.getByLabelText('장부 이름')).toHaveValue('')
       // 안내 "모르면 0으로 두고…" 와 맞게 이월금 칸은 0 으로 시작한다
       expect(screen.getByLabelText('작년 이월금')).toHaveValue('0')
-      expect(screen.getByRole('button', { name: '백업 불러오기' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '기록 파일 불러오기' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: '설정' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: '장부로' })).not.toBeInTheDocument()
     })
@@ -315,7 +315,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await renameBook('2')
 
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
-      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 기록 파일을 보내 두세요')
     })
 
     it('편집 화면에서 안드로이드 뒤로 버튼을 누르면 설정 목록으로, 한 번 더 누르면 장부로 돌아온다', async () => {
@@ -472,7 +472,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
-      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 기록 파일을 보내 두세요')
     })
 
     it('AC-12 입력창을 열면 방문 기록을 하나 쌓고, 안드로이드 뒤로 버튼(popstate)으로 입력창만 닫힌다', async () => {
@@ -649,7 +649,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByTestId('month-stepper-label')).toHaveTextContent('8월')
-      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 기록 파일을 보내 두세요')
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
       // 그 전에 저장한 내역은 그대로다
       expect(savedLedger(repository, 2026)?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '대관료'])
@@ -728,7 +728,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
-      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 기록 파일을 보내 두세요')
     })
 
     it('AC-7 [이 내역 지우기] → 확인 창에서 [아니요] 면 지우지 않고 고치기 화면에 남는다', async () => {
@@ -777,7 +777,7 @@ describe('SPEC-001 앱 뼈대', () => {
 
       expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
       expect(screen.getByRole('status')).toBeEmptyDOMElement()
-      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 기록 파일을 보내 두세요')
     })
   })
 
@@ -921,7 +921,7 @@ describe('SPEC-001 앱 뼈대', () => {
       await renameBook('2')
       await userEvent.click(screen.getByRole('button', { name: '장부로' }))
 
-      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 백업 파일을 보내 두세요')
+      expect(screen.getByRole('alert')).toHaveTextContent('저장하지 못했어요. 기록 파일을 보내 두세요')
       expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
     })
   })

@@ -38,7 +38,7 @@ type HarnessProps = {
   install?: InstallOptions
   kind?: BookKind
   canDeleteBook?: boolean
-  // 자동 보관 줄 (없으면 서버 주소가 없는 빌드 — "준비 중")
+  // 자동으로 지키기 (없으면 서버 주소가 없는 빌드 — 맨 위 카드 없이 기록 파일 두 줄)
   keep?: KeepRow
   recoveryCode?: string
   // 복구 코드로 불러오기에 쓰는 서버 (없으면 줄이 없다)
@@ -95,7 +95,7 @@ function pressBackButton() {
 
 describe('SPEC-001·002 설정 화면', () => {
   describe('줄 목록', () => {
-    it('SPEC-005 묶음 제목(장부 정보 / 기록 지키기) 아래 아이콘 + 이름 + 값 + 화살표 줄이 있다', () => {
+    it('SPEC-005 묶음 제목(장부 정보) 아래 아이콘 + 이름 + 값 + 화살표 줄이 있다', () => {
       render(<Harness lastBackupAt="2026-09-03T10:00:00.000+09:00" />)
 
       const book = screen.getByRole('region', { name: '장부 정보' })
@@ -113,14 +113,14 @@ describe('SPEC-001·002 설정 화면', () => {
         'calendar',
       ])
       // 줄 끝 화살표는 "누르면 들어간다" 표시
-      expect(rows.every((row) => row.querySelector('[data-icon="right"]') !== null)).toBe(true)
+      // 줄 끝 › 는 값 안이 아니라 ListRow chevron (큰 글씨에서 값이 아래 줄로 내려가도 줄 끝에 남는다, SPEC-001 v2.6)
+      expect(rows.every((row) => within(row).queryByTestId('list-row-chevron')?.querySelector('[data-icon="right"]'))).toBe(true)
+      expect(rows.every((row) => row.querySelector('.ui-row__end [data-icon="right"]') === null)).toBe(true)
 
-      const backup = screen.getByRole('region', { name: '기록 지키기' })
-      // 값이 없는 줄은 끝에 화살표만 있다
-      expect(within(backup).getAllByTestId('list-row').map((row) => row.textContent?.trim())).toEqual([
-        '자동 보관 준비 중',
-        '백업 파일 보내기 마지막 백업: 2026년 9월 3일',
-        '백업 파일 불러오기 새 폰으로 옮길 때',
+      // 값이 없는 줄은 끝에 화살표만 있다 (서버 주소 없는 빌드: 맨 위 기록 파일 두 줄)
+      expect(within(screen.getByTestId('settings-block-files')).getAllByTestId('list-row').map((row) => row.textContent?.trim())).toEqual([
+        '기록 파일 보내기 마지막: 2026년 9월 3일',
+        '기록 파일 불러오기 받아 둔 파일로 기록 되살리기',
       ])
     })
 
@@ -139,25 +139,25 @@ describe('SPEC-001·002 설정 화면', () => {
       expect(screen.getByRole('button', { name: /장부 연도/ })).toBeInTheDocument()
     })
 
-    it('[백업 파일 보내기] [백업 파일 불러오기] 줄은 누르면 바로 그 일을 한다', async () => {
+    it('[기록 파일 보내기] [기록 파일 불러오기] 줄은 누르면 바로 그 일을 한다', async () => {
       const onSendBackup = vi.fn()
       const onImportBackup = vi.fn()
       render(<Harness handlers={{ onSendBackup, onImportBackup }} />)
 
-      await userEvent.click(screen.getByRole('button', { name: /백업 파일 보내기/ }))
-      await userEvent.click(screen.getByRole('button', { name: /백업 파일 불러오기/ }))
+      await userEvent.click(screen.getByRole('button', { name: /기록 파일 보내기/ }))
+      await userEvent.click(screen.getByRole('button', { name: /기록 파일 불러오기/ }))
 
       expect(onSendBackup).toHaveBeenCalledOnce()
       expect(onImportBackup).toHaveBeenCalledOnce()
     })
 
-    it('한 달 넘게 백업하지 않았으면 제목 아래 백업 안내 띠와 [백업 파일 보내기] 가 보인다', async () => {
+    it('한 달 넘게 기록 파일을 보내지 않았으면 제목 아래 안내 띠와 [기록 파일 보내기] 가 보인다', async () => {
       const onSendBackup = vi.fn()
       render(<Harness needsBackup handlers={{ onSendBackup }} />)
 
       const notice = screen.getByTestId('notice-bar')
-      expect(notice).toHaveTextContent('한 달 넘게 백업하지 않았어요')
-      await userEvent.click(within(notice).getByRole('button', { name: '백업 파일 보내기' }))
+      expect(notice).toHaveTextContent('한 달 넘게 기록 파일을 보내지 않았어요')
+      await userEvent.click(within(notice).getByRole('button', { name: '기록 파일 보내기' }))
 
       expect(onSendBackup).toHaveBeenCalledOnce()
     })
@@ -171,7 +171,7 @@ describe('SPEC-001·002 설정 화면', () => {
 
       expect(screen.getByRole('heading', { level: 1, name: '장부 이름 바꾸기' })).toBeInTheDocument()
       expect(screen.getByLabelText('장부 이름')).toHaveValue('한랑드림')
-      expect(screen.queryByRole('region', { name: '기록 지키기' })).not.toBeInTheDocument()
+      expect(screen.queryByTestId('settings-block-files')).not.toBeInTheDocument()
       // 바꾼 것이 없으면 [저장] 을 누를 수 없다
       expect(screen.getByRole('button', { name: '저장' })).toBeDisabled()
     })
@@ -375,11 +375,7 @@ describe('SPEC-001·002 설정 화면', () => {
       render(<Harness />)
 
       const groups = screen.getAllByRole('region')
-      expect(groups.map((group) => group.querySelector('h2')?.textContent)).toEqual([
-        '장부 정보',
-        '기록 지키기',
-        '앱',
-      ])
+      expect(groups.map((group) => group.querySelector('h2')?.textContent)).toEqual(['장부 정보', '앱'])
       const row = within(screen.getByRole('region', { name: '앱' })).getByTestId('list-row')
       expect(row.textContent?.trim()).toBe('홈 화면에 추가 기록이 더 안전해요')
       expect(row.querySelector('[data-icon="phone"]')).toBeInTheDocument()
@@ -486,7 +482,7 @@ describe('SPEC-001·002 설정 화면', () => {
   })
 })
 
-describe('SPEC-006 설정 기록 지키기', () => {
+describe('SPEC-006 설정 기록 지키기 (v2.6 맨 위 카드·다른 방법으로 옮기기)', () => {
   const NOT_FOUND_SERVER: KeepServer = {
     put: async () => 'ok',
     get: async () => ({ status: 'not-found' }),
@@ -495,40 +491,67 @@ describe('SPEC-006 설정 기록 지키기', () => {
   }
 
   function keepRow(overrides: Partial<KeepRow> = {}): KeepRow {
-    return { status: '켜짐 · 3분 전', enabled: true, tooLarge: false, onTurnOn: vi.fn(), onTurnOff: vi.fn(), ...overrides }
+    return {
+      statusText: '자동으로 지키기 켜짐 · 3분 전에 보관했어요',
+      enabled: true,
+      tooLarge: false,
+      onTurnOn: vi.fn(),
+      onTurnOff: vi.fn(),
+      ...overrides,
+    }
   }
 
-  it('AC-1 복구 코드를 크게 보이고 새 폰에서 넣으라고 안내한다', () => {
-    render(<Harness keep={keepRow()} />)
+  const keepCard = () => screen.getByRole('region', { name: '새 폰으로 옮기려면 이 코드만 적어 두세요' })
+  const moreToggle = () => screen.getByRole('button', { name: '다른 방법으로 옮기기' })
 
-    const group = within(screen.getByRole('region', { name: '기록 지키기' }))
-    expect(group.getByTestId('recovery-code-value')).toHaveTextContent('HK7M-29QF-MX4P-8R2D')
-    expect(group.getByText('새 폰에서 이 코드를 넣으면 기록이 돌아와요. 가족에게도 보내 두세요.')).toBeInTheDocument()
+  async function openMore() {
+    await userEvent.click(moreToggle())
+  }
+
+  async function openKeepSheet() {
+    await openMore()
+    await userEvent.click(screen.getByRole('button', { name: /^자동으로 지키기/ }))
+  }
+
+  it('AC-10 설정 맨 위 카드 안에 제목·복구 코드·안내·주 버튼 [복구 코드 보내기]·상태 줄이 이 순서로 있다', () => {
+    render(<Harness keep={keepRow()} keepServer={NOT_FOUND_SERVER} />)
+
+    const card = keepCard()
+    const parts = [
+      within(card).getByRole('heading', { level: 2, name: '새 폰으로 옮기려면 이 코드만 적어 두세요' }),
+      within(card).getByTestId('recovery-code-value'),
+      within(card).getByText('새 폰에서 이 코드를 넣으면 기록이 돌아와요. 가족에게도 보내 두세요.'),
+      within(card).getByRole('button', { name: '복구 코드 보내기' }),
+      within(card).getByTestId('keep-status'),
+    ]
+    expect(parts[1]).toHaveTextContent('HK7M-29QF-MX4P-8R2D')
+    // 문서 순서가 위 순서와 같다
+    for (let index = 1; index < parts.length; index += 1) {
+      expect(parts[index - 1].compareDocumentPosition(parts[index]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    }
+    // 설정 화면의 주 버튼은 [복구 코드 보내기] 하나
+    expect(within(card).getByRole('button', { name: '복구 코드 보내기' })).toHaveAttribute('data-variant', 'primary')
   })
 
-  it('자동 보관 줄에 켜짐과 마지막 보관 시각이 보인다 (구름 아이콘)', () => {
-    render(<Harness keep={keepRow()} />)
+  it('AC-11 상태 줄은 구름 아이콘 + 상태 글자이고 누를 수 없다', () => {
+    render(<Harness keep={keepRow()} keepServer={NOT_FOUND_SERVER} />)
 
-    const row = screen.getByRole('button', { name: /^자동 보관/ })
-    expect(row).toHaveTextContent('켜짐 · 3분 전')
-    expect(row.querySelector('[data-icon="cloud"]')).toBeInTheDocument()
+    const status = screen.getByTestId('keep-status')
+    expect(status).toHaveTextContent('자동으로 지키기 켜짐 · 3분 전에 보관했어요')
+    expect(status.querySelector('[data-icon="cloud"]')).toBeInTheDocument()
+    expect(status.closest('button')).toBeNull()
+    expect(within(keepCard()).getAllByRole('button').map((button) => button.textContent)).toEqual(['복구 코드 보내기'])
   })
 
-  it('서버 주소가 없는 빌드면 자동 보관 줄은 "준비 중" 이고 누를 수 없다. 복구 코드는 보인다', () => {
-    render(<Harness />)
+  it('보관본이 너무 커 올리지 못했으면 상태 줄 다음 줄에 기록 파일을 보내 두라고 알린다', () => {
+    render(<Harness keep={keepRow({ tooLarge: true })} keepServer={NOT_FOUND_SERVER} />)
 
-    expect(screen.queryByRole('button', { name: /^자동 보관/ })).not.toBeInTheDocument()
-    expect(screen.getByText('준비 중')).toBeInTheDocument()
-    expect(screen.getByTestId('recovery-code-value')).toHaveTextContent('HK7M-29QF-MX4P-8R2D')
-    expect(screen.queryByRole('button', { name: /복구 코드로 불러오기/ })).not.toBeInTheDocument()
+    const status = screen.getByTestId('keep-status')
+    const warning = within(keepCard()).getByText('기록이 너무 많아 보관하지 못했어요. 기록 파일을 보내 두세요')
+    expect(status.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('복구 코드가 아직 없으면(읽기 전용 등) 코드 칸이 없다', () => {
-    render(<Harness recoveryCode="" />)
-    expect(screen.queryByTestId('recovery-code-value')).not.toBeInTheDocument()
-  })
-
-  it('AC-6 [보내기] 를 누르면 코드 보내기를 알린다', async () => {
+  it('AC-6 [복구 코드 보내기] 를 누르면 코드 보내기를 알린다', async () => {
     const onShareCode = vi.fn()
     render(<Harness keep={keepRow()} handlers={{ onShareCode }} />)
 
@@ -536,12 +559,107 @@ describe('SPEC-006 설정 기록 지키기', () => {
     expect(onShareCode).toHaveBeenCalledOnce()
   })
 
-  it('자동 보관 줄을 누르면 [켜기 | 끄기] 선택 창, 끄기를 고르면 서버 사본을 지울지 묻는다 ([남겨 두기])', async () => {
+  it('AC-12 "다른 방법으로 옮기기" 는 처음엔 접혀 있고, 펼치면 네 줄이 순서대로 있다', async () => {
+    render(<Harness keep={keepRow()} keepServer={NOT_FOUND_SERVER} lastBackupAt="2026-10-15T10:00:00.000+09:00" />)
+
+    expect(moreToggle()).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: /기록 파일 보내기/ })).not.toBeInTheDocument()
+
+    await openMore()
+
+    expect(moreToggle()).toHaveAttribute('aria-expanded', 'true')
+    const body = screen.getByTestId('settings-more-body')
+    expect(moreToggle()).toHaveAttribute('aria-controls', body.id)
+    const rows = within(body).getAllByTestId('list-row')
+    expect(rows.map((row) => row.textContent?.trim())).toEqual([
+      '기록 파일 보내기 마지막: 2026년 10월 15일',
+      '기록 파일 불러오기 받아 둔 파일로 기록 되살리기',
+      '복구 코드로 불러오기 다른 폰의 코드를 넣기',
+      '자동으로 지키기 켜짐',
+    ])
+    expect(rows.map((row) => row.querySelector('[data-icon]')?.getAttribute('data-icon'))).toEqual(['share', 'folder', 'key', 'cloud'])
+
+    // 다시 누르면 접힌다
+    await userEvent.click(moreToggle())
+    expect(moreToggle()).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('settings-more-body')).not.toBeInTheDocument()
+  })
+
+  it('AC-12 펼친 기록 파일 줄은 지금 동작 그대로 보내기·불러오기를 한다', async () => {
+    const onSendBackup = vi.fn()
+    const onImportBackup = vi.fn()
+    render(<Harness keep={keepRow()} handlers={{ onSendBackup, onImportBackup }} />)
+    await openMore()
+
+    expect(screen.getByRole('button', { name: /^기록 파일 보내기/ })).toHaveTextContent('아직 보내지 않았어요')
+    await userEvent.click(screen.getByRole('button', { name: /^기록 파일 보내기/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^기록 파일 불러오기/ }))
+
+    expect(onSendBackup).toHaveBeenCalledOnce()
+    expect(onImportBackup).toHaveBeenCalledOnce()
+  })
+
+  it('30일 안내 띠가 떠 있어도 "다른 방법으로 옮기기" 는 접혀 있다', () => {
+    render(<Harness keep={keepRow()} needsBackup />)
+
+    expect(screen.getByTestId('notice-bar')).toHaveTextContent('한 달 넘게 기록 파일을 보내지 않았어요')
+    expect(moreToggle()).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('AC-13 설정 묶음 순서는 기록 지키기 카드 → 다른 방법으로 옮기기 → 장부 정보 → 앱 → [이 장부 지우기] 다', () => {
+    render(<Harness keep={keepRow()} keepServer={NOT_FOUND_SERVER} />)
+
+    const blocks = [...screen.getByTestId('settings-screen').querySelectorAll('[data-testid^="settings-block-"]')]
+    expect(blocks.map((block) => block.getAttribute('data-testid'))).toEqual([
+      'settings-block-keep',
+      'settings-block-more',
+      'settings-block-book',
+      'settings-block-app',
+      'settings-block-delete',
+    ])
+    expect(within(screen.getByTestId('settings-block-book')).getByRole('heading', { name: '장부 정보' })).toBeInTheDocument()
+  })
+
+  it('AC-14 서버 주소가 없는 빌드면 맨 위 카드·접기·"준비 중"·[복구 코드로 불러오기] 없이 기록 파일 두 줄이 맨 위에 있다', () => {
+    render(<Harness />)
+
+    expect(screen.queryByRole('region', { name: '새 폰으로 옮기려면 이 코드만 적어 두세요' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '다른 방법으로 옮기기' })).not.toBeInTheDocument()
+    expect(screen.queryByText('준비 중')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('recovery-code-value')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /복구 코드로 불러오기/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/자동으로 지키기/)).not.toBeInTheDocument()
+
+    const blocks = [...screen.getByTestId('settings-screen').querySelectorAll('[data-testid^="settings-block-"]')]
+    expect(blocks.map((block) => block.getAttribute('data-testid'))).toEqual([
+      'settings-block-files',
+      'settings-block-book',
+      'settings-block-app',
+      'settings-block-delete',
+    ])
+    expect(within(screen.getByTestId('settings-block-files')).getAllByTestId('list-row').map((row) => row.querySelector('.ui-row__title')?.textContent)).toEqual([
+      '기록 파일 보내기',
+      '기록 파일 불러오기',
+    ])
+  })
+
+  it('AC-14 복구 코드가 아직 없으면(읽기 전용 시작) 서버가 있어도 기록 파일 두 줄만 맨 위에 있다', () => {
+    render(<Harness keep={keepRow()} keepServer={NOT_FOUND_SERVER} recoveryCode="" />)
+
+    expect(screen.queryByTestId('recovery-code-value')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '다른 방법으로 옮기기' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /복구 코드로 불러오기/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^자동으로 지키기/ })).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('settings-block-files')).getAllByTestId('list-row')).toHaveLength(2)
+  })
+
+  it('자동으로 지키기 줄을 누르면 [켜기 | 끄기] 선택 창, 끄기를 고르면 서버 사본을 지울지 묻는다 ([남겨 두기])', async () => {
     const onTurnOff = vi.fn()
     render(<Harness keep={keepRow({ onTurnOff })} />)
 
-    await userEvent.click(screen.getByRole('button', { name: /^자동 보관/ }))
-    const options = within(screen.getByRole('group', { name: '자동 보관' }))
+    await openKeepSheet()
+    expect(screen.getByRole('dialog', { name: '자동으로 지키기' })).toBeInTheDocument()
+    const options = within(screen.getByRole('group', { name: '자동으로 지키기' }))
     expect(options.getByRole('button', { name: '켜기' })).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(options.getByRole('button', { name: '끄기' }))
 
@@ -557,60 +675,56 @@ describe('SPEC-006 설정 기록 지키기', () => {
     const onTurnOff = vi.fn()
     render(<Harness keep={keepRow({ onTurnOff })} />)
 
-    await userEvent.click(screen.getByRole('button', { name: /^자동 보관/ }))
-    await userEvent.click(within(screen.getByRole('group', { name: '자동 보관' })).getByRole('button', { name: '끄기' }))
+    await openKeepSheet()
+    await userEvent.click(within(screen.getByRole('group', { name: '자동으로 지키기' })).getByRole('button', { name: '끄기' }))
     await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '지우기' }))
 
     expect(onTurnOff).toHaveBeenCalledWith(true)
   })
 
-  it('꺼져 있을 때 켜기를 고르면 켜 달라고 알리고, 지금 상태를 다시 고르면 창만 닫는다', async () => {
+  it('꺼져 있으면 줄 값은 "꺼짐", 켜기를 고르면 켜 달라고 알리고, 지금 상태를 다시 고르면 창만 닫는다', async () => {
     const onTurnOn = vi.fn()
     const onTurnOff = vi.fn()
-    render(<Harness keep={keepRow({ status: '꺼짐', enabled: false, onTurnOn, onTurnOff })} />)
+    render(<Harness keep={keepRow({ statusText: '자동으로 지키기 꺼짐', enabled: false, onTurnOn, onTurnOff })} />)
 
-    await userEvent.click(screen.getByRole('button', { name: /^자동 보관/ }))
-    await userEvent.click(within(screen.getByRole('group', { name: '자동 보관' })).getByRole('button', { name: '끄기' }))
+    await openMore()
+    expect(screen.getByRole('button', { name: /^자동으로 지키기/ })).toHaveTextContent('꺼짐')
+    await userEvent.click(screen.getByRole('button', { name: /^자동으로 지키기/ }))
+    await userEvent.click(within(screen.getByRole('group', { name: '자동으로 지키기' })).getByRole('button', { name: '끄기' }))
     expect(onTurnOff).not.toHaveBeenCalled()
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /^자동 보관/ }))
-    await userEvent.click(within(screen.getByRole('group', { name: '자동 보관' })).getByRole('button', { name: '켜기' }))
+    await userEvent.click(screen.getByRole('button', { name: /^자동으로 지키기/ }))
+    await userEvent.click(within(screen.getByRole('group', { name: '자동으로 지키기' })).getByRole('button', { name: '켜기' }))
     expect(onTurnOn).toHaveBeenCalledOnce()
   })
 
-  it('보관본이 너무 커 올리지 못했으면 자동 보관 줄 아래에 알린다', () => {
-    render(<Harness keep={keepRow({ tooLarge: true })} />)
-    expect(screen.getByRole('button', { name: /^자동 보관/ })).toHaveTextContent('기록이 너무 많아 보관하지 못했어요. 백업 파일을 보내 두세요')
-  })
-
-  it('[복구 코드로 불러오기] 줄을 누르면 설정 위에 불러오기 화면이 열리고 [‹ 설정] 으로 돌아온다', async () => {
+  it('[복구 코드로 불러오기] 줄을 누르면 설정 위에 불러오기 화면이 열리고 [‹ 설정] 으로 돌아오면 펼친 채다', async () => {
     render(<Harness keep={keepRow()} keepServer={NOT_FOUND_SERVER} />)
+    await openMore()
 
-    const rows = within(screen.getByRole('region', { name: '기록 지키기' })).getAllByTestId('list-row')
-    expect(rows.at(-1)?.textContent?.trim()).toBe('복구 코드로 불러오기')
-    expect(rows.at(-1)?.querySelector('[data-icon="key"]')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '복구 코드로 불러오기' }))
+    await userEvent.click(screen.getByRole('button', { name: /^복구 코드로 불러오기/ }))
 
     expect(screen.getByRole('heading', { level: 1, name: '복구 코드로 불러오기' })).toBeInTheDocument()
     expect(screen.queryByTestId('settings-screen')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '설정' }))
     expect(screen.getByTestId('settings-screen')).toBeInTheDocument()
+    expect(moreToggle()).toHaveAttribute('aria-expanded', 'true')
   })
 
   describe('#110 접근성 점검 09 뒤로 버튼', () => {
-    it('자동 보관을 끄며 묻는 창에서 뒤로 버튼을 누르면 [남겨 두기] 와 같이 끄고(사본은 남김) 창만 닫힌다', async () => {
+    it('자동으로 지키기를 끄며 묻는 창에서 뒤로 버튼을 누르면 [남겨 두기] 와 같이 끄고(사본은 남김) 창만 닫힌다', async () => {
       const onTurnOff = vi.fn()
       render(<Harness keep={keepRow({ onTurnOff })} />)
-      await userEvent.click(screen.getByRole('button', { name: /^자동 보관/ }))
-      await userEvent.click(within(screen.getByRole('group', { name: '자동 보관' })).getByRole('button', { name: '끄기' }))
+      await openKeepSheet()
+      await userEvent.click(within(screen.getByRole('group', { name: '자동으로 지키기' })).getByRole('button', { name: '끄기' }))
       await screen.findByRole('alertdialog')
 
       pressBackButton()
 
       expect(onTurnOff).toHaveBeenCalledExactlyOnceWith(false)
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
-      expect(screen.queryByRole('group', { name: '자동 보관' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: '자동으로 지키기' })).not.toBeInTheDocument()
       expect(screen.getByTestId('settings-screen')).toBeInTheDocument()
     })
   })

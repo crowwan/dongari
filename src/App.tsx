@@ -5,7 +5,7 @@ import { useBackup } from './features/backup/useBackup'
 import { NewBookScreen } from './features/books/NewBookScreen'
 import type { KeepState } from './features/keep/AutoKeeper'
 import { KeepRestoreScreen } from './features/keep/KeepRestoreScreen'
-import { KEEP_REMINDER_MESSAGE, keepRowText, needsKeepReminder } from './features/keep/keepStatus'
+import { KEEP_REMINDER_MESSAGE, keepStatusText, needsKeepReminder } from './features/keep/keepStatus'
 import { recoveryCodeOf } from './features/keep/recoveryCode'
 import { shareRecoveryCode, type ShareCodeResult } from './features/keep/shareCode'
 import type { Keep } from './features/keep/startKeep'
@@ -149,23 +149,25 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
     })
   }
 
-  // 자동 보관 끄기: 서버 사본을 지우기로 했으면 지운 결과까지 알린다
+  // 자동으로 지키기 끄기: 서버 사본을 지우기로 했으면 지운 결과까지 알린다
   function turnOffKeep(forgetCopy: boolean) {
     if (!keep) return
     keep.keeper.setEnabled(false)
     if (!forgetCopy) {
-      setToast('자동 보관을 껐어요')
+      setToast('자동으로 지키기를 껐어요')
       return
     }
     void keep.keeper.forget().then((removed) =>
-      setToast(removed ? '자동 보관을 끄고 보관해 둔 기록을 지웠어요' : '자동 보관을 껐어요. 보관해 둔 기록은 지우지 못했어요'),
+      setToast(
+        removed ? '자동으로 지키기를 끄고 보관해 둔 기록을 지웠어요' : '자동으로 지키기를 껐어요. 보관해 둔 기록은 지우지 못했어요',
+      ),
     )
   }
 
-  // 저장 상태 안내는 어느 화면이든 맨 위에 (SPEC-002). 할 일이 있으면 백업 버튼을 붙인다
+  // 저장 상태 안내는 어느 화면이든 맨 위에 (SPEC-002). 할 일이 있으면 기록 파일 버튼을 붙인다
   const noticeActions: Record<StorageNoticeAction, { label: string; icon: IconName; onClick: () => void }> = {
-    'import-backup': { label: '백업 파일 불러오기', icon: 'folder', onClick: backup.startImport },
-    'send-backup': { label: '백업 파일 보내기', icon: 'share', onClick: backup.send },
+    'import-backup': { label: '기록 파일 불러오기', icon: 'folder', onClick: backup.startImport },
+    'send-backup': { label: '기록 파일 보내기', icon: 'share', onClick: backup.send },
   }
   const storageNoticeList = storageNotices(ledger.startup, ledger.saveFailure)
   const notices = storageNoticeList.map(({ message, action }) => (
@@ -183,7 +185,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
       if (restoreByCode && screen.name === 'keep-restore') {
         return <KeepRestoreScreen {...restoreByCode} dialogs={navigation} backLabel="뒤로" onBack={navigation.backToLedger} />
       }
-      // 첫 실행은 새 장부 만들기 (SPEC-005). 새 폰으로 옮길 때는 장부를 만들지 않고 백업 파일(안내 띠에 같은 버튼이 있으면 하나만)이나
+      // 첫 실행은 새 장부 만들기 (SPEC-005). 새 폰으로 옮길 때는 장부를 만들지 않고 기록 파일(안내 띠에 같은 버튼이 있으면 하나만)이나
       // 복구 코드(SPEC-006)로 불러온다
       return (
         <>
@@ -191,7 +193,7 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
             <div className="screen__top-end">
               {!noticeOffersImport && (
                 <IconButton icon="folder" onClick={backup.startImport}>
-                  백업 불러오기
+                  기록 파일 불러오기
                 </IconButton>
               )}
               {restoreByCode && (
@@ -242,12 +244,12 @@ export default function App({ repository, loaded, options, keep }: AppProps) {
             keep={
               keep &&
               keepState && {
-                status: keepRowText(keepState, now()),
+                statusText: keepStatusText(keepState, now()),
                 enabled: keepState.enabled,
                 tooLarge: keepState.tooLarge === true,
                 onTurnOn: () => {
                   keep.keeper.setEnabled(true)
-                  setToast('자동 보관을 켰어요')
+                  setToast('자동으로 지키기를 켰어요')
                 },
                 onTurnOff: turnOffKeep,
               }
