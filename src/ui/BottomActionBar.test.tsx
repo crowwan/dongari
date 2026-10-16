@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createRef } from 'react'
 import { BottomActionBar } from './BottomActionBar'
 
 describe('BottomActionBar', () => {
@@ -136,5 +137,64 @@ describe('SPEC-001 아래 고정 영역과 폰 키패드 (#70)', () => {
     render(<BottomActionBar label="저장" onClick={() => {}} />)
 
     expect(screen.getByTestId('bottom-action-bar')).toHaveAttribute('data-keyboard', 'closed')
+  })
+})
+
+describe('SPEC-003 아래 고정 버튼 둘: 보조 + 주 (v2.6)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('보조 버튼을 주면 보조(왼쪽) · 주(오른쪽) 두 버튼을 둔다', async () => {
+    const save = vi.fn()
+    const send = vi.fn()
+    render(<BottomActionBar icon="share" label="사진 보내기" onClick={send} secondary={{ icon: 'download', label: '사진으로 저장', onClick: save }} />)
+
+    const buttons = within(screen.getByTestId('bottom-action-bar')).getAllByRole('button')
+    expect(buttons.map((button) => [button.textContent, button.dataset.variant])).toEqual([
+      ['사진으로 저장', 'secondary'],
+      ['사진 보내기', 'primary'],
+    ])
+    await userEvent.click(buttons[0])
+    expect(save).toHaveBeenCalledOnce()
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('보조 버튼도 따로 비활성으로 둘 수 있고, 말풍선이 가리킬 ref 를 받는다', () => {
+    const ref = createRef<HTMLButtonElement>()
+    render(<BottomActionBar label="사진 보내기" onClick={() => {}} secondary={{ label: '사진으로 저장', onClick: () => {}, disabled: true }} secondaryRef={ref} />)
+
+    const save = screen.getByRole('button', { name: '사진으로 저장' })
+    expect(save).toBeDisabled()
+    expect(screen.getByRole('button', { name: '사진 보내기' })).toBeEnabled()
+    expect(ref.current).toBe(save)
+  })
+
+  it('안내 문장은 기본으로 주 버튼 설명이고, noteFor="secondary" 면 보조 버튼 설명이다', () => {
+    const note = "누른 다음 '이미지 저장'을 고르면 사진 앱에 들어가요"
+    render(<BottomActionBar label="사진 보내기" onClick={() => {}} note={note} noteFor="secondary" secondary={{ label: '사진으로 저장', onClick: () => {} }} />)
+
+    expect(screen.getByRole('button', { name: '사진으로 저장' })).toHaveAccessibleDescription(note)
+    expect(screen.getByRole('button', { name: '사진 보내기' })).not.toHaveAttribute('aria-describedby')
+  })
+
+  it('고정 영역 높이를 놓인 화면에 --bottom-bar-height 로 알려 준다 (버튼이 두 줄로 쌓여도 마지막 줄이 가리지 않게)', () => {
+    let notify: () => void = () => {}
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          notify = callback
+        }
+        observe() {}
+        disconnect() {}
+      },
+    )
+    const { container } = render(<BottomActionBar label="사진 보내기" onClick={() => {}} />)
+    vi.spyOn(screen.getByTestId('bottom-action-bar'), 'offsetHeight', 'get').mockReturnValue(152)
+
+    act(() => notify())
+
+    expect(container.style.getPropertyValue('--bottom-bar-height')).toBe('152px')
   })
 })

@@ -19,6 +19,8 @@ const styles = {
   },
   amountCell: { ...sheetCell, padding: '4px 8px', textAlign: 'right' },
   totalRow: { backgroundColor: SHEET_COLOR.headFill, fontWeight: 'bold' },
+  // 화면 읽기에만 들리는 글자 (보이는 양식·사진은 v1 그대로 빈 칸). html2canvas 는 투명한 글자를 그리지 않는다
+  readerOnly: { position: 'absolute', width: '1px', height: '1px', overflow: 'hidden', opacity: 0, whiteSpace: 'nowrap' },
 } satisfies Record<string, CSSProperties>
 
 type IncomeExpenseTableProps = {
@@ -32,7 +34,10 @@ export function IncomeExpenseTable({ months, totals }: IncomeExpenseTableProps) 
     <table style={styles.table} data-testid="year-month-table">
       <thead>
         <tr>
-          <th style={styles.headCell}></th>
+          {/* 왼쪽 위 빈 머리 칸: 달 칸의 이름 "월" (SPEC-003 v2.6 AC-18, 접근성 점검 03 axe 지적) */}
+          <th style={styles.headCell}>
+            <span style={styles.readerOnly}>월</span>
+          </th>
           <th style={styles.headCell}>수 입</th>
           <th style={styles.headCell}>지 출</th>
         </tr>

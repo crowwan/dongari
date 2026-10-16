@@ -286,6 +286,32 @@
   gap: var(--space-2);
 }
 
+/*
+ * 보조 + 주 두 버튼 (SPEC-003 v2.6 [사진으로 저장] [사진 보내기]): 보조는 글자 폭만큼, 주는 남은 폭을 다 쓴다.
+ * 글자를 키워 한 줄에 안 들어가면 줄을 바꾸되 wrap-reverse 라 뒤(주)가 위 줄, 앞(보조)이 아래 줄로 쌓이고 둘 다 폭을 채운다
+ */
+.ui-bottom-bar__pair {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  gap: var(--space-2);
+}
+
+.ui-bottom-bar__pair > .ui-button {
+  width: auto;
+  flex: 1 1 auto;
+}
+
+/* 보조는 한 단계 작은 글자·좁은 안쪽 여백으로 주 버튼보다 덜 띄게 */
+.ui-bottom-bar__pair > .ui-button:first-child {
+  padding: 0 var(--space-3);
+  font-size: var(--text-label-size);
+}
+
+/* 한 줄에 둘이 있을 때 남는 폭은 거의 다 주 버튼이 갖는다 */
+.ui-bottom-bar__pair > .ui-button:last-child {
+  flex-grow: 999;
+}
+
 /* 버튼 바로 위 한 줄 안내 (누를 수 없는 이유): 가운데, 보조 글자 */
 .ui-bottom-bar__note {
   margin: 0;

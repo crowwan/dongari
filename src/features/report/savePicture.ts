@@ -1,13 +1,18 @@
-// [사진으로 저장] 의 두 단계 (SPEC-003): 정리 영역 → PNG 사진 만들기, 사진 → 폰에 넣기(내려받기, 아이폰은 공유 시트).
-// 화면은 PictureSaver 로 받아서 쓰고, 테스트는 가짜를 넣는다
-import { shareFile, type ShareResult } from '../backup/sendFile'
+// [사진으로 저장]·[사진 보내기] 의 단계 (SPEC-003): 정리 영역 → PNG 사진 만들기, 사진 → 폰에 넣기(내려받기, 아이폰은 공유 시트)
+// 또는 폰 공유 창으로 보내기(v2.6). 화면은 PictureSaver 로 받아서 쓰고, 테스트는 가짜를 넣는다
+import { shareFile, type ShareApi, type ShareResult } from '../backup/sendFile'
 
 export type PictureSaver = {
   make: (element: HTMLElement) => Promise<Blob>
   download: (picture: Blob, fileName: string) => void
   // 아이폰·아이패드만: 공유 시트를 열어 "이미지 저장" 으로 사진 앱에 넣는다 (내려받으면 파일 앱으로 간다). 없으면 내려받기만
   share?: (picture: File) => Promise<ShareResult>
+  // 공유 창에 사진을 넘길 수 있는 폰만(갤럭시·아이폰): [사진 보내기]. 없으면 [사진 보내기] 를 숨긴다
+  send?: (picture: File) => Promise<ShareResult>
 }
+
+// 사진 저장·보내기가 보는 navigator 기능만 (테스트는 가짜를 넣는다)
+export type PictureNavigator = ShareApi & Pick<Navigator, 'userAgent' | 'maxTouchPoints'>
 
 // 사진은 화면 테마와 상관없이 흰 바탕 (단톡방에서 읽기 쉽게)
 const PICTURE_BACKGROUND = '#ffffff'
@@ -61,11 +66,26 @@ export function isIos(navigator: Pick<Navigator, 'userAgent' | 'maxTouchPoints'>
   return navigator.userAgent.includes('Macintosh') && navigator.maxTouchPoints > 1
 }
 
-export const pictureSaver: PictureSaver = {
-  make: makePicture,
-  download: downloadPicture,
-  share: isIos(globalThis.navigator) ? (picture) => shareFile(picture) : undefined,
+// 공유 창에 PNG 사진을 넘길 수 있는지. PC 브라우저 등 canShare 가 거짓이면 [사진 보내기] 를 숨긴다 (SPEC-003 AC-15)
+export function canSendPictures(api: ShareApi | undefined): boolean {
+  if (!api?.share || !api.canShare) return false
+  try {
+    return api.canShare({ files: [new File([], 'picture.png', { type: 'image/png' })] })
+  } catch {
+    return false
+  }
 }
+
+export function createPictureSaver(navigator: PictureNavigator | undefined): PictureSaver {
+  return {
+    make: makePicture,
+    download: downloadPicture,
+    share: isIos(navigator) ? (picture) => shareFile(picture, navigator) : undefined,
+    send: canSendPictures(navigator) ? (picture) => shareFile(picture, navigator) : undefined,
+  }
+}
+
+export const pictureSaver: PictureSaver = createPictureSaver(globalThis.navigator)
 
 export function monthPictureName(year: number, month: number): string {
   return `우리장부-${year}년-${month}월-정리.png`
@@ -73,4 +93,9 @@ export function monthPictureName(year: number, month: number): string {
 
 export function yearPictureName(year: number): string {
   return `우리장부-${year}년-결산.png`
+}
+
+// 단톡방용 요약 (v2.6)
+export function yearSummaryPictureName(year: number): string {
+  return `우리장부-${year}년-결산-요약.png`
 }
