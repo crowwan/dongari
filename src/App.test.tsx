@@ -946,7 +946,6 @@ async function fillExpense(name: string, amount: string) {
   await userEvent.type(screen.getByLabelText('직접 적기'), name)
   await userEvent.click(screen.getByRole('button', { name: '다음' }))
   await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
-  await userEvent.click(screen.getByRole('button', { name: '다음' }))
   await userEvent.type(screen.getByLabelText('얼마인가요?'), amount)
 }
 

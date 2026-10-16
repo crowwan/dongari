@@ -4,12 +4,12 @@
 //                   │                                              ▼
 //                   └─ 직접 적기 → custom-name ─ 예전에 쓴 이름 ─→ amount → [저장]
 //                                      │                           ▲
-//                                      └─ 처음 쓰는 이름 → custom-type ─ 고르고 [다음]
+//                                      └─ 처음 쓰는 이름 → custom-type ─ 수입/지출 누름
 //
 // 공책 순서(날짜 → 항목 → 금액)대로 날짜(일)를 맨 처음 묻는다(v2.2). 달은 처음부터 정해져 있고(보던 달) "며칠인가요?" 에서 바꾼다.
 // 날은 숫자 칸에 쳐서 [다음] 으로 정하거나 빠른 칩([오늘 7일]·[방금 5일])을 눌러 바로 정한다(#80, 날 격자 대신).
 // "지금 적는 내역" 카드 날짜 줄 [바꾸기] 를 누르면 day 로 돌아갔다가(칸에 지금 날) 날을 정하면 하던 질문으로 돌아온다(항목·금액 유지).
-// 항목 줄 [바꾸기] 를 누르면 item 으로 돌아간다(금액 유지)
+// 항목 줄 [바꾸기] 를 누르면 item 으로 돌아간다(금액 유지). 새 이름의 수입/지출을 잘못 눌렀으면 이 길로 고친다
 import { isDayInMonth } from '../../domain/entryDate'
 import type { FrequentChoice } from '../../domain/ledger'
 import type { EntryType } from '../../domain/types'
@@ -51,8 +51,8 @@ export type StepAction =
   | { kind: 'type-custom-name'; name: string }
   // knownType: 그 이름을 예전에 쓴 종류. 처음 쓰는 이름이면 undefined (화면이 기록에서 찾아 넣는다)
   | { kind: 'submit-custom-name'; knownType: EntryType | undefined }
+  // 새 이름의 수입/지출: 항목 고르기처럼 누르면 바로 금액으로 (#111)
   | { kind: 'pick-type'; entryType: EntryType }
-  | { kind: 'submit-type' }
   | { kind: 'change-amount'; amount: number }
   | { kind: 'revisit-item' }
 
@@ -120,10 +120,9 @@ export function stepReducer(state: StepState, action: StepAction): StepState {
       return { ...state, step: 'custom-type', draft: { ...draft, name, type: undefined } }
     }
     case 'pick-type':
-      return { ...state, draft: { ...draft, type: action.entryType } }
-    case 'submit-type':
-      if (draft.type === undefined) return state
-      return { ...state, step: 'amount' }
+      // 이름을 정하기 전이면 넘어가지 않는다 (이름 칸의 [다음] 비활성 + "무엇인지 적어 주세요" 그대로)
+      if (draft.name === '') return state
+      return { ...state, step: 'amount', draft: { ...draft, type: action.entryType } }
     case 'change-amount':
       return { ...state, draft: { ...draft, amount: action.amount } }
     case 'revisit-item':
@@ -137,7 +136,7 @@ export function stepInput({ draft }: StepState): DraftCheck {
   return checkDraft(draft)
 }
 
-// 항목 고르기 단계는 누르면 바로 넘어가서 버튼이 없다. "며칠인가요?" 는 숫자 칸이라 [다음] (빈칸·없는 날이면 비활성 + 안내)
+// 항목 고르기·새 이름의 수입/지출 단계는 누르면 바로 넘어가서 버튼이 없다(#111). "며칠인가요?" 는 숫자 칸이라 [다음] (빈칸·없는 날이면 비활성 + 안내)
 export function stepButton(state: StepState): StepButton | null {
   const { step, draft, customName } = state
   switch (step) {
@@ -146,11 +145,10 @@ export function stepButton(state: StepState): StepButton | null {
       return { label: '다음', missing: check.ok ? undefined : check.missing }
     }
     case 'item':
+    case 'custom-type':
       return null
     case 'custom-name':
       return { label: '다음', missing: customName.trim() === '' ? '무엇인지 적어 주세요' : undefined }
-    case 'custom-type':
-      return { label: '다음', missing: draft.type === undefined ? '수입인지 지출인지 골라 주세요' : undefined }
     case 'amount': {
       const check = stepInput(state)
       return { label: '저장', missing: check.ok ? undefined : check.missing }
@@ -158,11 +156,11 @@ export function stepButton(state: StepState): StepButton | null {
   }
 }
 
-// 답한 것만 카드에. 지금 묻고 있는 값(이름 적기 중인 이름, 새 이름의 종류)은 올리지 않는다
+// 답한 것만 카드에. 지금 묻고 있는 값(이름 적기 중인 이름)은 올리지 않는다. 새 이름의 종류는 고르면 바로 금액으로 가서 묻는 동안엔 비어 있다
 export function answerRows({ step, draft }: StepState): AnswerRow[] {
   const rows: AnswerRow[] = [{ kind: 'date', month: draft.month, day: draft.day }]
   if (draft.name !== '' && step !== 'custom-name') {
-    rows.push({ kind: 'item', name: draft.name, type: step === 'custom-type' ? undefined : draft.type })
+    rows.push({ kind: 'item', name: draft.name, type: draft.type })
   }
   return rows
 }

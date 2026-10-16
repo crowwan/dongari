@@ -321,7 +321,6 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
     expect(within(now()).getByRole('group', { name: '수입인가요, 지출인가요?' })).toBeInTheDocument()
 
     await userEvent.click(within(now()).getByRole('button', { name: '지출' }))
-    await userEvent.click(screen.getByRole('button', { name: '다음' }))
     expect(within(now()).getByLabelText('얼마인가요?')).toBeInTheDocument()
     expect(within(now()).getByRole('button', { name: '1만 원 더하기' })).toBeInTheDocument()
   })
@@ -391,7 +390,7 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
       expect(actionButton()).toHaveAccessibleDescription('무엇인지 적어 주세요')
     })
 
-    it('AC-15 처음 쓰는 이름이면 "수입인가요, 지출인가요?" 를 기본값 없이 묻고, 안 골랐으면 [다음] 비활성 + 안내', async () => {
+    it('AC-15 처음 쓰는 이름이면 "수입인가요, 지출인가요?" 를 기본값 없이 묻고, 아래 [다음] 은 없다 (#111)', async () => {
       await renderAtItem()
 
       await writeCustomName(' 화환 ')
@@ -402,16 +401,17 @@ describe('SPEC-001 내역 적기 (하나씩 채우기)', () => {
       expect(kinds.every((kind) => kind.getAttribute('aria-pressed') === 'false')).toBe(true)
       // 지금 묻는 수입/지출은 카드에 올리지 않는다: 항목 줄은 이름만
       expect(answers()).toEqual(['10월 5일', '화환'])
-      expect(actionButton()).toBeDisabled()
-      expect(actionButton()).toHaveAccessibleDescription('수입인지 지출인지 골라 주세요')
+      expect(screen.queryByRole('button', { name: '다음' })).not.toBeInTheDocument()
     })
 
-    it('AC-15 새 이름의 종류를 고르고 [다음] 을 누르면 금액으로 넘어가 저장된다', async () => {
+    it('AC-15 새 이름의 [지출] 을 누르면 바로 "얼마인가요?" 로 넘어가(금액 칸 초점) 저장된다 (#111)', async () => {
       const { onSave } = await renderAtItem()
       await writeCustomName('화환')
 
       await userEvent.click(screen.getByRole('button', { name: '지출' }))
-      await userEvent.click(screen.getByRole('button', { name: '다음' }))
+      expect(question()).toHaveTextContent('얼마인가요?')
+      expect(answers()).toEqual(['10월 5일', '화환 · 지출'])
+      expect(screen.getByLabelText('얼마인가요?')).toHaveFocus()
       await userEvent.type(screen.getByLabelText('얼마인가요?'), '30000')
       await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
