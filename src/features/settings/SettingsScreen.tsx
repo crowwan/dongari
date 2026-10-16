@@ -417,7 +417,7 @@ type SettingRowProps = {
   onClick: () => void
 }
 
-// 설정 줄: 원형 아이콘 + 이름(+ 보조 줄) + 값 + 화살표. 줄 전체가 버튼이라 "장부 이름 한랑드림" 으로 읽힌다
+// 설정 줄: 원형 아이콘 + 이름(+ 보조 줄) + 값 + 줄 끝 › (ListRow chevron — 큰 글씨에서 값이 아래 줄로 내려가도 › 는 줄 끝에 남는다). 줄 전체가 버튼이라 "장부 이름 한랑드림" 으로 읽힌다
 function SettingRow({ icon, title, value, description, onClick }: SettingRowProps) {
   return (
     <ListRow
@@ -425,12 +425,8 @@ function SettingRow({ icon, title, value, description, onClick }: SettingRowProp
       title={title}
       description={description}
       onClick={onClick}
-      end={
-        <span className="settings__end">
-          {value !== undefined && <span className="settings__value">{value}</span>}
-          <Icon name="right" />
-        </span>
-      }
+      end={value !== undefined ? <span className="settings__value">{value}</span> : undefined}
+      chevron
     />
   )
 }

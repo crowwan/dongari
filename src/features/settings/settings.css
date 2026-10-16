@@ -42,27 +42,15 @@
   color: var(--muted);
 }
 
-/* 줄 오른쪽: 지금 값(회색) + 화살표. 긴 이름은 말줄임 */
-.settings__end {
-  max-width: 50vw;
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--muted);
-}
-
+/* 줄 오른쪽 지금 값(회색). 긴 이름은 말줄임. 화살표 › 는 ListRow chevron */
 .settings__value {
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--muted);
   font-size: var(--text-body-size);
-}
-
-.settings__end .ui-icon {
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-  color: var(--faint);
 }
 
 /* 편집 화면 머리: [‹ 설정] 과 제목은 한 덩어리 */

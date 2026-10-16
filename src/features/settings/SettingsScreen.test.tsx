@@ -113,7 +113,9 @@ describe('SPEC-001·002 설정 화면', () => {
         'calendar',
       ])
       // 줄 끝 화살표는 "누르면 들어간다" 표시
-      expect(rows.every((row) => row.querySelector('[data-icon="right"]') !== null)).toBe(true)
+      // 줄 끝 › 는 값 안이 아니라 ListRow chevron (큰 글씨에서 값이 아래 줄로 내려가도 줄 끝에 남는다, SPEC-001 v2.6)
+      expect(rows.every((row) => within(row).queryByTestId('list-row-chevron')?.querySelector('[data-icon="right"]'))).toBe(true)
+      expect(rows.every((row) => row.querySelector('.ui-row__end [data-icon="right"]') === null)).toBe(true)
 
       // 값이 없는 줄은 끝에 화살표만 있다 (서버 주소 없는 빌드: 맨 위 기록 파일 두 줄)
       expect(within(screen.getByTestId('settings-block-files')).getAllByTestId('list-row').map((row) => row.textContent?.trim())).toEqual([
