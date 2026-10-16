@@ -213,7 +213,7 @@ describe('SPEC-006 v2.6 용어 바꾸기 (백업 → 기록 파일, 자동 보�
     await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
     const notice = screen.getByTestId('notice-bar')
-    expect(notice).toHaveTextContent('저장하지 못했어요. 기록 파일을 보내 두세요')
+    expect(notice).toHaveTextContent('저장하지 못했어요. 방금 적은 내역은 앱을 닫으면 사라져요. 기록 파일을 보내 두세요')
     expect(within(notice).getByRole('button', { name: '기록 파일 보내기' })).toBeInTheDocument()
     expectNoOldTerms()
   })

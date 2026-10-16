@@ -71,4 +71,33 @@ describe('ListRow', () => {
 
     expect(screen.getByTestId('list-row').querySelector('[data-testid="list-row-chevron"]')).toBeNull()
   })
+
+  it('badge 면 보조 줄 아래 경고 아이콘 + 글자 알약을 그리고, 화면 읽기 이름은 줄 끝에 그 글자를 붙인다 (SPEC-002 v2.6)', () => {
+    render(
+      <ListRow
+        icon="building"
+        title="대관료"
+        description="16일 · 지출"
+        end={<AmountText type="expense" amount={40000} />}
+        onClick={vi.fn()}
+        chevron
+        badge="저장 안 됨"
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '대관료 16일 · 지출 −40,000원 저장 안 됨' })).toBeInTheDocument()
+    const badge = screen.getByTestId('list-row-badge')
+    expect(badge).toHaveTextContent('저장 안 됨')
+    expect(badge).toHaveAttribute('aria-hidden', 'true')
+    expect(badge.querySelector('[data-icon]')).toHaveAttribute('data-icon', 'alert')
+    // 보조 줄 바로 아래
+    expect(badge.previousElementSibling).toHaveTextContent('16일 · 지출')
+  })
+
+  it('badge 가 없으면 알약을 그리지 않는다', () => {
+    render(<ListRow icon="users" title="회비" description="수입" onClick={vi.fn()} />)
+
+    expect(screen.queryByTestId('list-row-badge')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '회비 수입' })).toBeInTheDocument()
+  })
 })

@@ -9,6 +9,7 @@ import { KeepRestoreScreen, KeptSummary } from '../features/keep/KeepRestoreScre
 import type { KeepServer } from '../features/keep/keepServer'
 import type { SheetHistory } from '../features/useScreenHistory'
 import { KEEP_REMINDER_MESSAGE } from '../features/keep/keepStatus'
+import { STORAGE_NOTICE } from '../features/storage/storageNotices'
 import { CarryoverField } from '../features/ledger/CarryoverField'
 import { tidyDayText } from '../features/ledger/entryDraft'
 import type { BookChoice } from '../features/ledger/useLedger'
@@ -115,6 +116,7 @@ const ACTION_ICONS: { icon: IconName; label: string }[] = [
   { icon: 'home', label: '개인 가계부 장부' },
   { icon: 'cloud', label: '자동으로 지키기' },
   { icon: 'key', label: '복구 코드로 불러오기' },
+  { icon: 'alert', label: '저장 안 됨' },
 ]
 
 // 복구 코드로 불러오기 미리보기용 서버: 어떤 코드든 보관본이 없다고 답한다
@@ -344,6 +346,19 @@ export function Catalog() {
                 description="10월 · 지출"
                 onClick={noop}
                 end={<AmountText type="expense" amount={40000} />}
+              />
+            </div>
+          </State>
+          <State label="저장 안 됨 (SPEC-002 v2.6, 저장에 실패한 뒤 적은 줄)">
+            <div className="catalog__card">
+              <ListRow
+                icon={itemIcon('대관료')}
+                title="대관료"
+                description="16일 · 지출"
+                onClick={noop}
+                end={<AmountText type="expense" amount={40000} />}
+                chevron
+                badge="저장 안 됨"
               />
             </div>
           </State>
@@ -836,13 +851,13 @@ export function Catalog() {
 
         <Section title="NoticeBar">
           <State label="저장 실패">
-            <NoticeBar message="저장하지 못했어요. 기록 파일을 보내 두세요" />
+            <NoticeBar message={STORAGE_NOTICE.saveFailed} />
           </State>
           <State label="긴 문장 (시작 안내)">
             <NoticeBar message="저장된 기록을 읽지 못해 새 장부로 시작해요. 예전 기록은 따로 보관해 두었어요" />
           </State>
           <State label="버튼 붙음 (저장 실패 → 기록 파일 보내기)">
-            <NoticeBar message="저장하지 못했어요. 기록 파일을 보내 두세요" action={{ label: '기록 파일 보내기', onClick: noop }} />
+            <NoticeBar message={STORAGE_NOTICE.saveFailed} action={{ label: '기록 파일 보내기', icon: 'share', onClick: noop }} />
           </State>
           <State label="30일 안내 → 기록 파일 보내기 (#9)">
             <NoticeBar message="한 달 넘게 기록 파일을 보내지 않았어요" action={{ label: '기록 파일 보내기', icon: 'share', onClick: noop }} />
