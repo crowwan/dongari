@@ -1,7 +1,7 @@
 ---
 id: SPEC-006
 title: 복구 코드로 자동 보관
-status: approved
+status: done
 milestone: v2.6
 issue: "#96"
 prototype: https://claude.ai/artifact/8S8y4GuLU5xkVkHTRPxt7M
@@ -300,3 +300,4 @@ updated: 2026-10-16
 | 2026-10-16 | v2.6 승인 (사용자: "승인, B 빼고 진행" — 결산 보내기 버튼 이름·갤럭시 공유 창 동작은 #114 기술 검증 뒤) |
 | 2026-10-16 | v2.6 보강 구현(#120): 상태 줄 글자 16(15 토큰 없음), 접기는 `aria-expanded` 버튼(접히면 안 줄 없음)·설정 위 화면에 다녀오면 펼친 채, 코드는 줄표 뒤에서만 줄바꿈(`<wbr>`), 읽기 전용 시작도 서버 없는 빌드처럼 기록 파일 두 줄만, `keepRowText` 대신 `keepStatusText`. 본문에 v2.5 모양 표시, 불러오기 안내·첫 실행 버튼 문구 v2.6 말로 |
 | 2026-10-16 | 기술 메모(#128): 미리보기를 다른 출처(Cloudflare Pages `https://uri-jangbu-preview.pages.dev`)로 옮기며 서버가 그 출처도 받고, 미리보기 요청은 KV `preview:` 자리에 둔다. CORS Allow-Origin 은 요청 출처 그대로 |
+| 2026-10-16 | v2.6.0 릴리스 (#137) |
