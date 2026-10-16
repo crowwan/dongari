@@ -722,8 +722,8 @@ button.ui-row {
 }
 
 .ui-row__badge .ui-icon {
-  width: var(--icon-xs);
-  height: var(--icon-xs);
+  width: var(--icon-text);
+  height: var(--icon-text);
 }
 
 /* 줄 끝 › : 누르면 고칠 수 있다는 표시 (설정 줄 › 와 같은 크기·색) */
