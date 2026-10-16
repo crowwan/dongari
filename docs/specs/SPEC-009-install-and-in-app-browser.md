@@ -1,7 +1,7 @@
 ---
 id: SPEC-009
 title: 홈 화면 추가 쉽게 · 카톡 안에서 열렸을 때
-status: approved
+status: done
 milestone: v2.7
 issue:
 prototype: https://claude.ai/artifact/DHKyo1y5u31KCDxNsTzZ16
@@ -517,3 +517,4 @@ C 카톡 안에서 열렸을 때
 | 2026-10-16 | B 연습 끝 묻기·설치 따라 하기 구현(#143): 기술 메모 B 에 구현 모양(`Mode` `install` 하나 + `PracticeInstall` 이 ②·③·그림 안내 창 방문 기록, `asksInstallAfterPractice` 에서 `stopped` 뺌, 카톡 판단 임시 `opensInKakao`, `practiceMark`, `GuideSheetHistory`·`onFinished`). 동작·문구는 본문 그대로. AC-24 실기기는 배포 뒤(qa-checklist) |
 | 2026-10-16 | C 카톡 안에서 열렸을 때 구현(#144): T-3·T-4·T-5·T-7·T-8 은 예상값 그대로, 실기기 확인은 배포 뒤(사용자 결정, 미리보기 `/#/dev/env`). 예상값·문구는 `inAppBrowser.ts` 한 곳. 더한 것: ② 복구 코드 화면이 떠 있는 동안 주소에도 `?from=kakao` 를 붙여 메뉴로 열어도 ③ 카드가 뜨게 함. 안드로이드·아이폰이 아닌 카톡(PC 등)은 C 없이 지금처럼. 아이폰 ② 는 [코드 복사하기]·[기록 파일 보내기] 를 보조 버튼으로. 자동으로 지키기가 "너무 큼" 이어도 기록 파일 순서. B 의 임시 카톡 판단 `opensInKakao` 를 `inAppKind` 하나로 모음 |
 | 2026-10-16 | A 그림 안내·홈 화면 모습 그림 구현(#142): 문구는 T-1·T-2 예상값 그대로, 실기기 확인은 배포 뒤(사용자 결정) — 열린 질문에 "배포 뒤 확인" 표시. 부품 이름 확정(`HomeScreenPreview`·`APP_SHORT_NAME`·`installGuideSteps`·`BrowserPicture`·`TapMark`·`SlideGuide`). 장 번호 "1 / 4" 는 글 줄 앞 알약, 화면 읽기는 "1 / 4, …". 창이 떠 있는 동안 `appinstalled` 가 오면 창을 닫는다(예외와 경계 그대로) |
+| 2026-10-16 | v2.7.0 릴리스 (#152) |

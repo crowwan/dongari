@@ -1,7 +1,7 @@
 ---
 id: SPEC-008
 title: 처음 쓰는 분 연습 장부
-status: approved
+status: done
 milestone: v2.7
 issue: "#117"
 prototype: https://claude.ai/artifact/UmGVPHtyHdMt3L46Ba5XLW
@@ -428,3 +428,4 @@ v2.6 은 "이모가 처음 쓰는 날"에 맞춰 묶었다. 장부를 처음 만
 | 2026-10-16 | 설정 "앱" 묶음 [연습해 보기] 아래에 버전 줄(SPEC-002 #135). 연습 장부에서는 홈 화면에 추가 권하기 카드가 뜨지 않는다 |
 | 2026-10-16 | v2.6.0 릴리스 (#137) |
 | 2026-10-16 | v2.7 보강: 끝 화면 절에 SPEC-009 참고 줄(첫 실행 연습 끝 "홈 화면에 추가하시겠어요?" 묻기, `dongari:practice` 표시로 다시 열면 새 장부 만들기, 카톡 안 안내가 물음보다 먼저). status done → approved, milestone v2.7 |
+| 2026-10-16 | v2.7.0 릴리스 (#152) |
