@@ -11,6 +11,7 @@ import {
   keepIdOf,
   normalizeRecoveryCode,
   NOT_FOUND,
+  rescueDir,
   rescueFileName,
   rescueKeep,
   SERVER_DOWN,
@@ -136,6 +137,15 @@ describe('#154 보관본 꺼내기 스크립트', () => {
       expect(rescueFileName(SAVED_AT)).toBe('우리장부-기록-2026-10-19.txt')
     })
 
+    it('기록 파일은 기본으로 레포 밖 ~/Downloads 에, 없으면 홈에 둔다 (지금 폴더가 아니다)', () => {
+      expect(rescueDir({}, '/Users/me', true)).toBe('/Users/me/Downloads')
+      expect(rescueDir({}, '/Users/me', false)).toBe('/Users/me')
+    })
+
+    it('RESCUE_DIR 이 있으면 그 폴더에 둔다', () => {
+      expect(rescueDir({ RESCUE_DIR: '/tmp/rescue' }, '/Users/me', true)).toBe('/tmp/rescue')
+    })
+
     it('요약에 보관 시각(한국 시간)·장부 이름·기록 건수를 넣고 복구 코드는 넣지 않는다', async () => {
       const { envelope } = await appEnvelope()
       const result = await rescueKeep(CODE, KEEP_URL, fakeServer(() => jsonResponse(envelope)).fetchFn)
@@ -146,6 +156,7 @@ describe('#154 보관본 꺼내기 스크립트', () => {
       expect(text).toContain('2026-10-19 01:30')
       expect(text).toContain('꽃동아리, 우리집 가계부')
       expect(text).toContain('3건')
+      expect(text).toContain('다 보냈으면 이 파일을 지우세요')
       expect(text).not.toMatch(/HK7M|29QF|MX4P|8R2D/)
     })
   })

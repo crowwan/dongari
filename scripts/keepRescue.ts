@@ -139,6 +139,13 @@ export function rescueFileName(savedAt: string): string {
   return `우리장부-기록-${formatKst(savedAt).slice(0, 10)}.txt`
 }
 
+// 기록 파일을 둘 폴더. 파일에는 장부 전체와 복구 코드가 들어 있어 레포(공개) 안에 만들지 않는다:
+// RESCUE_DIR 이 있으면 그곳, 없으면 ~/Downloads, 그것도 없으면 홈. 지금 폴더(레포 루트일 수 있음)는 기본값으로 쓰지 않는다
+export function rescueDir(env: { RESCUE_DIR?: string }, home: string, hasDownloads: boolean): string {
+  if (env.RESCUE_DIR) return env.RESCUE_DIR
+  return hasDownloads ? `${home.replace(/\/+$/, '')}/Downloads` : home
+}
+
 // 복구 코드로 보관본을 GET 해서 풀고 요약까지 만든다
 export async function rescueKeep(code: string, keepUrl: string, fetchFn: FetchFn): Promise<RescueResult> {
   const normalized = normalizeRecoveryCode(code)
@@ -164,12 +171,13 @@ export async function rescueKeep(code: string, keepUrl: string, fetchFn: FetchFn
 }
 
 // 성공했을 때 찍을 요약 줄 (복구 코드는 넣지 않는다)
-export function describeRescue(result: { savedAt: string; summary: RescueSummary }, fileName: string): string[] {
+export function describeRescue(result: { savedAt: string; summary: RescueSummary }, filePath: string): string[] {
   return [
     `보관 시각: ${formatKst(result.savedAt)} (한국 시간)`,
     `장부: ${result.summary.bookNames.join(', ') || '(없음)'} — ${result.summary.bookNames.length}개`,
     `기록: ${result.summary.entryCount}건`,
-    `저장한 파일: ${fileName}`,
+    `저장한 파일: ${filePath}`,
     '이 파일을 카톡으로 보내고, 앱 설정의 [기록 파일 불러오기]로 열게 하세요',
+    '다 보냈으면 이 파일을 지우세요 (복구 코드가 들어 있어요)',
   ]
 }
