@@ -22,5 +22,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "scripts/**/*.ts"]
+  "include": ["vite.config.ts", "scripts/**/*.ts"],
+  // scripts 테스트는 vitest(jsdom)에서 돌고 앱 코드(src)를 불러오기도 해서 tsconfig.app 이 검사한다 (#154)
+  "exclude": ["scripts/**/*.test.ts"]
 }

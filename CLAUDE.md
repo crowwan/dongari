@@ -129,6 +129,24 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
 - 로컬에서 돌리기: `KEEP_URL=… KEEP_REPORT_TOKEN=… node scripts/keep-watch.mjs` (토큰은 셸에만. 출력에 토큰은 찍히지 않는다)
 - 레포에 60일 동안 활동(커밋 등)이 없으면 GitHub 가 예약 실행을 멈춘다(멈추기 전에 메일로 알림). 멈췄으면 Actions → "보관 지켜보기" → 위쪽 안내의 [Enable workflow] 로 다시 켜고, Run workflow 로 한 번 돌려 본다.
 
+### 보관본 꺼내기 (개발자용, `scripts/keep-rescue.mjs`, #154)
+
+사용자가 앱에서 [복구 코드로 불러오기]를 못 할 때(카톡 안 브라우저, 앱 오류 등) 복구 코드를 받아 내가 대신 서버 보관본을 꺼내 기록 파일로 만들어 준다. 서버에는 `GET /v1/keep/<id>`(출처 `https://crowwan.github.io`, 본 자리) 하나만 보낸다 — 쓰기·지우기 없음.
+
+```bash
+KEEP_URL=$(gh variable get KEEP_URL) node scripts/keep-rescue.mjs   # 코드를 물으면 붙여 넣고 Enter
+```
+
+- 코드는 인자(`node scripts/keep-rescue.mjs HK7M-…`)로도 되지만 셸 기록에 남으니 표준 입력을 쓴다. 출력에 코드는 찍히지 않는다.
+- 레포 밖 `~/Downloads`(없으면 홈)에 `우리장부-기록-YYYY-MM-DD.txt`(날짜 = 보관한 날, 한국 시간)를 만들고 전체 경로·보관 시각·장부 이름·기록 건수를 찍는다. 다른 폴더는 `RESCUE_DIR=… ` 로. 같은 이름 파일이 있으면 덮어쓰지 않고 멈춘다.
+- 파일에는 그 사람 장부 전체와 복구 코드가 평문으로 들어 있다. 레포는 공개라 레포 안에 두지 않는다(`.gitignore` 에 `우리장부-기록-*.txt` 를 넣어 두었지만 안전망일 뿐).
+- 이 파일을 카톡으로 보내 앱 설정의 [기록 파일 불러오기]로 열게 한다. 불러오면 파일 속 복구 코드로 자동 보관이 같은 자리를 이어 쓴다.
+- **다 보냈으면 파일을 지운다** (복구 코드가 들어 있음).
+- 안내: 코드 형식 틀림 / 보관본 없음(404) / 코드가 안 맞음(풀기 실패) / 서버 오류(HTTP 코드) / 연결 실패가 각각 다르고, 실패면 종료 코드 1.
+- **주의: 받은 코드로 내 브라우저(본 주소)에서 [복구 코드로 불러오기]를 하지 않는다.** 같은 서버 자리를 쓰게 돼 내 쪽 자동 보관이 그 사람 보관본을 덮어쓸 수 있다. 꺼내기는 이 스크립트로만.
+- 푸는 방식은 `scripts/keepRescue.ts`(순수 함수, `keepWatch.ts` 와 같은 제약: 타입 지우기 문법만, 다른 패키지·src 불러오기 없음). 그래서 `keepCrypto.ts`·`recoveryCode.ts` 의 암호 방식·코드 정규화를 옮겨 두었고, `scripts/keepRescue.test.ts` 가 앱의 `sealKeep`·`keepIdOf` 로 만든 값을 풀어 `readBackup` 으로 읽어 본다 — 앱 쪽 방식을 바꾸면 이 테스트가 깨지니 같이 고친다.
+- `scripts/*.test.ts` 는 앱 코드를 불러오고 vitest(jsdom)에서 돌아서 타입 검사는 `tsconfig.app.json` 이 한다(`tsconfig.node.json` 은 테스트를 뺀 스크립트만).
+
 ## 폴더 구조
 
 ```
@@ -147,6 +165,6 @@ src/
 ├── devtools/    개발 확인 화면 `/#/dev/env` (개발 모드·미리보기 빌드 전용, 본 주소 번들 제외, SPEC-009 #141)
 └── test/        Vitest 설정, 여러 테스트가 같이 쓰는 장부 기록(ledgerFixtures: v1 예시 1년치, 장부·저장 데이터 만들기)
 public/icons/  앱 아이콘 (scripts/make-icons.mjs 가 토큰 색으로 만든다)
-scripts/       아이콘·글꼴 만들기, 보관 지켜보기(keep-watch.mjs + 판정 keepWatch.ts, 워크플로 keep-watch.yml 이 돌린다)
+scripts/       아이콘·글꼴 만들기, 보관 지켜보기(keep-watch.mjs + 판정 keepWatch.ts, 워크플로 keep-watch.yml 이 돌린다), 보관본 꺼내기(keep-rescue.mjs + 풀기 keepRescue.ts, 개발자가 손으로)
 worker/        자동 보관 서버 (Cloudflare Worker + KV, 따로 있는 패키지). src/index.ts 진입점(기본 내보내기만), src/keep.ts 요청 처리, wrangler.toml
 ```
