@@ -4,7 +4,7 @@ title: 홈 화면 추가 쉽게 · 카톡 안에서 열렸을 때
 status: done
 milestone: v2.7
 issue:
-prototype: https://claude.ai/artifact/DHKyo1y5u31KCDxNsTzZ16
+prototype: https://claude.ai/artifact/HR9eMbW2GY8dj6XDj4G7Cv
 updated: 2026-10-16
 ---
 
@@ -512,7 +512,7 @@ C 카톡 안에서 열렸을 때
 
 | 날짜 | 내용 |
 |---|---|
-| 2026-10-16 | 초안: v2.7 시안 https://claude.ai/artifact/DHKyo1y5u31KCDxNsTzZ16 (사용자 결정 2026-10-16 — A·C 추천값, D 넣지 않음, B 는 "연습 끝 화면 다음에 먼저 묻기" 로 바꿈: "홈 화면에 추가하시겠어요?" + 좋은 점 + [추가할게요]/[다음에 할게요], [추가할게요] 만 설치 따라 하기 → 설치 확인 → 여기서 새 장부, [다음에 할게요] 는 바로 새 장부·카드 안 띄움). 사용자 추가 "홈화면추가했을 때 어떻게 보이는지도 같이 안내에" → 홈 화면 모습 그림(묻는 화면·그림 안내 4장·설치 확인 화면). 실기기 확인 T-1~T-8 과 개발 확인 화면 `/#/dev/env`. AC-1~37. status approved(사용자 승인) |
+| 2026-10-16 | 초안: v2.7 시안 https://claude.ai/artifact/HR9eMbW2GY8dj6XDj4G7Cv (사용자 결정 2026-10-16 — A·C 추천값, D 넣지 않음, B 는 "연습 끝 화면 다음에 먼저 묻기" 로 바꿈: "홈 화면에 추가하시겠어요?" + 좋은 점 + [추가할게요]/[다음에 할게요], [추가할게요] 만 설치 따라 하기 → 설치 확인 → 여기서 새 장부, [다음에 할게요] 는 바로 새 장부·카드 안 띄움). 사용자 추가 "홈화면추가했을 때 어떻게 보이는지도 같이 안내에" → 홈 화면 모습 그림(묻는 화면·그림 안내 4장·설치 확인 화면). 실기기 확인 T-1~T-8 과 개발 확인 화면 `/#/dev/env`. AC-1~37. status approved(사용자 승인) |
 | 2026-10-16 | 개발 확인 화면 구현(#141): 주소(미리보기 `/#/dev/env`, intent 는 `?dev=env`), 열리는 기준 미리보기 빌드 = `APP_BASE=/`(`__PREVIEW_BUILD__`, `VITE_DEV_TOOLS` 안 씀), 버튼 이름([설치 창 띄우기]·[복사 시험]·[붙여넣기 시험]·[kakaotalk openExternal 로 열기]), `navigator.share`·`canShare(files)` 표시, 결과 기록 sessionStorage. 실기기 결과(T-1~T-8)는 다음 문서 PR |
 | 2026-10-16 | B 연습 끝 묻기·설치 따라 하기 구현(#143): 기술 메모 B 에 구현 모양(`Mode` `install` 하나 + `PracticeInstall` 이 ②·③·그림 안내 창 방문 기록, `asksInstallAfterPractice` 에서 `stopped` 뺌, 카톡 판단 임시 `opensInKakao`, `practiceMark`, `GuideSheetHistory`·`onFinished`). 동작·문구는 본문 그대로. AC-24 실기기는 배포 뒤(qa-checklist) |
 | 2026-10-16 | C 카톡 안에서 열렸을 때 구현(#144): T-3·T-4·T-5·T-7·T-8 은 예상값 그대로, 실기기 확인은 배포 뒤(사용자 결정, 미리보기 `/#/dev/env`). 예상값·문구는 `inAppBrowser.ts` 한 곳. 더한 것: ② 복구 코드 화면이 떠 있는 동안 주소에도 `?from=kakao` 를 붙여 메뉴로 열어도 ③ 카드가 뜨게 함. 안드로이드·아이폰이 아닌 카톡(PC 등)은 C 없이 지금처럼. 아이폰 ② 는 [코드 복사하기]·[기록 파일 보내기] 를 보조 버튼으로. 자동으로 지키기가 "너무 큼" 이어도 기록 파일 순서. B 의 임시 카톡 판단 `opensInKakao` 를 `inAppKind` 하나로 모음 |

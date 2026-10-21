@@ -4,7 +4,7 @@ title: 여러 장부
 status: done
 milestone: v2.4
 issue: "#86"
-prototype: https://claude.ai/artifact/8S8y4GuLU5xkVkHTRPxt7M
+prototype: https://claude.ai/artifact/E7u3oCTEWXuKJgDtbHfVLr
 updated: 2026-10-08
 ---
 
