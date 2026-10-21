@@ -87,7 +87,7 @@ Settings { lastBackupAt?, lastChangedAt?, lastBookId?(마지막에 본 장부) }
 
 | 날짜 | 링크 | 확인한 것 |
 |---|---|---|
-| 2026-10-03 | https://claude.ai/artifact/KfbCpZBE6H42ZUdBJSLRvE | SPEC-001 장부·입력 흐름, 큰 글씨 기준 (어머니 사용성 확인 예정) |
+| 2026-10-03 | https://claude.ai/artifact/7595JznB9a5RwUwJeA3JfX | SPEC-001 장부·입력 흐름, 큰 글씨 기준 (어머니 사용성 확인 예정) |
 
 ## 열린 질문
 

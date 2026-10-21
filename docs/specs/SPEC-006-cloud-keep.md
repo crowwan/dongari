@@ -4,7 +4,7 @@ title: 복구 코드로 자동 보관
 status: done
 milestone: v2.6
 issue: "#96"
-prototype: https://claude.ai/artifact/8S8y4GuLU5xkVkHTRPxt7M
+prototype: https://claude.ai/artifact/E7u3oCTEWXuKJgDtbHfVLr
 updated: 2026-10-16
 ---
 
@@ -87,7 +87,7 @@ updated: 2026-10-16
 
 ## v2.6 보강
 
-> 2026-10-16 초안·승인, #120 구현. 시안 https://claude.ai/artifact/HS6ZF1d1eBrQM31sR3zPfo "C 기록 지키기"(사용자 결정 2026-10-16 "추천대로 진행"), 접근성 점검 06. 위 본문은 v2.5 모양을 남기고 메모만 달았다 — 지금 화면은 이 절이 기준이다.
+> 2026-10-16 초안·승인, #120 구현. 시안 https://claude.ai/artifact/JWQEHC8AZCc7JYz4cxtMAi "C 기록 지키기"(사용자 결정 2026-10-16 "추천대로 진행"), 접근성 점검 06. 위 본문은 v2.5 모양을 남기고 메모만 달았다 — 지금 화면은 이 절이 기준이다.
 
 ### 왜
 
