@@ -5,12 +5,14 @@ import type { StoredData } from '../domain/types'
 // - newer-version: 저장소에 더 새 버전 데이터가 있어 덮어쓰지 않음 (앱을 다시 열어 새 버전으로 바꿔야 함)
 // - unreadable-original: 읽을 수 없는 원본을 따로 보존하지 못해 덮어쓰지 않음
 // - old-version-unpreserved: 이전 버전 원본을 새 형식으로 옮기기 전에 따로 보관하지 못해 덮어쓰지 않음 (SPEC-005)
+// - invalid-data: 저장 형식 가드(isStoredData)에 어긋나 쓰지 않음. 앱 코드가 규칙을 놓친 것이라 저장소 값은 그대로 둔다 (#172)
 // - unknown: 그 밖의 오류 (error 에 원인)
 export type SaveFailureReason =
   | 'quota-exceeded'
   | 'newer-version'
   | 'unreadable-original'
   | 'old-version-unpreserved'
+  | 'invalid-data'
   | 'unknown'
 
 export type SaveResult = { ok: true } | { ok: false; reason: SaveFailureReason; error?: unknown }

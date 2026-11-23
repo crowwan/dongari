@@ -1,7 +1,7 @@
 import { CURRENT_SCHEMA_VERSION, type StoredData } from '../domain/types'
 import type { LedgerRepository, LoadResult, ReadOnlyReason, SaveResult } from './LedgerRepository'
 import { migrate, NewerSchemaError } from './migrate'
-import { createEmptyData, isRecord } from './schema'
+import { createEmptyData, isRecord, isStoredData } from './schema'
 
 // 키 이름은 schemaVersion 이 올라도 그대로 둔다 (이미 설치한 앱의 기록을 그대로 읽게, ADR 001)
 export const STORAGE_KEY = 'dongari:v2'
@@ -74,7 +74,9 @@ export class LocalStorageRepository implements LedgerRepository {
     return result
   }
 
+  // 쓰기 전에 읽을 때와 같은 가드로 본다: 규칙에 어긋난 데이터를 쓰면 다음에 열 때 장부 전체가 깨진 데이터로 옮겨진다 (#172)
   private write(data: StoredData): SaveResult {
+    if (!isStoredData(data)) return { ok: false, reason: 'invalid-data' }
     try {
       this.storage.setItem(STORAGE_KEY, JSON.stringify(data))
       return { ok: true }

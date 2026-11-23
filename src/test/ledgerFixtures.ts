@@ -1,5 +1,5 @@
 // 여러 테스트가 같이 쓰는 장부 기록 만들기와 v1 예시 데이터
-import { CURRENT_SCHEMA_VERSION, type Book, type Entry, type EntryType, type Ledger, type StoredData } from '../domain/types'
+import { CURRENT_SCHEMA_VERSION, type Book, type Entry, type EntryType, type Ledger, type Payer, type StoredData } from '../domain/types'
 import type { LedgerRepository } from '../storage/LedgerRepository'
 
 // [월, 종류, 이름, 금액] 목록을 입력 순 기록으로 바꾼다
@@ -72,6 +72,30 @@ export function duesBook(overrides: Partial<Omit<Book, 'ledgers'>> = {}): Book {
     ...overrides,
   })
 }
+
+// duesBook 하나가 든 v4 저장 데이터. 낸 분을 주면 두 분이 낸 회비 기록(dues-1, 40,000원)의 낸 분만 바꾼다
+export function duesData(payers?: Payer[]): StoredData {
+  const target = duesBook()
+  if (payers) {
+    const year = target.ledgers['2026']
+    year.entries = year.entries.map((entry) => (entry.id === 'dues-1' ? { ...entry, payers } : entry))
+  }
+  return { schemaVersion: CURRENT_SCHEMA_VERSION, books: [target], settings: { lastBookId: target.id } }
+}
+
+// 타입은 맞지만 v4 가드(SPEC-010 1절)에 어긋나는 낸 분. duesData 에 넣으면 저장 형식 검사에서 깨진 데이터가 된다 (#172)
+export const PAYERS_OFF_AMOUNT: Payer[] = [
+  { memberId: 'm1', amount: 20_000 },
+  { memberId: 'm2', amount: 10_000 },
+] // 합 30,000원 ≠ 기록 금액 40,000원
+export const PAYERS_OFF_ROSTER: Payer[] = [
+  { memberId: 'm1', amount: 20_000 },
+  { memberId: 'm9', amount: 20_000 },
+] // m9 는 명단에 없다
+export const BROKEN_PAYERS: Array<[string, Payer[]]> = [
+  ['낸 분 금액 합이 기록 금액과 다름', PAYERS_OFF_AMOUNT],
+  ['명단에 없는 회원 번호', PAYERS_OFF_ROSTER],
+]
 
 // 저장소에 저장된 첫 장부의 그 해 장부
 export function savedLedger(repository: LedgerRepository, year: number): Ledger | undefined {

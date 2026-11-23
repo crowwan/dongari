@@ -24,12 +24,13 @@ export function importFailureMessage(reason: BackupReadFailure): DialogMessage {
   }
 }
 
+// 기록 파일·복구 코드 불러오기가 같이 쓴다. 저장 전 가드에 막힌 것(invalid-data)은 저장 공간 탓이 아니라 앱 문제다 (#172)
 export function restoreFailureMessage(reason: SaveFailureReason): DialogMessage {
-  return {
-    title: '불러오지 못했어요',
-    description:
-      reason === 'newer-version'
-        ? '새 버전 앱에서 쓴 기록이 있어요. 앱을 닫았다가 다시 열어 주세요'
-        : '기기에 저장하지 못했어요. 지금 기록은 그대로예요',
-  }
+  return { title: '불러오지 못했어요', description: restoreFailureDescription(reason) }
+}
+
+function restoreFailureDescription(reason: SaveFailureReason): string {
+  if (reason === 'newer-version') return '새 버전 앱에서 쓴 기록이 있어요. 앱을 닫았다가 다시 열어 주세요'
+  if (reason === 'invalid-data') return '앱에 문제가 있어 불러온 기록을 저장하지 않았어요. 지금 기록은 그대로예요'
+  return '기기에 저장하지 못했어요. 지금 기록은 그대로예요'
 }

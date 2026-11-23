@@ -283,6 +283,20 @@ describe('SPEC-010 엑셀로 새 장부 — 읽은 내용 확인 (8절 "읽은 �
     expect(screen.getByText('엑셀 장부를 만들었어요 · 기록 6건')).toBeInTheDocument()
   })
 
+  it('AC-28 [새 장부 만들기]가 저장 전 v4 가드에 막히면 저장 공간이 아니라 앱 문제라고 알리고 장부를 만들지 않는다 (#172)', async () => {
+    const repository = new MemoryRepository(ONE_BOOK)
+    vi.spyOn(repository, 'save').mockReturnValueOnce({ ok: false, reason: 'invalid-data' })
+    renderApp(repository)
+    await chooseExcel(await xlsxFile('지어낸모임.xlsx', clubSheets()))
+    await readExcelScreen()
+
+    await userEvent.click(screen.getByRole('button', { name: /^새 장부 만들기/ }))
+
+    expect(screen.getByRole('heading', { level: 1, name: '엑셀 파일을 읽었어요' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(/^앱에 문제가 있어 장부를 만들지 못했어요\. 지금 기록은 그대로예요$/)
+    expect(repository.load().data).toEqual(ONE_BOOK)
+  })
+
   it('[새 장부 만들기]를 저장하지 못하고 장부로 돌아가면 지금 장부 그대로이고 다음 저장도 지금 데이터만 쓴다 (#178 리뷰)', async () => {
     const repository = new MemoryRepository(ONE_BOOK)
     const save = vi.spyOn(repository, 'save').mockReturnValueOnce({ ok: false, reason: 'quota-exceeded' })

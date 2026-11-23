@@ -145,6 +145,17 @@ describe('SPEC-006 복구 코드로 불러오기 화면', () => {
     expect(await screen.findByText('불러오지 못했어요. 기기에 저장하지 못했어요. 지금 기록은 그대로예요')).toBeInTheDocument()
   })
 
+  it('저장 전 v4 가드에 막히면 저장 공간이 아니라 앱 문제라고 알린다 (#172)', async () => {
+    renderScreen(await serverWithKept(), { restore: vi.fn<Restore>(() => ({ ok: false, reason: 'invalid-data' })) })
+    await typeCode(CODE)
+    await userEvent.click(screen.getByRole('button', { name: '불러오기' }))
+    await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '바꾸기' }))
+
+    expect(
+      await screen.findByText('불러오지 못했어요. 앱에 문제가 있어 불러온 기록을 저장하지 않았어요. 지금 기록은 그대로예요'),
+    ).toBeInTheDocument()
+  })
+
   it('맨 위 되돌아가기 버튼', async () => {
     const { onBack } = renderScreen(answering({ status: 'not-found' }))
     await userEvent.click(screen.getByRole('button', { name: '설정' }))

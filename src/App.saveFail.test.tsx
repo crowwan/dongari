@@ -5,7 +5,7 @@ import App from './App'
 import type { Ledger, StoredData } from './domain/types'
 import type { LedgerRepository, LoadResult, SaveFailureReason } from './storage/LedgerRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
-import { storedWith } from './test/ledgerFixtures'
+import { duesData, PAYERS_OFF_ROSTER, storedWith } from './test/ledgerFixtures'
 
 // SPEC-002 v2.6 보강: 저장 실패 안내 문구 ① · 저장 안 된 줄의 "저장 안 됨" 알약 (#121)
 
@@ -142,5 +142,40 @@ describe('SPEC-002 v2.6 저장 실패 안내·저장 안 됨 표시', () => {
     expect(unsavedRowTitles()).toEqual(['회비', '간식비'])
     expect(screen.getAllByTestId('notice-bar')).toHaveLength(1)
     expect(screen.getByRole('alert')).toHaveTextContent('저장된 기록을 읽지 못했어요. 지금 적는 내용은 저장되지 않아요')
+  })
+})
+
+describe('SPEC-002 저장 전 v4 가드 (#172)', () => {
+  it('가드에 어긋난 데이터를 저장하면 저장소 값이 그대로이고 장부 위 띠로 저장 실패를 알린다 (그 변경은 화면에도 넣지 않는다)', async () => {
+    const { repository, memory, state } = switchable(storedWith(LEDGER_2026), 'invalid-data')
+    renderApp(repository)
+
+    await addExpense('간식비', '5000')
+
+    const notice = screen.getByTestId('notice-bar')
+    expect(within(notice).getByRole('alert')).toHaveTextContent(
+      /^앱에 문제가 있어 방금 바꾼 것을 저장하지 않았어요\. 그 전 기록은 그대로예요$/,
+    )
+    // 기록 파일 보내기·다시 열기 버튼 없이 안내만: 화면은 이미 그 전 기록이고, 다음 저장은 된다
+    expect(within(notice).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^간식비/ })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('list-row-badge')).not.toBeInTheDocument()
+    expect(memory.load().data).toEqual(storedWith(LEDGER_2026))
+
+    state.failing = false
+    await addExpense('꽃값', '30000')
+
+    expect(screen.queryByTestId('notice-bar')).not.toBeInTheDocument()
+    expect(memory.load().data.books[0]?.ledgers['2026']?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '꽃값'])
+  })
+
+  it('진짜 가드로도 같다: 화면 기록에 명단에 없는 회원 번호가 있으면 저장하지 않고 알린다', async () => {
+    const memory = new MemoryRepository(duesData(PAYERS_OFF_ROSTER))
+    renderApp(memory)
+
+    await addExpense('간식비', '5000')
+
+    expect(screen.getByRole('alert')).toHaveTextContent('앱에 문제가 있어 방금 바꾼 것을 저장하지 않았어요. 그 전 기록은 그대로예요')
+    expect(memory.load().data).toEqual(duesData(PAYERS_OFF_ROSTER))
   })
 })

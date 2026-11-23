@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { storedWith, ledger } from '../test/ledgerFixtures'
+import { duesData, ledger, PAYERS_OFF_AMOUNT, PAYERS_OFF_ROSTER, storedWith } from '../test/ledgerFixtures'
 import type { LedgerRepository } from './LedgerRepository'
+import { LocalStorageRepository } from './LocalStorageRepository'
 import { MemoryRepository } from './MemoryRepository'
 import { NotifyingRepository } from './NotifyingRepository'
 
@@ -30,5 +31,20 @@ describe('SPEC-006 저장 성공 알림 (자동 보관기와 저장 계층 사�
     expect(repository.restore(DATA).ok).toBe(false)
     expect(repository.load().status).toBe('read-only')
     expect(onSaved).not.toHaveBeenCalled()
+  })
+
+  // 폰 저장소 그대로 감싸 본다: 가드가 막은 데이터가 자동으로 지키기 보관본으로 올라가지 않게 (#172)
+  it('가드에 어긋나 저장하지 않은 데이터는 알리지 않는다 (자동으로 지키기가 보관하지 않음)', () => {
+    localStorage.clear()
+    const onSaved = vi.fn()
+    const repository = new NotifyingRepository(new LocalStorageRepository(), onSaved)
+    repository.load()
+
+    expect(repository.save(duesData(PAYERS_OFF_ROSTER))).toEqual({ ok: false, reason: 'invalid-data' })
+    expect(repository.restore(duesData(PAYERS_OFF_AMOUNT))).toEqual({ ok: false, reason: 'invalid-data' })
+    expect(onSaved).not.toHaveBeenCalled()
+
+    expect(repository.save(duesData())).toEqual({ ok: true })
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith(duesData())
   })
 })

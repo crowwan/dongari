@@ -39,6 +39,13 @@ describe('SPEC-002 시작 안내·저장 실패 안내', () => {
     ])
   })
 
+  // 화면은 그 변경 전으로 돌아가 있어 할 일이 없다: 기록 파일을 보낼 일도, 다시 열 일도 없다 (#172)
+  it('가드에 어긋나 저장하지 않았으면 앱 문제라 방금 바꾼 것만 저장하지 않았다고 알리고 버튼은 붙이지 않는다', () => {
+    expect(storageNotices({ status: 'ok' }, 'invalid-data')).toEqual([
+      { message: '앱에 문제가 있어 방금 바꾼 것을 저장하지 않았어요. 그 전 기록은 그대로예요' },
+    ])
+  })
+
   it('저장을 막아 둔 상태의 저장 실패는 시작 안내 하나로만 알린다 (같은 이유를 두 번 말하지 않음)', () => {
     expect(storageNotices({ status: 'read-only', reason: 'newer-version' }, 'newer-version')).toEqual([
       { message: STORAGE_NOTICE.newerVersion },
