@@ -1,6 +1,7 @@
 import { useEffect, useReducer } from 'react'
 import { itemIcon } from '../../domain/itemIcon'
 import type { EntryInput, FrequentChoice } from '../../domain/ledger'
+import type { PayerChoices } from '../../domain/payers'
 import type { EntryType } from '../../domain/types'
 import { AmountDisplay } from '../../ui/AmountDisplay'
 import { BottomActionBar } from '../../ui/BottomActionBar'
@@ -14,16 +15,22 @@ import { SegmentedControl } from '../../ui/SegmentedControl'
 import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
 import type { SheetHistory } from '../useScreenHistory'
+import { formatAmount } from '../../ui/money'
+import { AddPayerSheet } from './AddPayerSheet'
 import { EntryMonthSheet } from './EntryMonthSheet'
 import { ENTRY_MONTH_SHEET, itemOptions, olderItems, TYPE_LABELS, TYPE_SEGMENTS } from './entryOptions'
+import { ADD_PAYER_SHEET, PAYER_SHARES_PAGE, payerNames, type EntryDues } from './entryDues'
+import { PayerPicker } from './PayerPicker'
+import { PayerSharesPage } from './PayerSharesPage'
+import { startingShares } from './payerShares'
 import {
   answerRows,
+  entryToSave,
   isStepDirty,
   offersFinish,
   quickDays,
   startSteps,
   stepButton,
-  stepInput,
   stepReducer,
   type AnswerRow,
   type QuickDay,
@@ -55,6 +62,8 @@ type AddEntryFormProps = {
   onDirtyChange?: (dirty: boolean) => void
   // 지금 단계·적는 값이 바뀔 때마다 알린다 (연습 장부가 말풍선을 옮긴다, SPEC-008)
   onStepChange?: (state: StepState) => void
+  // 회비 적기 "누가 냈어요?" (SPEC-010 3절). 없으면 v2.7 과 같다
+  dues?: EntryDues
 }
 
 // 내역 적기 (SPEC-001 기록 입력, ADR 004): 적는 내역 하나는 "지금 적는 내역" 카드 하나 — 답한 것은 카드 안 한 줄로 접히고,
@@ -75,9 +84,11 @@ export function AddEntryForm({
   onBack,
   onDirtyChange,
   onStepChange,
+  dues,
 }: AddEntryFormProps) {
-  const [state, dispatch] = useReducer(stepReducer, { year, month }, startSteps)
+  const [state, dispatch] = useReducer(stepReducer, { year, month, dues: dues && { fee: dues.choices(month).fee } }, startSteps)
   const { draft } = state
+  const choices = dues?.choices(draft.month, state.payers.memberIds)
   const lastSaved = saved.at(-1)
   const dirty = isStepDirty(state, month)
   const continuing = saved.length > 0
@@ -101,9 +112,14 @@ export function AddEntryForm({
       case 'custom-name':
         dispatch({ kind: 'submit-custom-name', knownType: lastUsedType(state.customName) })
         return
+      case 'payers':
+        dispatch({ kind: 'submit-payers' })
+        return
       case 'amount': {
-        const check = stepInput(state)
-        if (check.ok) onSave(check.input)
+        const save = entryToSave(state)
+        // 금액이 사람 수로 안 나눠떨어지면 저장하지 않고 "한 분씩 금액" 으로 (SPEC-010 3절)
+        if (save.kind === 'shares') sheets.openSheet(PAYER_SHARES_PAGE)
+        if (save.kind === 'save') onSave(save.input)
         return
       }
       case 'item':
@@ -130,7 +146,39 @@ export function AddEntryForm({
           value: row.type ? `${row.name} · ${TYPE_LABELS[row.type]}` : row.name,
           onChange: () => dispatch({ kind: 'revisit-item' }),
         }
+      case 'payers': {
+        const names = choices ? payerNames(row.memberIds, choices) : []
+        return {
+          label: '낸 분',
+          icon: 'users',
+          value: row.nameless ? '이름 없이' : names.join(', '),
+          detail: row.nameless ? undefined : `${names.length}명`,
+          onChange: () => dispatch({ kind: 'revisit-payers' }),
+        }
+      }
     }
+  }
+
+  // "한 분씩 금액" (SPEC-010 3절): 고른 분(목록 순서)과 처음 몫. [이대로 할게요] 면 그 합이 금액이 되고 "얼마인가요?" 로 돌아온다
+  if (sheets.sheet === PAYER_SHARES_PAGE && choices) {
+    const picked = choices.members.filter((member) => state.payers.memberIds.includes(member.id))
+    return (
+      <PayerSharesPage
+        backLabel="내역 적기"
+        members={picked}
+        initial={startingShares(
+          picked.map((member) => member.id),
+          draft.amount,
+          choices.fee,
+          { shares: state.payers.shares },
+        )}
+        onDone={(shares) => {
+          dispatch({ kind: 'set-shares', shares })
+          sheets.closeSheet()
+        }}
+        onBack={sheets.closeSheet}
+      />
+    )
   }
 
   return (
@@ -149,6 +197,9 @@ export function AddEntryForm({
               dispatch={dispatch}
               onSubmit={pressButton}
               onPickMonth={() => sheets.openSheet(ENTRY_MONTH_SHEET)}
+              choices={choices}
+              onAddPayer={() => sheets.openSheet(ADD_PAYER_SHEET)}
+              onOpenShares={() => sheets.openSheet(PAYER_SHARES_PAGE)}
               quickDays={quickDays(
                 { year, month: draft.month },
                 {
@@ -166,7 +217,7 @@ export function AddEntryForm({
           label={button.label}
           icon={button.label === '저장' ? 'check' : undefined}
           disabled={button.missing !== undefined}
-          note={button.missing}
+          note={button.missing ?? button.note}
           onClick={pressButton}
         />
       )}
@@ -179,6 +230,18 @@ export function AddEntryForm({
         currentMonth={currentMonth}
         onChange={(picked) => dispatch({ kind: 'change-month', month: picked })}
       />
+      {dues && (
+        <AddPayerSheet
+          open={sheets.sheet === ADD_PAYER_SHEET}
+          members={dues.members}
+          joinedText={`${year}년 ${draft.month}월`}
+          onAdd={(name) => {
+            dispatch({ kind: 'toggle-payer', memberId: dues.onAddMember(name, draft.month) })
+            sheets.closeSheet()
+          }}
+          onClose={sheets.closeSheet}
+        />
+      )}
     </div>
   )
 }
@@ -193,12 +256,37 @@ type StepQuestionProps = {
   onPickMonth: () => void
   // "며칠인가요?" 빠른 칩 ([오늘 7일]·[방금 5일]). 없으면 칩 줄을 숨긴다
   quickDays: QuickDay[]
+  // 회비 적기 (SPEC-010 3절): "누가 냈어요?" 목록, [+ 회원 넣기], [한 분만 금액이 달라요]
+  choices: PayerChoices | undefined
+  onAddPayer: () => void
+  onOpenShares: () => void
+}
+
+// "얼마인가요?" 아래 안내 (SPEC-010 3절): 한 분씩 정한 몫이면 그 말, 아니면 월 회비로 채웠다는 말 (월 회비가 없으면 없음)
+function amountNote({ draft, payers }: StepState, fee: number | undefined): string | undefined {
+  const count = payers.memberIds.length
+  if (payers.shares !== undefined && payers.shares.reduce((sum, share) => sum + share.amount, 0) === draft.amount) {
+    return `한 분씩 정한 금액을 더했어요 (${count}명)`
+  }
+  if (fee === undefined) return undefined
+  return `${count}명 × ${formatAmount(fee)}원으로 채웠어요. 고쳐도 돼요.`
 }
 
 const QUICK_DAY_TAGS = { today: '오늘', recent: '방금' } as const
 
 // 지금 단계의 질문 하나와 답하는 자리
-function StepQuestion({ state, frequentChoices, olderChoices, dispatch, onSubmit, onPickMonth, quickDays }: StepQuestionProps) {
+function StepQuestion({
+  state,
+  frequentChoices,
+  olderChoices,
+  dispatch,
+  onSubmit,
+  onPickMonth,
+  quickDays,
+  choices,
+  onAddPayer,
+  onOpenShares,
+}: StepQuestionProps) {
   const { draft } = state
   switch (state.step) {
     case 'day':
@@ -295,7 +383,29 @@ function StepQuestion({ state, frequentChoices, olderChoices, dispatch, onSubmit
           <p className="screen__note">처음 쓰는 항목이라 한 번만 물어봐요. 다음부터는 목록에서 고르면 저절로 정해져요</p>
         </>
       )
-    case 'amount':
+    case 'payers':
+      if (!choices) return null
+      return (
+        <>
+          <h2 className="entry__question">누가 냈어요?</h2>
+          <PayerPicker
+            choices={choices}
+            checked={state.payers.memberIds}
+            onToggle={(memberId) => dispatch({ kind: 'toggle-payer', memberId })}
+            onPick={(memberIds) => dispatch({ kind: 'pick-payers', memberIds })}
+            onAddMember={onAddPayer}
+          />
+          <div className="entry__aside">
+            <IconButton icon="pen" onClick={() => dispatch({ kind: 'skip-payers' })}>
+              이름 없이 적기
+            </IconButton>
+          </div>
+        </>
+      )
+    case 'amount': {
+      // 낸 분을 고른 회비 기록이면 채운 금액 안내 + [한 분만 금액이 달라요] (SPEC-010 3절)
+      const picked = choices !== undefined && state.payers.answer === 'picked' && state.payers.memberIds.length > 0
+      const note = picked ? amountNote(state, choices.fee) : undefined
       return (
         <>
           <h2 className="entry__question">
@@ -307,7 +417,16 @@ function StepQuestion({ state, frequentChoices, olderChoices, dispatch, onSubmit
             autoFocus
             onChange={(amount) => dispatch({ kind: 'change-amount', amount })}
           />
+          {note && <p className="screen__note">{note}</p>}
+          {picked && (
+            <div className="entry__aside">
+              <IconButton icon="users" onClick={onOpenShares}>
+                한 분만 금액이 달라요
+              </IconButton>
+            </div>
+          )}
         </>
       )
+    }
   }
 }

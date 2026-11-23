@@ -82,3 +82,73 @@
   display: flex;
   flex-direction: column;
 }
+
+/* "누가 냈어요?" 답 (SPEC-010 3절): 빠른 고르기 → 세로 체크 목록. 질문 제목 ↔ 답보다 한 단계 넓게 */
+.entry__payers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
+}
+
+/* 빠른 고르기 [지난번 낸 분 N명] [모두 N명]: 놓인 면(옅은 청록·화면 바탕) 위 흰 면 + 청록 글자, 한 줄에 안 들어가면 아래 줄로 */
+.entry__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.entry__quick-button {
+  flex: 1 1 auto;
+  min-height: var(--touch-min);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--corner-md);
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-family: var(--typeface);
+  font-size: var(--text-label-size);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--letter-body);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.entry__quick-button:active {
+  background: var(--pressed);
+}
+
+.entry__quick-button:focus-visible {
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
+
+/* "한 분씩 금액" 위쪽 [‹ 내역 적기] + 제목 + 안내 한 덩어리 (설정 편집 화면 머리와 같은 간격) */
+.entry__page-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.entry__shares {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
+}
+
+/* 합계 줄: "합계 180,000원 (4명)" — 질문 제목 급 굵은 글자 한 줄 */
+.entry__shares-total {
+  margin: 0;
+  color: var(--strong);
+  font-size: var(--text-heading-size);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+/* [+ 회원 넣기] 창 안: 이름 칸 → 안내 → [넣기] */
+.entry__add-payer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack);
+}

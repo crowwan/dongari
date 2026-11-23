@@ -30,9 +30,10 @@ const TYPE_LABEL: Record<EntryType, string> = { income: '수입', expense: '지�
 // 이 폰에 저장되지 않은 줄의 알약 (SPEC-002 v2.6): 앱을 닫으면 사라질 내역
 const UNSAVED_BADGE = '저장 안 됨'
 
-// 줄 보조 줄: "7일 · 지출", 날짜 없는 예전 기록은 "지출"만 (AC-9)
-function rowDescription({ day, type }: Entry): string {
-  return day === undefined ? TYPE_LABEL[type] : `${day}일 · ${TYPE_LABEL[type]}`
+// 줄 보조 줄: "7일 · 지출", 날짜 없는 예전 기록은 "지출"만 (AC-9). 낸 분이 있는 회비 기록은 "17일 · 수입 · 4명" (SPEC-010 3절)
+function rowDescription({ day, type, payers }: Entry): string {
+  const parts = [...(day === undefined ? [] : [`${day}일`]), TYPE_LABEL[type], ...(payers?.length ? [`${payers.length}명`] : [])]
+  return parts.join(' · ')
 }
 
 type LedgerScreenProps = {

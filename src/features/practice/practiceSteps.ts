@@ -118,6 +118,9 @@ function entryCoach(entry: NonNullable<PracticeView['entry']>, { income, expense
     case 'custom-type':
       // 말풍선이 항목 줄만 열어 두어 오지 않는 단계
       return undefined
+    case 'payers':
+      // 회비 "누가 냈어요?" (SPEC-010 3절): 연습 장부에는 아직 회원 명단이 없어 오지 않는다. 이 단계의 말풍선은 연습 이슈(#168)에서
+      return undefined
   }
 }
 

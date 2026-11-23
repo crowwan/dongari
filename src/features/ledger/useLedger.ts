@@ -19,6 +19,7 @@ import {
   type EntryInput,
   type FrequentChoice,
   type LedgerTotals,
+  type PayersEdit,
 } from '../../domain/ledger'
 import {
   addMember as addMemberTo,
@@ -86,13 +87,14 @@ export interface LedgerState {
   lastUsedType: (name: string) => EntryType | undefined
   // 지금 장부에 이 연도 장부를 시작한다 (새 연도). 장부가 없으면(첫 실행) createBook 을 쓴다
   startLedger: (info: BookInfo) => void
-  addEntry: (input: EntryInput) => boolean // 저장에 성공했는지 (성공일 때만 "저장했어요" 를 띄운다)
-  updateEntry: (id: string, input: EntryInput) => boolean // 저장에 성공했는지 (성공일 때만 "고쳤어요")
+  addEntry: (input: EntryInput) => boolean // 저장에 성공했는지 (성공일 때만 "저장했어요" 를 띄운다). 낸 분은 지금 장부 명단으로 검사한다
+  // 저장에 성공했는지 (성공일 때만 "고쳤어요"). payers: 낸 분 세 상태(SPEC-010 3절), 없으면 금액 규칙대로 다시 계산
+  updateEntry: (id: string, input: EntryInput, payers?: PayersEdit) => boolean
   deleteEntry: (id: string) => boolean // 저장에 성공했는지 (성공일 때만 "지웠어요")
   updateBookInfo: (setup: BookSetup) => boolean // 장부 이름·종류·이 연도 이월금. 저장에 성공했는지 (성공일 때만 알림을 띄운다)
   // 회원 명단·회비 표 시작 달·월 회비 (SPEC-010 6절). 저장에 성공했는지 (성공일 때만 알림)
-  // 명단을 처음 넣으면 회비 표 시작 달이 보고 있는 장부 연도의 1월이 된다
-  addMember: (member: NewMember) => boolean
+  // 명단을 처음 넣으면 회비 표 시작 달이 보고 있는 장부 연도의 1월이 된다. 회원 넣기는 새 회원 번호도 돌려준다 (내역 적기에서 넣은 분을 바로 체크, SPEC-010 3절)
+  addMember: (member: NewMember) => { saved: boolean; id: string }
   updateMember: (id: string, changes: MemberChanges) => boolean
   deleteMember: (id: string) => boolean // 기록에 낸 분으로 들어간 회원은 지우지 않는다 (화면은 버튼 대신 안내)
   changeDuesStart: (month: YearMonth) => boolean
@@ -207,9 +209,9 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     })
   }
 
-  // entryId: 추가하거나 고친 기록 (지울 때는 표시할 줄이 없어 넘기지 않는다)
-  function changeEntries(change: (ledger: Ledger) => Ledger, entryId?: string): boolean {
-    return changeLedger((ledger, target) => withLedger(target, change(ledger)), entryId)
+  // entryId: 추가하거나 고친 기록 (지울 때는 표시할 줄이 없어 넘기지 않는다). book: 낸 분을 검사할 명단이 든 지금 장부
+  function changeEntries(change: (ledger: Ledger, book: Book) => Ledger, entryId?: string): boolean {
+    return changeLedger((ledger, target) => withLedger(target, change(ledger, target)), entryId)
   }
 
   // 새 장부는 올해 장부 하나로 시작해 만든 순 맨 뒤에 들어가고 지금 장부가 된다 (같은 이름이어도 id 로 구분).
@@ -296,15 +298,19 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     addEntry: (input) => {
       // 저장 안 됨 표시에 쓰려고 새 기록 id 를 먼저 정한다
       const id = createId()
-      return changeEntries((item) => addEntryTo(item, input, { createId: () => id, now }), id)
+      return changeEntries((item, target) => addEntryTo(item, input, { createId: () => id, now }, target.members), id)
     },
-    updateEntry: (id, input) => changeEntries((item) => updateEntryIn(item, id, input), id),
+    updateEntry: (id, input, payers) => changeEntries((item, target) => updateEntryIn(item, id, input, payers, target.members), id),
     deleteEntry: (id) => changeEntries((item) => deleteEntryFrom(item, id)),
     updateBookInfo: (setup) =>
       changeLedger((item, target) =>
         withLedger({ ...target, name: setup.name.trim(), kind: setup.kind }, updateCarryover(item, setup.carryover)),
       ),
-    addMember: (member) => changeBook((target) => addMemberTo(target, member, { createId, year })),
+    addMember: (member) => {
+      // 넣은 분을 바로 체크할 수 있게 번호를 먼저 정한다 (addEntry 와 같은 방식)
+      const id = createId()
+      return { saved: changeBook((target) => addMemberTo(target, member, { createId: () => id, year })), id }
+    },
     updateMember: (id, changes) => changeBook((target) => updateMemberIn(target, id, changes)),
     deleteMember: (id) => changeBook((target) => deleteMemberFrom(target, id)),
     changeDuesStart: (month) => changeBook((target) => changeDuesStartOf(target, month)),
