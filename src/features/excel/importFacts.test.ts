@@ -21,6 +21,12 @@ describe('SPEC-010 읽은 내용 확인 화면에 보이는 글 (8절 "읽은 �
     expect(importedBookName('확장자없음', [])).toBe('확장자없음')
   })
 
+  it('AC-28 장부 이름에서 엑셀 확장자(.xlsx·.xls)만 빼고, 이름 안의 점은 그대로 둔다 (#178 리뷰)', () => {
+    expect(importedBookName('모임 v1.2.xlsx', [])).toBe('모임 v1.2')
+    expect(importedBookName('모임 v1.2', [])).toBe('모임 v1.2')
+    expect(importedBookName('2026.11 장부.xls', [])).toBe('2026.11 장부')
+  })
+
   it('해는 처음 ~ 마지막 해와 해 수, 한 해면 그 해만', () => {
     expect(yearsText([2013, 2014, 2026])).toEqual({ main: '2013 ~ 2026년', sub: '3개 해' })
     expect(yearsText([2026])).toEqual({ main: '2026년', sub: '1개 해' })

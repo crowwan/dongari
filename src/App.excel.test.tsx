@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import App from './App'
 import type { StoredData } from './domain/types'
 import { EXCEL_FILE_MAX_BYTES } from './features/excel/excelFile'
+import { isNearKeepLimit } from './features/excel/importFacts'
 import type { SheetData } from './features/excel/sheet'
 import { writeWorkbook, XLSX_MIME } from './features/excel/sheetjs'
 import type { LedgerRepository } from './storage/LedgerRepository'
@@ -12,6 +13,12 @@ import { MemoryRepository } from './storage/MemoryRepository'
 import { isStoredData } from './storage/schema'
 import { duesSheet, ledgerSheet, months, otherSheet, type LedgerRow } from './test/excelFixtures'
 import { book, ledger, storedWith } from './test/ledgerFixtures'
+
+// 크기 경고 셈을 몇 번 하는지 세려고 진짜 함수를 감싼다 (#178 리뷰: 글자를 칠 때마다 전체 데이터를 직렬화하지 않게)
+vi.mock('./features/excel/importFacts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./features/excel/importFacts')>()
+  return { ...actual, isNearKeepLimit: vi.fn(actual.isNearKeepLimit) }
+})
 
 const TODAY = new Date('2026-11-23T09:00:00.000+09:00')
 
@@ -116,6 +123,17 @@ describe('SPEC-010 엑셀로 새 장부 — 여는 곳 (8절 "여는 곳", #166)
     expect(row).toHaveTextContent('엑셀 장부로 새 장부 만들기')
     await userEvent.click(row)
     expect(opened()).toBe(screen.getByLabelText('엑셀 파일 고르기'))
+  })
+
+  it('장부 고르기 창이 떠 있어 뒤 화면이 잠겨(inert) 있어도 엑셀 파일 고르기 칸은 잠긴 곳 밖에 있다 (#178 리뷰)', async () => {
+    renderApp(new MemoryRepository(ONE_BOOK))
+
+    await openBookSheet()
+
+    // 창이 뒤 화면(앱 뿌리)을 잠갔다
+    expect(screen.getByTestId('ledger-screen').closest('[inert]')).not.toBeNull()
+    // 숨은 파일 칸은 잠기지 않아 [엑셀 파일로 새 장부] 의 click() 이 파일 고르기를 연다
+    expect(screen.getByLabelText('엑셀 파일 고르기').closest('[inert]')).toBeNull()
   })
 })
 
@@ -231,6 +249,46 @@ describe('SPEC-010 엑셀로 새 장부 — 읽은 내용 확인 (8절 "읽은 �
     expect(repository.load().data.settings.recoveryCode).toBeDefined()
   })
 
+  it('AC-28 [새 장부 만들기]를 저장하지 못하면(저장 공간 부족 등) 장부를 만들지 않고 확인 화면에 남아 알리며, 다시 누를 수 있다 (#178 리뷰)', async () => {
+    const repository = new MemoryRepository(ONE_BOOK)
+    const save = vi.spyOn(repository, 'save').mockReturnValueOnce({ ok: false, reason: 'quota-exceeded' })
+    renderApp(repository)
+    await chooseExcel(await xlsxFile('지어낸모임.xlsx', clubSheets()))
+    await readExcelScreen()
+
+    await userEvent.click(screen.getByRole('button', { name: /^새 장부 만들기/ }))
+
+    expect(screen.getByRole('heading', { level: 1, name: '엑셀 파일을 읽었어요' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('장부를 만들지 못했어요. 이 폰에 저장하지 못해 지금 기록은 그대로예요')
+    expect(repository.load().data).toEqual(ONE_BOOK)
+
+    // 화면 데이터에도 새 장부가 들어가지 않았다: 다시 누르면 장부가 하나만 생긴다
+    await userEvent.click(screen.getByRole('button', { name: /^새 장부 만들기/ }))
+
+    expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+    expect(save).toHaveBeenCalledTimes(2)
+    expect(repository.load().data.books.map((item) => item.name)).toEqual(['한랑드림', '지어낸모임'])
+    expect(screen.getByText('엑셀 장부를 만들었어요 · 기록 6건')).toBeInTheDocument()
+  })
+
+  it('[새 장부 만들기]를 저장하지 못하고 장부로 돌아가면 지금 장부 그대로이고 다음 저장도 지금 데이터만 쓴다 (#178 리뷰)', async () => {
+    const repository = new MemoryRepository(ONE_BOOK)
+    const save = vi.spyOn(repository, 'save').mockReturnValueOnce({ ok: false, reason: 'quota-exceeded' })
+    renderApp(repository)
+    await chooseExcel(await xlsxFile('지어낸모임.xlsx', clubSheets()))
+    await readExcelScreen()
+    await userEvent.click(screen.getByRole('button', { name: /^새 장부 만들기/ }))
+
+    await userEvent.click(screen.getByRole('button', { name: '장부로' }))
+
+    expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('한랑드림')
+    const sheet = await openBookSheet()
+    expect(sheet.queryByRole('button', { name: /^지어낸모임/ })).not.toBeInTheDocument()
+    await userEvent.click(sheet.getByRole('button', { name: /^한랑드림/ }))
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ books: [expect.objectContaining({ name: '한랑드림' })] }))
+  })
+
   it('월 회비를 고치면 그 금액으로 낸 분을 다시 나눠 확인 화면이 바뀐다 (스펙 8절 "구현에서 정한 것")', async () => {
     renderApp(new MemoryRepository(ONE_BOOK))
     await chooseExcel(await xlsxFile('지어낸모임.xlsx', clubSheets()))
@@ -248,6 +306,49 @@ describe('SPEC-010 엑셀로 새 장부 — 읽은 내용 확인 (8절 "읽은 �
     expect(await readExcelScreen()).toBeInTheDocument()
     expect(fact('월 회비')).toHaveTextContent('월 회비2024년 5,000원2025년 10,000원')
     expect(screen.queryByText(/낸 분을 다 못 나눈 회비/)).not.toBeInTheDocument()
+  })
+
+  it('월 회비 고치기는 바꾼 해만 고정하고, 다 나눈 줄이 없어 앞 해 값을 이어 쓰던 다음 해는 고친 값을 이어 쓴다 (#178 리뷰)', async () => {
+    // 2025년은 회비 줄이 없어(이자만) 2024년 월 회비를 이어 쓴다
+    const sheets = [
+      ledgerSheet(2024, 0, [[1, 5, 20_000, '강민지,김도윤', null]]),
+      duesSheet(2024, [[1, '강민지', ...months(0)], [2, '김도윤', ...months(0)]]),
+      ledgerSheet(2025, 20_000, [[1, 5, 1_000, '이자', null]]),
+    ]
+    renderApp(new MemoryRepository(ONE_BOOK))
+    await chooseExcel(await xlsxFile('지어낸모임.xlsx', sheets))
+    await readExcelScreen()
+    expect(fact('월 회비')).toHaveTextContent('월 회비2024~2025년 10,000원')
+
+    await userEvent.click(screen.getByRole('button', { name: '월 회비 고치기' }))
+    await userEvent.clear(screen.getByLabelText('2024년 월 회비'))
+    await userEvent.type(screen.getByLabelText('2024년 월 회비'), '5000')
+    await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+    expect(await readExcelScreen()).toBeInTheDocument()
+    expect(fact('월 회비')).toHaveTextContent('월 회비2024~2025년 5,000원')
+
+    // 한 번 더 고쳐도 앞에서 고친 해는 그대로 남는다
+    await userEvent.click(screen.getByRole('button', { name: '월 회비 고치기' }))
+    expect(screen.getByLabelText('2024년 월 회비')).toHaveValue('5,000')
+    await userEvent.clear(screen.getByLabelText('2025년 월 회비'))
+    await userEvent.type(screen.getByLabelText('2025년 월 회비'), '8000')
+    await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+    expect(await readExcelScreen()).toBeInTheDocument()
+    expect(fact('월 회비')).toHaveTextContent('월 회비2024년 5,000원2025년 8,000원')
+  })
+
+  it('자동으로 지키기 크기 경고는 읽은 뒤 한 번만 센다 (장부 이름을 칠 때마다 전체 데이터를 직렬화하지 않음, #178 리뷰)', async () => {
+    renderApp(new MemoryRepository(ONE_BOOK))
+    await chooseExcel(await xlsxFile('지어낸모임.xlsx', clubSheets()))
+    await readExcelScreen()
+    vi.mocked(isNearKeepLimit).mockClear()
+
+    await userEvent.type(screen.getByLabelText('장부 이름'), ' 2026')
+
+    expect(screen.getByLabelText('장부 이름')).toHaveValue('지어낸모임 2026')
+    expect(isNearKeepLimit).not.toHaveBeenCalled()
   })
 
   it('월 회비 고치기에서 읽은 값이 있던 해를 비우면 저장할 수 없다', async () => {
@@ -291,10 +392,11 @@ describe('SPEC-010 엑셀로 새 장부 — 파일 안내 (8절 예외, #166)', 
   it.each([
     ['5MB 넘는 파일', () => new File([new Uint8Array(EXCEL_FILE_MAX_BYTES + 1)], '큰 장부.xlsx'), '파일이 너무 커요', '5MB 까지 읽을 수 있어요'],
     [
+      // 서버 주소 없는 빌드: 설정 맨 위 카드에 [기록 파일 불러오기] 가 바로 있다 ("다른 방법으로 옮기기" 접기 없음, #178 리뷰)
       '기록 파일',
       () => new File([JSON.stringify(ONE_BOOK)], '우리장부-기록-2026-11-23.txt', { type: 'text/plain' }),
       '이 파일은 기록 파일이에요',
-      '설정 › 다른 방법으로 옮기기 › 기록 파일 불러오기에서 열어 주세요',
+      '설정 › 기록 파일 불러오기에서 열어 주세요',
     ],
     ['깨진 엑셀', () => new File(['PK\u0003\u0004 깨진 파일'], '깨진.xlsx'), '엑셀 파일을 읽지 못했어요', '엑셀에서 다시 저장해 보세요'],
   ])('AC-29 %s을 고르면 각자의 안내가 나오고 장부는 그대로다', async (_label, makeFile, title, description) => {
@@ -351,5 +453,30 @@ describe('SPEC-010 엑셀로 새 장부 — 파일 안내 (8절 예외, #166)', 
     expect(dialog.getByText('이 파일은 엑셀 파일이에요')).toBeInTheDocument()
     expect(dialog.getByText('[엑셀 파일 불러오기]에서 열어 주세요')).toBeInTheDocument()
     expect(repository.load().data).toEqual(ONE_BOOK)
+  })
+
+  it('AC-29 첫 실행에서 엑셀 대신 기록 파일을 고르면 위쪽 [기록 파일 불러오기]로 안내한다 (#178 리뷰)', async () => {
+    renderApp(new MemoryRepository())
+    const user = userEvent.setup({ applyAccept: false })
+    await user.click(screen.getByRole('button', { name: '엑셀 파일 불러오기' }))
+
+    await user.upload(screen.getByLabelText('엑셀 파일 고르기'), new File(['{}'], '우리장부-기록-2026-11-23.txt', { type: 'text/plain' }))
+
+    expect(await screen.findByRole('heading', { level: 1, name: '이 파일은 기록 파일이에요' })).toBeInTheDocument()
+    expect(screen.getByText('위쪽 [기록 파일 불러오기]에서 열어 주세요')).toBeInTheDocument()
+  })
+
+  it('기록 파일 불러오기에서 엑셀이 아닌 zip 파일(.zip·.docx 등, 머리가 같음)을 고르면 엑셀이라고 하지 않는다 (#178 리뷰)', async () => {
+    renderApp(new MemoryRepository(ONE_BOOK))
+    const user = userEvent.setup({ applyAccept: false })
+    await user.click(screen.getByRole('button', { name: '설정' }))
+    await user.click(screen.getByRole('button', { name: /^기록 파일 불러오기/ }))
+    const zipBytes = await (await xlsxFile('같은 머리.xlsx', clubSheets())).arrayBuffer()
+
+    await user.upload(screen.getByLabelText('기록 파일 고르기'), new File([zipBytes], '사진 모음.zip'))
+
+    const dialog = within(await screen.findByRole('alertdialog'))
+    expect(dialog.getByText('이 파일은 열 수 없어요')).toBeInTheDocument()
+    expect(dialog.queryByText('이 파일은 엑셀 파일이에요')).not.toBeInTheDocument()
   })
 })

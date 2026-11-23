@@ -7,9 +7,10 @@ import type { BalanceCheck, ExcelImportSummary, ImportedBook } from './readExcel
 // 직렬화한 저장 데이터가 이보다 크면 자동으로 지키기 상한(1MB, SPEC-006)에 가깝다고 경고한다 (8절)
 export const KEEP_WARNING_BYTES = 900_000
 
-// 장부 이름 칸 처음 값: 파일 이름에서 확장자를 뺀 것. 같은 이름 장부가 있으면 뒤에 " (엑셀)"
+// 장부 이름 칸 처음 값: 파일 이름에서 엑셀 확장자(.xlsx·.xls)를 뺀 것 — 이름 안의 점("모임 v1.2")은 그대로 (#178 리뷰).
+// 같은 이름 장부가 있으면 뒤에 " (엑셀)"
 export function importedBookName(fileName: string, existingNames: readonly string[]): string {
-  const base = fileName.trim().replace(/\.[^.]+$/, '').trim()
+  const base = fileName.trim().replace(/\.(xlsx|xls)$/i, '').trim()
   return existingNames.some((name) => name.trim() === base) ? `${base} (엑셀)` : base
 }
 

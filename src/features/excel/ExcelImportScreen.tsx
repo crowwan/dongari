@@ -10,12 +10,13 @@ import { Button } from '../../ui/Button'
 import { Icon, type IconName } from '../../ui/Icon'
 import { formatAmount } from '../../ui/money'
 import { MoneyInput } from '../../ui/MoneyInput'
+import { NoticeBar } from '../../ui/NoticeBar'
 import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
 import { EditPage } from '../settings/EditPage'
 import type { SheetHistory } from '../useScreenHistory'
 import { readExcelFile, type ExcelFileProblem, type PickedFile } from './excelFile'
-import { EXCEL_PROBLEM_MESSAGES } from './excelMessages'
+import { EXCEL_CREATE_FAILED, type BackupFileRoute } from './excelMessages'
 import { ExcelProblem, ExcelReading } from './ExcelStatus'
 import {
   balanceCheckText,
@@ -42,23 +43,47 @@ export type ExcelImportScreenProps = {
   bookNames: readonly string[] // 지금 있는 장부 이름 (같은 이름이면 " (엑셀)")
   data: StoredData // 지금 저장 데이터 (자동으로 지키기 크기 경고)
   sheets: SheetHistory
+  backupRoute: BackupFileRoute // 기록 파일을 골랐을 때 안내할 [기록 파일 불러오기] 자리
   onBack: () => void
   onPickAgain: () => void // 파일 고르기 창을 다시 연다
-  onCreate: (name: string, book: ImportedBook) => void // [새 장부 만들기]
+  onReload: () => void // [앱 다시 열기] (엑셀 기능을 받지 못했을 때)
+  onCreate: (name: string, book: ImportedBook) => boolean // [새 장부 만들기]. 기기에 저장했으면 true
 }
 
 type Read = { book: ImportedBook; summary: ExcelImportSummary; workbook: ExcelWorkbook }
 
-type Phase = { name: 'reading' } | { name: 'failed'; problem: ExcelFileProblem } | { name: 'read'; read: Read }
+// 읽음: 자동으로 지키기 크기 경고는 읽을 때(월 회비를 고쳐 다시 읽을 때) 한 번만 센다 — 전체 데이터를 직렬화하므로
+// 장부 이름을 칠 때마다 세지 않게 (#178 리뷰)
+type Phase =
+  | { name: 'reading' }
+  | { name: 'failed'; problem: ExcelFileProblem }
+  | { name: 'read'; read: Read; nearKeepLimit: boolean }
 
-export function ExcelImportScreen({ file, deps, bookNames, data, sheets, onBack, onPickAgain, onCreate }: ExcelImportScreenProps) {
+export function ExcelImportScreen({
+  file,
+  deps,
+  bookNames,
+  data,
+  sheets,
+  backupRoute,
+  onBack,
+  onPickAgain,
+  onReload,
+  onCreate,
+}: ExcelImportScreenProps) {
   const [phase, setPhase] = useState<Phase>({ name: 'reading' })
   // 장부 이름 칸. 손대기 전에는 파일 이름에서 정한 값
   const [name, setName] = useState<string>()
+  // 월 회비 고치기에서 사람이 바꾼 해만 (여러 번 고치면 쌓인다). 안 바꾼 해는 읽는 규칙대로 앞 해 값을 이어 쓴다 (#178 리뷰)
+  const [fixedFees, setFixedFees] = useState<ReadonlyMap<number, number>>(() => new Map())
+  // [새 장부 만들기]를 기기에 저장하지 못했다 (#178 리뷰)
+  const [createFailed, setCreateFailed] = useState(false)
   // [새 장부 만들기] 를 두 번 눌러 장부가 둘 생기지 않게
   const created = useRef(false)
 
+  const readPhase = (read: Read): Phase => ({ name: 'read', read, nearKeepLimit: isNearKeepLimit(data, read.book) })
   const readFile = useEffectEvent(() => readExcelFile(file, deps))
+  const showRead = useEffectEvent((read: Read) => setPhase(readPhase(read)))
   useEffect(() => {
     // 화면을 떠나면(읽는 중 [‹ 장부로]·뒤로 버튼) 읽은 결과를 버린다
     let alive = true
@@ -66,7 +91,8 @@ export function ExcelImportScreen({ file, deps, bookNames, data, sheets, onBack,
       .catch((): { ok: false; problem: ExcelFileProblem } => ({ ok: false, problem: 'not-excel' }))
       .then((result) => {
         if (!alive) return
-        setPhase(result.ok ? { name: 'read', read: result } : { name: 'failed', problem: result.problem })
+        if (result.ok) showRead(result)
+        else setPhase({ name: 'failed', problem: result.problem })
       })
     return () => {
       alive = false
@@ -75,7 +101,7 @@ export function ExcelImportScreen({ file, deps, bookNames, data, sheets, onBack,
 
   if (phase.name === 'reading') return <ExcelReading fileName={file.name} onBack={onBack} />
   if (phase.name === 'failed') {
-    return <ExcelProblem message={EXCEL_PROBLEM_MESSAGES[phase.problem]} onBack={onBack} onPickAgain={onPickAgain} />
+    return <ExcelProblem problem={phase.problem} route={backupRoute} onBack={onBack} onPickAgain={onPickAgain} onReload={onReload} />
   }
 
   const { read } = phase
@@ -86,10 +112,14 @@ export function ExcelImportScreen({ file, deps, bookNames, data, sheets, onBack,
       <FeeEdit
         fees={summary.monthlyFees}
         onBack={sheets.closeSheet}
-        onSave={(fixed) => {
-          // 고친 월 회비로 낸 분 배수 판정을 다시 해 처음부터 다시 읽는다 (8절 "월 회비", 스펙 "구현에서 정한 것")
+        onSave={(changed) => {
+          // 바꾼 해만 고정해 낸 분 배수 판정을 다시 하며 처음부터 다시 읽는다 (8절 "월 회비", 스펙 "구현에서 정한 것")
+          const fixed = new Map([...fixedFees, ...changed])
           const again = readExcelBook(read.workbook, deps, { monthlyFees: fixed })
-          if (again.ok) setPhase({ name: 'read', read: { ...again, workbook: read.workbook } })
+          if (again.ok) {
+            setFixedFees(fixed)
+            setPhase(readPhase({ ...again, workbook: read.workbook }))
+          }
           sheets.closeSheet()
         }}
       />
@@ -98,9 +128,12 @@ export function ExcelImportScreen({ file, deps, bookNames, data, sheets, onBack,
 
   const bookName = name ?? importedBookName(file.name, bookNames)
   const missingName = bookName.trim() === ''
+  const unreadSheets = unreadSheetsText(summary.unreadSheets)
 
   return (
     <div className="screen screen--stack excel excel-import" data-testid="excel-import-screen">
+      {/* 저장 실패 안내는 다른 화면의 저장 실패 안내 띠와 같은 자리(맨 위)에 */}
+      {createFailed && <NoticeBar message={EXCEL_CREATE_FAILED} />}
       <div className="excel__head">
         <BackToLedger onBack={onBack} />
         <h1 className="screen__title">엑셀 파일을 읽었어요</h1>
@@ -146,14 +179,14 @@ export function ExcelImportScreen({ file, deps, bookNames, data, sheets, onBack,
             금액이나 날짜를 읽지 못해 넣지 않았어요. 필요하면 만든 뒤 직접 적어 주세요.
           </ImportNote>
         )}
-        {isNearKeepLimit(data, read.book) && (
+        {phase.nearKeepLimit && (
           <ImportNote tone="warn" title="기록이 많아 자동으로 지키기를 못 할 수 있어요">
             장부는 만들 수 있어요. 가끔 기록 파일을 보내 두세요.
           </ImportNote>
         )}
       </div>
 
-      {unreadSheetsText(summary.unreadSheets) && <p className="screen__note">{unreadSheetsText(summary.unreadSheets)}</p>}
+      {unreadSheets && <p className="screen__note">{unreadSheets}</p>}
 
       <LineNotesSheet
         open={sheets.sheet === CHANGED_DATES_SHEET}
@@ -177,7 +210,11 @@ export function ExcelImportScreen({ file, deps, bookNames, data, sheets, onBack,
         onClick={() => {
           if (missingName || created.current) return
           created.current = true
-          onCreate(bookName.trim(), read.book)
+          if (onCreate(bookName.trim(), read.book)) return
+          // 저장하지 못했으면 장부는 생기지 않았다: 이 화면에 남아 맨 위에 알리고 다시 누를 수 있게 (#178 리뷰)
+          created.current = false
+          setCreateFailed(true)
+          window.scrollTo(0, 0)
         }}
       />
     </div>
@@ -350,25 +387,26 @@ function LineNotesSheet({ open, title, notes, onClose }: LineNotesSheetProps) {
 
 type FeeEditProps = {
   fees: ExcelImportSummary['monthlyFees']
-  onSave: (fixed: Map<number, number>) => void
+  onSave: (changed: Map<number, number>) => void // 바꾼 해와 금액만
   onBack: () => void
 }
 
 // 월 회비 고치기: 해마다 금액 칸 하나. 고치면 그 금액으로 낸 분을 다시 나눈다 (월 회비의 배수 판정이 달라지므로).
+// [저장]은 바꾼 해만 넘긴다 — 안 바꾼 해까지 고정하면 앞 해 값을 이어 쓰던 해가 고친 앞 해 값을 따라가지 못한다 (#178 리뷰).
 // 읽은 값이 있던 해는 비울 수 없다 (설정 월 회비처럼 "정하지 않음"으로 되돌리는 길은 두지 않는다)
 function FeeEdit({ fees, onSave, onBack }: FeeEditProps) {
   const [amounts, setAmounts] = useState(() => new Map(fees.map(({ year, fee }) => [year, fee ?? 0])))
   const amountOf = (year: number) => amounts.get(year) ?? 0
-  const changed = fees.some(({ year, fee }) => amountOf(year) !== (fee ?? 0))
+  const changedYears = fees.filter(({ year, fee }) => amountOf(year) !== (fee ?? 0) && amountOf(year) > 0)
   const emptied = fees.some(({ year, fee }) => fee !== undefined && amountOf(year) === 0)
 
   return (
     <EditPage
       title="월 회비 고치기"
       backLabel="읽은 내용"
-      canSave={changed && !emptied}
+      canSave={changedYears.length > 0 && !emptied}
       onBack={onBack}
-      onSave={() => onSave(new Map([...amounts].filter(([, amount]) => amount > 0)))}
+      onSave={() => onSave(new Map(changedYears.map(({ year }) => [year, amountOf(year)])))}
     >
       <p className="screen__note">해마다 한 분이 한 달에 내는 돈이에요. 고치면 그 금액으로 낸 분을 다시 나눠요.</p>
       {fees.map(({ year, fee }) => (

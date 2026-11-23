@@ -48,7 +48,10 @@ describe('SPEC-010 엑셀로 새 장부 — 엑셀 기능을 받지 못함 (8절
     await chooseExcel(xlsxLike())
 
     expect(await screen.findByRole('heading', { level: 1, name: '엑셀 기능을 받지 못했어요' }, { timeout: 5_000 })).toBeInTheDocument()
-    expect(screen.getByText('인터넷에 연결된 뒤 다시 해 주세요')).toBeInTheDocument()
+    // 실패한 동적 import 는 브라우저가 기억할 수 있어 파일을 다시 골라도 또 실패한다 → 앱을 다시 열게 한다 (#178 리뷰)
+    expect(screen.getByText('인터넷에 연결된 뒤 [앱 다시 열기]를 눌러 주세요')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '앱 다시 열기' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '파일 다시 고르기' })).not.toBeInTheDocument()
     expect(repository.load().data).toEqual(ONE_BOOK)
   })
 
@@ -63,7 +66,7 @@ describe('SPEC-010 엑셀로 새 장부 — 엑셀 기능을 받지 못함 (8절
     await chooseExcel(xlsxLike())
 
     expect(await screen.findByRole('heading', { level: 1, name: '엑셀 기능을 받지 못했어요' }, { timeout: 5_000 })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '파일 다시 고르기' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '앱 다시 열기' })).toBeInTheDocument()
     expect(repository.load().data).toEqual(ONE_BOOK)
   })
 })

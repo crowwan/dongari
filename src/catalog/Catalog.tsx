@@ -5,7 +5,6 @@ import { yearReport } from '../domain/report'
 import type { EntryType } from '../domain/types'
 import { BookPicker } from '../features/books/BookPicker'
 import { ImportFacts, ImportNote } from '../features/excel/ExcelImportScreen'
-import { EXCEL_PROBLEM_MESSAGES } from '../features/excel/excelMessages'
 import { ExcelProblem, ExcelReading } from '../features/excel/ExcelStatus'
 import type { ExcelImportSummary } from '../features/excel/readExcelBook'
 import { BrowserBar, BrowserMenu, BrowserPage, BrowserPicture } from '../features/install/BrowserPicture'
@@ -607,10 +606,17 @@ export function Catalog() {
               </div>
             </div>
           </State>
-          <State label="읽지 못함: 제목 + 다음에 할 일 + 아래 고정 [파일 다시 고르기] (기록 파일을 고른 경우)">
+          <State label="읽지 못함: 제목 + 다음에 할 일 + 아래 고정 [파일 다시 고르기] (기록 파일을 고른 경우, 서버 주소 없는 빌드)">
             <div className="catalog__frame catalog__frame--short-screen">
               <div className="app__main">
-                <ExcelProblem message={EXCEL_PROBLEM_MESSAGES['backup-file']} onBack={noop} onPickAgain={noop} />
+                <ExcelProblem problem="backup-file" route="settings" onBack={noop} onPickAgain={noop} onReload={noop} />
+              </div>
+            </div>
+          </State>
+          <State label="엑셀 기능을 받지 못함: 주 버튼이 [앱 다시 열기] (실패한 동적 import 는 다시 불러도 남을 수 있어 새로 연다)">
+            <div className="catalog__frame catalog__frame--short-screen">
+              <div className="app__main">
+                <ExcelProblem problem="load-failed" route="settings" onBack={noop} onPickAgain={noop} onReload={noop} />
               </div>
             </div>
           </State>

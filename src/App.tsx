@@ -252,16 +252,16 @@ export default function App({
   }
 
   // 엑셀 읽은 내용 [새 장부 만들기] (SPEC-010 8절): 동아리·모임 장부를 만들어 지금 장부로, 장부 연도는 엑셀 마지막 해.
-  // 기기에 저장했을 때만 알린다. 읽은 내용 화면 칸을 되돌려 장부로
-  function importExcelBook(name: string, imported: ImportedBook) {
+  // 기기에 저장했으면 알리고 읽은 내용 화면 칸을 되돌려 장부로. 저장하지 못했으면 장부를 만들지 않고 그 화면에 남는다(화면이 알린다)
+  function importExcelBook(name: string, imported: ImportedBook): boolean {
     const isFirstBook = ledger.isFirstRun
-    if (ledger.importBook(name, imported)) {
-      const entryCount = Object.values(imported.ledgers).reduce((sum, item) => sum + item.entries.length, 0)
-      setToast(`엑셀 장부를 만들었어요 · 기록 ${formatAmount(entryCount)}건`)
-      if (isFirstBook) startFirstBook()
-    }
+    if (!ledger.importBook(name, imported)) return false
+    const entryCount = Object.values(imported.ledgers).reduce((sum, item) => sum + item.entries.length, 0)
+    setToast(`엑셀 장부를 만들었어요 · 기록 ${formatAmount(entryCount)}건`)
+    if (isFirstBook) startFirstBook()
     setViewedMonth(undefined)
     navigation.backToLedger()
+    return true
   }
 
   // 복구 코드로 받아 온 데이터로 전체 바꾸기 (SPEC-006 AC-5). 백업 불러오기와 같이 올해 장부의 처음 달로 돌아가 알린다
@@ -388,8 +388,11 @@ export default function App({
         bookNames={ledger.bookChoices.map((choice) => choice.name)}
         data={ledger.data}
         sheets={navigation}
+        // 기록 파일을 골랐을 때 [기록 파일 불러오기] 자리: 첫 실행 위쪽 / 설정 맨 위 카드(복구 코드 없음) / 설정 › 다른 방법으로 옮기기
+        backupRoute={ledger.isFirstRun ? 'first-run' : keep && keepState && recoveryCode ? 'settings-more' : 'settings'}
         onBack={navigation.backToLedger}
         onPickAgain={excelImport.start}
+        onReload={() => window.location.reload()}
         onCreate={importExcelBook}
       />
     )

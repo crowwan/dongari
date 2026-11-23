@@ -2,8 +2,9 @@
 // 정적으로 부르면 첫 화면 파일이 엑셀 읽기 규칙만큼 커진다. 받는 동안은 "읽는 중", 받지 못하면(오프라인인데 서비스 워커가 아직 못 받음 등)
 // 엑셀 라이브러리를 받지 못한 것과 같은 안내를 보인다
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { OUTSIDE_LAYER } from '../../ui/modalLayer'
 import type { ExcelImportScreenProps } from './ExcelImportScreen'
-import { EXCEL_PROBLEM_MESSAGES } from './excelMessages'
 import { EXCEL_FILE_ACCEPT, ExcelProblem, ExcelReading } from './ExcelStatus'
 import type { ExcelImportFlow } from './useExcelImport'
 
@@ -29,15 +30,24 @@ export function ExcelImportSlot(props: ExcelImportScreenProps) {
   }, [])
 
   if (loaded === 'failed') {
-    return <ExcelProblem message={EXCEL_PROBLEM_MESSAGES['load-failed']} onBack={props.onBack} onPickAgain={props.onPickAgain} />
+    return (
+      <ExcelProblem
+        problem="load-failed"
+        route={props.backupRoute}
+        onBack={props.onBack}
+        onPickAgain={props.onPickAgain}
+        onReload={props.onReload}
+      />
+    )
   }
   if (!loaded) return <ExcelReading fileName={props.file.name} onBack={props.onBack} />
   return <loaded.ExcelImportScreen {...props} />
 }
 
-// 엑셀 파일 고르기 숨은 칸 (입구 세 곳이 같이 쓴다)
+// 엑셀 파일 고르기 숨은 칸 (입구 세 곳이 같이 쓴다). 장부 고르기 창이 떠 있으면 창 밖(앱 뿌리 #root)이 inert 로 잠겨
+// 그 안 칸의 click() 이 무시될 수 있어서, 앱 뿌리 밖 body 바로 아래에 두고 잠그지 않게 표시한다 (#178 리뷰, ui/modalLayer)
 export function ExcelFileInput({ flow: { attachFileInput, onFileChosen } }: { flow: ExcelImportFlow }) {
-  return (
+  return createPortal(
     <input
       ref={attachFileInput}
       type="file"
@@ -46,6 +56,8 @@ export function ExcelFileInput({ flow: { attachFileInput, onFileChosen } }: { fl
       aria-label="엑셀 파일 고르기"
       data-testid="excel-file-input"
       onChange={onFileChosen}
-    />
+      {...{ [OUTSIDE_LAYER]: '' }}
+    />,
+    document.body,
   )
 }

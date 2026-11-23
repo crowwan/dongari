@@ -104,7 +104,7 @@ export interface LedgerState {
   // 새 장부를 만들어 지금 장부로 정하고 올해 장부를 연다. 저장에 성공했는지 (성공일 때만 "새 장부를 만들었어요")
   createBook: (setup: BookSetup) => boolean
   // 엑셀에서 읽은 내용으로 동아리·모임 장부를 만들어 지금 장부로 정하고 마지막 해 장부를 연다 (SPEC-010 8절 #166).
-  // 저장에 성공했는지 (성공일 때만 "엑셀 장부를 만들었어요")
+  // 저장에 성공했는지. 저장하지 못하면 아무것도 바꾸지 않는다 (화면 데이터에도 넣지 않음, 성공일 때만 "엑셀 장부를 만들었어요")
   importBook: (name: string, imported: ImportedBook) => boolean
   // 장부를 지우고 남은 첫 장부의 올해 장부를 연다. 저장하지 못하면 아무것도 지우지 않고 false. 하나뿐인 장부는 지우지 않는다
   deleteBook: (id: string) => boolean
@@ -328,10 +328,15 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     },
     importBook: (name, imported) => {
       // 엑셀로 만든 장부는 늘 동아리·모임 장부다 (회원 명단·월 회비가 있는 장부, SPEC-010 8절)
-      const saved = commit((current) => appendBook(current, { name, kind: 'club', ...imported }))
+      const created = appendBook(latest.current, { name, kind: 'club', ...imported })
+      const next: StoredData = { ...created, settings: { ...created.settings, lastChangedAt: now().toISOString() } }
+      // 저장했을 때만 화면에 들인다 (deleteBook·restoreBackup 과 같이, #178 리뷰): 큰 장부를 저장하지 못했는데(용량 초과 등)
+      // 화면 데이터에 남기면 그 뒤 저장마다 그 장부까지 쓰려다 모두 실패한다. 못 했으면 지금 데이터·저장 상태 그대로
+      const result = replace(next, (changed) => repository.save(changed))
+      if (!result.ok) return false
       // 장부 연도는 엑셀의 마지막 해
       setYear(Math.max(...Object.values(imported.ledgers).map((item) => item.year)))
-      return saved
+      return true
     },
     deleteBook: (id) => {
       // 저장하지 못하면 지운 것처럼 보였다가 새로고침 때 되살아나지 않게 화면도 그대로 둔다 (SPEC-005 예외)

@@ -5,7 +5,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BottomSheet } from './BottomSheet'
 import { ConfirmDialog } from './ConfirmDialog'
-import { useModalLayer } from './modalLayer'
+import { OUTSIDE_LAYER, useModalLayer } from './modalLayer'
 
 // 뒤 화면 버튼이 잠겼는지: 자신이나 조상 중 inert 가 있으면 Tab·화면 읽기가 닿지 않는다
 function isLocked(element: HTMLElement): boolean {
@@ -80,6 +80,26 @@ describe.each([
 
     expect(document.querySelector('[inert]')).toBeNull()
     expect(opener).toHaveFocus()
+  })
+})
+
+describe('SPEC-010 #178 창이 떠 있어도 잠그지 않는 숨은 파일 칸 (OUTSIDE_LAYER)', () => {
+  it('body 바로 아래 OUTSIDE_LAYER 표시가 있는 요소(숨은 파일 고르기 칸)는 창이 떠 있어도 잠그지 않는다', async () => {
+    const user = userEvent.setup()
+    function WithFileInput() {
+      return (
+        <>
+          <Screen kind="sheet" />
+          {createPortal(<input type="file" hidden aria-label="파일 고르기" {...{ [OUTSIDE_LAYER]: '' }} />, document.body)}
+        </>
+      )
+    }
+    render(<WithFileInput />)
+
+    await user.click(screen.getByRole('button', { name: '이 내역 지우기' }))
+
+    expect(isLocked(screen.getByRole('button', { name: '저장' }))).toBe(true)
+    expect(isLocked(screen.getByLabelText('파일 고르기'))).toBe(false)
   })
 })
 
