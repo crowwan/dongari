@@ -125,10 +125,21 @@ export interface UnassignedDues {
   total: number
 }
 
+// 그 해에 쓰는 월 회비와 그 값을 정한 해 (설정 월 회비 편집이 "2025년 금액을 이어 쓰고 있어요"에 쓴다, #161)
+export interface MonthlyFeeSource {
+  amount: number
+  year: number // 그 해, 또는 값을 이어 온 가장 가까운 그 전 해
+}
+
 // 그 해 월 회비: 그 해 값, 없으면 가장 가까운 그 전 해 값, 어느 해에도 없으면 undefined (2절 3, 1절)
-export function monthlyFeeOf(book: Book, year: number): number | undefined {
+export function monthlyFeeSource(book: Book, year: number): MonthlyFeeSource | undefined {
   const withFee = Object.values(book.ledgers).filter((ledger) => ledger.year <= year && ledger.monthlyFee !== undefined)
-  return withFee.sort((a, b) => b.year - a.year)[0]?.monthlyFee
+  const source = withFee.sort((a, b) => b.year - a.year)[0]
+  return source?.monthlyFee === undefined ? undefined : { amount: source.monthlyFee, year: source.year }
+}
+
+export function monthlyFeeOf(book: Book, year: number): number | undefined {
+  return monthlyFeeSource(book, year)?.amount
 }
 
 // 칸마다 월 회비를 찾으니 해별로 한 번만 센다

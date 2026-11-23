@@ -1,5 +1,7 @@
 // 저장 데이터 런타임 검증. 외부에서 들어온 값(localStorage, 백업 파일)은 이 가드를 통과해야 타입을 얻는다
 import { isDayInMonth } from '../domain/entryDate'
+// 'YYYY-MM' 달 규칙은 회원 명단을 바꾸는 도메인 함수와 하나로 (SPEC-010 1절, #161)
+import { isYearMonth } from '../domain/members'
 import {
   CURRENT_SCHEMA_VERSION,
   ENTRY_AMOUNT_MAX,
@@ -11,7 +13,6 @@ import {
   type Payer,
   type Settings,
   type StoredData,
-  type YearMonth,
 } from '../domain/types'
 
 // 장부가 하나도 없는 처음 상태 (첫 실행 화면)
@@ -40,13 +41,6 @@ function isAmount(value: unknown): value is number {
 // 겹치는 값이 없다 (장부 id, 회원 번호, 한 기록의 낸 분)
 function allDifferent(values: readonly string[]): boolean {
   return new Set(values).size === values.length
-}
-
-// 'YYYY-MM' 달 (SPEC-010 1절). 한 자리 달·13월·날짜까지 붙은 글은 아니다
-const YEAR_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
-
-function isYearMonth(value: unknown): value is YearMonth {
-  return typeof value === 'string' && YEAR_MONTH.test(value)
 }
 
 function isPayer(value: unknown): value is Payer {

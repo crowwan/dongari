@@ -1,5 +1,6 @@
 import { Fragment, useId, useState, type ReactNode } from 'react'
 import { BOOK_KIND_LABELS, type CarryoverWords } from '../../domain/book'
+import type { MonthlyFeeSource } from '../../domain/duesTable'
 import type { BookSetup } from '../../domain/ledger'
 import type { BookKind, Ledger, StoredData } from '../../domain/types'
 import type { SaveResult } from '../../storage/LedgerRepository'
@@ -268,7 +269,7 @@ export function SettingsScreen({
                   icon="coin"
                   title="월 회비"
                   description={`${year}년`}
-                  value={clubDues.monthlyFee === undefined ? '정하지 않음' : `${formatAmount(clubDues.monthlyFee)}원`}
+                  value={clubDues.monthlyFee === undefined ? '정하지 않음' : `${formatAmount(clubDues.monthlyFee.amount)}원`}
                   onClick={() => sheets.openSheet(MONTHLY_FEE_PAGE)}
                 />
               </>
@@ -570,24 +571,32 @@ function CarryoverEdit({ label, ledger, onSave, onBack }: CarryoverEditProps) {
 
 type MonthlyFeeEditProps = {
   year: number // 지금 장부 연도
-  fee: number | undefined // 지금 값 (그 해에 없으면 그 전 해 값)
+  fee: MonthlyFeeSource | undefined // 지금 쓰는 값과 그 값을 정한 해 (그 해에 없으면 그 전 해 값)
   onSave: (fee: number) => void
   onBack: () => void
 }
 
-// 월 회비 (SPEC-010 6절): 지금 장부 연도의 한 분 한 달 금액. 이월금 편집과 같은 모양
+// 월 회비 (SPEC-010 6절): 지금 장부 연도의 한 분 한 달 금액. 이월금 편집과 같은 모양.
+// 그 전 해 값을 이어 쓰는 중이면 그 해에 저장된 값이 없으니 같은 금액 그대로도 [저장]해 이 해 값으로 정할 수 있다
 function MonthlyFeeEdit({ year, fee, onSave, onBack }: MonthlyFeeEditProps) {
-  const [amount, setAmount] = useState(fee ?? 0)
+  const [amount, setAmount] = useState(fee?.amount ?? 0)
+  const inheritedFrom = fee !== undefined && fee.year !== year ? fee.year : undefined
+  const savedThisYear = inheritedFrom === undefined ? fee?.amount : undefined
 
   return (
     <EditPage
       title={fee === undefined ? '월 회비 정하기' : '월 회비 바꾸기'}
-      canSave={amount > 0 && amount !== fee}
+      canSave={amount > 0 && amount !== savedThisYear}
       onSave={() => onSave(amount)}
       onBack={onBack}
     >
       <div className="settings__field">
         <MoneyInput label={`${year}년 월 회비`} labelRole="label" value={amount} onChange={setAmount} />
+        {inheritedFrom !== undefined && (
+          <p className="screen__note">
+            {inheritedFrom}년 금액을 이어 쓰고 있어요. 저장하면 {year}년 금액이 돼요
+          </p>
+        )}
         <p className="screen__note">한 분이 한 달에 내는 돈이에요. 새해 장부를 시작하면 이 금액을 그대로 가져와요</p>
       </div>
     </EditPage>

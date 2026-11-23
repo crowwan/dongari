@@ -9,8 +9,8 @@ import {
   changeMonthlyFee,
   deleteMember,
   hasSameName,
+  isYearMonth,
   memberHasRecords,
-  monthlyFeeOf,
   nextMonth,
   previousMonth,
   splitYearMonth,
@@ -38,6 +38,14 @@ describe('SPEC-010 달 글자 (YYYY-MM)', () => {
     expect(yearMonth(2026, 7)).toBe('2026-07')
     expect(yearMonth(2026, 12)).toBe('2026-12')
     expect(splitYearMonth('2025-03')).toEqual({ year: 2025, month: 3 })
+  })
+
+  it('달 글자는 "YYYY-MM" 만 맞다 (저장 형식 검사와 같은 규칙)', () => {
+    expect(isYearMonth('2026-07')).toBe(true)
+    expect(isYearMonth('2026-12')).toBe(true)
+    for (const wrong of ['2026-7', '2026-13', '2026-00', '2026-07-01', '26-07', '', 202607]) {
+      expect(isYearMonth(wrong)).toBe(false)
+    }
   })
 
   it('오늘이 속한 달, 다음 달, 앞 달 (해를 넘어간다)', () => {
@@ -80,6 +88,14 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 (6절)', () => {
       )
     })
 
+    it('들어온 달이 "YYYY-MM" 이 아니면 넣지 않는다 (엑셀 불러오기 등 다른 곳에서 불러도)', () => {
+      for (const joined of ['2026-7', '2026-13', '2026-11-01']) {
+        expect(() => addMember(duesBook(), { name: '박서연', joined }, { createId: ids('m3'), year: 2026 })).toThrow(
+          InvalidLedgerInputError,
+        )
+      }
+    })
+
     it('만든 번호가 이미 명단에 있으면 넣지 않는다 (번호는 겹치지 않는다)', () => {
       expect(() => addMember(duesBook(), { name: '박서연', joined: '2026-11' }, { createId: ids('m1'), year: 2026 })).toThrow(
         InvalidLedgerInputError,
@@ -119,6 +135,14 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 (6절)', () => {
       expect(change('김도윤', 1.5)).toThrow(InvalidLedgerInputError)
       expect(change('김도윤', -1_000_000_000)).toThrow(InvalidLedgerInputError)
     })
+
+    it('들어온 달·그만둔 달이 "YYYY-MM" 이 아니면 바꾸지 않는다', () => {
+      const change = (joined: string, left?: string) => () => updateMember(duesBook(), 'm1', { name: '김도윤', joined, left, opening: 0 })
+
+      expect(change('2026-1')).toThrow(InvalidLedgerInputError)
+      expect(change('2026-01', '2027-13')).toThrow(InvalidLedgerInputError)
+      expect(change('2026-01', '')).toThrow(InvalidLedgerInputError)
+    })
   })
 
   describe('회원 지우기 (AC-21)', () => {
@@ -151,22 +175,14 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 (6절)', () => {
 
       expect(next.dues).toEqual({ startMonth: '2025-07', hideUnassigned: true })
     })
+
+    it('시작 달이 "YYYY-MM" 이 아니면 바꾸지 않는다', () => {
+      expect(() => changeDuesStart(duesBook(), '2025-7')).toThrow(InvalidLedgerInputError)
+      expect(() => changeDuesStart(duesBook(), '2025')).toThrow(InvalidLedgerInputError)
+    })
   })
 
   describe('월 회비', () => {
-    it('그 해 월 회비가 없으면 그 전 해 값을 쓰고, 어느 해에도 없으면 없다', () => {
-      const target = book([
-        { year: 2024, carryover: 0, entries: [], monthlyFee: 10_000 },
-        { year: 2025, carryover: 0, entries: [], monthlyFee: 20_000 },
-        { year: 2026, carryover: 0, entries: [] },
-      ])
-
-      expect(monthlyFeeOf(target, 2026)).toBe(20_000)
-      expect(monthlyFeeOf(target, 2025)).toBe(20_000)
-      expect(monthlyFeeOf(target, 2024)).toBe(10_000)
-      expect(monthlyFeeOf(target, 2023)).toBeUndefined()
-    })
-
     it('지금 장부 연도의 월 회비를 바꾼다 (1원 이상 정수만)', () => {
       const ledger = { year: 2026, carryover: 0, entries: [] }
 

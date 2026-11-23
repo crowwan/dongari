@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import type { MonthlyFeeSource } from '../../domain/duesTable'
 import {
   hasSameName,
   nextMonth,
@@ -41,7 +42,7 @@ const SAME_NAME_NOTE = '같은 이름이 있어요. 구분할 수 있게 적어 
 export interface DuesSettings {
   members: readonly Member[]
   startMonth: YearMonth | undefined // 회비 표 시작 달. 명단을 처음 넣을 때 생긴다
-  monthlyFee: number | undefined // 지금 장부 연도 월 회비 (그 해에 없으면 그 전 해 값)
+  monthlyFee: MonthlyFeeSource | undefined // 지금 장부 연도에 쓰는 월 회비와 그 값을 정한 해 (그 해에 없으면 그 전 해 값)
   hasRecords: (memberId: string) => boolean // 회비 기록에 낸 분으로 들어간 회원 (지울 수 없다)
   thisMonth: YearMonth // 이번 달: 들어온 달 기본값, 쉬는 달 표시, 달 고르기 테두리
   onAddMember: (member: NewMember) => void
@@ -119,7 +120,13 @@ type RosterScreenProps = {
   onOpen: (memberId: string) => void
 }
 
-// 회원 명단 (SPEC-010 6절, 시안 D): [‹ 설정] → 제목 → 지금 회원 → [+ 회원 넣기] → 그만둔 분 → 회비 표 시작 달 + [시작 달 바꾸기]
+// 지금 회원 목록 자리의 안내: 명단 전체가 비면 넣어 달라는 말, 모두 그만둔 분이면 지금 회원이 없다는 말 (SPEC-010 6절)
+function emptyCurrentNote(memberCount: number): string {
+  return memberCount === 0 ? '아직 회원이 없어요. 회비 표에 나올 분을 넣어 주세요' : '지금 회원이 없어요'
+}
+
+// 회원 명단 (SPEC-010 6절, 시안 D): [‹ 설정] → 제목 → 지금 회원 → [+ 회원 넣기] → 그만둔 분 → 회비 표 시작 달 + [시작 달 바꾸기].
+// 시작 달 안내는 명단에 한 분이라도(그만둔 분 포함) 있을 때만 — 마지막 회원을 지워도 시작 달 값은 남지만 보여 줄 표가 없다
 function RosterScreen({ dues, sheets, onAdd, onOpen }: RosterScreenProps) {
   const leftTitleId = useId()
   const { members, startMonth, thisMonth } = dues
@@ -145,11 +152,7 @@ function RosterScreen({ dues, sheets, onAdd, onOpen }: RosterScreenProps) {
         <BackButton label="설정" onBack={sheets.closeSheet} />
         <h1 className="screen__title">회원 명단</h1>
       </div>
-      {current.length > 0 ? (
-        rows(current, '지금 회원')
-      ) : (
-        <p className="screen__note">아직 회원이 없어요. 회비 표에 나올 분을 넣어 주세요</p>
-      )}
+      {current.length > 0 ? rows(current, '지금 회원') : <p className="screen__note">{emptyCurrentNote(members.length)}</p>}
       {/* 장부 고르기 창 [+ 새 장부 만들기] 와 같은 점선 버튼 — 줄 목록과 다른 일 */}
       <button type="button" className="roster__add" onClick={onAdd}>
         <Icon name="plus" />
@@ -164,7 +167,7 @@ function RosterScreen({ dues, sheets, onAdd, onOpen }: RosterScreenProps) {
           <p className="screen__note">그만둔 분도 예전 해 회비 표와 기록에는 그대로 남아요</p>
         </section>
       )}
-      {startMonth && (
+      {startMonth && members.length > 0 && (
         <div className="roster__start">
           <p className="screen__note">회비 표는 {fullMonthText(startMonth)}부터 계산해요</p>
           <IconButton icon="calendar" variant="surface" onClick={() => sheets.openDialog(START_SHEET)}>

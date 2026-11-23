@@ -904,11 +904,11 @@ describe('SPEC-010 useLedger 회원 명단·월 회비·시작 달 (6절)', () =
       new MemoryRepository(storedWith({ ...ledger2026(), year: 2025, monthlyFee: 10_000 }, ledger2026())),
     )
 
-    expect(result.current.monthlyFee).toBe(10_000)
+    expect(result.current.monthlyFee).toEqual({ amount: 10_000, year: 2025 })
     act(() => {
       result.current.changeMonthlyFee(20_000)
     })
-    expect(result.current.monthlyFee).toBe(20_000)
+    expect(result.current.monthlyFee).toEqual({ amount: 20_000, year: 2026 })
     expect(result.current.ledger?.monthlyFee).toBe(20_000)
   })
 

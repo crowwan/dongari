@@ -3,13 +3,13 @@ import { useEffect, useRef, useState } from 'react'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { carryoverWords } from '../../domain/book'
+import { monthlyFeeSource } from '../../domain/duesTable'
 import {
   addMember,
   changeDuesStart,
   changeMonthlyFee,
   deleteMember,
   memberHasRecords,
-  monthlyFeeOf,
   updateMember,
 } from '../../domain/members'
 import { CURRENT_SCHEMA_VERSION, type Book, type BookKind, type Ledger, type Member } from '../../domain/types'
@@ -55,7 +55,7 @@ function Harness({ initial = duesBook(), kind = 'club', onBook }: HarnessProps) 
   const dues: DuesSettings = {
     members: target.members ?? [],
     startMonth: target.dues?.startMonth,
-    monthlyFee: monthlyFeeOf(target, YEAR),
+    monthlyFee: monthlyFeeSource(target, YEAR),
     hasRecords: (id) => memberHasRecords(target, id),
     thisMonth: THIS_MONTH,
     onAddMember: (input) =>
@@ -171,6 +171,32 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 설정 (6절)', () => {
       expect(saved?.ledgers['2026']?.monthlyFee).toBe(25_000)
     })
 
+    it('그 해 월 회비 없이 그 전 해 값을 이어 쓰면 이어 쓴다는 안내가 보이고, 같은 금액 그대로 [저장]해 이 해 값으로 정할 수 있다', async () => {
+      let saved: Book | undefined
+      const inherited = book([
+        { year: 2025, carryover: 0, entries: [], monthlyFee: 20_000 },
+        { year: YEAR, carryover: 0, entries: [] },
+      ])
+      render(<Harness initial={inherited} onBook={(changed) => (saved = changed)} />)
+
+      await userEvent.click(screen.getByRole('button', { name: '월 회비 2026년 20,000원' }))
+      expect(screen.getByLabelText('2026년 월 회비')).toHaveValue('20,000')
+      expect(screen.getByText('2025년 금액을 이어 쓰고 있어요. 저장하면 2026년 금액이 돼요')).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: '저장' }))
+
+      expect(heading('설정')).toBeInTheDocument()
+      expect(saved?.ledgers['2026']?.monthlyFee).toBe(20_000)
+      expect(saved?.ledgers['2025']?.monthlyFee).toBe(20_000)
+    })
+
+    it('그 해 값으로 정해져 있으면 이어 쓴다는 안내가 없다', async () => {
+      render(<Harness />)
+
+      await userEvent.click(screen.getByRole('button', { name: /^월 회비/ }))
+
+      expect(screen.queryByText(/이어 쓰고 있어요/)).not.toBeInTheDocument()
+    })
+
     it('월 회비를 비우면 [저장]을 누를 수 없다', async () => {
       render(<Harness />)
       await userEvent.click(screen.getByRole('button', { name: /^월 회비/ }))
@@ -215,6 +241,32 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 설정 (6절)', () => {
       expect(screen.getByRole('button', { name: '회원 넣기' })).toBeInTheDocument()
       expect(screen.queryByRole('region', { name: '그만둔 분' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: '시작 달 바꾸기' })).not.toBeInTheDocument()
+    })
+
+    it('마지막 회원을 지워 명단이 비면 빈 명단 안내만 남고 시작 달 안내·[시작 달 바꾸기]는 사라진다', async () => {
+      const onlyOne = duesBook({ members: [{ id: 'm9', name: '윤채원', joined: '2026-01', off: [] }] })
+      render(<Harness initial={{ ...onlyOne, ledgers: { '2026': { year: YEAR, carryover: 0, entries: [] } } }} />)
+      await openMember(/^윤채원/)
+      expect(screen.getByRole('button', { name: '회원 명단' })).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: '이 회원 지우기' }))
+      await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '지우기' }))
+
+      expect(heading('회원 명단')).toBeInTheDocument()
+      expect(screen.getByText('아직 회원이 없어요. 회비 표에 나올 분을 넣어 주세요')).toBeInTheDocument()
+      expect(screen.queryByText(/회비 표는 .*부터 계산해요/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: '시작 달 바꾸기' })).not.toBeInTheDocument()
+    })
+
+    it('모두 그만둔 분이면 지금 회원 자리에 "지금 회원이 없어요"가 보이고, 그만둔 분 묶음과 시작 달 안내는 있다', async () => {
+      render(<Harness initial={duesBook({ members: ROSTER.filter((member) => member.left !== undefined) })} />)
+
+      await openRoster()
+
+      expect(screen.getByText('지금 회원이 없어요')).toBeInTheDocument()
+      expect(screen.queryByText(/아직 회원이 없어요/)).not.toBeInTheDocument()
+      expect(within(screen.getByRole('region', { name: '그만둔 분' })).getByRole('button', { name: /^오현우/ })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '시작 달 바꾸기' })).toBeInTheDocument()
     })
 
     it('[‹ 설정] 이나 안드로이드 뒤로 버튼을 누르면 설정으로 돌아온다', async () => {

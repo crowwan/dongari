@@ -26,11 +26,11 @@ import {
   changeDuesStart as changeDuesStartOf,
   changeMonthlyFee as changeMonthlyFeeOf,
   deleteMember as deleteMemberFrom,
-  monthlyFeeOf,
   updateMember as updateMemberIn,
   type MemberChanges,
   type NewMember,
 } from '../../domain/members'
+import { monthlyFeeSource, type MonthlyFeeSource } from '../../domain/duesTable'
 import type { Book, BookKind, EntryType, Ledger, StoredData, YearMonth } from '../../domain/types'
 import { createRecoveryCode, recoveryCodeOf, withRecoveryCode } from '../keep/recoveryCode'
 import type {
@@ -70,7 +70,8 @@ export interface LedgerState {
   isFirstRun: boolean // 장부가 하나도 없다 (첫 실행 화면)
   newLedgerDefaults: BookInfo // 이 연도 장부를 새로 만들 때 기본값 (AC-8)
   carryoverWords: CarryoverWords // 지금 장부·연도의 이월금 이름 (동아리 "작년 이월금", 가계부 첫 해 "지금 남은 돈")
-  monthlyFee: number | undefined // 지금 장부·연도의 월 회비. 그 해에 없으면 그 전 해 값 (SPEC-010 1절)
+  // 지금 장부·연도에 쓰는 월 회비와 그 값을 정한 해. 그 해에 없으면 그 전 해 값 (SPEC-010 1절)
+  monthlyFee: MonthlyFeeSource | undefined
   startup: StartupStatus
   saveFailure: SaveFailureReason | undefined // 마지막 저장이 실패했으면 그 이유
   // 이 폰에 저장되지 않은 기록 id: 저장에 실패한 뒤 추가하거나 고친 기록 (SPEC-002 v2.6 "저장 안 됨").
@@ -275,7 +276,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     isFirstRun: book === undefined,
     newLedgerDefaults: defaultsFor(book, year),
     carryoverWords: wordsFor(book?.kind ?? 'club', isFirstYear(book, year)),
-    monthlyFee: book && monthlyFeeOf(book, year),
+    monthlyFee: book && monthlyFeeSource(book, year),
     startup,
     saveFailure,
     unsavedEntryIds,
