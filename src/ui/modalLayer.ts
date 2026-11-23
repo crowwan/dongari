@@ -18,7 +18,15 @@ interface Layer {
 
 const openLayers = new Set<Layer>()
 
-// 어느 창이 잠갔고, 그 창이 아닌 말풍선이 열어 두지 않았으면 잠긴다. 창이 뜨고 닫히는 순서와 상관없이 떠 있는 창들로만 정한다
+// 창이 포커스를 옮긴 요소 → 옮기기 전 포커스가 있던 곳. 말풍선이 먼저 창 안 버튼으로 포커스를 옮겨 놓은 뒤 그 창이 열리면,
+// 창은 "닫을 때 돌아갈 곳"으로 그 버튼(창과 함께 사라짐)이 아니라 그 전에 있던 곳(창을 연 버튼)을 기억한다 (SPEC-010 10절 ⑥)
+const focusMovedFrom = new WeakMap<Element, Element>()
+
+// 어느 창이 잠갔고, 그 창이 아닌 말풍선이 열어 두지 않았으면 잠긴다. 창이 뜨고 닫히는 순서와 상관없이 떠 있는 창들로만 정한다.
+// 조건: 말풍선 "위에" 확인 창이 뜨면, 그 확인 창이 잠근 곳이라도 말풍선이 열어 둔 요소(가리키는 버튼·연습 띠)는 열린 채다.
+// 지금은 일어나지 않는다 — 연습 말풍선은 확인 창·선택 창(장부 고르기 창 빼고)이 뜨면 숨고(practiceSteps `covered`),
+// 복구 코드 말풍선은 창이 없을 때만 뜬다(guideRules `blocked`). 말풍선을 숨기지 않고 그 위에 창을 띄우게 되면
+// 열어 두기를 "그 말풍선보다 먼저 뜬 창의 잠금"으로 좁혀야 한다
 function shouldLock(element: Element): boolean {
   return [...openLayers].some(
     (locker) =>
@@ -62,6 +70,7 @@ const NOTHING_KEPT: readonly RefObject<HTMLElement | null>[] = []
 // 창이 열려 있는 동안: 창 밖을 잠그고 focusTarget 으로 포커스를 옮긴다. 닫히면 잠금을 풀고 연 자리(열 때 포커스가 있던 곳)로 돌려준다.
 // 풀기가 먼저다: inert 인 곳에는 포커스가 가지 않는다.
 // 포커스가 이미 창 안에 있으면 옮기지 않는다 — 말풍선이 먼저 창 안 버튼으로 옮겨 둔 포커스를 그 창이 가져가지 않게 (SPEC-010 10절).
+// 그때 닫으면 돌아갈 곳은 말풍선이 옮기기 전 자리(창을 연 버튼)다.
 // enabled 가 false 면(카탈로그 견본) 아무것도 하지 않는다.
 // keepOpen(SPEC-008 말풍선): 창 밖이지만 열어 둘 요소들(가리키는 버튼, 같이 열어 둘 날 칸·금액 칸, 연습 띠 [그만하기]).
 // 닫히면 포커스를 연 자리 대신 첫 요소(가리키는 버튼)에 둔다 (그 버튼을 눌러 화면이 바뀌었으면 요소가 없어져 그 화면 규칙을 따른다).
@@ -77,9 +86,16 @@ export function useModalLayer(
     const layer = layerRef.current
     if (!open || !enabled || !layer) return
     const kept = keepOpen.flatMap((ref) => (ref.current ? [ref.current] : []))
-    const previous = kept[0] ?? document.activeElement
+    const active = document.activeElement
+    const focusInside = active !== null && layer.contains(active)
+    // 포커스가 이미 창 안이면(말풍선이 옮겨 둠) 그 전에 있던 곳으로 돌아간다
+    const previous = kept[0] ?? (focusInside ? (focusMovedFrom.get(active) ?? active) : active)
     const unlock = lockOutside([layer, ...kept], kept.length > 0)
-    if (!layer.contains(document.activeElement)) focusTarget.current?.focus({ preventScroll: true })
+    const target = focusTarget.current
+    if (!focusInside && target) {
+      if (active) focusMovedFrom.set(target, active)
+      target.focus({ preventScroll: true })
+    }
     return () => {
       unlock()
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus()

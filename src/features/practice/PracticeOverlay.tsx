@@ -20,6 +20,8 @@ type PracticeOverlayProps = {
   onStop: () => void
   // 공유 갈래의 [다음에 할게요]
   onLater: () => void
+  // 엑셀 화면 조각을 받지 못했을 때 [엑셀 연습 건너뛰기] (연습 끝으로, SPEC-010 10절)
+  onSkipExcel: () => void
 }
 
 // 말풍선 없이 읽는 동안: 월 정리·회비 표를 연 뒤 1초쯤, 연습용 엑셀을 읽는 동안 (SPEC-010 10절)
@@ -32,7 +34,7 @@ function isReading(view: PracticeView, progress: PracticeProgress): boolean {
 
 // 연습 동안 App 위에 얹는 것 (SPEC-008): 맨 위 연습 띠, 단계 말풍선 하나, 그만할까요 확인 창.
 // 월 정리·회비 표를 연 뒤 1초쯤은 말풍선 없이 읽게 하되 뒤 화면은 그대로 막아 둔다(띠 [그만하기] 만)
-export function PracticeOverlay({ view, dialogs, example, progress, onOpened, onStop, onLater }: PracticeOverlayProps) {
+export function PracticeOverlay({ view, dialogs, example, progress, onOpened, onStop, onLater, onSkipExcel }: PracticeOverlayProps) {
   const bandRef = useRef<HTMLDivElement>(null)
   const coach = practiceCoach(view, progress, example)
   const reading = isReading(view, progress)
@@ -65,6 +67,7 @@ export function PracticeOverlay({ view, dialogs, example, progress, onOpened, on
           example={example}
           bandRef={bandRef}
           onLater={onLater}
+          onSkipExcel={onSkipExcel}
         />
       )}
       <ConfirmDialog
@@ -80,17 +83,30 @@ export function PracticeOverlay({ view, dialogs, example, progress, onOpened, on
   )
 }
 
+// 말풍선 아래 줄 오른쪽 버튼
+function coachAction(coach: PracticeCoach, onLater: () => void, onSkipExcel: () => void): { label: string; onClick: () => void } | undefined {
+  switch (coach.action) {
+    case 'later':
+      return { label: '다음에 할게요', onClick: onLater }
+    case 'skip-excel':
+      return { label: '엑셀 연습 건너뛰기', onClick: onSkipExcel }
+    case undefined:
+      return undefined
+  }
+}
+
 type PracticeCoachMarkProps = {
   coach: PracticeCoach
   stages: number // 단계 수 ("연습 N / 6", 가계부 5)
   example: PracticeExample
   bandRef: RefObject<HTMLDivElement | null>
   onLater: () => void
+  onSkipExcel: () => void
 }
 
 // 단계 말풍선 하나. 가리키는 곳·같이 열어 둘 곳(+ 연습 띠)은 이 단계 동안 바뀌지 않게 처음 한 번 만든다.
 // 글이 바뀌면(공유 갈래) 새로 띄운다: 가리키는 버튼이 제 안내(aria-describedby)를 바꾸며 말풍선 설명을 덮어써도 다시 붙는다
-function PracticeCoachMark({ coach, stages, example, bandRef, onLater }: PracticeCoachMarkProps) {
+function PracticeCoachMark({ coach, stages, example, bandRef, onLater, onSkipExcel }: PracticeCoachMarkProps) {
   const [refs] = useState(() => ({
     target: practiceTargetRef(coach.target, example),
     alsoOpen: [...coach.alsoOpen.map((target) => practiceTargetRef(target, example)), bandRef],
@@ -105,7 +121,7 @@ function PracticeCoachMark({ coach, stages, example, bandRef, onLater }: Practic
       spotlight={refs.spotlight}
       message={coach.message}
       progress={`연습 ${coach.stage} / ${stages}`}
-      action={coach.later ? { label: '다음에 할게요', onClick: onLater } : undefined}
+      action={coachAction(coach, onLater, onSkipExcel)}
     />
   )
 }

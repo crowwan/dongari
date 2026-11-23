@@ -270,6 +270,28 @@ describe('SPEC-010 10절 말풍선이 선택 창 안을 가리킬 때 (연습 �
     },
   )
 
+  it.each(['coach-first', 'sheet-first'] as const)(
+    '창을 연 버튼으로 포커스가 돌아온다 — 말풍선이 먼저 창 안으로 포커스를 옮겨 놓았어도 (%s)',
+    (order) => {
+      function WithOpener({ open }: { open: boolean }) {
+        return (
+          <>
+            <button type="button">장부 바꾸기</button>
+            <CoachOnSheet open={open} order={order} />
+          </>
+        )
+      }
+      const { rerender } = render(<WithOpener open={false} />)
+      const opener = screen.getByRole('button', { name: '장부 바꾸기' })
+      opener.focus()
+      rerender(<WithOpener open />)
+
+      rerender(<WithOpener open={false} />)
+
+      expect(opener).toHaveFocus()
+    },
+  )
+
   it.each(['coach-first', 'sheet-first'] as const)('둘 다 닫히면 잠금이 하나도 남지 않는다 (%s)', (order) => {
     const { rerender } = render(<CoachOnSheet open order={order} />)
 

@@ -30,7 +30,6 @@ describe('SPEC-008 연습 단계 말풍선 (practiceCoach)', () => {
       alsoOpen: [],
       spotlight: [],
       message: '회비 10,000원을 적어 볼게요. 여기를 눌러요',
-      later: false,
     })
   })
 
@@ -140,13 +139,13 @@ describe('SPEC-008 연습 단계 말풍선 (practiceCoach)', () => {
       alsoOpen: [],
       spotlight: [],
       message: "결산은 사진으로 보낼 수 있어요. [사진 보내기]를 눌러 카톡 '나와의 채팅'에 보내 보세요",
-      later: false,
     })
   })
 
   it('AC-18 공유가 끝나면 결산 화면 말풍선이 "잘 보냈어요! 여기를 눌러 장부로 돌아가요" 로 [‹ 장부로] 를 가리킨다', () => {
     const coach = practiceCoach(view({ screen: 'year-summary', entries: [INCOME] }), progress({ monthSeen: true, picture: 'sent' }), CLUB)
-    expect(coach).toMatchObject({ stage: 4, target: 'back-to-ledger', message: '잘 보냈어요! 여기를 눌러 장부로 돌아가요', later: false })
+    expect(coach).toMatchObject({ stage: 4, target: 'back-to-ledger', message: '잘 보냈어요! 여기를 눌러 장부로 돌아가요' })
+    expect(coach?.action).toBeUndefined()
   })
 
   it('AC-19·20 [다음에 할게요]·사진으로 저장 뒤에는 "다음에 보내도 돼요. 여기를 눌러 장부로 돌아가요"', () => {
@@ -156,7 +155,7 @@ describe('SPEC-008 연습 단계 말풍선 (practiceCoach)', () => {
 
   it('AC-19 공유 창을 그냥 닫고 오면 글이 바뀌고 [다음에 할게요] 가 생긴다', () => {
     const coach = practiceCoach(view({ screen: 'year-summary', entries: [INCOME] }), progress({ monthSeen: true, sendCancelled: true }), CLUB)
-    expect(coach).toMatchObject({ target: 'send', message: '아직 안 보냈어요. 다시 눌러 보거나, 나중에 해도 돼요', later: true })
+    expect(coach).toMatchObject({ target: 'send', message: '아직 안 보냈어요. 다시 눌러 보거나, 나중에 해도 돼요', action: 'later' })
   })
 
   it('AC-20 공유를 못 쓰는 기기는 처음부터 [사진으로 저장] 을 가리키고 [다음에 할게요] 가 있다', () => {
@@ -164,13 +163,14 @@ describe('SPEC-008 연습 단계 말풍선 (practiceCoach)', () => {
     expect(coach).toMatchObject({
       target: 'save-picture',
       message: '이 기기에서는 바로 보낼 수 없어요. 사진으로 저장해 두었다가 보내요',
-      later: true,
+      action: 'later',
     })
   })
 
   it('AC-21 누른 순간이 지나 거부되면 [한 번 더 눌러 보내기] 를 가리킨 채 "사진이 준비됐어요. 한 번 더 눌러 주세요"', () => {
     const coach = practiceCoach(view({ screen: 'year-summary', entries: [INCOME] }), progress({ monthSeen: true, sendReady: true }), CLUB)
-    expect(coach).toMatchObject({ target: 'send', message: '사진이 준비됐어요. 한 번 더 눌러 주세요', later: false })
+    expect(coach).toMatchObject({ target: 'send', message: '사진이 준비됐어요. 한 번 더 눌러 주세요' })
+    expect(coach?.action).toBeUndefined()
   })
 
   it('AC-26 가계부 연습은 용돈 10,000원·장보기 5,000원으로 말한다', () => {
@@ -244,10 +244,20 @@ describe('SPEC-010 10절 연습 장부 회비·엑셀 단계 (practiceCoach)', (
     })
   })
 
-  it('엑셀을 읽는 동안·읽지 못했을 때는 말풍선이 없다', () => {
+  it('엑셀을 읽는 동안은 말풍선이 없다', () => {
     const seen = { ...PICTURE_DONE, duesSeen: true, duesReady: true }
     expect(practiceCoach(view({ screen: 'excel-import', excel: 'reading' }), seen, CLUB)).toBeUndefined()
-    expect(practiceCoach(view({ screen: 'excel-import', excel: 'failed' }), seen, CLUB)).toBeUndefined()
+  })
+
+  it('엑셀 화면 조각을 받지 못했으면 [‹ 장부로](다시 해 보기)를 가리키고 [엑셀 연습 건너뛰기] 를 둔다 ([앱 다시 열기]로 연습을 잃지 않게)', () => {
+    const seen = { ...PICTURE_DONE, duesSeen: true, duesReady: true }
+    expect(practiceCoach(view({ screen: 'excel-import', excel: 'failed' }), seen, CLUB)).toMatchObject({
+      stage: 6,
+      target: 'back-to-ledger',
+      message: '엑셀 연습 화면을 받지 못했어요. 인터넷이 되면 장부로 돌아가 다시 해 보거나, 엑셀 연습은 건너뛰어도 돼요',
+      action: 'skip-excel',
+    })
+    expect(practiceCoach(view({ screen: 'excel-import', excel: 'failed' }), PICTURE_DONE, HOUSEHOLD)?.stage).toBe(5)
   })
 
   it('⑥ 차례가 아니면 장부 고르기 창이 떠도 말풍선이 없다', () => {

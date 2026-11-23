@@ -1,7 +1,7 @@
 // 연습용 엑셀 (SPEC-010 10절): 연습 ⑥(가계부 ⑤) 에서 파일 고르기 창 대신 읽는 지어낸 엑셀. 파일(.xlsx)이 아니라 시트 배열로 만든다.
 // - 읽는 규칙(readExcelBook)은 시트 배열만 알아서 SheetJS 를 연습 중에 받지 않는다 (진짜 파일만 SheetJS 가 시트 배열로 바꾼다)
 // - 엑셀 조각(ExcelImportScreen)만 이 파일을 불러 첫 화면 번들에 들지 않고, 그 조각은 서비스 워커가 미리 받아 오프라인에서도 열린다
-// - 해를 연습하는 날의 작년·올해로 맞춘다(올해는 이번 달까지)
+// - 해를 연습하는 날의 작년·올해로 맞춘다(올해는 오늘 날짜까지 — 앞으로 올 날을 지어내지 않는다)
 // 이름은 모두 지어낸 것 (예시 회원 PRACTICE_MEMBERS)
 import type { BookKind } from '../../domain/types'
 import type { ExcelWorkbook, SheetCell, SheetData, SheetMerge } from '../excel/sheet'
@@ -47,7 +47,14 @@ function duesSheet(year: number, title: string, paidMonths: number): SheetData {
     paidMonths * PRACTICE_MONTHLY_FEE,
     0,
   ])
-  return { name: `${year}년 회비내역`, rows: [[`${year}년 ${title} 회비`], header, ...members], merges: [merge(0, 0, 0, 13)] }
+  // 제목은 머리 끝(덜 낸 돈)까지 병합 (내보낸 9절 모양과 같다)
+  return { name: `${year}년 회비내역`, rows: [[`${year}년 ${title} 회비`], header, ...members], merges: [merge(0, 0, 0, header.length - 1)] }
+}
+
+// 이번 달 줄은 오늘 날짜를 넘지 않게 당긴다 (회비 5일·간식비 20일·관리비 25일이 앞으로 올 날이 되지 않게, 1월 간식비도)
+function upToToday(lines: readonly Line[], now: Date): Line[] {
+  const thisMonth = now.getMonth() + 1
+  return lines.map(([month, day, income, content, expense]) => [month, month === thisMonth ? Math.min(day, now.getDate()) : day, income, content, expense])
 }
 
 // 동아리: 달마다 세 분이 같이 낸 회비(이름을 쉼표로) + 가끔 간식비·대관료
@@ -72,17 +79,17 @@ function householdLines(months: readonly number[]): Line[] {
 const CLUB_TITLE = '연습 모임'
 const HOUSEHOLD_TITLE = '연습 가계부'
 
-// 연습하는 날의 작년(1~12월)과 올해(1월~이번 달) 두 해 치
+// 연습하는 날의 작년(1~12월)과 올해(1월~오늘) 두 해 치
 export function practiceWorkbook(kind: BookKind, now: Date): ExcelWorkbook {
   const year = now.getFullYear()
   const thisYearMonths = MONTHS.slice(0, now.getMonth() + 1)
   if (kind === 'household') {
     const last = ledgerSheet(year - 1, HOUSEHOLD_TITLE, 100_000, householdLines(MONTHS))
-    const current = ledgerSheet(year, HOUSEHOLD_TITLE, last.balance, householdLines(thisYearMonths))
+    const current = ledgerSheet(year, HOUSEHOLD_TITLE, last.balance, upToToday(householdLines(thisYearMonths), now))
     return { sheets: [last.sheet, current.sheet] }
   }
   const last = ledgerSheet(year - 1, CLUB_TITLE, 50_000, clubLines(MONTHS, { 3: ['간식비', 20_000], 6: ['대관료', 50_000], 12: ['송년회', 90_000] }))
-  const current = ledgerSheet(year, CLUB_TITLE, last.balance, clubLines(thisYearMonths, { 1: ['간식비', 15_000] }))
+  const current = ledgerSheet(year, CLUB_TITLE, last.balance, upToToday(clubLines(thisYearMonths, { 1: ['간식비', 15_000] }), now))
   return {
     sheets: [last.sheet, duesSheet(year - 1, CLUB_TITLE, 12), current.sheet, duesSheet(year, CLUB_TITLE, thisYearMonths.length)],
   }

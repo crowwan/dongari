@@ -76,6 +76,31 @@ describe('SPEC-010 10절 연습용 엑셀 (시트 배열)', () => {
     expect(read.book.ledgers['2025'].entries.some((entry) => entry.month === 12)).toBe(true)
   })
 
+  it.each([
+    ['동아리', 'club', new Date('2026-10-03T09:00:00.000+09:00')],
+    ['가계부', 'household', new Date('2026-10-03T09:00:00.000+09:00')],
+    ['동아리 1월 초(1월 간식비)', 'club', new Date('2027-01-02T09:00:00.000+09:00')],
+  ] as const)('%s 연습용 엑셀의 이번 달 기록은 오늘 날짜를 넘지 않는다 (앞으로 올 날을 지어내지 않는다)', (_, kind, now) => {
+    const read = readExcelBook(practiceWorkbook(kind, now), { createId: () => crypto.randomUUID(), now: () => now })
+    if (!read.ok) throw new Error('연습용 엑셀을 읽지 못했다')
+
+    const thisMonth = read.book.ledgers[String(now.getFullYear())].entries.filter((entry) => entry.month === now.getMonth() + 1)
+    expect(thisMonth.length).toBeGreaterThan(0)
+    expect(thisMonth.every((entry) => entry.day !== undefined && entry.day <= now.getDate())).toBe(true)
+    expect(read.summary.changedDates).toEqual([])
+  })
+
+  it('연습용 회비내역 시트 제목 줄은 머리(번호·이름·1~12월·낸 돈·덜 낸 돈) 끝까지 병합한다 (9절 모양)', () => {
+    const duesSheets = practiceWorkbook('club', NOW).sheets.filter((sheet) => sheet.name.endsWith('회비내역'))
+
+    expect(duesSheets).toHaveLength(2)
+    for (const sheet of duesSheets) {
+      const header = sheet.rows[1]
+      expect(header.at(-1)).toBe('덜 낸 돈')
+      expect(sheet.merges[0]).toEqual({ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } })
+    }
+  })
+
   it('가계부 연습용 엑셀은 회비내역 없이 두 해 입출금내역이고, 수입·지출 항목 이름이 엑셀 글 그대로다', () => {
     const read = readExcelBook(practiceWorkbook('household', NOW), deps())
     if (!read.ok) throw new Error('연습용 엑셀을 읽지 못했다')

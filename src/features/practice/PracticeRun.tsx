@@ -9,12 +9,16 @@ import { PracticeOverlay } from './PracticeOverlay'
 import { PRACTICE_EXAMPLES, practiceData } from './practiceScript'
 import { READING_MS, START_PROGRESS, type PracticeProgress } from './practiceSteps'
 
+// 연습을 끝까지 하며 해 본 것 (끝 화면 배운 것 줄 체크)
+export type PracticeResult = { sent: boolean; excel: boolean }
+
 type PracticeRunProps = {
   kind: BookKind // 첫 실행이면 동아리, 설정에서 열었으면 지금 장부 종류
   now: Date // 연습을 시작한 때. 연습 동안 "오늘"은 이 날로 둔다 (자정을 넘겨도 [오늘 N일] 이 바뀌지 않게)
   saver?: PictureSaver
   onStop: () => void // 그만할까요 [그만하기]
-  onFinish: (sent: boolean) => void // 끝(연습용 엑셀 [새 장부 만들기]): ④ 에서 공유를 마쳤으면 true, [다음에 할게요]·사진으로 저장이면 false
+  // 끝(연습용 엑셀 [새 장부 만들기] 또는 [엑셀 연습 건너뛰기]). sent: ④ 에서 공유를 마쳤다, excel: ⑥ 연습용 엑셀까지 해 봤다
+  onFinish: (result: PracticeResult) => void
 }
 
 // 연습 장부 (SPEC-008·SPEC-010 10절): 진짜 App 을 메모리 저장소(MemoryRepository)로 한 번 더 그린다.
@@ -74,10 +78,11 @@ export function PracticeRun({ kind, now, saver, onStop, onFinish }: PracticeRunP
             onOpened={opened}
             onStop={onStop}
             onLater={() => finishPicture('later')}
+            onSkipExcel={() => onFinish({ sent: progress.picture === 'sent', excel: false })}
           />
         ),
         onPictureResult: pictureResult,
-        onExcelCreate: () => onFinish(progress.picture === 'sent'),
+        onExcelCreate: () => onFinish({ sent: progress.picture === 'sent', excel: true }),
       }}
     />
   )

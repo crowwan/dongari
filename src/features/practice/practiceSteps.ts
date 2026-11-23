@@ -46,6 +46,9 @@ export type PracticeTarget =
 
 export type PracticeStage = 1 | 2 | 3 | 4 | 5 | 6
 
+// 말풍선 아래 줄 오른쪽 버튼: [다음에 할게요](공유 갈래 A·B) / [엑셀 연습 건너뛰기](엑셀 화면 조각을 받지 못함, SPEC-010 10절)
+export type PracticeAction = 'later' | 'skip-excel'
+
 export type PracticeCoach = {
   step: string // 단계 이름 (말풍선 data-state)
   stage: PracticeStage // "연습 N / 6" (가계부 "연습 N / 5")
@@ -53,7 +56,7 @@ export type PracticeCoach = {
   alsoOpen: PracticeTarget[] // 같이 열어 둘 곳 (누를 수 있다)
   spotlight: PracticeTarget[] // 가리키는 곳과 함께 밝게 보일 바로 옆 칸 (날 칸·금액 칸)
   message: string
-  later: boolean // [다음에 할게요] 를 둔다 (공유 갈래 A·B)
+  action?: PracticeAction // 아래 줄 오른쪽 버튼 (없으면 버튼 없음)
 }
 
 // 연습 App 이 그릴 때마다 넘기는 지금 화면 상태
@@ -108,7 +111,7 @@ function withObject(word: string): string {
 const won = (amount: number) => `${formatAmount(amount)}원`
 
 function coach(step: string, stage: PracticeStage, target: PracticeTarget, message: string, extra: Partial<PracticeCoach> = {}): PracticeCoach {
-  return { step, stage, target, alsoOpen: [], spotlight: [], message, later: false, ...extra }
+  return { step, stage, target, alsoOpen: [], spotlight: [], message, ...extra }
 }
 
 // ① 내역 적기 화면: 저장한 수로 수입·지출 예시 중 어느 쪽을 적는지 안다
@@ -163,11 +166,32 @@ function yearCoach(view: PracticeView, progress: PracticeProgress): PracticeCoac
   if (progress.picture === 'sent') return coach('back-from-year', 4, 'back-to-ledger', '잘 보냈어요! 여기를 눌러 장부로 돌아가요')
   if (progress.picture === 'later') return coach('back-from-year', 4, 'back-to-ledger', '다음에 보내도 돼요. 여기를 눌러 장부로 돌아가요')
   if (!view.canSend) {
-    return coach('send', 4, 'save-picture', '이 기기에서는 바로 보낼 수 없어요. 사진으로 저장해 두었다가 보내요', { later: true })
+    return coach('send', 4, 'save-picture', '이 기기에서는 바로 보낼 수 없어요. 사진으로 저장해 두었다가 보내요', { action: 'later' })
   }
-  if (progress.sendReady) return coach('send', 4, 'send', '사진이 준비됐어요. 한 번 더 눌러 주세요', { later: progress.sendCancelled })
-  if (progress.sendCancelled) return coach('send', 4, 'send', '아직 안 보냈어요. 다시 눌러 보거나, 나중에 해도 돼요', { later: true })
+  if (progress.sendReady) {
+    return coach('send', 4, 'send', '사진이 준비됐어요. 한 번 더 눌러 주세요', progress.sendCancelled ? { action: 'later' } : {})
+  }
+  if (progress.sendCancelled) return coach('send', 4, 'send', '아직 안 보냈어요. 다시 눌러 보거나, 나중에 해도 돼요', { action: 'later' })
   return coach('send', 4, 'send', "결산은 사진으로 보낼 수 있어요. [사진 보내기]를 눌러 카톡 '나와의 채팅'에 보내 보세요")
+}
+
+// ⑥ 엑셀 읽은 내용 화면: 다 읽었으면 [새 장부 만들기]. 확인 화면 조각을 받지 못했으면(오프라인 등) 그 화면의 [앱 다시 열기]는
+// 연습을 잃으니 잠가 두고, [‹ 장부로](다시 해 보기)를 가리키며 [엑셀 연습 건너뛰기](연습 끝으로)를 준다 (SPEC-010 10절)
+function excelCoach(view: PracticeView, example: PracticeExample): PracticeCoach | undefined {
+  const stage = practiceStageCount(example)
+  if (view.excel === 'read') {
+    return coach('create-excel', stage, 'excel-create', '엑셀 장부가 있으면 이렇게 읽은 내용을 먼저 보여 줘요. [새 장부 만들기]를 눌러 보세요.')
+  }
+  if (view.excel === 'failed') {
+    return coach(
+      'excel-failed',
+      stage,
+      'back-to-ledger',
+      '엑셀 연습 화면을 받지 못했어요. 인터넷이 되면 장부로 돌아가 다시 해 보거나, 엑셀 연습은 건너뛰어도 돼요',
+      { action: 'skip-excel' },
+    )
+  }
+  return undefined
 }
 
 // 장부 화면에서 할 차례: 진행과 연습 장부 기록으로 정한다
@@ -227,14 +251,7 @@ export function practiceCoach(view: PracticeView, progress: PracticeProgress, ex
         ? coach('back-from-dues', 5, 'back-to-ledger', '누가 몇 월까지 냈는지 여기서 봐요. 다 봤으면 여기를 눌러 장부로 돌아가요')
         : undefined
     case 'excel-import':
-      return view.excel === 'read'
-        ? coach(
-            'create-excel',
-            practiceStageCount(example),
-            'excel-create',
-            '엑셀 장부가 있으면 이렇게 읽은 내용을 먼저 보여 줘요. [새 장부 만들기]를 눌러 보세요.',
-          )
-        : undefined
+      return excelCoach(view, example)
     case 'settings':
     case 'new-book':
     case 'keep-restore':

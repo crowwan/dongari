@@ -75,6 +75,7 @@ type PracticeEndProps = {
   asksInstall: boolean // 다음 화면에서 "홈 화면에 추가하시겠어요?" 를 묻는다 (SPEC-009 B, 첫 실행 연습만)
   kind: BookKind // 연습 장부 종류: 동아리면 "[회비 표]로 누가 냈나 보기" 줄이 있다 (SPEC-010 10절)
   sent: boolean // 결산 사진 보내기를 마쳤다
+  excel: boolean // 연습용 엑셀 불러오기까지 해 봤다 ([엑셀 연습 건너뛰기]면 아님)
   month: number // "[N월 정리 보기]로 한 달 보기" 의 이번 달
   onDone: () => void
 }
@@ -93,7 +94,7 @@ function endButton(firstRun: boolean, asksInstall: boolean): { label: string; ic
 
 // 연습 끝 화면 (SPEC-008 컷 6, SPEC-010 10절): 연습 띠 없이 체크 동그라미, 제목 "연습 끝!", 배운 것(동아리 여섯 줄 · 가계부 다섯 줄),
 // 진짜 엑셀 여는 길, 아래 주 버튼 하나. 마지막 단계가 엑셀이라 제목은 보냈어도 "연습 끝!" (보냈는지는 넷째 줄 체크로)
-export function PracticeEnd({ firstRun, asksInstall, kind, sent, month, onDone }: PracticeEndProps) {
+export function PracticeEnd({ firstRun, asksInstall, kind, sent, excel, month, onDone }: PracticeEndProps) {
   const button = endButton(firstRun, asksInstall)
   const learned = [
     { text: '[+ 내역 적기]로 한 줄씩 적기', done: true },
@@ -101,7 +102,7 @@ export function PracticeEnd({ firstRun, asksInstall, kind, sent, month, onDone }
     { text: '줄을 눌러 고치고 지우기', done: true },
     { text: '결산 사진 보내기', done: sent },
     ...(kind === 'club' ? [{ text: '[회비 표]로 누가 냈나 보기', done: true }] : []),
-    { text: '엑셀 장부 불러오기', done: true },
+    { text: '엑셀 장부 불러오기', done: excel },
   ]
   return (
     <StandaloneScreen testId="practice-end">
