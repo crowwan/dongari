@@ -11,6 +11,8 @@ type TextFieldProps = {
   placeholder?: string
   // 있으면 오류 상태로 보이고 입력칸 아래에 문장으로 알려준다
   error?: string
+  // 막지 않는 안내: 오류가 아니라 입력칸 아래 보조 글자 (예: 같은 이름이 있어요, SPEC-010)
+  note?: string
   disabled?: boolean
   // 나타나자마자 포커스 (하나씩 채우기의 "직접 적기" — 키패드가 바로 뜬다)
   autoFocus?: boolean
@@ -26,12 +28,16 @@ export function TextField({
   onChange,
   placeholder,
   error,
+  note,
   disabled,
   autoFocus,
   autoCapitalize,
 }: TextFieldProps) {
   const inputId = useId()
   const errorId = useId()
+  const noteId = useId()
+  // 칸 설명: 오류 문장과 안내 (있는 것만)
+  const describedBy = [error && errorId, note && noteId].filter(Boolean).join(' ')
 
   return (
     <div className="ui-field" data-testid="text-field" data-label-role={labelRole} data-state={error ? 'error' : 'default'}>
@@ -49,12 +55,17 @@ export function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={describedBy || undefined}
         disabled={disabled}
       />
       {error && (
         <p className="ui-field__error" id={errorId}>
           {error}
+        </p>
+      )}
+      {note && (
+        <p className="ui-field__note" id={noteId}>
+          {note}
         </p>
       )}
     </div>

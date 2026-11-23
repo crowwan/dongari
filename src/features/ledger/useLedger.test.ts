@@ -882,3 +882,76 @@ describe('SPEC-002 v2.6 useLedger 저장 안 된 기록', () => {
     )
   })
 })
+
+describe('SPEC-010 useLedger 회원 명단·월 회비·시작 달 (6절)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('AC-20 새 연도를 시작하면 작년 월 회비를 가져와 저장한다', () => {
+    const repository = new MemoryRepository(storedWith(ledger2026({ monthlyFee: 20_000 })))
+    const { result } = renderLedger(repository)
+    act(() => result.current.changeYear(2027))
+
+    act(() => result.current.startLedger(result.current.newLedgerDefaults))
+
+    expect(result.current.ledger?.monthlyFee).toBe(20_000)
+    expect(savedLedger(repository, 2027)?.monthlyFee).toBe(20_000)
+  })
+
+  it('지금 장부 연도의 월 회비를 알려 주고, 그 해에 없으면 그 전 해 값을 쓴다', () => {
+    const { result } = renderLedger(
+      new MemoryRepository(storedWith({ ...ledger2026(), year: 2025, monthlyFee: 10_000 }, ledger2026())),
+    )
+
+    expect(result.current.monthlyFee).toBe(10_000)
+    act(() => {
+      result.current.changeMonthlyFee(20_000)
+    })
+    expect(result.current.monthlyFee).toBe(20_000)
+    expect(result.current.ledger?.monthlyFee).toBe(20_000)
+  })
+
+  it('회원 넣기·고치기·지우기·시작 달·월 회비를 지금 장부에 저장하고, 다시 읽어도 깨진 데이터가 아니다 (v4 가드)', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(storedWith(ledger2026())))
+    const { result } = renderLedger(new LocalStorageRepository())
+
+    act(() => {
+      result.current.addMember({ name: ' 김도윤 ', joined: '2026-10' })
+    })
+    act(() => {
+      result.current.addMember({ name: '박서연', joined: '2026-01' })
+    })
+    act(() => {
+      result.current.updateMember('id-1', { name: '김도윤', joined: '2026-03', left: '2027-01', opening: -20_000 })
+    })
+    act(() => {
+      result.current.deleteMember('id-2')
+    })
+    act(() => {
+      result.current.changeDuesStart('2025-07')
+    })
+    act(() => {
+      result.current.changeMonthlyFee(20_000)
+    })
+
+    expect(result.current.book?.members).toEqual([
+      { id: 'id-1', name: '김도윤', joined: '2026-03', left: '2027-01', off: [], opening: -20_000 },
+    ])
+    expect(result.current.book?.dues).toEqual({ startMonth: '2025-07' })
+    const reloaded = new LocalStorageRepository().load()
+    expect(reloaded.status).toBe('ok')
+    expect(reloaded.data).toEqual(result.current.data)
+  })
+
+  it('명단을 처음 넣으면 회비 표 시작 달이 보고 있는 장부 연도의 1월이 된다', () => {
+    const { result } = renderLedger(new MemoryRepository(storedWith({ ...ledger2026(), year: 2025 }, ledger2026())))
+    act(() => result.current.changeYear(2025))
+
+    act(() => {
+      result.current.addMember({ name: '김도윤', joined: '2026-11' })
+    })
+
+    expect(result.current.book?.dues).toEqual({ startMonth: '2025-01' })
+  })
+})

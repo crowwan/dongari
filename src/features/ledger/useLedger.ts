@@ -20,7 +20,18 @@ import {
   type FrequentChoice,
   type LedgerTotals,
 } from '../../domain/ledger'
-import type { Book, BookKind, EntryType, Ledger, StoredData } from '../../domain/types'
+import {
+  addMember as addMemberTo,
+  carryMonthlyFee,
+  changeDuesStart as changeDuesStartOf,
+  changeMonthlyFee as changeMonthlyFeeOf,
+  deleteMember as deleteMemberFrom,
+  monthlyFeeOf,
+  updateMember as updateMemberIn,
+  type MemberChanges,
+  type NewMember,
+} from '../../domain/members'
+import type { Book, BookKind, EntryType, Ledger, StoredData, YearMonth } from '../../domain/types'
 import { createRecoveryCode, recoveryCodeOf, withRecoveryCode } from '../keep/recoveryCode'
 import type {
   LedgerRepository,
@@ -32,7 +43,7 @@ import type {
 
 export interface UseLedgerOptions {
   now?: () => Date // 기본 연도·입력 시각·변경 시각 (기본: 지금)
-  createId?: () => string // 기록·장부 id (기본: crypto.randomUUID)
+  createId?: () => string // 기록·장부·회원 id (기본: crypto.randomUUID)
   createRecoveryCode?: () => string // 복구 코드 (기본: 무작위, SPEC-006)
 }
 
@@ -59,6 +70,7 @@ export interface LedgerState {
   isFirstRun: boolean // 장부가 하나도 없다 (첫 실행 화면)
   newLedgerDefaults: BookInfo // 이 연도 장부를 새로 만들 때 기본값 (AC-8)
   carryoverWords: CarryoverWords // 지금 장부·연도의 이월금 이름 (동아리 "작년 이월금", 가계부 첫 해 "지금 남은 돈")
+  monthlyFee: number | undefined // 지금 장부·연도의 월 회비. 그 해에 없으면 그 전 해 값 (SPEC-010 1절)
   startup: StartupStatus
   saveFailure: SaveFailureReason | undefined // 마지막 저장이 실패했으면 그 이유
   // 이 폰에 저장되지 않은 기록 id: 저장에 실패한 뒤 추가하거나 고친 기록 (SPEC-002 v2.6 "저장 안 됨").
@@ -77,6 +89,13 @@ export interface LedgerState {
   updateEntry: (id: string, input: EntryInput) => boolean // 저장에 성공했는지 (성공일 때만 "고쳤어요")
   deleteEntry: (id: string) => boolean // 저장에 성공했는지 (성공일 때만 "지웠어요")
   updateBookInfo: (setup: BookSetup) => boolean // 장부 이름·종류·이 연도 이월금. 저장에 성공했는지 (성공일 때만 알림을 띄운다)
+  // 회원 명단·회비 표 시작 달·월 회비 (SPEC-010 6절). 저장에 성공했는지 (성공일 때만 알림)
+  // 명단을 처음 넣으면 회비 표 시작 달이 보고 있는 장부 연도의 1월이 된다
+  addMember: (member: NewMember) => boolean
+  updateMember: (id: string, changes: MemberChanges) => boolean
+  deleteMember: (id: string) => boolean // 기록에 낸 분으로 들어간 회원은 지우지 않는다 (화면은 버튼 대신 안내)
+  changeDuesStart: (month: YearMonth) => boolean
+  changeMonthlyFee: (fee: number) => boolean // 이 연도 월 회비
   changeYear: (year: number) => void
   // 장부를 고른다: 마지막에 본 장부로 저장하고 그 장부의 올해 장부를 연다 (기록 변경은 아니라 변경 시각은 그대로)
   switchBook: (id: string) => void
@@ -178,6 +197,15 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     )
   }
 
+  // 지금 장부를 바꾼다 (연도와 상관없는 값: 회원 명단·회비 표 시작 달)
+  function changeBook(change: (book: Book) => Book): boolean {
+    return commit((current) => {
+      const target = currentBook(current)
+      if (!target) throw new Error('장부가 없다')
+      return replaceBook(current, change(target))
+    })
+  }
+
   // entryId: 추가하거나 고친 기록 (지울 때는 표시할 줄이 없어 넘기지 않는다)
   function changeEntries(change: (ledger: Ledger) => Ledger, entryId?: string): boolean {
     return changeLedger((ledger, target) => withLedger(target, change(ledger)), entryId)
@@ -247,6 +275,7 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     isFirstRun: book === undefined,
     newLedgerDefaults: defaultsFor(book, year),
     carryoverWords: wordsFor(book?.kind ?? 'club', isFirstYear(book, year)),
+    monthlyFee: book && monthlyFeeOf(book, year),
     startup,
     saveFailure,
     unsavedEntryIds,
@@ -259,8 +288,9 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
         const target = currentBook(current)
         if (!target) throw new Error('장부가 없다 (첫 실행은 새 장부 만들기)')
         if (target.ledgers[String(year)]) throw new Error(`${year}년 장부가 이미 있다`)
-        // 새 연도를 시작할 때 고친 이름은 장부 이름이 된다 (이름은 장부에 하나)
-        return replaceBook(current, withLedger({ ...target, name: info.name.trim() }, createLedger(year, info.carryover)))
+        // 새 연도를 시작할 때 고친 이름은 장부 이름이 된다 (이름은 장부에 하나). 월 회비는 작년 값을 가져온다 (SPEC-010 6절)
+        const started = carryMonthlyFee(target, createLedger(year, info.carryover))
+        return replaceBook(current, withLedger({ ...target, name: info.name.trim() }, started))
       }),
     addEntry: (input) => {
       // 저장 안 됨 표시에 쓰려고 새 기록 id 를 먼저 정한다
@@ -273,6 +303,11 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
       changeLedger((item, target) =>
         withLedger({ ...target, name: setup.name.trim(), kind: setup.kind }, updateCarryover(item, setup.carryover)),
       ),
+    addMember: (member) => changeBook((target) => addMemberTo(target, member, { createId, year })),
+    updateMember: (id, changes) => changeBook((target) => updateMemberIn(target, id, changes)),
+    deleteMember: (id) => changeBook((target) => deleteMemberFrom(target, id)),
+    changeDuesStart: (month) => changeBook((target) => changeDuesStartOf(target, month)),
+    changeMonthlyFee: (fee) => changeLedger((item, target) => withLedger(target, changeMonthlyFeeOf(item, fee))),
     changeYear: setYear,
     switchBook: (id) => {
       commit((current) => ({ ...current, settings: { ...current.settings, lastBookId: id } }), { recordChange: false })

@@ -14,6 +14,7 @@ import {
   CircleMinus,
   CirclePlus,
   Coffee,
+  Coins,
   Download,
   Ellipsis,
   EllipsisVertical,
@@ -84,6 +85,7 @@ export type IconName =
   | 'talk'
   | 'open'
   | 'more'
+  | 'coin'
 
 const ICONS: Record<IconName, LucideIcon> = {
   // 항목 (domain/itemIcon 이 이름으로 고른다)
@@ -143,6 +145,8 @@ const ICONS: Record<IconName, LucideIcon> = {
   talk: MessageCircle,
   open: ExternalLink,
   more: Ellipsis,
+  // 설정 [월 회비] 줄 (SPEC-010 6절): 동전 더미
+  coin: Coins,
 }
 
 // 꾸밈 아이콘: 화면 읽기에서 숨기고(뜻은 옆 글자가 전한다), 크기·색은 놓인 자리의 CSS 가 정한다

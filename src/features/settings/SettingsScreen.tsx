@@ -9,10 +9,11 @@ import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { Icon, type IconName } from '../../ui/Icon'
 import { ListRow } from '../../ui/ListRow'
 import { formatAmount } from '../../ui/money'
+import { MoneyInput } from '../../ui/MoneyInput'
 import { NoticeBar } from '../../ui/NoticeBar'
 import { OptionList } from '../../ui/OptionList'
 import { TextField } from '../../ui/TextField'
-import { BackButton, BackToLedger } from '../BackToLedger'
+import { BackToLedger } from '../BackToLedger'
 import { BACKUP_REMINDER_MESSAGE, lastBackupText } from '../backup/backupReminder'
 import { bookKindIcon } from '../books/bookKindIcon'
 import { KeepRestoreScreen } from '../keep/KeepRestoreScreen'
@@ -25,11 +26,15 @@ import { browserInstallEnvironment, type InstallEnvironment } from '../install/i
 import { CarryoverField } from '../ledger/CarryoverField'
 import type { SheetHistory } from '../useScreenHistory'
 import { browserAppVersion, useUpdateReady, type AppVersion } from '../version/appVersion'
+import { EditPage } from './EditPage'
+import { isRosterPage, ROSTER_PAGE } from './roster'
+import { RosterPages, type DuesSettings } from './RosterPages'
 import './settings.css'
 
 // 설정 화면 위에 뜨는 것들 (방문 기록 한 칸씩 — 뒤로 버튼은 이것만 닫는다)
 const BOOK_NAME_PAGE = 'settings-book-name'
 const CARRYOVER_PAGE = 'settings-carryover'
+const MONTHLY_FEE_PAGE = 'settings-monthly-fee'
 const KIND_SHEET = 'settings-kind'
 const YEAR_SHEET = 'settings-year'
 const INSTALL_GUIDE_SHEET = 'settings-install-guide'
@@ -91,6 +96,8 @@ type SettingsScreenProps = {
   inApp?: { kind: InAppKind; move: LedgerMove }
   // 버전 줄 값과 새 버전 받음 (기본은 이 빌드·지금 브라우저, 테스트에서 바꿔 넣는다)
   version?: AppVersion
+  // 회원 명단·월 회비 (SPEC-010 6절). 동아리·모임 장부에서만 장부 정보에 두 줄이 보인다 (가계부면 값은 두고 숨긴다)
+  dues?: DuesSettings
 }
 
 // 이월금 값: 적자는 빼기표 대신 "적자" (장부 잔액 카드와 같은 말)
@@ -98,9 +105,9 @@ function carryoverText(carryover: number): string {
   return carryover < 0 ? `적자 ${formatAmount(-carryover)}원` : `${formatAmount(carryover)}원`
 }
 
-// 설정 (SPEC-001 화면 구성, SPEC-002 기록 파일, SPEC-005 장부 정보, SPEC-006 기록 지키기 v2.6):
+// 설정 (SPEC-001 화면 구성, SPEC-002 기록 파일, SPEC-005 장부 정보, SPEC-006 기록 지키기 v2.6, SPEC-010 회원 명단·월 회비):
 // 맨 위 기록 지키기 카드 → "다른 방법으로 옮기기" 접기 → 장부 정보 → 앱 → [이 장부 지우기].
-// 이름·이월금 줄은 그 값 하나만 고치는 편집 화면을, 종류·연도·자동으로 지키기 줄은 선택 창을 연다
+// 이름·이월금·월 회비 줄은 그 값 하나만 고치는 편집 화면을, 회원 명단 줄은 회원 명단 화면을, 종류·연도·자동으로 지키기 줄은 선택 창을 연다
 export function SettingsScreen({
   bookName,
   bookKind,
@@ -126,10 +133,13 @@ export function SettingsScreen({
   install = browserInstallEnvironment(),
   inApp,
   version = browserAppVersion(),
+  dues,
 }: SettingsScreenProps) {
   const installAction = useInstallAction(install, sheets, INSTALL_GUIDE_SHEET)
   // 다른 방법으로 옮기기: 설정을 열 때마다 처음엔 접혀 있다 (편집·불러오기 화면에 다녀와도 그대로)
   const [moreOpen, setMoreOpen] = useState(false)
+  // 회원 명단·월 회비는 동아리·모임 장부에만 (SPEC-010 6절)
+  const clubDues = bookKind === 'club' ? dues : undefined
 
   // 기록 파일 보내기·불러오기 두 줄 (SPEC-002): 맨 위(코드 없을 때) 또는 접기 안 처음 두 줄
   const fileRows = (
@@ -161,6 +171,22 @@ export function SettingsScreen({
         name={bookName}
         onSave={(name) => {
           onSaveBookInfo({ name, kind: bookKind, carryover: ledger.carryover })
+          sheets.closeSheet()
+        }}
+        onBack={sheets.closeSheet}
+      />
+    )
+  }
+  if (clubDues && isRosterPage(sheets.sheet)) {
+    return <RosterPages dues={clubDues} sheets={sheets} />
+  }
+  if (ledger && clubDues && sheets.sheet === MONTHLY_FEE_PAGE) {
+    return (
+      <MonthlyFeeEdit
+        year={year}
+        fee={clubDues.monthlyFee}
+        onSave={(fee) => {
+          clubDues.onChangeMonthlyFee(fee)
           sheets.closeSheet()
         }}
         onBack={sheets.closeSheet}
@@ -229,6 +255,24 @@ export function SettingsScreen({
               value={BOOK_KIND_LABELS[bookKind]}
               onClick={() => sheets.openSheet(KIND_SHEET)}
             />
+            {clubDues && (
+              <>
+                <SettingRow
+                  icon="users"
+                  title="회원 명단"
+                  description="회비 표에 나오는 분들"
+                  value={`${clubDues.members.filter((member) => member.left === undefined).length}명`}
+                  onClick={() => sheets.openSheet(ROSTER_PAGE)}
+                />
+                <SettingRow
+                  icon="coin"
+                  title="월 회비"
+                  description={`${year}년`}
+                  value={clubDues.monthlyFee === undefined ? '정하지 않음' : `${formatAmount(clubDues.monthlyFee)}원`}
+                  onClick={() => sheets.openSheet(MONTHLY_FEE_PAGE)}
+                />
+              </>
+            )}
             <SettingRow
               icon="bank"
               title={carryoverWords.label}
@@ -484,39 +528,6 @@ function VersionRow({ version }: { version: AppVersion }) {
   )
 }
 
-type EditPageProps = {
-  title: string
-  // 저장할 수 있는가 (바꾼 것이 있고 빠진 것이 없다)
-  canSave: boolean
-  onSave: () => void
-  onBack: () => void
-  children: ReactNode
-}
-
-// 설정 값 하나를 고치는 화면: [‹ 설정] → 제목 → 입력칸 → [저장]. 선택 창 대신 화면을 통째로 쓴다 —
-// 폰 키패드가 올라와도 칸과 [저장] 이 가려지지 않고, 큰 글씨로 늘어나도 한 화면에 들어간다 (SPEC-001 설정)
-function EditPage({ title, canSave, onSave, onBack, children }: EditPageProps) {
-  return (
-    <form
-      className="screen screen--groups"
-      data-testid="settings-edit"
-      onSubmit={(event) => {
-        event.preventDefault()
-        if (canSave) onSave()
-      }}
-    >
-      <div className="settings__edit-head">
-        <BackButton label="설정" onBack={onBack} />
-        <h1 className="screen__title">{title}</h1>
-      </div>
-      {children}
-      <Button type="submit" icon="check" disabled={!canSave}>
-        저장
-      </Button>
-    </form>
-  )
-}
-
 function BookNameEdit({ name, onSave, onBack }: { name: string; onSave: (name: string) => void; onBack: () => void }) {
   const [bookName, setBookName] = useState(name)
   const missingName = bookName.trim() === ''
@@ -553,6 +564,32 @@ function CarryoverEdit({ label, ledger, onSave, onBack }: CarryoverEditProps) {
       onBack={onBack}
     >
       <CarryoverField label={label} value={carryover} onChange={setCarryover} labelRole="label" />
+    </EditPage>
+  )
+}
+
+type MonthlyFeeEditProps = {
+  year: number // 지금 장부 연도
+  fee: number | undefined // 지금 값 (그 해에 없으면 그 전 해 값)
+  onSave: (fee: number) => void
+  onBack: () => void
+}
+
+// 월 회비 (SPEC-010 6절): 지금 장부 연도의 한 분 한 달 금액. 이월금 편집과 같은 모양
+function MonthlyFeeEdit({ year, fee, onSave, onBack }: MonthlyFeeEditProps) {
+  const [amount, setAmount] = useState(fee ?? 0)
+
+  return (
+    <EditPage
+      title={fee === undefined ? '월 회비 정하기' : '월 회비 바꾸기'}
+      canSave={amount > 0 && amount !== fee}
+      onSave={() => onSave(amount)}
+      onBack={onBack}
+    >
+      <div className="settings__field">
+        <MoneyInput label={`${year}년 월 회비`} labelRole="label" value={amount} onChange={setAmount} />
+        <p className="screen__note">한 분이 한 달에 내는 돈이에요. 새해 장부를 시작하면 이 금액을 그대로 가져와요</p>
+      </div>
     </EditPage>
   )
 }

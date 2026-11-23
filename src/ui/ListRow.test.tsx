@@ -30,6 +30,13 @@ describe('ListRow', () => {
     expect(screen.getByTestId('list-row')).toHaveAttribute('data-tone', 'income')
   })
 
+  it('아이콘을 주지 않으면 원형 아이콘 자리 없이 이름부터 그린다 (회원 명단 줄, SPEC-010)', () => {
+    render(<ListRow title="김도윤" description="7월에 들어왔어요" onClick={vi.fn()} chevron />)
+
+    const row = screen.getByRole('button', { name: '김도윤 7월에 들어왔어요' })
+    expect(row.querySelector('.ui-row__icon')).toBeNull()
+  })
+
   it('기본은 회색 원이다', () => {
     render(<ListRow icon="receipt" title="행사비" />)
 
