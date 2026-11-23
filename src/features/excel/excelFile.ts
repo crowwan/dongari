@@ -14,7 +14,7 @@ export const EXCEL_FILE_MAX_BYTES = 5 * 1024 * 1024
 // - backup-file: 앱 기록 파일 (.txt 이거나 내용이 기록 파일) → 기록 파일 불러오기로 안내
 // - not-excel: 엑셀이 아니거나 깨졌다
 // - load-failed: 파일은 멀쩡할 수 있는데 엑셀 라이브러리를 받지 못했다(오프라인·서비스 워커가 아직 못 받음·배포 뒤 옛 조각)
-//   → "인터넷에 연결된 뒤 다시 해 주세요"
+//   → "인터넷에 연결된 뒤 [앱 다시 열기]를 눌러 주세요" (문구는 excelMessages)
 // - no-sheets: 읽을 수 있는 입출금내역 시트(2013 이후 "YYYY년 입출금내역")가 없다
 export type ExcelFileProblem = 'too-large' | 'backup-file' | 'not-excel' | 'load-failed' | 'no-sheets'
 

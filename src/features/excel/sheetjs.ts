@@ -8,7 +8,7 @@ import type { ExcelWorkbook, SheetCell, SheetData, SheetMerge, WriteCell, WriteS
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 // 엑셀 라이브러리 조각을 받지 못함: 오프라인인데 서비스 워커가 아직 못 받았거나, 배포 뒤 옛 조각 주소가 사라짐.
-// 파일 탓이 아니라서 "엑셀이 아니에요"와 다르게 안내한다 (#166 "인터넷에 연결된 뒤 다시 해 주세요")
+// 파일 탓이 아니라서 "엑셀이 아니에요"와 다르게 안내한다 (#166 "엑셀 기능을 받지 못했어요" + [앱 다시 열기], excelMessages)
 export class SheetJsLoadError extends Error {
   constructor(cause: unknown) {
     super('엑셀 라이브러리를 받지 못했어요', { cause })
