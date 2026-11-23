@@ -221,17 +221,19 @@
   list-style: none;
 }
 
-/* 다른 묶음(그만둔 분·시작 달)은 묶음 간격만큼 띄운다 */
+/* 다른 묶음(그만둔 분·시작 달·낸 분 붙이기)은 묶음 간격만큼 띄운다 */
 .roster__group,
-.roster__start {
+.roster__start,
+.roster__assign {
   margin-top: calc(var(--group-gap) - var(--stack));
   display: flex;
   flex-direction: column;
   gap: var(--stack-tight);
 }
 
-/* 시작 달 [바꾸기] 는 글자 폭만큼 (폭 채움 아님) */
-.roster__start {
+/* 시작 달 [바꾸기]·[낸 분 붙이기] 는 글자 폭만큼 (폭 채움 아님) */
+.roster__start,
+.roster__assign {
   align-items: flex-start;
 }
 

@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { useId, type ReactNode, type Ref } from 'react'
 import { Icon, type IconName } from './Icon'
 import './ui.css'
 
@@ -18,17 +18,21 @@ type EntryCardProps = {
   rows: EntryCardRow[]
   // 지금 질문 (제목 + 답 칸). 카드 안 맨 아래 옅은 면 칸에 펼쳐진다
   children: ReactNode
+  // 카드 머리 (기본 "지금 적는 내역". 낸 분 붙이기는 이미 적은 기록이라 "이 기록", SPEC-010 7절)
+  title?: string
+  // 카드 머리에 포커스를 옮길 때 (낸 분 붙이기에서 다음 기록으로 넘긴 뒤, #181 리뷰). 주면 머리가 화면 읽기용 포커스 자리(tabIndex -1)가 된다
+  titleRef?: Ref<HTMLParagraphElement>
 }
 
 // 하나씩 채우기에서 지금 적는 내역 하나 (SPEC-001 기록 입력, AC-16·23): 흰 면 + 청록 둘레 카드 "지금 적는 내역" 안에
 // 답한 줄(작은 이름표 + 굵은 값(+ 둘째 줄 작은 글자) + [바꾸기], 줄 사이 가는 선) → 맨 아래 옅은 면에 지금 질문. ✓ 는 "장부에 들어감" 에만 써서 여기엔 없다
-export function EntryCard({ rows, children }: EntryCardProps) {
+export function EntryCard({ rows, children, title = '지금 적는 내역', titleRef }: EntryCardProps) {
   const titleId = useId()
   return (
     <section className="ui-entry-card" data-testid="entry-card" aria-labelledby={titleId}>
       {/* 질문 제목(h2)과 겹치지 않게 제목 요소 대신 카드 이름으로만 읽힌다 */}
-      <p className="ui-entry-card__title" id={titleId}>
-        지금 적는 내역
+      <p className="ui-entry-card__title" id={titleId} ref={titleRef} tabIndex={titleRef ? -1 : undefined}>
+        {title}
       </p>
       <ul className="ui-entry-card__list">
         {rows.map(({ label, icon, value, detail, onChange }) => (

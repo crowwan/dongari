@@ -1276,6 +1276,11 @@ button.ui-row {
   line-height: var(--line-tight);
 }
 
+/* 낸 분 붙이기에서 다음 기록으로 넘긴 뒤 머리에 주는 포커스는 화면 읽기용 (화면 제목 h1 과 같이 테두리를 그리지 않는다, #181 리뷰) */
+.ui-entry-card__title[tabindex='-1']:focus {
+  outline: none;
+}
+
 .ui-entry-card__list {
   margin: 0;
   padding: 0;

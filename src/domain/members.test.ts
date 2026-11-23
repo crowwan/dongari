@@ -10,6 +10,7 @@ import {
   deleteMember,
   hasNameSeparator,
   hasSameName,
+  hideUnassignedDues,
   isYearMonth,
   memberHasRecords,
   nextMonth,
@@ -200,6 +201,19 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 (6절)', () => {
     it('시작 달이 "YYYY-MM" 이 아니면 바꾸지 않는다', () => {
       expect(() => changeDuesStart(duesBook(), '2025-7')).toThrow(InvalidLedgerInputError)
       expect(() => changeDuesStart(duesBook(), '2025')).toThrow(InvalidLedgerInputError)
+    })
+  })
+
+  describe('"낸 분을 안 적은 회비" 카드 숨기기 (7절, AC-22)', () => {
+    it('AC-22 카드 숨김을 장부에 저장하고 시작 달은 그대로 둔다 — 저장 형식 검사를 통과한다', () => {
+      const next = hideUnassignedDues(duesBook({ dues: { startMonth: '2025-07' } }))
+
+      expect(next.dues).toEqual({ startMonth: '2025-07', hideUnassigned: true })
+      expect(isStoredData(stored(next))).toBe(true)
+    })
+
+    it('회비 표 시작 달이 없는 장부(명단을 넣기 전)는 숨길 카드가 없어 바꾸지 않는다', () => {
+      expect(() => hideUnassignedDues(plainBook())).toThrow(InvalidLedgerInputError)
     })
   })
 

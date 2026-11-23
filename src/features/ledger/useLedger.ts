@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { bookBalance, carryoverWords as wordsFor, currentBook, isFirstYear, type CarryoverWords } from '../../domain/book'
 import {
   addEntry as addEntryTo,
+  assignPayers as assignPayersIn,
   calculateTotals,
   createLedger,
   deleteEntry as deleteEntryFrom,
@@ -27,6 +28,7 @@ import {
   changeDuesStart as changeDuesStartOf,
   changeMonthlyFee as changeMonthlyFeeOf,
   deleteMember as deleteMemberFrom,
+  hideUnassignedDues as hideUnassignedDuesIn,
   restMember as restMemberIn,
   resumeMember as resumeMemberIn,
   updateMember as updateMemberIn,
@@ -34,7 +36,7 @@ import {
   type NewMember,
 } from '../../domain/members'
 import { monthlyFeeSource, type MonthlyFeeSource } from '../../domain/duesTable'
-import type { Book, BookKind, EntryType, Ledger, StoredData, YearMonth } from '../../domain/types'
+import type { Book, BookKind, EntryType, Ledger, Payer, StoredData, YearMonth } from '../../domain/types'
 import type { ImportedBook } from '../excel/readExcelBook'
 import { createRecoveryCode, recoveryCodeOf, withRecoveryCode } from '../keep/recoveryCode'
 import type {
@@ -105,6 +107,9 @@ export interface LedgerState {
   // 쉬는 기간 넣기·빼기 (SPEC-010 5절 한 분 보기, #163)
   restMember: (id: string, from: YearMonth, until: YearMonth) => boolean
   resumeMember: (id: string, from: YearMonth) => boolean
+  // 낸 분 붙이기 (SPEC-010 7절, #164): 그 해(보고 있는 장부 연도와 달라도) 회비 기록에 낸 분만 정한다 / "낸 분을 안 적은 회비" 카드 숨기기
+  assignPayers: (entryYear: number, id: string, payers: readonly Payer[]) => boolean
+  hideUnassignedDues: () => boolean
   changeYear: (year: number) => void
   // 장부를 고른다: 마지막에 본 장부로 저장하고 그 장부의 올해 장부를 연다 (기록 변경은 아니라 변경 시각은 그대로)
   switchBook: (id: string) => void
@@ -330,6 +335,9 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
       changeLedger((item, target) => withLedger(target, changeMonthlyFeeOf(item, fee)), undefined, feeYear),
     restMember: (id, from, until) => changeBook((target) => restMemberIn(target, id, from, until)),
     resumeMember: (id, from) => changeBook((target) => resumeMemberIn(target, id, from)),
+    assignPayers: (entryYear, id, payers) =>
+      changeLedger((item, target) => withLedger(target, assignPayersIn(item, id, payers, target.members ?? [])), id, entryYear),
+    hideUnassignedDues: () => changeBook(hideUnassignedDuesIn),
     changeYear: setYear,
     switchBook: (id) => {
       commit((current) => ({ ...current, settings: { ...current.settings, lastBookId: id } }), { recordChange: false })

@@ -7,6 +7,7 @@
 .dues-row,
 .dues-pill,
 .dues-summary__action,
+.dues-unassigned__hide,
 .dues-member__name,
 .dues-calendar__cell {
   font-family: var(--typeface);
@@ -16,6 +17,7 @@
 
 .dues-pill:focus-visible,
 .dues-summary__action:focus-visible,
+.dues-unassigned__hide:focus-visible,
 .dues-member__name:focus-visible,
 .dues-calendar__cell:focus-visible {
   outline: var(--focus-ring) solid var(--accent-ink);
@@ -46,6 +48,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* [이 카드 숨기기] 뒤 요약 카드에 주는 포커스는 화면 읽기용 (화면 제목 h1 과 같이 테두리를 그리지 않는다, 7절 #181 리뷰) */
+.dues-summary[tabindex='-1']:focus {
+  outline: none;
 }
 
 .dues-summary__line {
@@ -476,10 +483,119 @@ button.dues-calendar__cell[data-state='full']:active,
   gap: var(--space-2);
 }
 
+/* "낸 분을 안 적은 회비" 카드 (7절, 시안 G1): 알아 둘 것 색 면 → 제목(Heading) → 설명 → [👥 낸 분 붙이기](흰 면, 폭 채움) → 글자 버튼 [이 카드 숨기기] */
+.dues-unassigned {
+  padding: var(--card-pad-block) var(--card-pad-inline) var(--space-2);
+  border-radius: var(--corner-lg);
+  background: var(--info-bg);
+  color: var(--info-ink);
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+.dues-unassigned__title {
+  margin: 0;
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+}
+
+.dues-unassigned__text {
+  margin: 0;
+  word-break: keep-all;
+}
+
+.dues-unassigned__assign {
+  margin-top: var(--space-1);
+  display: flex;
+}
+
+.dues-unassigned__assign > .ui-icon-button {
+  flex: 1;
+  color: var(--strong);
+}
+
+/* 글자 버튼: 면 없는 청록 글자 (요약 카드 [바꾸기] 와 같은 모양), 56 이상, 가운데 */
+.dues-unassigned__hide {
+  align-self: center;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--corner-md);
+  background: none;
+  color: var(--accent-ink);
+  font-size: var(--text-label-size);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+/* 눌림: 알아 둘 것 면(--info-bg) 위에서는 --pressed(옅은 회색)가 면과 거의 같아 안 보이니, 청록 글자에 맞춘 옅은 청록 눌림 면 (#181 리뷰) */
+.dues-unassigned__hide:active,
+[data-preview-pressed] .dues-unassigned__hide {
+  background: var(--primary-soft-pressed);
+}
+
+/* 붙이기 화면 진행 "3 / 12" + 막대 (7절) */
+.assign__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.assign__count {
+  flex: none;
+  color: var(--muted);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.assign__bar {
+  flex: 1;
+  height: var(--space-2);
+  border-radius: var(--corner-pill);
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.assign__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+/* 엑셀에 적혀 있던 글: 회색 상자 (엑셀에서 불러온 기록만). 이름 칸이 아니라 읽을 글이라 낱말 단위 줄바꿈 */
+.assign__source {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--corner-md);
+  background: var(--fill);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.assign__source-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--weight-semibold);
+}
+
+.assign__source-text {
+  margin: 0;
+  color: var(--strong);
+  font-weight: var(--weight-semibold);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .dues-row,
   .dues-pill,
   .dues-summary__action,
+  .dues-unassigned__hide,
   .dues-member__name,
   .dues-calendar__cell {
     transition: background-color var(--motion-fast) var(--motion-curve);
