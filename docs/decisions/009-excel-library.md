@@ -34,3 +34,15 @@
 - 좋음: .xls 까지 읽는다. 수식과 값을 같이 써서 미리보기에서도 숫자가 보인다. 첫 화면 크기는 그대로다.
 - 나쁨: 처음 엑셀을 열 때 수백 KB 를 받는다(서비스 워커가 미리 받아 두면 오프라인·두 번째부터는 바로). 내보낸 파일에 테두리가 없다.
 - 위험: SheetJS 를 레지스트리 밖에서 받으므로 버전 올리기를 사람이 챙겨야 한다. 받은 파일(신뢰할 수 없는 입력)을 읽으므로 최신 판을 쓴다.
+
+## 설치와 크기 (#165, 2026-11-23)
+
+- **버전 0.20.3** (그날 `https://cdn.sheetjs.com/xlsx.lst` 의 최신). `package.json` 의존성 `"xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"`, `package-lock.json` 에 같은 주소(`resolved`)와 무결성 `sha512-oLDq3jw7…H+3AJA==` 가 남는다. 올릴 때는 `xlsx.lst` 에서 새 버전을 보고 같은 모양의 주소로 `npm i` 한다.
+- **크기**: 엑셀 화면이 어댑터를 부르면 생기는 SheetJS 조각(`assets/xlsx-*.js`)이 **499.55 kB, gzip 162.96 kB**(vite 빌드 출력 기준). #165 에는 화면이 없어 진입점에서 임시로 부르게 해 빌드해 잰 값이다(커밋하지 않음). 첫 화면 파일(`index-*.js`)은 그대로이고, 서비스 워커 미리 받기는 11 → 12개(+약 490 KiB)가 된다. workbox 미리 받기 파일 상한(기본 2 MiB) 안이라 `pwaOptions` 는 바꾸지 않았다.
+- **확인 장치**: `npm run build` 끝의 `scripts/check-excel-bundle.mjs` 가 index.html 이 처음 받는 파일(`<script src>`·`modulepreload`)에 SheetJS 가 없고 SheetJS 가 든 조각이 sw.js 미리 받기 목록에 있는지 보고, 아니면 빌드(CI·배포)를 멈춘다. SheetJS 를 정적 import 로 섞으면 실제로 멈추는 것을 확인했다. 소스 쪽은 `src/features/excel/sheetjs.test.ts` 가 "xlsx 를 부르는 곳은 `features/excel/sheetjs.ts` 하나, 동적 import 만(타입은 `import type`)"을 본다.
+- **어댑터** (`src/features/excel/sheetjs.ts`)
+  - 읽기 `readWorkbook(ArrayBuffer)`: `read(…, { type: 'array', dense: true, cellFormula: false, cellHTML: false })` → 시트마다 `{ name, rows, merges }`. 수식 칸은 계산된 값, 오류 칸은 글자("#REF!"), 참·거짓은 글자, 날짜 서식 칸은 숫자 그대로. SheetJS 값은 `unknown` 으로 받아 런타임 검사로 좁힌다.
+  - 쓰기 `writeWorkbook(WriteSheet[])` → xlsx `Blob`(#167): `aoa_to_sheet` + 수식 칸 `{ t: 'n', v, f }` + `!merges` + `!cols`(글자 수 `wch`), `compression: true`. 열 너비는 다시 읽을 때 `cellStyles: true` 여야 보인다.
+  - 조각을 받지 못하면(오프라인인데 서비스 워커가 아직 못 받음, 배포 뒤 옛 조각 주소가 사라짐) 읽기·쓰기 모두 `SheetJsLoadError` 를 던진다. 파일 탓이 아니라 "깨진 파일"과 가른다(`excelFile.readExcelFile` → `load-failed`, #176 리뷰).
+- 실제 이모 엑셀(레포 밖, 시트 37개)을 개발자가 읽어 본 값(#176 리뷰): SheetJS 읽기 65ms·규칙 7ms(맥), 입출금내역 14개에서 수입 1,019·지출 81건, 직렬화 138KB. 이때 회비내역 머리에 번호·이름 글자가 없어 회원을 못 모은 것을 고쳤다(SPEC-010 8절).
+- 빌드 결과물(`dist/index.html`·`sw.js`·`assets`)이 없을 때 검사를 돌리면 ENOENT 대신 무엇이 없는지 한글로 알리고 멈춘다.
