@@ -883,6 +883,113 @@ describe('SPEC-002 v2.6 useLedger 저장 안 된 기록', () => {
   })
 })
 
+// 저장소가 가드에 어긋나 쓰지 않은 변경(invalid-data)은 화면에도 들이지 않는다: 틀린 값이 화면에 남으면 그 뒤 저장이 모두 막히고,
+// 다시 열면 그 뒤 기록까지 사라진다. 그 한 번의 변경만 잃게 한다 (#172 리뷰)
+describe('SPEC-002 useLedger 저장 전 v4 가드 (#172)', () => {
+  const ENTRY = { month: 10, day: 3, type: 'expense', name: '간식비', amount: 5_000 } as const
+
+  // 번호를 차례로 내주는 저장 도구 (앞 번호가 지금 장부와 겹치게 할 수 있다)
+  function renderWithIds(repository: LedgerRepository, ids: string[]) {
+    const queue = [...ids]
+    return renderHook(() => useLedger(repository, repository.load(), { now: () => TODAY, createId: () => queue.shift() ?? 'id-last' }))
+  }
+
+  // 저장 결과를 차례로 정해 두는 저장소. 정해 둔 것이 떨어지면 메모리에 저장한다
+  function scripted(data: StoredData, results: SaveResult[]) {
+    const memory = new MemoryRepository(data)
+    const repository: LedgerRepository = {
+      load: () => memory.load(),
+      save: (next) => results.shift() ?? memory.save(next),
+      restore: (next) => memory.restore(next),
+    }
+    return { repository, memory }
+  }
+
+  it('가드에 어긋난 변경(겹치는 장부 번호)은 저장하지 않고 화면도 그 전 데이터로 두며, 다음 바른 저장은 된다', () => {
+    const repository = new MemoryRepository(storedWith(ledger2026()))
+    const { result } = renderWithIds(repository, ['book-1', 'id-entry'])
+    const before = result.current.data
+
+    let created = true
+    act(() => {
+      created = result.current.createBook({ name: '겹친 장부', kind: 'club', carryover: 0 })
+    })
+
+    expect(created).toBe(false)
+    expect(result.current.saveFailure).toBe('invalid-data')
+    expect(result.current.data).toEqual(before)
+    expect(result.current.bookChoices.map((choice) => choice.name)).toEqual(['한랑드림'])
+
+    act(() => {
+      result.current.addEntry(ENTRY)
+    })
+
+    expect(result.current.saveFailure).toBeUndefined()
+    expect(savedLedger(repository, 2026)?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '간식비'])
+    expect(repository.load().data.books).toHaveLength(1)
+  })
+
+  it('가드에 막힌 변경 하나만 잃는다: 그 전에 저장하지 못한 기록은 "저장 안 됨" 으로 화면에 남는다', () => {
+    const { repository, memory } = scripted(storedWith(ledger2026()), [
+      { ok: false, reason: 'quota-exceeded' },
+      { ok: false, reason: 'invalid-data' },
+    ])
+    const { result } = renderLedger(repository)
+    act(() => {
+      result.current.addEntry(ENTRY)
+    })
+    act(() => {
+      result.current.addEntry({ ...ENTRY, name: '꽃값' })
+    })
+
+    expect(result.current.ledger?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '간식비'])
+    expect([...result.current.unsavedEntryIds]).toEqual(['id-1'])
+    expect(result.current.saveFailure).toBe('invalid-data')
+
+    act(() => {
+      result.current.addEntry({ ...ENTRY, name: '떡값' })
+    })
+
+    expect(result.current.unsavedEntryIds.size).toBe(0)
+    expect(savedLedger(memory, 2026)?.entries.map((entry) => entry.name)).toEqual(['회비', '대관료', '간식비', '떡값'])
+  })
+
+  it('엑셀로 만든 장부가 가드에 어긋나면(명단에 없는 낸 분) 만들지 않고 실패 이유 invalid-data 를 돌려준다', () => {
+    const repository = new MemoryRepository(storedWith(ledger2026()))
+    const { result } = renderLedger(repository)
+    const before = result.current.data
+
+    let saved: SaveResult = { ok: true }
+    act(() => {
+      saved = result.current.importBook('지어낸모임', {
+        ledgers: {
+          '2026': {
+            year: 2026,
+            carryover: 0,
+            entries: [
+              {
+                id: 'x1',
+                month: 3,
+                type: 'income',
+                name: '회비',
+                amount: 10_000,
+                createdAt: '2026-03-01T00:00:00.000Z',
+                payers: [{ memberId: 'ghost', amount: 10_000 }],
+              },
+            ],
+          },
+        },
+        members: [{ id: 'm1', name: '김도윤', joined: '2026-01', off: [] }],
+        dues: { startMonth: '2026-01' },
+      })
+    })
+
+    expect(saved).toEqual({ ok: false, reason: 'invalid-data' })
+    expect(result.current.data).toEqual(before)
+    expect(repository.load().data).toEqual(storedWith(ledger2026()))
+  })
+})
+
 describe('SPEC-010 useLedger 회원 명단·월 회비·시작 달 (6절)', () => {
   beforeEach(() => {
     localStorage.clear()

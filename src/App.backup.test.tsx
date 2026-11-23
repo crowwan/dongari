@@ -261,6 +261,19 @@ describe('SPEC-002 기록 파일 보내기·불러오기', () => {
       expect(dialog).toHaveAccessibleDescription('기기에 저장하지 못했어요. 지금 기록은 그대로예요')
       expect(memory.load().data).toEqual(storedWith(LEDGER_2026))
     })
+
+    it('불러온 것이 저장 전 v4 가드에 막히면 저장 공간이 아니라 앱 문제라고 알린다 (#172)', async () => {
+      const memory = new MemoryRepository(storedWith(LEDGER_2026))
+      renderApp({ load: () => memory.load(), save: (data) => memory.save(data), restore: () => ({ ok: false, reason: 'invalid-data' }) })
+      await openSettings()
+
+      await chooseFile(textFile(JSON.stringify(storedWith(LEDGER_2025))))
+      await userEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '불러오기' }))
+
+      const dialog = screen.getByRole('alertdialog', { name: '불러오지 못했어요' })
+      expect(dialog).toHaveAccessibleDescription('앱에 문제가 있어 불러온 기록을 저장하지 않았어요. 지금 기록은 그대로예요')
+      expect(memory.load().data).toEqual(storedWith(LEDGER_2026))
+    })
   })
 
   describe('시작 안내에서 불러오기', () => {

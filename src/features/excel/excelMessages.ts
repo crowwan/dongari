@@ -1,5 +1,6 @@
 // 엑셀 불러오기 화면 문구 (SPEC-010 8절 "읽은 내용 확인"·"예외와 경계 상황", #166).
 // 작은 파일이라 첫 화면(기록 파일 불러오기 안내·읽는 중 화면)이 불러도 엑셀 읽기 코드가 따라오지 않는다
+import type { SaveFailureReason } from '../../storage/LedgerRepository'
 import type { ExcelFileProblem } from './excelFile'
 
 // 제목 한 줄(화면 제목·확인 창 제목) + 다음에 할 일 한 줄
@@ -54,6 +55,12 @@ export const EXCEL_IN_BACKUP_IMPORT: ExcelMessage = {
 
 // [새 장부 만들기]를 기기에 저장하지 못함 (저장 공간 부족 등, #178 리뷰). 장부를 만들지 않았으니 지금 기록은 그대로다
 export const EXCEL_CREATE_FAILED = '장부를 만들지 못했어요. 이 폰에 저장하지 못해 지금 기록은 그대로예요'
+// 저장 전 가드에 막힘(#172): 엑셀을 읽은 앱 쪽 문제라 저장 공간을 비우고 다시 해도 같다
+export const EXCEL_CREATE_INVALID = '앱에 문제가 있어 장부를 만들지 못했어요. 지금 기록은 그대로예요'
+
+export function excelCreateFailedMessage(reason: SaveFailureReason): string {
+  return reason === 'invalid-data' ? EXCEL_CREATE_INVALID : EXCEL_CREATE_FAILED
+}
 
 export const EXCEL_READING_TITLE = '엑셀 파일을 읽는 중이에요'
 
