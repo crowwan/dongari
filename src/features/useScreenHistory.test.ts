@@ -416,6 +416,45 @@ describe('#110 접근성 점검 09 확인 창과 뒤로 버튼', () => {
   })
 })
 
+describe('SPEC-010 회비 표 화면 칸 (#163)', () => {
+  it('결산 회비 줄에서 회비 표로 갈 때는 결산 칸을 회비 표 칸으로 바꿔 끼워, 뒤로 버튼 한 번에 장부로 온다', () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    const result = renderOpened({ name: 'year-summary' })
+
+    act(() => result.current.replace({ name: 'dues', year: 2025 }))
+
+    expect(result.current.screen).toEqual({ name: 'dues', year: 2025 })
+    expect(push).not.toHaveBeenCalled()
+    expect(replaceState).toHaveBeenCalledWith({ screen: 'dues' }, '')
+    pressBackButton()
+    expect(result.current.screen).toEqual({ name: 'ledger' })
+  })
+
+  it('장부 화면에서 부르면 바꿔 끼우지 않고 칸을 쌓는다 (장부 칸을 바꾸면 뒤로 버튼에 앱이 닫힌다)', () => {
+    const { result } = renderHook(() => useScreenHistory())
+
+    act(() => result.current.replace({ name: 'dues' }))
+
+    expect(push).toHaveBeenCalledWith({ screen: 'dues' }, '')
+  })
+
+  it('선택 창 위에 확인 창이 떠 있을 때 선택 창을 닫으면 두 칸을 한 번에 되돌린다 (한 분 보기 회원 정보에서 지운 뒤 회비 표로)', () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const result = renderOpened({ name: 'dues' })
+    act(() => result.current.openSheet('dues-member-edit'))
+    act(() => result.current.openDialog('settings-roster-delete'))
+
+    act(() => result.current.closeSheet())
+
+    expect(go).toHaveBeenCalledWith(-2)
+    expect(back).not.toHaveBeenCalled()
+    expect(result.current.sheet).toBeNull()
+    expect(result.current.dialog).toBeNull()
+    pressBackButton()
+    expect(result.current.screen).toEqual({ name: 'dues' })
+  })
+})
+
 describe('SPEC-008 말풍선(확인 창 칸)에서 화면 열기', () => {
   it('말풍선이 가리키는 버튼으로 화면을 열면(내역 적기) 말풍선 칸을 그 화면 칸으로 바꿔, 뒤로 버튼 한 번에 장부로 온다', () => {
     const replace = vi.spyOn(window.history, 'replaceState')

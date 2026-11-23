@@ -27,6 +27,8 @@ type YearSummaryScreenProps = {
   practice?: boolean
   // [사진으로 저장]·[사진 보내기] 가 끝난 결과 (연습 장부가 결산 보내기 단계를 정한다)
   onPictureResult?: (action: PictureAction, result: PictureResult) => void
+  // 수입 항목별의 회비 기록 줄을 누르면 회비 표로 (SPEC-010 4절, 동아리·모임 장부만)
+  onOpenDues?: () => void
 }
 
 // 결산 화면에서 볼 것 (v2.6): 단톡방용 요약(큰 글씨 카드 셋) / 결산표(제출용, v1 양식). 둘 다 그대로 사진 한 장이 된다
@@ -84,6 +86,7 @@ export function YearSummaryScreen({
   saver = pictureSaver,
   practice = false,
   onPictureResult,
+  onOpenDues,
 }: YearSummaryScreenProps) {
   const [view, setView] = useState<YearView>('summary')
   // 기록이 하나라도 있어야 결산을 만든다
@@ -105,7 +108,14 @@ export function YearSummaryScreen({
           <SegmentedControl label="무엇을 볼까요?" options={YEAR_VIEWS} value={view} onChange={setView} />
           {view === 'summary' ? (
             <>
-              <YearShareSummary report={report} bookName={bookName} carryoverWords={carryoverWords} targetRef={targetRef} practice={practice} />
+              <YearShareSummary
+                report={report}
+                bookName={bookName}
+                carryoverWords={carryoverWords}
+                targetRef={targetRef}
+                practice={practice}
+                onOpenDues={onOpenDues}
+              />
               <p className="screen__note report__photo-note">이 화면 그대로 사진 한 장이 돼요</p>
             </>
           ) : (

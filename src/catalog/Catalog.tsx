@@ -3,7 +3,10 @@ import { carryoverWords } from '../domain/book'
 import { itemIcon } from '../domain/itemIcon'
 import { yearReport } from '../domain/report'
 import type { EntryType } from '../domain/types'
+import type { DuesCell, DuesCellState } from '../domain/duesTable'
 import { BookPicker } from '../features/books/BookPicker'
+import { DuesCalendar } from '../features/dues/DuesCalendar'
+import { DuesStrip } from '../features/dues/DuesStrip'
 import { BrowserBar, BrowserMenu, BrowserPage, BrowserPicture } from '../features/install/BrowserPicture'
 import { HomeScreenPreview } from '../features/install/HomeScreenPreview'
 import { InAppBrowserScreen, InAppImportCard } from '../features/install/InAppBrowserScreen'
@@ -50,6 +53,7 @@ import { SlideGuide } from '../ui/SlideGuide'
 import { TextField } from '../ui/TextField'
 import { Toast } from '../ui/Toast'
 import { YearMonthPicker } from '../ui/YearMonthPicker'
+import { YearStepper } from '../ui/YearStepper'
 import './catalog.css'
 
 type ThemeChoice = 'system' | 'light' | 'dark'
@@ -224,6 +228,36 @@ const GUIDE_PICTURES: GuidePicture[] = [
   'samsung-confirm',
 ]
 
+// 회비 표 칸 견본 (SPEC-010 #163): 1~9월 채움(1/19 입금), 10월 반, 11월 안 냄, 12월 쉬는 달
+function duesCell(month: number, state: DuesCellState, paid = 0): DuesCell {
+  const fills: DuesCell['fills'] =
+    paid > 0 ? [{ kind: 'payment', entryId: 'e1', year: 2026, month: month === 10 ? 10 : 1, day: 19, amount: paid }] : []
+  return { month, state, fee: state === 'off' ? undefined : 20000, paid, fills }
+}
+
+const DUES_CELLS: DuesCell[] = [
+  ...Array.from({ length: 9 }, (_, index) => duesCell(index + 1, 'full', 20000)),
+  duesCell(10, 'partial', 10000),
+  duesCell(11, 'empty'),
+  duesCell(12, 'off'),
+]
+
+// 칸 모양 전부: 회원 아님·시작 달 전·월 회비 모름도
+const DUES_CELLS_ALL: DuesCell[] = [
+  duesCell(1, 'notMember'),
+  duesCell(2, 'beforeStart'),
+  duesCell(3, 'noFee'),
+  duesCell(4, 'full', 20000),
+  duesCell(5, 'full', 20000),
+  duesCell(6, 'empty'),
+  duesCell(7, 'off'),
+  duesCell(8, 'off'),
+  duesCell(9, 'empty'),
+  duesCell(10, 'partial', 10000),
+  duesCell(11, 'empty'),
+  duesCell(12, 'empty'),
+]
+
 // 개발 모드 전용 디자인 카탈로그: 모든 기본 컴포넌트를 모든 상태로 한 화면에서 본다
 export function Catalog() {
   const [theme, setTheme] = useState<ThemeChoice>('system')
@@ -244,6 +278,7 @@ export function Catalog() {
   const [pickedItem, setPickedItem] = useState('대관료')
   const [dayText, setDayText] = useState('')
   const [pickedYearMonth, setPickedYearMonth] = useState({ year: 2026, month: 7 })
+  const [duesYear, setDuesYear] = useState(2026)
 
   return (
     <div className="catalog" data-theme={theme === 'system' ? undefined : theme} data-testid="design-catalog">
@@ -601,6 +636,24 @@ export function Catalog() {
               </BottomSheet>
             </div>
           </State>
+          <State label="고를 수 있는 첫 달 min(그 전 달은 점선 비활성) · 언제까지 쉬나요? (SPEC-010 5절 #163)">
+            <div className="catalog__frame catalog__frame--sheet">
+              <BottomSheet inline open title="언제까지 쉬나요?" onClose={noop}>
+                <p className="screen__note">고른 달까지 쉬는 달이 돼요</p>
+                <YearMonthPicker
+                  value={null}
+                  min={{ year: 2026, month: 10 }}
+                  current={{ year: 2026, month: 11 }}
+                  firstYear={2026}
+                  lastYear={2027}
+                  onChange={noop}
+                />
+                <Button variant="secondary" onClick={noop}>
+                  아직 몰라요
+                </Button>
+              </BottomSheet>
+            </div>
+          </State>
           <State label="마지막 해(다음 해 화살표 비활성) · 안내 Caption (회비 표 시작 달)">
             <div className="catalog__frame catalog__frame--sheet">
               <BottomSheet inline open title="회비 표를 언제부터 계산할까요?" onClose={noop}>
@@ -728,6 +781,16 @@ export function Catalog() {
             <div>
               <IconButton icon="left" onClick={noop}>
                 장부로
+              </IconButton>
+            </div>
+          </State>
+          <State label="흰 면 + 보조 글 note (장부 [회비 표], SPEC-010 #163) · 좁으면 보조 글이 아래 줄로">
+            <div className="catalog__stack">
+              <IconButton icon="users" variant="surface" note="지난달까지 덜 낸 분 2명" onClick={noop}>
+                회비 표
+              </IconButton>
+              <IconButton icon="users" variant="surface" onClick={noop}>
+                회비 표
               </IconButton>
             </div>
           </State>
@@ -897,6 +960,44 @@ export function Catalog() {
               nextDisabled={pickedMonth === 12}
               onPickMonth={() => setSheetOpen(true)}
             />
+          </State>
+        </Section>
+
+        <Section title="YearStepper (한 해씩 넘기기, SPEC-010 #163)">
+          <State label={`회비 표 제목(h1, 흰 화살표) · ${duesYear}년 (눌러 보기, 2025~2026)`}>
+            <YearStepper
+              heading
+              label={`${duesYear}년 회비`}
+              onPrevious={() => setDuesYear((value) => value - 1)}
+              onNext={() => setDuesYear((value) => value + 1)}
+              previousDisabled={duesYear <= 2025}
+              nextDisabled={duesYear >= 2026}
+            />
+          </State>
+        </Section>
+
+        <Section title="DuesStrip (회비 표 사람별 줄 12칸 띠, SPEC-010 4절 #163)">
+          <State label="1~9월 채움 · 10월 반 · 11월 안 냄 · 12월 쉬는 달, 기준 달 10월 테두리">
+            <div className="catalog__card">
+              <DuesStrip cells={DUES_CELLS} referenceMonth={10} />
+            </div>
+          </State>
+          <State label="회원 아님(1월) · 시작 달 전(2월) · 월 회비 모름(3월, 빗금) · 채움 · 안 냄 · 쉬는 달 · 반">
+            <div className="catalog__card">
+              <DuesStrip cells={DUES_CELLS_ALL} referenceMonth={11} />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="DuesCalendar (한 분 보기 12칸 달력, SPEC-010 5절 #163)">
+          <State label="채움 1/19 · 반 · 아직 · 쉼, 기준 달 10월 테두리">
+            <DuesCalendar cells={DUES_CELLS} year={2026} referenceMonth={10} onPick={noop} />
+          </State>
+          <State label="회원 아님·시작 달 전(누를 수 없음 -) · 월 회비 모름(빗금) · 눌림">
+            <DuesCalendar cells={DUES_CELLS_ALL} year={2026} referenceMonth={11} onPick={noop} />
+            <div data-preview-pressed="">
+              <DuesCalendar cells={DUES_CELLS.slice(8, 12)} year={2026} onPick={noop} />
+            </div>
           </State>
         </Section>
 

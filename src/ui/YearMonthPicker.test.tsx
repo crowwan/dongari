@@ -57,4 +57,27 @@ describe('YearMonthPicker (해·달 고르기, SPEC-010 6절)', () => {
     await user.click(screen.getByRole('button', { name: '이전 해' }))
     expect(screen.getByRole('button', { name: '11월' })).not.toHaveAttribute('aria-current')
   })
+
+  it('고를 수 있는 첫 달(min)이 있으면 그 해부터 보이고, 그 전 달은 누를 수 없다 (SPEC-010 5절 "언제까지 쉬나요?")', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(
+      <YearMonthPicker
+        value={null}
+        min={{ year: 2025, month: 11 }}
+        current={{ year: 2026, month: 11 }}
+        firstYear={2025}
+        lastYear={2027}
+        onChange={onChange}
+      />,
+    )
+
+    expect(screen.getByText('2025년')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '10월' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '이전 해' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: '11월' }))
+    expect(onChange).toHaveBeenCalledWith(2025, 11)
+    await user.click(screen.getByRole('button', { name: '다음 해' }))
+    expect(screen.getByRole('button', { name: '1월' })).toBeEnabled()
+  })
 })
