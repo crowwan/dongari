@@ -1,10 +1,19 @@
 // 장부 계산·변경 순수 함수 (SPEC-001). 화면·저장소와 무관하게 Ledger 만 다룬다
-import { isDuesEntry } from './dues'
+import { isDuesEntry, isEvenSplit, splitEvenly } from './dues'
 import { byDate, isDayInMonth } from './entryDate'
-import { ENTRY_AMOUNT_MAX, type Book, type BookKind, type Entry, type EntryType, type Ledger, type Payer } from './types'
+import { ENTRY_AMOUNT_MAX, type Book, type BookKind, type Entry, type EntryType, type Ledger, type Member, type Payer } from './types'
 
-// 사용자가 입력하는 기록 내용. id·createdAt 은 앱이 붙인다. 날짜(일)는 새로 적을 때 꼭 있고, 날짜 없는 예전 기록을 고칠 때만 빠진다
-export type EntryInput = Pick<Entry, 'month' | 'day' | 'type' | 'name' | 'amount' | 'batchId'>
+// 사용자가 입력하는 기록 내용. id·createdAt 은 앱이 붙인다. 날짜(일)는 새로 적을 때 꼭 있고, 날짜 없는 예전 기록을 고칠 때만 빠진다.
+// 낸 분(SPEC-010 3절)은 새로 적을 때만 이 칸으로 받는다. 고치기는 updateEntry 의 PayersEdit 로 받는다
+export type EntryInput = Pick<Entry, 'month' | 'day' | 'type' | 'name' | 'amount' | 'batchId' | 'payers'>
+
+// 고치기에서 낸 분을 어떻게 할지 (SPEC-010 3절 "고치기 화면", #159 리뷰의 세 상태)
+// - recalculate: 화면이 낸 분을 묻지 않았다(명단 없는 장부·개인 가계부). 지금 낸 분을 금액 규칙대로 남기거나 뺀다 (payersAfterEdit)
+// - set: 고치기 "누가 냈어요?"·"한 분씩 금액"에서 정한 낸 분 그대로
+// - clear: 낸 분을 모두 해제했거나, 회비가 아닌 항목으로 바꾸기로 확인했다 ("낸 분 기록이 지워져요" [바꾸기])
+export type PayersEdit = { kind: 'recalculate' } | { kind: 'set'; payers: readonly Payer[] } | { kind: 'clear' }
+
+const RECALCULATE: PayersEdit = { kind: 'recalculate' }
 
 // 장부를 시작하거나 고칠 때 입력하는 장부 이름(Book)과 그 해 이월금(Ledger)
 export interface BookInfo {
@@ -118,21 +127,48 @@ function normalizeEntryInput(year: number, input: EntryInput): EntryInput {
   return input.batchId === undefined ? dated : { ...dated, batchId: input.batchId }
 }
 
-// 새로 적는 내역은 날짜(일)가 꼭 있다 (AC-24). 날짜 없는 기록은 v2.2 전에 적은 예전 기록뿐이다
-export function addEntry(ledger: Ledger, input: EntryInput, deps: EntryDeps): Ledger {
+// 낸 분 검사 (SPEC-010 1절, 저장 형식 검사와 같은 규칙): 회비 기록에만, 같은 회원 두 번 없고, 몫은 1원 이상 정수,
+// 합 = 기록 금액, 그 장부 명단(members)에 있는 회원만. 빈 목록은 낸 분 없음. 어긋나면 저장 형식 검사가 장부 전체를 깨진 것으로 보니 막는다
+function checkPayers(payers: readonly Payer[], content: EntryInput, members: readonly Member[]): Payer[] | undefined {
+  if (payers.length === 0) return undefined
+  if (!isDuesEntry(content)) throw new InvalidLedgerInputError('회비 기록이 아닌 기록에는 낸 분을 넣지 않는다')
+  const memberIds = new Set(members.map((member) => member.id))
+  const seen = new Set<string>()
+  for (const { memberId, amount } of payers) {
+    if (!memberIds.has(memberId)) throw new InvalidLedgerInputError(`명단에 없는 회원이다: ${memberId}`)
+    if (seen.has(memberId)) throw new InvalidLedgerInputError(`같은 회원이 두 번 있다: ${memberId}`)
+    if (!Number.isInteger(amount) || amount < 1) throw new InvalidLedgerInputError(`낸 분 몫은 1원 이상 정수여야 한다: ${amount}`)
+    seen.add(memberId)
+  }
+  const total = payers.reduce((sum, payer) => sum + payer.amount, 0)
+  if (total !== content.amount) throw new InvalidLedgerInputError(`낸 분 몫의 합(${total})이 기록 금액(${content.amount})과 다르다`)
+  return payers.map(({ memberId, amount }) => ({ memberId, amount }))
+}
+
+// 새로 적는 내역은 날짜(일)가 꼭 있다 (AC-24). 날짜 없는 기록은 v2.2 전에 적은 예전 기록뿐이다.
+// 낸 분은 그 장부 명단(members)으로 검사한다 (SPEC-010 3절)
+export function addEntry(ledger: Ledger, input: EntryInput, deps: EntryDeps, members: readonly Member[] = []): Ledger {
   if (input.day === undefined) throw new InvalidLedgerInputError('새로 적는 내역에 날짜(일)가 없다')
-  const entry: Entry = { id: deps.createId(), ...normalizeEntryInput(ledger.year, input), createdAt: deps.now().toISOString() }
+  const content = normalizeEntryInput(ledger.year, input)
+  const payers = checkPayers(input.payers ?? [], content, members)
+  const entry: Entry = { id: deps.createId(), ...content, ...(payers && { payers }), createdAt: deps.now().toISOString() }
   return { ...ledger, entries: [...ledger.entries, entry] }
 }
 
 // id·입력 시각·순서는 그대로 두고 내용만 바꾼다. 입력에 없는 칸은 keptOnEdit 대로 남긴다.
-// 날짜는 입력 그대로: 날짜 없는 예전 기록은 날짜 없이도 저장된다 (AC-25)
-export function updateEntry(ledger: Ledger, id: string, input: EntryInput): Ledger {
+// 날짜는 입력 그대로: 날짜 없는 예전 기록은 날짜 없이도 저장된다 (AC-25). 낸 분은 payers(세 상태)대로, set 은 명단(members)으로 검사한다
+export function updateEntry(
+  ledger: Ledger,
+  id: string,
+  input: Omit<EntryInput, 'payers'>,
+  payers: PayersEdit = RECALCULATE,
+  members: readonly Member[] = [],
+): Ledger {
   const content = normalizeEntryInput(ledger.year, input)
   return {
     ...ledger,
     entries: ledger.entries.map((entry) =>
-      entry.id === id ? { id, ...content, ...keptOnEdit(entry, content), createdAt: entry.createdAt } : entry,
+      entry.id === id ? { id, ...content, ...keptOnEdit(entry, content, payers, members), createdAt: entry.createdAt } : entry,
     ),
   }
 }
@@ -140,14 +176,30 @@ export function updateEntry(ledger: Ledger, id: string, input: EntryInput): Ledg
 // 고쳐도 남기는 칸 (고치기 화면이 입력으로 넘기지 않는 것). 없는 값은 키째 뺀다
 // - 사진으로 함께 넣은 묶음: 입력에 묶음이 없으면 원래 묶음 그대로
 // - 엑셀에 적혀 있던 글: 늘 그대로 (SPEC-010 8절, 엑셀 원래 글)
-// - 낸 분: payersAfterEdit 규칙대로 (SPEC-010 3절 "고치기 화면")
-function keptOnEdit(before: Entry, content: EntryInput): Pick<Entry, 'batchId' | 'sourceText' | 'payers'> {
+// - 낸 분: PayersEdit 대로 (SPEC-010 3절 "고치기 화면")
+function keptOnEdit(
+  before: Entry,
+  content: EntryInput,
+  edit: PayersEdit,
+  members: readonly Member[],
+): Pick<Entry, 'batchId' | 'sourceText' | 'payers'> {
   const kept: Pick<Entry, 'batchId' | 'sourceText' | 'payers'> = {}
   if (content.batchId === undefined && before.batchId !== undefined) kept.batchId = before.batchId
   if (before.sourceText !== undefined) kept.sourceText = before.sourceText
-  const payers = payersAfterEdit(before, content)
+  const payers = payersOnEdit(before, content, edit, members)
   if (payers !== undefined) kept.payers = payers
   return kept
+}
+
+function payersOnEdit(before: Entry, content: EntryInput, edit: PayersEdit, members: readonly Member[]): Payer[] | undefined {
+  switch (edit.kind) {
+    case 'recalculate':
+      return payersAfterEdit(before, content)
+    case 'set':
+      return checkPayers(edit.payers, content, members)
+    case 'clear':
+      return undefined
+  }
 }
 
 // 고친 기록의 낸 분 (SPEC-010 3절 "고치기 화면"). 저장 형식 검사(낸 분 금액 합 = 기록 금액)와 어긋나게 남기지 않는다
@@ -159,9 +211,11 @@ function payersAfterEdit(before: Entry, content: EntryInput): Payer[] | undefine
   const { payers } = before
   if (payers === undefined || !isDuesEntry(content)) return undefined
   if (content.amount === before.amount) return payers
-  const share = content.amount / payers.length
-  const evenlySplit = new Set(payers.map((payer) => payer.amount)).size === 1
-  return evenlySplit && Number.isInteger(share) ? payers.map((payer) => ({ ...payer, amount: share })) : undefined
+  if (!isEvenSplit(payers)) return undefined
+  return splitEvenly(
+    payers.map((payer) => payer.memberId),
+    content.amount,
+  )
 }
 
 export function deleteEntry(ledger: Ledger, id: string): Ledger {

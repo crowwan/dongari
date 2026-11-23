@@ -15,6 +15,7 @@ import {
   updateCarryover,
   updateEntry,
   type EntryInput,
+  type PayersEdit,
 } from './ledger'
 import { isStoredData } from '../storage/schema'
 import { duesBook, storedWith } from '../test/ledgerFixtures'
@@ -588,5 +589,98 @@ describe('SPEC-010 고치기에서 낸 분·엑셀 글 (3절 "고치기 화면")
     const data: StoredData = { ...storedWith(), books: [{ ...book, ledgers: { '2026': after } }] }
 
     expect(isStoredData(data)).toBe(true)
+  })
+})
+
+describe('SPEC-010 낸 분을 넣어 적고 고치기 (3절)', () => {
+  const MEMBERS = [
+    { id: 'm1', name: '김도윤', joined: '2026-01', off: [] },
+    { id: 'm2', name: '강민지', joined: '2026-01', off: [] },
+  ]
+  const duesInput: EntryInput = { month: 3, day: 5, type: 'income', name: '회비', amount: 40_000 }
+  const twoPaid = [
+    { memberId: 'm1', amount: 20_000 },
+    { memberId: 'm2', amount: 20_000 },
+  ]
+
+  it('AC-11 새 회비 기록에 낸 분을 넣어 저장한다', () => {
+    const [saved] = addEntry(ledger(), { ...duesInput, payers: twoPaid }, fixedDeps(), MEMBERS).entries
+
+    expect(saved?.payers).toEqual(twoPaid)
+  })
+
+  it('AC-13 낸 분 없이(이름 없이 적기) 적으면 낸 분 칸이 생기지 않는다 — 빈 목록도 같다', () => {
+    const [plain] = addEntry(ledger(), duesInput, fixedDeps(), MEMBERS).entries
+    const [empty] = addEntry(ledger(), { ...duesInput, payers: [] }, fixedDeps(), MEMBERS).entries
+
+    expect(plain).not.toHaveProperty('payers')
+    expect(empty).not.toHaveProperty('payers')
+  })
+
+  it.each([
+    ['회비 기록이 아님 (지출)', { ...duesInput, type: 'expense' as const, payers: twoPaid }],
+    ['몫의 합이 기록 금액과 다름', { ...duesInput, amount: 50_000, payers: twoPaid }],
+    ['같은 회원이 두 번', { ...duesInput, payers: [{ memberId: 'm1', amount: 20_000 }, { memberId: 'm1', amount: 20_000 }] }],
+    ['명단에 없는 회원', { ...duesInput, payers: [{ memberId: 'm1', amount: 20_000 }, { memberId: 'nobody', amount: 20_000 }] }],
+    ['몫이 0원', { ...duesInput, payers: [{ memberId: 'm1', amount: 40_000 }, { memberId: 'm2', amount: 0 }] }],
+  ])('저장 형식 검사와 어긋나는 낸 분은 넣지 않는다: %s', (_label, input) => {
+    expect(() => addEntry(ledger(), input, fixedDeps(), MEMBERS)).toThrow(InvalidLedgerInputError)
+  })
+
+  describe('고치기 세 상태 (다시 계산 / 이 값 / 지우기)', () => {
+    const paid = entry({ id: 'a', ...duesInput, payers: twoPaid })
+
+    function edited(input: Partial<EntryInput>, edit?: PayersEdit): Entry {
+      const [result] = updateEntry(ledger({ entries: [paid] }), 'a', { ...duesInput, ...input }, edit, MEMBERS).entries
+      if (!result) throw new Error('고친 기록이 없다')
+      return result
+    }
+
+    it('다시 계산(기본): 화면이 묻지 않았으면 금액 규칙대로 남기거나 다시 나눈다', () => {
+      expect(edited({ amount: 60_000 }).payers).toEqual([
+        { memberId: 'm1', amount: 30_000 },
+        { memberId: 'm2', amount: 30_000 },
+      ])
+      expect(edited({ amount: 60_000 }, { kind: 'recalculate' })).toEqual(edited({ amount: 60_000 }))
+    })
+
+    it('AC-15 이 값: 고치기에서 정한 낸 분으로 바꾼다 (한 분씩 금액)', () => {
+      const shares = [
+        { memberId: 'm1', amount: 20_000 },
+        { memberId: 'm2', amount: 120_000 },
+      ]
+
+      expect(edited({ amount: 140_000 }, { kind: 'set', payers: shares }).payers).toEqual(shares)
+    })
+
+    it('AC-15 이 값: 낸 분이 없던 회비 기록에 낸 분을 붙인다', () => {
+      const [result] = updateEntry(
+        ledger({ entries: [entry({ id: 'b', ...duesInput })] }),
+        'b',
+        duesInput,
+        { kind: 'set', payers: twoPaid },
+        MEMBERS,
+      ).entries
+
+      expect(result?.payers).toEqual(twoPaid)
+    })
+
+    it('AC-15 지우기: 낸 분을 모두 해제하면 낸 분 없는 회비 기록이 되고 엑셀 글은 남는다', () => {
+      const result = updateEntry(
+        ledger({ entries: [{ ...paid, sourceText: '김도윤,강민지' }] }),
+        'a',
+        duesInput,
+        { kind: 'clear' },
+        MEMBERS,
+      ).entries[0]
+
+      expect(result).not.toHaveProperty('payers')
+      expect(result?.sourceText).toBe('김도윤,강민지')
+    })
+
+    it('이 값이 저장 형식 검사와 어긋나면(합이 금액과 다름·회비 아님) 고치지 않는다', () => {
+      expect(() => edited({ amount: 50_000 }, { kind: 'set', payers: twoPaid })).toThrow(InvalidLedgerInputError)
+      expect(() => edited({ name: '찬조금' }, { kind: 'set', payers: twoPaid })).toThrow(InvalidLedgerInputError)
+    })
   })
 })

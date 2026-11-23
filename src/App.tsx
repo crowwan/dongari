@@ -24,6 +24,7 @@ import { shareRecoveryCode, type ShareCodeResult } from './features/keep/shareCo
 import type { Keep } from './features/keep/startKeep'
 import { AddEntryForm } from './features/ledger/AddEntryForm'
 import { EditEntryForm } from './features/ledger/EditEntryForm'
+import { entryDues } from './features/ledger/entryDues'
 import { LedgerScreen } from './features/ledger/LedgerScreen'
 import type { StepState } from './features/ledger/entrySteps'
 import { StartLedgerScreen } from './features/ledger/StartLedgerScreen'
@@ -110,7 +111,7 @@ function duesSettings(state: LedgerState, today: Date, notify: (message: string)
     monthlyFee: state.monthlyFee,
     hasRecords: (id) => memberHasRecords(book, id),
     thisMonth: thisMonthOf(today),
-    onAddMember: (member) => notifyIfSaved(state.addMember(member), '회원을 넣었어요'),
+    onAddMember: (member) => notifyIfSaved(state.addMember(member).saved, '회원을 넣었어요'),
     onUpdateMember: (id, changes) => notifyIfSaved(state.updateMember(id, changes), '바꿨어요'),
     onDeleteMember: (id) => notifyIfSaved(state.deleteMember(id), '지웠어요'),
     onChangeStartMonth: (month) => notifyIfSaved(state.changeDuesStart(month), '바꿨어요'),
@@ -578,11 +579,12 @@ export default function App({
             onBack={navigation.requestBack}
             onDirtyChange={navigation.confirmBeforeLeave}
             onStepChange={practice && reportEntryStep}
+            dues={entryDues(ledger, setToast)}
           />
         )
       case 'edit-entry': {
         if (!editingEntry) return null
-        const { id, month: entryMonth, day, type, name, amount } = editingEntry
+        const { id, month: entryMonth, day, type, name, amount, payers } = editingEntry
         return (
           <EditEntryForm
             // 다른 기록을 고치러 오면 처음 값부터 다시
@@ -593,10 +595,12 @@ export default function App({
             frequentChoices={ledger.frequentChoices}
             olderChoices={ledger.olderChoices}
             sheets={navigation}
-            onSave={(input) => returnToLedger(ledger.updateEntry(id, input), '고쳤어요', input.month)}
+            onSave={(input, payerEdit) => returnToLedger(ledger.updateEntry(id, input, payerEdit), '고쳤어요', input.month)}
             onBack={navigation.requestBack}
             onDirtyChange={navigation.confirmBeforeLeave}
             onDelete={() => returnToLedger(ledger.deleteEntry(id), '지웠어요', entryMonth)}
+            initialPayers={payers}
+            dues={entryDues(ledger, setToast)}
           />
         )
       }

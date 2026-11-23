@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { frequentChoices, olderChoices, type EntryInput } from '../../domain/ledger'
+import { frequentChoices, olderChoices, type EntryInput, type PayersEdit } from '../../domain/ledger'
 import type { Entry } from '../../domain/types'
 import { useScreenHistory } from '../useScreenHistory'
 import { EditEntryForm } from './EditEntryForm'
@@ -14,6 +14,9 @@ const HISTORY: Entry[] = [
   { id: '3', month: 9, type: 'income', name: '찬조금', amount: 50_000, createdAt: '2026-09-03T00:00:00.000Z' },
 ]
 
+// 명단이 없는 장부라 낸 분은 묻지 않고 금액 규칙대로 (SPEC-010 3절)
+const RECALCULATE: PayersEdit = { kind: 'recalculate' }
+
 // 4월 7일에 적은 회비
 const SAVED: EntryDraft = { month: 4, day: 7, type: 'income', name: '회비', amount: 140_000 }
 // 날짜(일) 칸이 생기기 전에 적은 예전 기록
@@ -21,7 +24,7 @@ const OLD_SAVED: EntryDraft = { ...SAVED, day: undefined }
 
 function makeHandlers() {
   return {
-    onSave: vi.fn<(input: EntryInput) => void>(),
+    onSave: vi.fn<(input: EntryInput, payers: PayersEdit) => void>(),
     onBack: vi.fn<() => void>(),
     onDirtyChange: vi.fn<(dirty: boolean) => void>(),
     onDelete: vi.fn<() => void>(),
@@ -120,7 +123,7 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       await userEvent.click(saveButton())
 
       expect(screen.queryByRole('group', { name: '빠른 날짜' })).not.toBeInTheDocument()
-      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 12, type: 'income', name: '회비', amount: 140_000 })
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 12, type: 'income', name: '회비', amount: 140_000 }, RECALCULATE)
     })
 
     it('[4월 ▾] 로 달을 바꾸면 그 달로, 그 날이 그 달에 있으면 칸은 그대로다', async () => {
@@ -131,7 +134,7 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       expect(dayField()).toHaveValue('7')
       await userEvent.click(saveButton())
 
-      expect(onSave).toHaveBeenCalledWith({ month: 10, day: 7, type: 'income', name: '회비', amount: 140_000 })
+      expect(onSave).toHaveBeenCalledWith({ month: 10, day: 7, type: 'income', name: '회비', amount: 140_000 }, RECALCULATE)
     })
 
     it('달 선택 창은 지금 달에 체크, 올해 장부의 이번 달에 테두리', async () => {
@@ -184,7 +187,7 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       await userEvent.click(screen.getByRole('button', { name: '1만 원 더하기' }))
       await userEvent.click(saveButton())
 
-      expect(onSave).toHaveBeenCalledWith({ month: 4, type: 'income', name: '회비', amount: 150_000 })
+      expect(onSave).toHaveBeenCalledWith({ month: 4, type: 'income', name: '회비', amount: 150_000 }, RECALCULATE)
     })
 
     it('날짜 없는 예전 내역도 날을 적어 날짜를 붙일 수 있다 (없는 날이면 안내)', async () => {
@@ -195,7 +198,7 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       await typeDay('20')
       await userEvent.click(saveButton())
 
-      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 20, type: 'income', name: '회비', amount: 140_000 })
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 20, type: 'income', name: '회비', amount: 140_000 }, RECALCULATE)
     })
 
     it('숫자만 두 자리까지 쳐진다', async () => {
@@ -244,7 +247,7 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       expect(within(itemList()).getByRole('button', { name: '회비 수입' })).toHaveAttribute('aria-pressed', 'false')
       await userEvent.click(saveButton())
 
-      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 7, type: 'expense', name: '꽃값', amount: 140_000 })
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 7, type: 'expense', name: '꽃값', amount: 140_000 }, RECALCULATE)
     })
   })
 
@@ -280,7 +283,7 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       await userEvent.click(within(typeGroup()).getByRole('button', { name: '지출' }))
       await userEvent.click(saveButton())
 
-      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 7, type: 'expense', name: '회비 환불', amount: 140_000 })
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 7, type: 'expense', name: '회비 환불', amount: 140_000 }, RECALCULATE)
     })
 
     it('목록 줄을 누르면 칸이 닫히고 적던 글자는 지워진다', async () => {
@@ -308,7 +311,7 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
       expect(screen.queryByRole('textbox', { name: '무엇인지 적어 주세요' })).not.toBeInTheDocument()
       expect(within(itemList()).getByRole('button', { name: '회비 수입' })).toHaveAttribute('aria-pressed', 'true')
       await userEvent.click(saveButton())
-      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 7, type: 'income', name: '회비', amount: 140_000 })
+      expect(onSave).toHaveBeenCalledWith({ month: 4, day: 7, type: 'income', name: '회비', amount: 140_000 }, RECALCULATE)
     })
   })
 
@@ -331,7 +334,7 @@ describe('SPEC-001 내역 고치기 (펼친 모양)', () => {
     await userEvent.click(screen.getByRole('button', { name: '1만 원 더하기' }))
     await userEvent.click(saveButton())
 
-    expect(onSave).toHaveBeenCalledWith({ month: 5, day: 31, type: 'expense', name: '꽃값', amount: 150_000 })
+    expect(onSave).toHaveBeenCalledWith({ month: 5, day: 31, type: 'expense', name: '꽃값', amount: 150_000 }, RECALCULATE)
   })
 
   describe('적던 내용 (닫기 전 확인)', () => {

@@ -425,3 +425,39 @@ describe('SPEC-005 장부 화면의 장부 바꾸기', () => {
     expect(screen.getByTestId('balance-card-note')).toHaveTextContent('작년에서 넘어온 돈 500,000원 포함')
   })
 })
+
+describe('SPEC-010 장부 줄의 낸 분 수 (3절)', () => {
+  it('AC-13 낸 분이 있는 회비 기록의 보조 줄은 "17일 · 수입 · 4명", 낸 분 없는 회비는 지금과 같다', () => {
+    const payers = ['m1', 'm2', 'm3', 'm4'].map((memberId) => ({ memberId, amount: 20_000 }))
+    renderScreen(
+      {
+        year: 2026,
+        carryover: 0,
+        entries: [
+          { id: 'a', month: 10, day: 17, type: 'income', name: '회비', amount: 80_000, createdAt: '2026-10-17T00:00:00.000Z', payers },
+          { id: 'b', month: 10, day: 18, type: 'income', name: '회비', amount: 30_000, createdAt: '2026-10-18T00:00:00.000Z' },
+        ],
+      },
+      10,
+    )
+
+    expect(screen.getByRole('button', { name: '회비 17일 · 수입 · 4명 +80,000원' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '회비 18일 · 수입 +30,000원' })).toBeInTheDocument()
+  })
+
+  it('개인 가계부로 바꾼 장부는 명단·회비 값을 숨기므로 낸 분 수를 붙이지 않는다 (6절)', () => {
+    const payers = ['m1', 'm2'].map((memberId) => ({ memberId, amount: 20_000 }))
+    renderScreen(
+      {
+        year: 2026,
+        carryover: 0,
+        entries: [{ id: 'a', month: 10, day: 17, type: 'income', name: '회비', amount: 40_000, createdAt: '2026-10-17T00:00:00.000Z', payers }],
+      },
+      10,
+      {},
+      { books: [{ id: 'club', name: '한랑드림', kind: 'household', balance: 0 }] },
+    )
+
+    expect(screen.getByRole('button', { name: '회비 17일 · 수입 +40,000원' })).toBeInTheDocument()
+  })
+})
