@@ -39,6 +39,15 @@ describe('TextField', () => {
     expect(screen.getByTestId('text-field')).toHaveAttribute('data-state', 'error')
   })
 
+  it('안내(note)는 오류가 아니라 칸 아래 보조 글자로 보이고 칸 설명으로 읽힌다 (같은 이름 안내, SPEC-010)', () => {
+    render(<TextField label="이름" value="김도윤" onChange={() => {}} note="같은 이름이 있어요. 구분할 수 있게 적어 주세요" />)
+
+    const field = screen.getByLabelText('이름')
+    expect(field).toHaveAccessibleDescription('같은 이름이 있어요. 구분할 수 있게 적어 주세요')
+    expect(field).not.toHaveAttribute('aria-invalid')
+    expect(screen.getByTestId('text-field')).toHaveAttribute('data-state', 'default')
+  })
+
   it('이름은 기본으로 질문 제목 급(heading)으로 보인다', () => {
     render(<TextField label="동아리 이름" value="" onChange={() => {}} />)
 

@@ -4,6 +4,7 @@ import {
   duesTable,
   duesYears,
   monthlyFeeOf,
+  monthlyFeeSource,
   unassignedDues,
   type DatedEntry,
   type DuesCellState,
@@ -544,6 +545,14 @@ describe('SPEC-010 회비 표 계산 (2절)', () => {
       expect(monthlyFeeOf(club, 2025)).toBe(10_000)
       expect(monthlyFeeOf(club, 2026)).toBe(20_000)
       expect(monthlyFeeOf(club, 2028)).toBe(20_000)
+    })
+
+    it('그 해에 쓰는 월 회비와 그 값을 정한 해를 함께 알려 준다 (설정 월 회비 "2024년 금액을 이어 쓰고 있어요", #161)', () => {
+      const club = clubBook({ members: [], fees: { 2024: 10_000, 2026: 20_000 } })
+
+      expect(monthlyFeeSource(club, 2023)).toBeUndefined()
+      expect(monthlyFeeSource(club, 2025)).toEqual({ amount: 10_000, year: 2024 })
+      expect(monthlyFeeSource(club, 2026)).toEqual({ amount: 20_000, year: 2026 })
     })
 
     it('낸 분 없는 회비 기록은 칸을 채우지 않는다', () => {
