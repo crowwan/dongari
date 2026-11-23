@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
-import type { Settings, StoredData } from './domain/types'
+import { CURRENT_SCHEMA_VERSION, type Settings, type StoredData } from './domain/types'
 import { AutoKeeper, type KeepState } from './features/keep/AutoKeeper'
 import { keepIdOf, sealKeep, type KeepEnvelope } from './features/keep/keepCrypto'
 import type { KeepServer } from './features/keep/keepServer'
@@ -28,7 +28,7 @@ function phoneData(settings: Settings = {}): StoredData {
 
 // 다른 폰이 보관해 둔 기록 (장부 둘)
 const KEPT: StoredData = {
-  schemaVersion: 3,
+  schemaVersion: CURRENT_SCHEMA_VERSION,
   books: [
     book([ledger([[3, 'income', '회비', 140_000]], { year: 2026 })], { id: 'club', name: '꽃동산' }),
     book([ledger([[1, 'expense', '장보기', 30_000]], { year: 2026 })], { id: 'home', name: '우리집 가계부', kind: 'household' }),

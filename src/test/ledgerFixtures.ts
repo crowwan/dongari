@@ -37,6 +37,42 @@ export function storedWith(...ledgers: Ledger[]): StoredData {
   return { schemaVersion: CURRENT_SCHEMA_VERSION, books: [book(ledgers)], settings: {} }
 }
 
+// 저장 형식 v4 칸이 모두 든 동아리 장부 (SPEC-010 1절): 회원 둘(한 분은 그만둔 달·쉬는 달·시작할 때 덜 낸 돈까지),
+// 회비 표 시작 달, 2026년 월 회비, 두 분이 낸 회비 기록 하나와 엑셀에서 불러와 낸 분을 못 나눈 회비 기록 하나
+export function duesBook(overrides: Partial<Omit<Book, 'ledgers'>> = {}): Book {
+  const paid: Entry = {
+    id: 'dues-1',
+    month: 3,
+    day: 5,
+    type: 'income',
+    name: '회비',
+    amount: 40_000,
+    createdAt: '2026-03-05T00:00:00.000Z',
+    payers: [
+      { memberId: 'm1', amount: 20_000 },
+      { memberId: 'm2', amount: 20_000 },
+    ],
+  }
+  const imported: Entry = {
+    id: 'dues-2',
+    month: 4,
+    day: 1,
+    type: 'income',
+    name: '회비',
+    amount: 30_000,
+    createdAt: '2026-04-01T00:00:00.000Z',
+    sourceText: '4월 -2명: 김도윤(1만원),이서준',
+  }
+  return book([{ year: 2026, carryover: 0, monthlyFee: 20_000, entries: [paid, imported] }], {
+    members: [
+      { id: 'm1', name: '김도윤', joined: '2026-01', off: [] },
+      { id: 'm2', name: '강민지', joined: '2025-07', left: '2026-12', off: ['2026-02'], opening: -30_000 },
+    ],
+    dues: { startMonth: '2026-01' },
+    ...overrides,
+  })
+}
+
 // 저장소에 저장된 첫 장부의 그 해 장부
 export function savedLedger(repository: LedgerRepository, year: number): Ledger | undefined {
   return repository.load().data.books[0]?.ledgers[String(year)]

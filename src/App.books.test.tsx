@@ -51,7 +51,7 @@ describe('SPEC-005 여러 장부 저장 형식 (화면)', () => {
     localStorage.clear()
   })
 
-  it('AC-1 지금(v2) 기록으로 새 버전을 열면 같은 이름·잔액·결산의 장부 하나로 보이고, 바꾸면 v3 로 저장되며 옛 기록은 보관된다', async () => {
+  it('AC-1 지금(v2) 기록으로 새 버전을 열면 같은 이름·잔액·결산의 장부 하나로 보이고, 바꾸면 지금 형식(v4, SPEC-010)으로 저장되며 옛 기록은 보관된다', async () => {
     const v2Raw = JSON.stringify({ schemaVersion: 2, ledgers: { '2026': { ...EXAMPLE_2026, clubName: '한랑드림' } }, settings: {} })
     localStorage.setItem(STORAGE_KEY, v2Raw)
 
@@ -73,7 +73,7 @@ describe('SPEC-005 여러 장부 저장 형식 (화면)', () => {
     await userEvent.click(screen.getByRole('button', { name: '적자였어요' }))
     await userEvent.click(screen.getByRole('button', { name: '저장' }))
 
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '')).toMatchObject({ schemaVersion: 3, books: [{ name: '한랑드림', kind: 'club' }] })
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '')).toMatchObject({ schemaVersion: 4, books: [{ name: '한랑드림', kind: 'club' }] })
     expect(localStorage.getItem(`${OLD_VERSION_KEY_PREFIX}2`)).toBe(v2Raw)
   })
 

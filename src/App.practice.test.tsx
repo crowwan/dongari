@@ -1,7 +1,7 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BookKind, StoredData } from './domain/types'
+import { CURRENT_SCHEMA_VERSION, type BookKind, type StoredData } from './domain/types'
 import { ACTIVE_GUIDE } from './features/guide/guideRules'
 import { GUIDE_KEY, localGuideStore } from './features/guide/guideStore'
 import { AutoKeeper } from './features/keep/AutoKeeper'
@@ -75,7 +75,7 @@ function openWith(data: StoredData | undefined, saver: PictureSaver = fakeSaver(
 function realPhone(kind: BookKind = 'club', count = 2): StoredData {
   const specs: EntrySpec[] = Array.from({ length: count }, (_, index) => [10, 'expense', `지출${index + 1}`, 10_000])
   return {
-    schemaVersion: 3,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     books: [book([ledger(specs, { year: 2026 })], { kind })],
     settings: { lastBackupAt: TODAY.toISOString(), recoveryCode: PHONE_CODE },
   }

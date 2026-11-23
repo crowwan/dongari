@@ -3,7 +3,7 @@ import type { StoredData } from '../domain/types'
 import { BROKEN_KEY_PREFIX, LocalStorageRepository, OLD_VERSION_KEY_PREFIX, STORAGE_KEY } from './LocalStorageRepository'
 import { FIRST_BOOK_ID } from './migrate'
 
-const EMPTY: StoredData = { schemaVersion: 3, books: [], settings: {} }
+const EMPTY: StoredData = { schemaVersion: 4, books: [], settings: {} }
 
 const LEDGER_2026 = {
   year: 2026,
@@ -13,7 +13,7 @@ const LEDGER_2026 = {
 
 function sampleData(): StoredData {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     books: [{ id: 'book-1', name: '꽃동산 동아리', kind: 'club', ledgers: { '2026': structuredClone(LEDGER_2026) }, createdAt: '2026-01-01T00:00:00.000Z' }],
     settings: { lastChangedAt: '2026-03-02T10:00:00.000Z', lastBookId: 'book-1' },
   }
@@ -53,13 +53,13 @@ describe('SPEC-002 저장 (localStorage)', () => {
     expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data })
   })
 
-  it('AC-2 키 이름은 그대로 dongari:v2 하나에 schemaVersion 3 으로 저장한다 (설치한 앱·기록 유지)', () => {
+  it('AC-2 키 이름은 그대로 dongari:v2 하나에 schemaVersion 4 로 저장한다 (설치한 앱·기록 유지, SPEC-010)', () => {
     new LocalStorageRepository().save(sampleData())
 
     const raw = localStorage.getItem(STORAGE_KEY)
     expect(STORAGE_KEY).toBe('dongari:v2')
     expect(raw).not.toBeNull()
-    expect(JSON.parse(raw ?? '')).toMatchObject({ schemaVersion: 3 })
+    expect(JSON.parse(raw ?? '')).toMatchObject({ schemaVersion: 4 })
   })
 
   it('저장된 데이터가 없으면 빈 초기값으로 정상(ok) 시작한다', () => {
@@ -91,7 +91,7 @@ describe('SPEC-002 저장 (localStorage)', () => {
       expect(result).toEqual({
         status: 'ok',
         data: {
-          schemaVersion: 3,
+          schemaVersion: 4,
           books: [{ id: FIRST_BOOK_ID, name: '꽃동산 동아리', kind: 'club', ledgers: { '2026': LEDGER_2026 }, createdAt: expect.any(String) }],
           settings: { lastChangedAt: '2026-03-02T10:00:00.000Z', lastBookId: FIRST_BOOK_ID },
         },
@@ -100,7 +100,7 @@ describe('SPEC-002 저장 (localStorage)', () => {
       expect(oldVersionKeys()).toEqual(['dongari:v2:schema-2'])
     })
 
-    it('옮긴 데이터를 저장하면 v3 로 바뀌고, 보관한 v2 원본은 그대로 남는다', () => {
+    it('옮긴 데이터를 저장하면 v4 로 바뀌고, 보관한 v2 원본은 그대로 남는다', () => {
       const raw = v2Raw()
       localStorage.setItem(STORAGE_KEY, raw)
       const repository = new LocalStorageRepository()
@@ -151,11 +151,72 @@ describe('SPEC-002 저장 (localStorage)', () => {
     })
   })
 
+  describe('SPEC-010 저장 형식 v3 → v4 옮기기', () => {
+    // v2.7 앱이 저장한 형식 (장부 여러 개, 번호 3)
+    function v3Raw(): string {
+      return JSON.stringify({ ...sampleData(), schemaVersion: 3 })
+    }
+
+    function oldVersionKeys(): string[] {
+      return Object.keys(localStorage).filter((key) => key.startsWith(OLD_VERSION_KEY_PREFIX))
+    }
+
+    it('AC-1 v3 데이터를 열면 v4 로 옮겨 장부·기록·이월금이 그대로이고, 옮기기 전 원본이 dongari:v2:schema-3 에 남는다', () => {
+      const raw = v3Raw()
+      localStorage.setItem(STORAGE_KEY, raw)
+
+      const result = new LocalStorageRepository().load()
+
+      expect(result).toEqual({ status: 'ok', data: sampleData() })
+      expect(result.data.schemaVersion).toBe(4)
+      expect(localStorage.getItem('dongari:v2:schema-3')).toBe(raw)
+      expect(oldVersionKeys()).toEqual(['dongari:v2:schema-3'])
+    })
+
+    it('AC-1 옮긴 데이터를 저장하면 v4 로 바뀌고, 보관한 v3 원본은 그대로 남는다', () => {
+      const raw = v3Raw()
+      localStorage.setItem(STORAGE_KEY, raw)
+      const repository = new LocalStorageRepository()
+
+      expect(repository.save(repository.load().data)).toEqual({ ok: true })
+
+      expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '')).toMatchObject({ schemaVersion: 4 })
+      expect(localStorage.getItem('dongari:v2:schema-3')).toBe(raw)
+    })
+
+    it('v2 → v3 때 보관한 v2 원본이 있어도 지우지 않고 v3 원본을 따로 남긴다', () => {
+      const v2 = v2Raw()
+      localStorage.setItem(`${OLD_VERSION_KEY_PREFIX}2`, v2)
+      localStorage.setItem(STORAGE_KEY, v3Raw())
+
+      new LocalStorageRepository().load()
+
+      expect(oldVersionKeys().sort()).toEqual(['dongari:v2:schema-2', 'dongari:v2:schema-3'])
+      expect(localStorage.getItem(`${OLD_VERSION_KEY_PREFIX}2`)).toBe(v2)
+    })
+
+    it('v3 원본을 보관하지 못하면 옮긴 기록은 보여 주되 읽기 전용으로 저장을 막는다', () => {
+      const raw = v3Raw()
+      localStorage.setItem(STORAGE_KEY, raw)
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+        throw quotaError()
+      })
+      const repository = new LocalStorageRepository()
+
+      const result = repository.load()
+
+      expect(result).toEqual({ status: 'read-only', reason: 'old-version-unpreserved', data: sampleData() })
+      expect(repository.save(result.data)).toEqual({ ok: false, reason: 'old-version-unpreserved' })
+      expect(localStorage.getItem(STORAGE_KEY)).toBe(raw)
+    })
+  })
+
   describe('깨진 데이터', () => {
     it.each([
       ['JSON 이 깨짐', '{"schemaVersion": 2,'],
-      ['형식이 다름', JSON.stringify({ schemaVersion: 3, books: {} })],
+      ['형식이 다름', JSON.stringify({ schemaVersion: 4, books: {} })],
       ['옮기기 전(v2) 형식이 다름', JSON.stringify({ schemaVersion: 2, ledgers: [] })],
+      ['SPEC-010 옮기기 전(v3) 형식이 다름', JSON.stringify({ schemaVersion: 3, books: {}, settings: {} })],
       [
         '그 달에 없는 날짜 (2026년 2월 29일)',
         JSON.stringify({
@@ -230,7 +291,7 @@ describe('SPEC-002 저장 (localStorage)', () => {
 
   describe('상위 버전 데이터', () => {
     it('빈 초기값의 읽기 전용으로 알리고 저장을 막아 상위 버전 원본을 덮어쓰지 않는다', () => {
-      const newer = JSON.stringify({ schemaVersion: 4, books: [], settings: {} })
+      const newer = JSON.stringify({ schemaVersion: 5, books: [], settings: {} })
       localStorage.setItem(STORAGE_KEY, newer)
 
       const repository = new LocalStorageRepository()
@@ -277,7 +338,7 @@ describe('SPEC-002 저장 (localStorage)', () => {
     })
 
     it('상위 버전 원본이 있으면 불러오기도 막아 새 앱의 기록을 덮어쓰지 않는다', () => {
-      const newer = JSON.stringify({ schemaVersion: 4, books: [], settings: {} })
+      const newer = JSON.stringify({ schemaVersion: 5, books: [], settings: {} })
       localStorage.setItem(STORAGE_KEY, newer)
       const repository = new LocalStorageRepository()
       repository.load()

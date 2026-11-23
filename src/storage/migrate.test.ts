@@ -4,24 +4,26 @@ import { yearReport } from '../domain/report'
 import { ledger, V1_EXAMPLE_YEAR } from '../test/ledgerFixtures'
 import { FIRST_BOOK_ID, InvalidDataError, migrate, NewerSchemaError, type MigrationSteps } from './migrate'
 
-const v3Data = { schemaVersion: 3, books: [], settings: {} }
+const v4Data = { schemaVersion: 4, books: [], settings: {} }
 
 describe('SPEC-002 마이그레이션', () => {
-  it('AC-2 현재 버전(3) 데이터는 그대로 읽는다', () => {
-    expect(migrate(v3Data)).toEqual(v3Data)
+  it('AC-2 현재 버전(4) 데이터는 그대로 읽는다', () => {
+    expect(migrate(v4Data)).toEqual(v4Data)
   })
 
   it('AC-2 낮은 버전 데이터는 버전별 마이그레이션 함수를 차례로 거쳐 읽힌다', () => {
-    // 가상의 v1 → v2 → v3 체인으로 구조를 확인한다
+    // 가상의 v1 → v2 → v3 → v4 체인으로 구조를 확인한다
     const fromV1 = vi.fn((data: unknown) => ({ schemaVersion: 2, prev: data }))
-    const fromV2 = vi.fn(() => ({ schemaVersion: 3, books: [], settings: { lastChangedAt: 'migrated' } }))
-    const steps: MigrationSteps = { 1: fromV1, 2: fromV2 }
+    const fromV2 = vi.fn(() => ({ schemaVersion: 3, books: [], settings: {} }))
+    const fromV3 = vi.fn(() => ({ schemaVersion: 4, books: [], settings: { lastChangedAt: 'migrated' } }))
+    const steps: MigrationSteps = { 1: fromV1, 2: fromV2, 3: fromV3 }
 
     const result = migrate({ schemaVersion: 1 }, steps)
 
     expect(fromV1).toHaveBeenCalledWith({ schemaVersion: 1 })
     expect(fromV2).toHaveBeenCalledWith({ schemaVersion: 2, prev: { schemaVersion: 1 } })
-    expect(result).toEqual({ schemaVersion: 3, books: [], settings: { lastChangedAt: 'migrated' } })
+    expect(fromV3).toHaveBeenCalledWith({ schemaVersion: 3, books: [], settings: {} })
+    expect(result).toEqual({ schemaVersion: 4, books: [], settings: { lastChangedAt: 'migrated' } })
   })
 
   it('AC-2 낮은 버전인데 올릴 마이그레이션 함수가 없으면 거부한다', () => {
@@ -29,27 +31,83 @@ describe('SPEC-002 마이그레이션', () => {
   })
 
   it('AC-2 마이그레이션 함수가 다음 버전을 만들지 못하면 거부한다', () => {
-    const steps: MigrationSteps = { 2: () => ({ schemaVersion: 2 }) }
+    const steps: MigrationSteps = { 3: () => ({ schemaVersion: 3 }) }
 
-    expect(() => migrate({ schemaVersion: 2 }, steps)).toThrow(InvalidDataError)
+    expect(() => migrate({ schemaVersion: 3 }, steps)).toThrow(InvalidDataError)
   })
 
   it('AC-2 마이그레이션 결과가 스키마 검증을 통과하지 못하면 거부한다', () => {
-    const steps: MigrationSteps = { 2: () => ({ schemaVersion: 3 }) }
+    const steps: MigrationSteps = { 3: () => ({ schemaVersion: 4 }) }
 
-    expect(() => migrate({ schemaVersion: 2 }, steps)).toThrow(InvalidDataError)
+    expect(() => migrate({ schemaVersion: 3 }, steps)).toThrow(InvalidDataError)
   })
 
   it('AC-2 앱보다 높은 버전 데이터는 거부한다', () => {
-    expect(() => migrate({ schemaVersion: 4, books: [], settings: {} })).toThrow(NewerSchemaError)
+    expect(() => migrate({ schemaVersion: 5, books: [], settings: {} })).toThrow(NewerSchemaError)
   })
 
   it.each([
     ['객체가 아님', 'text'],
     ['schemaVersion 없음', { books: [] }],
-    ['schemaVersion 이 문자열', { schemaVersion: '3' }],
-    ['현재 버전인데 형식이 틀림', { schemaVersion: 3, books: {} }],
+    ['schemaVersion 이 문자열', { schemaVersion: '4' }],
+    ['현재 버전인데 형식이 틀림', { schemaVersion: 4, books: {} }],
   ])('형식이 틀린 데이터는 거부한다: %s', (_label, raw) => {
+    expect(() => migrate(raw)).toThrow(InvalidDataError)
+  })
+})
+
+// v2.7 앱이 저장한 v3 데이터: 장부 둘(동아리·가계부), 날짜·묶음이 있는 기록, 이월금, 설정
+function v3Data() {
+  return {
+    schemaVersion: 3,
+    books: [
+      {
+        id: 'book-1',
+        name: '한랑드림',
+        kind: 'club',
+        ledgers: {
+          '2025': ledger(V1_EXAMPLE_YEAR),
+          '2026': {
+            year: 2026,
+            carryover: 152_905,
+            entries: [{ id: 'a', month: 3, day: 9, type: 'income', name: '회비(14인)', amount: 140_000, createdAt: '2026-03-09T00:00:00.000Z', batchId: 'b1' }],
+          },
+        },
+        createdAt: '2026-10-08T00:00:00.000Z',
+      },
+      { id: 'book-2', name: '우리집 가계부', kind: 'household', ledgers: {}, createdAt: '2026-10-09T00:00:00.000Z' },
+    ],
+    settings: { lastBookId: 'book-2', lastBackupAt: '2026-11-01T00:00:00.000Z', recoveryCode: 'HK7M-29QF-MX4P-8R2D' },
+  }
+}
+
+describe('SPEC-010 저장 형식 v3 → v4 옮기기', () => {
+  it('AC-1 v3 데이터를 v4 로 옮기면 번호만 바뀌고 장부·기록·이월금·설정은 그대로다', () => {
+    const raw = v3Data()
+
+    expect(migrate(raw)).toEqual({ ...v3Data(), schemaVersion: 4 })
+  })
+
+  it('AC-1 옮긴 v3 장부에는 회원 명단·회비 값·월 회비·낸 분이 생기지 않는다 (빈 채로 시작, 11절)', () => {
+    const [club] = migrate(v3Data()).books
+
+    expect(club).not.toHaveProperty('members')
+    expect(club).not.toHaveProperty('dues')
+    expect(club?.ledgers['2026']).not.toHaveProperty('monthlyFee')
+    expect(club?.ledgers['2026']?.entries[0]).not.toHaveProperty('payers')
+  })
+
+  it('AC-1 v2 데이터는 v3 를 거쳐 v4 로 옮긴다', () => {
+    const moved = migrate(v2Data({ '2025': v2Ledger('한랑드림') }))
+
+    expect(moved.schemaVersion).toBe(4)
+    expect(moved.books[0]?.ledgers['2025']).toEqual(ledger(V1_EXAMPLE_YEAR))
+  })
+
+  it.each([
+    ['books 가 객체', { schemaVersion: 3, books: {}, settings: {} }],
+    ['금액이 0 인 기록', { ...v3Data(), books: [{ ...v3Data().books[1], ledgers: { '2026': ledger([[1, 'income', '회비', 0]], { year: 2026 }) } }] }],
+  ])('형식이 틀린 v3 데이터는 옮기지 않고 거부한다: %s', (_label, raw) => {
     expect(() => migrate(raw)).toThrow(InvalidDataError)
   })
 })
@@ -64,6 +122,7 @@ function v2Ledger(clubName: string, overrides: Parameters<typeof ledger>[1] = {}
   return { ...ledger(specs, overrides), clubName }
 }
 
+// v2 → v3 뒤 v3 → v4(번호만, SPEC-010)까지 이어서 거친다
 describe('SPEC-005 지금 기록 옮기기 (v2 → v3)', () => {
   it('AC-1 v2 장부들을 이름 = 동아리 이름, 종류 동아리·모임인 장부 하나로 옮기고 마지막에 본 장부로 정한다', () => {
     const raw = v2Data(
@@ -74,7 +133,7 @@ describe('SPEC-005 지금 기록 옮기기 (v2 → v3)', () => {
     const data = migrate(raw)
 
     expect(data).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       books: [
         {
           id: FIRST_BOOK_ID,
@@ -114,7 +173,7 @@ describe('SPEC-005 지금 기록 옮기기 (v2 → v3)', () => {
 
   it('장부가 없는 v2 데이터(첫 실행 전)는 장부 없이 옮겨 첫 실행 화면이 그대로 뜬다', () => {
     expect(migrate(v2Data({}, { lastBackupAt: '2026-09-01T00:00:00.000Z' }))).toEqual({
-      schemaVersion: 3,
+      schemaVersion: 4,
       books: [],
       settings: { lastBackupAt: '2026-09-01T00:00:00.000Z' },
     })

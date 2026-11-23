@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { CURRENT_SCHEMA_VERSION, type StoredData } from '../../domain/types'
 import { createBackup } from '../../storage/backup'
-import { book, ledger } from '../../test/ledgerFixtures'
+import { book, duesBook, ledger } from '../../test/ledgerFixtures'
 import { keepIdOf, sealKeep, type KeepEnvelope } from './keepCrypto'
 import { fetchKept } from './keepRestore'
 import type { KeepGetResult, KeepServer } from './keepServer'
@@ -73,5 +73,30 @@ describe('SPEC-006 복구 코드로 보관본 받아 오기', () => {
     await expect(fetchKept(serverWith({ [id]: otherKey }), CODE)).resolves.toEqual({ status: 'failed' })
     const notBackup = await sealKeep(CODE, '{"hello":1}', SAVED_AT)
     await expect(fetchKept(serverWith({ [id]: notBackup }), CODE)).resolves.toEqual({ status: 'failed' })
+  })
+})
+
+describe('SPEC-010 복구 코드로 받는 보관본 v4', () => {
+  async function serverKeeping(text: string): Promise<KeepServer> {
+    return serverWith({ [await keepIdOf(CODE)]: await sealKeep(CODE, text, SAVED_AT) })
+  }
+
+  it('AC-3 v3 보관본(v2.7 앱이 올린 것)을 받으면 v4 로 옮겨 장부·기록이 그대로다', async () => {
+    const v3Text = JSON.stringify({ ...KEPT, schemaVersion: 3 }, null, 2)
+
+    const result = await fetchKept(await serverKeeping(v3Text), CODE)
+    if (result.status !== 'found') throw new Error(result.status)
+
+    expect(result.data.schemaVersion).toBe(4)
+    expect(result.data.books).toEqual(KEPT.books)
+  })
+
+  it('AC-3 v4 보관본의 회원 명단·월 회비·낸 분·엑셀 글을 그대로 받는다', async () => {
+    const kept: StoredData = { ...KEPT, books: [duesBook()] }
+
+    const result = await fetchKept(await serverKeeping(createBackup(kept, new Date(SAVED_AT)).text), CODE)
+    if (result.status !== 'found') throw new Error(result.status)
+
+    expect(result.data.books).toEqual(kept.books)
   })
 })
