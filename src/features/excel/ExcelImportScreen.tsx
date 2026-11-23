@@ -286,16 +286,25 @@ type ImportNoteProps = {
   onOpen?: () => void
 }
 
-// 확인 화면의 알림 줄 한 개: 아이콘 + 굵은 제목 + 설명. 색만이 아니라 아이콘 모양으로도 갈린다
+// 확인 화면의 알림 줄 한 개: 아이콘 + 굵은 제목 + 설명 (+ [보기 ›]). 색만이 아니라 아이콘 모양으로도 갈린다.
+// [보기 ›] 는 글이 좁아지면(큰 글씨) 글 아래 줄로 내려간다 (PATTERNS A5)
 export function ImportNote({ tone, title, children, onOpen }: ImportNoteProps) {
   // 버튼 안에는 글자 덩어리(span)만 둘 수 있다. 버튼이 아니면 설명에 목록(검산 차이)을 넣을 수 있게 div
   const Text = onOpen ? 'span' : 'div'
   const content = (
     <>
       <Icon name={NOTE_ICONS[tone]} />
-      <Text className="excel-note__text">
-        <Text className="excel-note__title">{title}</Text>
-        <Text className="excel-note__body">{children}</Text>
+      <Text className="excel-note__main">
+        <Text className="excel-note__text">
+          <Text className="excel-note__title">{title}</Text>
+          <Text className="excel-note__body">{children}</Text>
+        </Text>
+        {onOpen && (
+          <span className="excel-note__open">
+            보기
+            <Icon name="right" />
+          </span>
+        )}
       </Text>
     </>
   )
@@ -309,10 +318,6 @@ export function ImportNote({ tone, title, children, onOpen }: ImportNoteProps) {
   return (
     <button type="button" className="excel-note" data-tone={tone} data-testid="excel-note" onClick={onOpen}>
       {content}
-      <span className="excel-note__open">
-        보기
-        <Icon name="right" />
-      </span>
     </button>
   )
 }

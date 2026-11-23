@@ -15,11 +15,15 @@
   );
 }
 
-/* [‹ 장부로] 와 제목은 한 덩어리 */
+/* [‹ 장부로] 와 제목은 한 덩어리. 제목은 큰 글씨에서 낱말 단위로 줄바꿈 ("엑셀 파일/을" 처럼 끊지 않게, PATTERNS A4) */
 .excel__head {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+}
+
+.excel__head .screen__title {
+  word-break: keep-all;
 }
 
 /* 읽는 파일 이름: 긴 이름도 화면 밖으로 넘치지 않게 아무 데서나 줄바꿈 */
