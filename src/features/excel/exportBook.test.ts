@@ -88,7 +88,8 @@ describe('SPEC-010 엑셀 내보내기 — 시트 (9절, #167)', () => {
     const sheet = sheetNamed(exportBook(CLUB, TODAY).sheets, '2025년 입출금내역')
 
     expect(sheet.rows).toEqual([
-      ['2025년 다솜회 입출금 내역'],
+      // 제목 줄 오른쪽(G1·H1)에 그 해 월 회비 — 다시 읽을 때 추정하지 않고 이 값을 쓴다 (8절)
+      ['2025년 다솜회 입출금 내역', null, null, null, null, null, '월 회비', 10_000],
       ['월', '일', '입금', null, '출금', '잔액'],
       ['2024년 이월금', null, null, null, null, 100_000],
       [1, null, 20_000, '강민지,이서준', null, { formula: 'F3+C4-E4', value: 120_000 }],
@@ -115,7 +116,24 @@ describe('SPEC-010 엑셀 내보내기 — 시트 (9절, #167)', () => {
       { members: MEMBERS, dues: { startMonth: '2026-01' } },
     )
 
-    expect(sheetNamed(exportBook(noFee, TODAY).sheets, '2026년 입출금내역').rows[3][3]).toBe('강민지(1만원),김도윤(2만원)')
+    const rows = sheetNamed(exportBook(noFee, TODAY).sheets, '2026년 입출금내역').rows
+    expect(rows[3][3]).toBe('강민지(1만원),김도윤(2만원)')
+    // 월 회비가 어느 해에도 없으면 "월 회비" 칸도 없다
+    expect(rows[0]).toEqual(['2026년 한랑드림 입출금 내역'])
+  })
+
+  it('AC-32 "월 회비" 칸은 그 해에 쓰는 월 회비(그 해 값이 없으면 이어 쓰는 전 해 값), 개인 가계부에는 없다', () => {
+    expect(sheetNamed(exportBook(CLUB, TODAY).sheets, '2026년 입출금내역').rows[0]).toEqual([
+      '2026년 다솜회 입출금 내역',
+      null,
+      null,
+      null,
+      null,
+      null,
+      '월 회비',
+      10_000,
+    ])
+    expect(sheetNamed(exportBook({ ...CLUB, kind: 'household' }, TODAY).sheets, '2026년 입출금내역').rows[0]).toEqual(['2026년 다솜회 입출금 내역'])
   })
 
   it('AC-32 적자 이월금은 빼기 수로, 기록이 없는 해도 제목·머리·이월금 줄은 있다', () => {
@@ -265,6 +283,27 @@ describe('SPEC-010 엑셀 내보내기 — 다시 불러오기 (9절, AC-33)', (
     // 엑셀 글로 남아 있던 못 나눈 회비는 다시 못 나눈 회비(같은 엑셀 글)로
     expect(again.ledgers['2025'].entries.find((item) => item.amount === 15_000)?.sourceText).toBe('이서준')
     expect(summary.balanceMismatches).toEqual([])
+  })
+
+  it('AC-33 낸 분을 못 나눈 회비(엑셀 글)가 이름만 있는 줄보다 많아도 "월 회비" 칸 값으로 다시 나눠 낸 분·월 회비가 같다 (#180 리뷰)', async () => {
+    // 한 분 1만 원 줄 하나 + 엑셀 글 "김도윤" 1만5천 원 셋: 추정하면 1만5천이 가장 흔해 1만 원 줄의 낸 분이 빠지고 1만5천 줄에 낸 분이 생긴다
+    const unassigned = () => entry(2, 5, 'income', '회비', 15_000, { sourceText: '김도윤' })
+    const club = bookOf(
+      [
+        {
+          year: 2026,
+          carryover: 0,
+          monthlyFee: 10_000,
+          entries: [entry(1, 5, 'income', '회비', 10_000, { payers: [{ memberId: 'm1', amount: 10_000 }] }), unassigned(), unassigned(), unassigned()],
+        },
+      ],
+      { members: MEMBERS.slice(0, 2), dues: { startMonth: '2026-01' } },
+    )
+    const { book: again, summary } = await roundTrip(club)
+
+    expect(entryKeys(again, 2026)).toEqual(entryKeys(club, 2026))
+    expect(summary.monthlyFees).toEqual([{ year: 2026, fee: 10_000 }])
+    expect(summary.unassignedDuesCount).toBe(3)
   })
 
   it('AC-33 개인 가계부도 기록(날짜·종류·항목·금액)·이월금이 같다 — 숨긴 회원 값(동아리였던 장부)은 내보내지 않는다', async () => {

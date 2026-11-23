@@ -61,16 +61,23 @@ function monthEntries(ledger: Ledger, month: number): Entry[] {
   return [...byDate(inMonth.filter((entry) => entry.day === undefined)), ...byDate(inMonth.filter((entry) => entry.day !== undefined))]
 }
 
-// 열 너비(글자 수): 월·일 좁게, 내용 열을 넓게
-const LEDGER_COLUMN_WIDTHS = [6, 6, 12, 40, 12, 14]
+// 열 너비(글자 수): 월·일 좁게, 내용 열을 넓게. G·H 는 제목 줄 "월 회비" 칸
+const LEDGER_COLUMN_WIDTHS = [6, 6, 12, 40, 12, 14, 10, 10]
 
-// 입출금내역 (9절): 1행 제목(A~F 병합) / 2행 머리 / 3행 "YYYY−1년 이월금"(A~E 병합) + 잔액 / 4행부터 기록.
+// 입출금내역 1행: 제목(A~F 병합) + 동아리 장부는 그 해에 쓰는 월 회비 "월 회비"(G1)·금액(H1).
+// 다시 읽을 때 이 값이 있으면 이름만 쓴 줄로 추정하지 않는다 (8절 "월 회비", #180 리뷰: 낸 분 없는 회비가 많으면 추정이 틀려 낸 분이 빠짐)
+function ledgerTitle(book: Book, year: number, fee: number | undefined): WriteCell[] {
+  const title = `${year}년 ${book.name} 입출금 내역`
+  return book.kind === 'club' && fee !== undefined ? [title, null, null, null, null, null, '월 회비', fee] : [title]
+}
+
+// 입출금내역 (9절): 1행 제목(A~F 병합, + 월 회비) / 2행 머리 / 3행 "YYYY−1년 이월금"(A~E 병합) + 잔액 / 4행부터 기록.
 // 잔액 칸은 수식(=F{윗줄}+C{줄}-E{줄})과 계산한 값 — 컴퓨터에서 고치면 따라 바뀌고 미리보기에서도 숫자가 보인다(ADR 009)
 function ledgerSheet(book: Book, ledger: Ledger, names: ReadonlyMap<string, string>): WriteSheet {
   const club = book.kind === 'club'
   const fee = monthlyFeeOf(book, ledger.year)
   const rows: WriteCell[][] = [
-    [`${ledger.year}년 ${book.name} 입출금 내역`],
+    ledgerTitle(book, ledger.year, fee),
     ['월', '일', '입금', null, '출금', '잔액'],
     [`${ledger.year - 1}년 이월금`, null, null, null, null, ledger.carryover],
   ]
