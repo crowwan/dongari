@@ -3,6 +3,9 @@ import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
 import { NewBookScreen } from './features/books/NewBookScreen'
+import { ExcelFileInput, ExcelImportSlot } from './features/excel/ExcelImportSlot'
+import type { ImportedBook } from './features/excel/readExcelBook'
+import { useExcelImport } from './features/excel/useExcelImport'
 import { FirstUseGuideMark } from './features/guide/FirstUseGuideMark'
 import type { GuideStore } from './features/guide/guideStore'
 import { useFirstUseGuide } from './features/guide/useFirstUseGuide'
@@ -46,6 +49,7 @@ import { requestPersistentStorage } from './storage/persist'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import type { IconName } from './ui/Icon'
 import { IconButton } from './ui/IconButton'
+import { formatAmount } from './ui/money'
 import { NoticeBar } from './ui/NoticeBar'
 import { Toast } from './ui/Toast'
 import './features/screens.css'
@@ -165,6 +169,9 @@ export default function App({
     onSent: setToast,
     dialogs: navigation,
   })
+  // 엑셀 불러오기 (SPEC-010 8절): 장부 고르기 창·설정·첫 실행이 같은 파일 고르기를 쓴다
+  const excelImport = useExcelImport(navigation)
+  const createId = options?.createId ?? (() => crypto.randomUUID())
 
   // 홈 화면에 추가 (SPEC-002): 권하기 카드는 첫 장부를 만든 직후부터 [나중에]·설치 전까지 (#135)
   const installAction = useInstallAction(install, navigation, LEDGER_INSTALL_GUIDE_SHEET)
@@ -222,27 +229,43 @@ export default function App({
     navigation.backToLedger()
   }
 
+  // 첫 장부를 만든 직후 (손으로·엑셀로, SPEC-005·SPEC-010 8절):
+  // 브라우저에 오래 보관을 요청한다. 앱 시작 때는 장부가 없어 요청하지 않았다 (SPEC-002). 결과를 기다리지 않는다
+  function startFirstBook() {
+    void requestPersistentStorage()
+    // 처음 쓰는 분 안내는 이때만 켠다 (SPEC-008). 두 번째 장부를 만들 때는 켜지 않는다
+    guide.activate()
+    // 홈 화면에 추가 권하기도 첫 장부 직후에만 (SPEC-002 #135). 연습 장부에는 없다.
+    // 연습 끝 "홈 화면에 추가하시겠어요?" 에 이미 대답했으면(done) 덮지 않는다 (SPEC-009 B). 카톡 안에서는 설치가 안 돼 권하지 않는다 (SPEC-009 C)
+    if (installOfferStore && !practice && installOfferStore.load() !== 'done' && !inApp) {
+      installOfferStore.save('waiting')
+      setInstallOffer('waiting')
+    }
+  }
+
   // 새 장부를 만들면 그 장부의 올해 장부 화면(이번 달)으로. 기기에 저장했을 때만 알린다 (SPEC-005 AC-4)
-  // 첫 장부면 브라우저에 오래 보관을 요청한다. 앱 시작 때는 장부가 없어 요청하지 않았다 (SPEC-002). 결과를 기다리지 않는다
   function createBook(setup: BookSetup) {
     const isFirstBook = ledger.isFirstRun
     if (ledger.createBook(setup)) {
       setToast('새 장부를 만들었어요')
-      if (isFirstBook) {
-        void requestPersistentStorage()
-        // 처음 쓰는 분 안내는 이때만 켠다 (SPEC-008). 두 번째 장부를 만들 때는 켜지 않는다
-        guide.activate()
-        // 홈 화면에 추가 권하기도 첫 장부 직후에만 (SPEC-002 #135). 연습 장부에는 없다.
-        // 연습 끝 "홈 화면에 추가하시겠어요?" 에 이미 대답했으면(done) 덮지 않는다 (SPEC-009 B). 카톡 안에서는 설치가 안 돼 권하지 않는다 (SPEC-009 C)
-        if (installOfferStore && !practice && installOfferStore.load() !== 'done' && !inApp) {
-          installOfferStore.save('waiting')
-          setInstallOffer('waiting')
-        }
-      }
+      if (isFirstBook) startFirstBook()
     }
     setViewedMonth(undefined)
     // 첫 실행이면 이미 장부 화면 자리라 돌아갈 방문 기록이 없다
     if (screen.name === 'new-book') navigation.backToLedger()
+  }
+
+  // 엑셀 읽은 내용 [새 장부 만들기] (SPEC-010 8절): 동아리·모임 장부를 만들어 지금 장부로, 장부 연도는 엑셀 마지막 해.
+  // 기기에 저장했으면 알리고 읽은 내용 화면 칸을 되돌려 장부로. 저장하지 못했으면 장부를 만들지 않고 그 화면에 남는다(화면이 알린다)
+  function importExcelBook(name: string, imported: ImportedBook): boolean {
+    const isFirstBook = ledger.isFirstRun
+    if (!ledger.importBook(name, imported)) return false
+    const entryCount = Object.values(imported.ledgers).reduce((sum, item) => sum + item.entries.length, 0)
+    setToast(`엑셀 장부를 만들었어요 · 기록 ${formatAmount(entryCount)}건`)
+    if (isFirstBook) startFirstBook()
+    setViewedMonth(undefined)
+    navigation.backToLedger()
+    return true
   }
 
   // 복구 코드로 받아 온 데이터로 전체 바꾸기 (SPEC-006 AC-5). 백업 불러오기와 같이 올해 장부의 처음 달로 돌아가 알린다
@@ -357,10 +380,33 @@ export default function App({
     canSend: saver.send !== undefined,
   }
 
+  // 엑셀 파일 읽기 → 읽은 내용 확인 (SPEC-010 8절). 파일을 고를 때마다 처음부터 다시 읽는다(key)
+  function excelImportScreen(): ReactNode {
+    const { pick } = excelImport
+    if (!pick) return null
+    return (
+      <ExcelImportSlot
+        key={pick.id}
+        file={pick.file}
+        deps={{ createId, now }}
+        bookNames={ledger.bookChoices.map((choice) => choice.name)}
+        data={ledger.data}
+        sheets={navigation}
+        // 기록 파일을 골랐을 때 [기록 파일 불러오기] 자리: 첫 실행 위쪽 / 설정 맨 위 카드(복구 코드 없음) / 설정 › 다른 방법으로 옮기기
+        backupRoute={ledger.isFirstRun ? 'first-run' : keep && keepState && recoveryCode ? 'settings-more' : 'settings'}
+        onBack={navigation.backToLedger}
+        onPickAgain={excelImport.start}
+        onReload={() => window.location.reload()}
+        onCreate={importExcelBook}
+      />
+    )
+  }
+
   function screenContent(): ReactNode {
     if (inApp && inAppGate && !ledger.isFirstRun) {
       return <InAppBrowserScreen kind={inApp.kind} move={ledgerMove} onStay={stayInApp} />
     }
+    if (screen.name === 'excel-import') return excelImportScreen()
     if (ledger.isFirstRun) {
       if (restoreByCode && screen.name === 'keep-restore') {
         return (
@@ -374,23 +420,24 @@ export default function App({
         )
       }
       // 첫 실행은 새 장부 만들기 (SPEC-005). 새 폰으로 옮길 때는 장부를 만들지 않고 기록 파일(안내 띠에 같은 버튼이 있으면 하나만)이나
-      // 복구 코드(SPEC-006)로 불러온다
+      // 복구 코드(SPEC-006)로 불러온다. 엑셀로 쓰던 장부는 엑셀 파일로 새 장부를 만든다 (SPEC-010 8절)
       return (
         <>
-          {(!noticeOffersImport || restoreByCode) && (
-            <div className="screen__top-end">
-              {!noticeOffersImport && (
-                <IconButton icon="folder" onClick={backup.startImport}>
-                  기록 파일 불러오기
-                </IconButton>
-              )}
-              {restoreByCode && (
-                <IconButton icon="key" onClick={() => navigation.open({ name: 'keep-restore' })}>
-                  복구 코드로 불러오기
-                </IconButton>
-              )}
-            </div>
-          )}
+          <div className="screen__top-end">
+            {!noticeOffersImport && (
+              <IconButton icon="folder" onClick={backup.startImport}>
+                기록 파일 불러오기
+              </IconButton>
+            )}
+            {restoreByCode && (
+              <IconButton icon="key" onClick={() => navigation.open({ name: 'keep-restore' })}>
+                복구 코드로 불러오기
+              </IconButton>
+            )}
+            <IconButton icon="excel" onClick={excelImport.start}>
+              엑셀 파일 불러오기
+            </IconButton>
+          </div>
           <NewBookScreen onCreate={createBook} />
         </>
       )
@@ -450,6 +497,7 @@ export default function App({
             install={install}
             inApp={inApp && { kind: inApp.kind, move: ledgerMove }}
             dues={duesSettings(ledger, today, setToast)}
+            onImportExcel={excelImport.start}
           />
         )
       case 'month-summary':
@@ -608,6 +656,7 @@ export default function App({
             setViewedMonth(undefined)
           }}
           onNewBook={() => navigation.open({ name: 'new-book' })}
+          onImportExcel={excelImport.start}
           year={year}
           ledger={ledger.ledger}
           totals={totals}
@@ -648,6 +697,7 @@ export default function App({
         onCancel={navigation.cancelLeave}
       />
       <BackupDialogs backup={backup} />
+      <ExcelFileInput flow={excelImport} />
       <FirstUseGuideMark guide={guide} />
       <Toast message={toast} onDone={() => setToast(null)} />
     </div>

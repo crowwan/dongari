@@ -34,6 +34,7 @@ import {
 } from '../../domain/members'
 import { monthlyFeeSource, type MonthlyFeeSource } from '../../domain/duesTable'
 import type { Book, BookKind, EntryType, Ledger, StoredData, YearMonth } from '../../domain/types'
+import type { ImportedBook } from '../excel/readExcelBook'
 import { createRecoveryCode, recoveryCodeOf, withRecoveryCode } from '../keep/recoveryCode'
 import type {
   LedgerRepository,
@@ -107,6 +108,9 @@ export interface LedgerState {
   switchBook: (id: string) => void
   // 새 장부를 만들어 지금 장부로 정하고 올해 장부를 연다. 저장에 성공했는지 (성공일 때만 "새 장부를 만들었어요")
   createBook: (setup: BookSetup) => boolean
+  // 엑셀에서 읽은 내용으로 동아리·모임 장부를 만들어 지금 장부로 정하고 마지막 해 장부를 연다 (SPEC-010 8절 #166).
+  // 저장에 성공했는지. 저장하지 못하면 아무것도 바꾸지 않는다 (화면 데이터에도 넣지 않음, 성공일 때만 "엑셀 장부를 만들었어요")
+  importBook: (name: string, imported: ImportedBook) => boolean
   // 장부를 지우고 남은 첫 장부의 올해 장부를 연다. 저장하지 못하면 아무것도 지우지 않고 false. 하나뿐인 장부는 지우지 않는다
   deleteBook: (id: string) => boolean
   // 백업 파일 데이터로 통째로 바꾼다 (SPEC-002). 저장에 성공했을 때만 화면을 바꾸고 올해 장부로 연다
@@ -217,21 +221,24 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     return changeLedger((ledger, target) => withLedger(target, change(ledger)), entryId)
   }
 
-  // 새 장부는 올해 장부 하나로 시작해 만든 순 맨 뒤에 들어가고 지금 장부가 된다 (같은 이름이어도 id 로 구분).
+  // 새 장부는 만든 순 맨 뒤에 들어가고 지금 장부가 된다 (같은 이름이어도 id 로 구분).
   // 첫 장부면 복구 코드도 이때 생긴다 (SPEC-006 AC-1)
-  function addBook(current: StoredData, setup: BookSetup): StoredData {
-    const thisYear = now().getFullYear()
-    const created: Book = {
-      id: createId(),
-      name: setup.name.trim(),
-      kind: setup.kind,
-      ledgers: { [String(thisYear)]: createLedger(thisYear, setup.carryover) },
-      createdAt: now().toISOString(),
-    }
+  function appendBook(current: StoredData, content: Pick<Book, 'name' | 'kind' | 'ledgers'> & Partial<Pick<Book, 'members' | 'dues'>>): StoredData {
+    const created: Book = { id: createId(), ...content, name: content.name.trim(), createdAt: now().toISOString() }
     return withRecoveryCode(
       { ...current, books: [...current.books, created], settings: { ...current.settings, lastBookId: created.id } },
       createCode,
     )
+  }
+
+  // 손으로 만든 새 장부는 올해 장부 하나로 시작한다
+  function addBook(current: StoredData, setup: BookSetup): StoredData {
+    const thisYear = now().getFullYear()
+    return appendBook(current, {
+      name: setup.name,
+      kind: setup.kind,
+      ledgers: { [String(thisYear)]: createLedger(thisYear, setup.carryover) },
+    })
   }
 
   // 불러올 데이터의 복구 코드: 파일(보관본)의 코드를 쓴다 (SPEC-006 AC-7). 코드가 없는 옛 백업 파일이면
@@ -326,6 +333,18 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
       const saved = commit((current) => addBook(current, setup))
       openThisYear()
       return saved
+    },
+    importBook: (name, imported) => {
+      // 엑셀로 만든 장부는 늘 동아리·모임 장부다 (회원 명단·월 회비가 있는 장부, SPEC-010 8절)
+      const created = appendBook(latest.current, { name, kind: 'club', ...imported })
+      const next: StoredData = { ...created, settings: { ...created.settings, lastChangedAt: now().toISOString() } }
+      // 저장했을 때만 화면에 들인다 (deleteBook·restoreBackup 과 같이, #178 리뷰): 큰 장부를 저장하지 못했는데(용량 초과 등)
+      // 화면 데이터에 남기면 그 뒤 저장마다 그 장부까지 쓰려다 모두 실패한다. 못 했으면 지금 데이터·저장 상태 그대로
+      const result = replace(next, (changed) => repository.save(changed))
+      if (!result.ok) return false
+      // 장부 연도는 엑셀의 마지막 해
+      setYear(Math.max(...Object.values(imported.ledgers).map((item) => item.year)))
+      return true
     },
     deleteBook: (id) => {
       // 저장하지 못하면 지운 것처럼 보였다가 새로고침 때 되살아나지 않게 화면도 그대로 둔다 (SPEC-005 예외)

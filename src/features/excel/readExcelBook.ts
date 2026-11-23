@@ -124,8 +124,9 @@ function mostCommon(values: readonly number[]): number | undefined {
 
 type Roster = ReadonlyMap<string, string>
 
-// 해마다 월 회비 (8절 "월 회비"): 그 해 낸 분을 다 나눈 줄의 한 분 몫 중 가장 흔한 값, 없으면 전 해 값
-function monthlyFees(yearReads: readonly YearRead[], roster: Roster): Map<number, number | undefined> {
+// 해마다 월 회비 (8절 "월 회비"): 그 해 낸 분을 다 나눈 줄의 한 분 몫 중 가장 흔한 값, 없으면 전 해 값.
+// 확인 화면에서 고친 해는 그 값을 쓴다(fixed, #166) — 다 나눈 줄이 없는 다음 해는 고친 값을 이어 쓴다
+function monthlyFees(yearReads: readonly YearRead[], roster: Roster, fixed: ReadonlyMap<number, number>): Map<number, number | undefined> {
   const fees = new Map<number, number | undefined>()
   let previous: number | undefined
   for (const { year, sheet } of yearReads) {
@@ -135,7 +136,7 @@ function monthlyFees(yearReads: readonly YearRead[], roster: Roster): Map<number
       const share = match.kind === 'members' ? equalShare(match.members, income) : undefined
       return share === undefined ? [] : [share]
     })
-    const fee = mostCommon(shares) ?? previous
+    const fee = fixed.get(year) ?? mostCommon(shares) ?? previous
     fees.set(year, fee)
     previous = fee
   }
@@ -174,9 +175,14 @@ function sumOf(entries: readonly Entry[], type: Entry['type']): number {
   return entries.reduce((sum, entry) => (entry.type === type ? sum + entry.amount : sum), 0)
 }
 
+export interface ReadExcelOptions {
+  // 확인 화면에서 고친 해별 월 회비 (#166). 주면 그 값으로 월 회비 배수 판정을 다시 해 낸 분을 나눈다
+  monthlyFees?: ReadonlyMap<number, number>
+}
+
 // 엑셀 시트들 → 가져올 장부 + 확인 화면 요약. 기록·회원 번호와 적은 시각은 deps 로 받는다(테스트에서 고정).
 // 아무것도 저장하지 않는다 — 저장은 확인 화면의 [새 장부 만들기] (#166)
-export function readExcelBook(workbook: ExcelWorkbook, deps: EntryDeps): ExcelBookRead {
+export function readExcelBook(workbook: ExcelWorkbook, deps: EntryDeps, options: ReadExcelOptions = {}): ExcelBookRead {
   const { statuses, yearReads, duesSheets } = readSheets(workbook)
   if (yearReads.length === 0) return { ok: false, problem: 'no-sheets' }
   const lastYear = yearReads[yearReads.length - 1].year
@@ -189,7 +195,7 @@ export function readExcelBook(workbook: ExcelWorkbook, deps: EntryDeps): ExcelBo
   const roster = new Map(members.map((member) => [member.name, member.id]))
 
   // 월 회비를 먼저 정하고, 그 배수 판정으로 낸 분을 나눈다 (8절 "월 회비": 배수 판정은 이 값이 정해진 뒤 한 번 더)
-  const fees = monthlyFees(yearReads, roster)
+  const fees = monthlyFees(yearReads, roster, options.monthlyFees ?? new Map())
   const makeEntry = entryMaker(deps)
   const ledgers: Record<string, Ledger> = {}
   for (const { year, sheet } of yearReads) {

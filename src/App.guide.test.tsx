@@ -157,7 +157,8 @@ describe('SPEC-008 진짜 장부의 복구 코드 안내 말풍선 (화면)', ()
     await userEvent.click(screen.getByRole('button', { name: /^설정/ }))
     act(() => keep.keeper.setEnabled(true))
     expect(coachMark()).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /장부로/ }))
+    // 설정 "엑셀" 줄 보조 글 "엑셀 장부로 새 장부 만들기"(SPEC-010)와 갈리게 이름 전체로 찾는다
+    await userEvent.click(screen.getByRole('button', { name: '장부로' }))
     await screen.findByTestId('ledger-screen')
 
     expect(await screen.findByTestId('coach-mark')).toHaveAttribute('data-state', '4')

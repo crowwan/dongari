@@ -4,7 +4,8 @@ import { CURRENT_SCHEMA_VERSION } from '../../domain/types'
 import { createBackup } from '../../storage/backup'
 import { duesSheet, ledgerSheet, months, otherSheet } from '../../test/excelFixtures'
 import { ledger, storedWith } from '../../test/ledgerFixtures'
-import { EXCEL_FILE_MAX_BYTES, isExcelBytes, readExcelFile, type PickedFile } from './excelFile'
+import { isExcelBytes } from './excelBytes'
+import { EXCEL_FILE_MAX_BYTES, readExcelFile, type PickedFile } from './excelFile'
 import type { SheetData } from './sheet'
 import { writeWorkbook } from './sheetjs'
 
@@ -74,6 +75,8 @@ describe('SPEC-010 엑셀 파일 고르기 판별 (8절 예외, AC-29 의 판별
     expect(result.book.ledgers['2025']).toMatchObject({ carryover: 50_000, monthlyFee: 10_000 })
     expect(result.book.ledgers['2025'].entries[0].payers).toHaveLength(2)
     expect(result.summary.readSheets).toEqual(['2025년 입출금내역', '2025년 회비내역'])
+    // 확인 화면에서 월 회비를 고치면 같은 시트로 다시 읽는다 (#166)
+    expect(result.workbook.sheets.map((sheet) => sheet.name)).toEqual(['2025년 입출금내역', '2025년 회비내역'])
   })
 
   it('옛 형식 엑셀(.xls)도 읽는다', async () => {

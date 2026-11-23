@@ -36,6 +36,7 @@ export type Screen =
   | { name: 'new-book' } // 새 장부 만들기 (SPEC-005, 장부 고르기 창에서)
   | { name: 'keep-restore' } // 복구 코드로 불러오기 (SPEC-006, 첫 실행 화면에서. 설정에서는 설정 위 편집 화면으로)
   | { name: 'dues'; year?: number } // 회비 표 (SPEC-010 4절). year: 처음 볼 해 (결산에서 오면 그 해, 없으면 올해)
+  | { name: 'excel-import' } // 엑셀 파일 읽기 → 읽은 내용 확인 (SPEC-010 8절, 장부 고르기 창·설정·첫 실행에서 파일을 고르면)
 
 const LEDGER: Screen = { name: 'ledger' }
 

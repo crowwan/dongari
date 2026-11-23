@@ -99,6 +99,8 @@ type SettingsScreenProps = {
   version?: AppVersion
   // 회원 명단·월 회비 (SPEC-010 6절). 동아리·모임 장부에서만 장부 정보에 두 줄이 보인다 (가계부면 값은 두고 숨긴다)
   dues?: DuesSettings
+  // "엑셀" 묶음 [엑셀 파일 불러오기] (SPEC-010 8·9절): 폰 파일 고르기를 연다. 없으면 묶음이 없다
+  onImportExcel?: () => void
 }
 
 // 이월금 값: 적자는 빼기표 대신 "적자" (장부 잔액 카드와 같은 말)
@@ -107,7 +109,7 @@ function carryoverText(carryover: number): string {
 }
 
 // 설정 (SPEC-001 화면 구성, SPEC-002 기록 파일, SPEC-005 장부 정보, SPEC-006 기록 지키기 v2.6, SPEC-010 회원 명단·월 회비):
-// 맨 위 기록 지키기 카드 → "다른 방법으로 옮기기" 접기 → 장부 정보 → 앱 → [이 장부 지우기].
+// 맨 위 기록 지키기 카드 → "다른 방법으로 옮기기" 접기 → 엑셀(SPEC-010) → 장부 정보 → 앱 → [이 장부 지우기].
 // 이름·이월금·월 회비 줄은 그 값 하나만 고치는 편집 화면을, 회원 명단 줄은 회원 명단 화면을, 종류·연도·자동으로 지키기 줄은 선택 창을 연다
 export function SettingsScreen({
   bookName,
@@ -135,6 +137,7 @@ export function SettingsScreen({
   inApp,
   version = browserAppVersion(),
   dues,
+  onImportExcel,
 }: SettingsScreenProps) {
   const installAction = useInstallAction(install, sheets, INSTALL_GUIDE_SHEET)
   // 다른 방법으로 옮기기: 설정을 열 때마다 처음엔 접혀 있다 (편집·불러오기 화면에 다녀와도 그대로)
@@ -243,6 +246,13 @@ export function SettingsScreen({
         <div className="settings__list" data-testid="settings-block-files">
           {fileRows}
         </div>
+      )}
+
+      {/* 엑셀 (SPEC-010 9절): 기록 지키기(서버 주소 없는 빌드는 기록 파일 카드) 다음, 장부 정보 앞. [내보내기] 줄은 #167 */}
+      {onImportExcel && (
+        <SettingsGroup title="엑셀" testId="settings-block-excel">
+          <SettingRow icon="file-in" title="엑셀 파일 불러오기" description="엑셀 장부로 새 장부 만들기" onClick={onImportExcel} />
+        </SettingsGroup>
       )}
 
       {/* 장부 정보 (SPEC-005): 처음 만들 때 정한 값이라 자주 열지 않아 기록 지키기 아래 */}

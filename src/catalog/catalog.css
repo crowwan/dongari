@@ -131,6 +131,11 @@
   height: 560px;
 }
 
+/* 화면 하나, 위쪽만 (엑셀 읽는 중·읽지 못함, SPEC-010 #166): 제목·안내·아래 고정 버튼 */
+.catalog__frame--short-screen {
+  height: 360px;
+}
+
 /* 화면 하나 통째, 내용 높이대로 (카톡 안에서 열렸을 때, SPEC-009 C) */
 .catalog__frame--auto {
   height: auto;

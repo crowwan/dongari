@@ -33,8 +33,4 @@ if (result.problems.length > 0) {
   for (const problem of result.problems) console.error(`엑셀 조각 검사 실패: ${problem}`)
   process.exit(1)
 }
-console.log(
-  result.excelChunks.length === 0
-    ? '엑셀 조각 검사 통과: 첫 화면에 SheetJS 없음 (아직 화면이 엑셀 기능을 부르지 않아 엑셀 조각도 없음)'
-    : '엑셀 조각 검사 통과: 첫 화면에 SheetJS 없음, 엑셀 조각은 서비스 워커가 미리 받음',
-)
+console.log('엑셀 조각 검사 통과: 첫 화면에 SheetJS 없음, 엑셀 조각은 서비스 워커가 미리 받음')
