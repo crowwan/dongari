@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isDuesEntry } from '../../domain/dues'
+import { unassignedDues } from '../../domain/duesTable'
 import { CURRENT_SCHEMA_VERSION, type Book, type Entry } from '../../domain/types'
 import { isStoredData } from '../../storage/schema'
 import { duesSheet, ledgerSheet, months, otherSheet, workbook, type LedgerRow } from '../../test/excelFixtures'
@@ -384,6 +385,20 @@ describe('SPEC-010 엑셀 불러오기 — 검산과 확인 화면 요약 (8절 
     expect(Object.values(result.book.ledgers).flatMap((ledger) => ledger.entries).filter((entry) => entry.payers?.length === 4)).toHaveLength(840)
     // 잰 값 약 490KB (2026-11-23). 자동으로 지키기 상한 1MB, 확인 화면 경고 900KB (SPEC-010 8절, 기술 메모 "크기")
     expect(new TextEncoder().encode(JSON.stringify(data)).length).toBeLessThan(900_000)
+  })
+
+  it('불러온 장부에서 회비 표 시작 달(마지막 해 1월) 이후의 못 나눈 회비만 7절 "낸 분 붙이기" 대상이 된다', () => {
+    const result = read(
+      workbook(
+        ledgerSheet(2024, 0, [[3, 5, 30_000, '강민지,외부 손님', null]]),
+        ledgerSheet(2025, 30_000, [[1, 5, 20_000, '강민지,김도윤', null], [2, 5, 25_000, '김도윤,외부 손님', null]]),
+        threeMembers(2025),
+      ),
+    )
+    const book: Book = { id: 'book-excel', name: '지어낸 모임', kind: 'club', createdAt: NOW, ...result.book }
+
+    expect(result.summary.unassignedDuesCount).toBe(2)
+    expect(unassignedDues(book).items.map(({ year, entry }) => [year, entry.month, entry.sourceText])).toEqual([[2025, 2, '김도윤,외부 손님']])
   })
 
   it('불러온 장부는 저장 형식 v4 검사(isStoredData)를 통과한다', () => {

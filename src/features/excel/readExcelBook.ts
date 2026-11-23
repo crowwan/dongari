@@ -44,7 +44,8 @@ export interface ExcelImportSummary {
   startMonth: YearMonth
   balanceChecks: BalanceCheck[]
   balanceMismatches: BalanceMismatch[]
-  unassignedDuesCount: number // 낸 분을 다 못 나눈 회비
+  // 낸 분을 다 못 나눈 회비(모든 해). 그중 회비 표 시작 달 이후 것이 7절 카드(domain/duesTable.unassignedDues)에 모인다
+  unassignedDuesCount: number
   changedDates: LineNote[] // 날짜를 바꾼 줄
   unreadLines: LineNote[] // 읽지 못한 줄
 }
