@@ -9,10 +9,12 @@ export const STORAGE_NOTICE = {
   oldVersionUnpreserved: '기록을 새 버전으로 옮기지 못했어요. 지금 적는 내용은 저장되지 않아요',
   // v2.6 문구 ①: 목록에 보이는 내역이 앱을 닫으면 사라진다는 것까지 알린다 (#121)
   saveFailed: '저장하지 못했어요. 방금 적은 내역은 앱을 닫으면 사라져요. 기록 파일을 보내 두세요',
+  // 가드에 어긋나 쓰지 않음(#172): 사용자가 잘못한 것이 아니고, 다시 열면 마지막으로 저장한 기록이 열린다
+  invalidData: '앱에 문제가 있어 방금 바꾼 것을 저장하지 않았어요. 그 전 기록은 그대로예요. 앱을 다시 열어 주세요',
 }
 
-// 안내 띠에 붙는 버튼: [기록 파일 불러오기] / [기록 파일 보내기]
-export type StorageNoticeAction = 'import-backup' | 'send-backup'
+// 안내 띠에 붙는 버튼: [기록 파일 불러오기] / [기록 파일 보내기] / [앱 다시 열기]
+export type StorageNoticeAction = 'import-backup' | 'send-backup' | 'reload-app'
 
 export interface StorageNotice {
   message: string
@@ -36,12 +38,17 @@ function startupNotice(startup: StartupStatus): StorageNotice | undefined {
   return undefined
 }
 
+// 가드에 어긋난 저장(invalid-data)은 화면의 기록에 앱이 만든 틀린 값이 들어 있어, 지금 기록 파일을 보내면 열 수 없는 파일이 된다.
+// 보내기 대신 앱을 다시 열어 마지막으로 저장한 기록으로 돌아가게 한다 (#172)
+function saveFailureNotice(reason: SaveFailureReason): StorageNotice {
+  if (reason === 'invalid-data') return { message: STORAGE_NOTICE.invalidData, action: 'reload-app' }
+  return { message: STORAGE_NOTICE.saveFailed, action: 'send-backup' }
+}
+
 // 화면 위에 띄울 안내, 위에서부터 순서대로.
 // 저장을 막아 둔 상태(read-only)의 저장 실패는 시작 안내가 이미 이유를 말하므로 따로 띄우지 않는다
 export function storageNotices(startup: StartupStatus, saveFailure: SaveFailureReason | undefined): StorageNotice[] {
   const notices = [startupNotice(startup)]
-  if (saveFailure && startup.status !== 'read-only') {
-    notices.push({ message: STORAGE_NOTICE.saveFailed, action: 'send-backup' })
-  }
+  if (saveFailure && startup.status !== 'read-only') notices.push(saveFailureNotice(saveFailure))
   return notices.filter((notice) => notice !== undefined)
 }

@@ -339,6 +339,7 @@ export default function App({
   const noticeActions: Record<StorageNoticeAction, { label: string; icon: IconName; onClick: () => void }> = {
     'import-backup': { label: '기록 파일 불러오기', icon: 'folder', onClick: backup.startImport },
     'send-backup': { label: '기록 파일 보내기', icon: 'share', onClick: backup.send },
+    'reload-app': { label: '앱 다시 열기', icon: 'refresh', onClick: () => window.location.reload() },
   }
   const storageNoticeList = storageNotices(ledger.startup, ledger.saveFailure)
   const notices = storageNoticeList.map(({ message, action }) => (

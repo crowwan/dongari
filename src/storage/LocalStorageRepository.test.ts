@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StoredData } from '../domain/types'
+import { BROKEN_PAYERS, duesData, PAYERS_OFF_AMOUNT, PAYERS_OFF_ROSTER } from '../test/ledgerFixtures'
 import { BROKEN_KEY_PREFIX, LocalStorageRepository, OLD_VERSION_KEY_PREFIX, STORAGE_KEY } from './LocalStorageRepository'
 import { FIRST_BOOK_ID } from './migrate'
 
@@ -364,6 +365,41 @@ describe('SPEC-002 저장 (localStorage)', () => {
       })
 
       expect(new LocalStorageRepository().save(sampleData())).toEqual({ ok: false, reason: 'unknown', error: cause })
+    })
+  })
+
+  // 앱 코드가 규칙 하나를 놓쳐 만든 데이터를 그대로 쓰면 다음에 열 때 장부 전체가 깨진 데이터로 옮겨진다 (#172)
+  describe('SPEC-010 저장 전 v4 가드 (#172)', () => {
+    it.each(BROKEN_PAYERS)('가드에 어긋난 데이터를 저장하면 저장소 값이 그대로이고 저장 실패로 알린다 — %s', (_, payers) => {
+      const repository = new LocalStorageRepository()
+      repository.load()
+      expect(repository.save(duesData())).toEqual({ ok: true })
+      const saved = localStorage.getItem(STORAGE_KEY)
+
+      expect(repository.save(duesData(payers))).toEqual({ ok: false, reason: 'invalid-data' })
+      expect(localStorage.getItem(STORAGE_KEY)).toBe(saved)
+      // 다시 열면 깨진 데이터로 옮기지 않고 마지막에 저장한 장부가 열린다
+      expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data: duesData() })
+      expect(brokenKeys()).toEqual([])
+    })
+
+    it('기록 파일로 바꾸기(restore)도 가드에 어긋난 데이터는 쓰지 않고 저장 실패로 알린다', () => {
+      const repository = new LocalStorageRepository()
+      repository.load()
+      repository.save(duesData())
+      const saved = localStorage.getItem(STORAGE_KEY)
+
+      expect(repository.restore(duesData(PAYERS_OFF_AMOUNT))).toEqual({ ok: false, reason: 'invalid-data' })
+      expect(localStorage.getItem(STORAGE_KEY)).toBe(saved)
+    })
+
+    it('가드에 어긋나 쓰지 않은 뒤에도 바른 데이터는 저장된다 (저장을 막아 두지 않는다)', () => {
+      const repository = new LocalStorageRepository()
+      repository.load()
+      repository.save(duesData(PAYERS_OFF_ROSTER))
+
+      expect(repository.save(duesData())).toEqual({ ok: true })
+      expect(new LocalStorageRepository().load()).toEqual({ status: 'ok', data: duesData() })
     })
   })
 })

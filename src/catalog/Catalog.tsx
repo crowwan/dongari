@@ -1305,6 +1305,9 @@ export function Catalog() {
           <State label="버튼 붙음 (저장 실패 → 기록 파일 보내기)">
             <NoticeBar message={STORAGE_NOTICE.saveFailed} action={{ label: '기록 파일 보내기', icon: 'share', onClick: noop }} />
           </State>
+          <State label="가드에 어긋나 저장하지 않음 → 앱 다시 열기 (#172, 기록 파일 보내기 없음)">
+            <NoticeBar message={STORAGE_NOTICE.invalidData} action={{ label: '앱 다시 열기', icon: 'refresh', onClick: noop }} />
+          </State>
           <State label="30일 안내 → 기록 파일 보내기 (#9)">
             <NoticeBar message="한 달 넘게 기록 파일을 보내지 않았어요" action={{ label: '기록 파일 보내기', icon: 'share', onClick: noop }} />
           </State>

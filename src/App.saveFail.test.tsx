@@ -5,7 +5,7 @@ import App from './App'
 import type { Ledger, StoredData } from './domain/types'
 import type { LedgerRepository, LoadResult, SaveFailureReason } from './storage/LedgerRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
-import { storedWith } from './test/ledgerFixtures'
+import { duesData, PAYERS_OFF_ROSTER, storedWith } from './test/ledgerFixtures'
 
 // SPEC-002 v2.6 보강: 저장 실패 안내 문구 ① · 저장 안 된 줄의 "저장 안 됨" 알약 (#121)
 
@@ -142,5 +142,25 @@ describe('SPEC-002 v2.6 저장 실패 안내·저장 안 됨 표시', () => {
     expect(unsavedRowTitles()).toEqual(['회비', '간식비'])
     expect(screen.getAllByTestId('notice-bar')).toHaveLength(1)
     expect(screen.getByRole('alert')).toHaveTextContent('저장된 기록을 읽지 못했어요. 지금 적는 내용은 저장되지 않아요')
+  })
+})
+
+describe('SPEC-002 저장 전 v4 가드 (#172)', () => {
+  it('가드에 어긋난 데이터를 저장하면 저장소 값이 그대로이고 장부 위 띠로 저장 실패를 알린다 ([앱 다시 열기], 적은 줄은 "저장 안 됨")', async () => {
+    // 화면 데이터에 앱이 만든 틀린 값(명단에 없는 회원 번호)이 들어 있는 상태: 진짜 가드가 다음 저장을 막는다
+    const memory = new MemoryRepository(duesData(PAYERS_OFF_ROSTER))
+    renderApp(memory)
+
+    await addExpense('간식비', '5000')
+
+    const notice = screen.getByTestId('notice-bar')
+    expect(within(notice).getByRole('alert')).toHaveTextContent(
+      /^앱에 문제가 있어 방금 바꾼 것을 저장하지 않았어요\. 그 전 기록은 그대로예요\. 앱을 다시 열어 주세요$/,
+    )
+    expect(within(notice).getByRole('button', { name: '앱 다시 열기' })).toBeInTheDocument()
+    // 지금 화면 데이터로 만든 기록 파일은 열 수 없는 파일이 되니 보내기를 권하지 않는다
+    expect(within(notice).queryByRole('button', { name: '기록 파일 보내기' })).not.toBeInTheDocument()
+    expect(unsavedRowTitles()).toEqual(['간식비'])
+    expect(memory.load().data).toEqual(duesData(PAYERS_OFF_ROSTER))
   })
 })

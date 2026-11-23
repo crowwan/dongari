@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StoredData } from '../domain/types'
-import { storedWith } from '../test/ledgerFixtures'
+import { BROKEN_PAYERS, duesData, storedWith } from '../test/ledgerFixtures'
 import { MemoryRepository } from './MemoryRepository'
 
 function sampleData(): StoredData {
@@ -40,5 +40,14 @@ describe('SPEC-002 저장 (메모리)', () => {
 
     expect(repository.restore(sampleData())).toEqual({ ok: true })
     expect(repository.load()).toEqual({ status: 'ok', data: sampleData() })
+  })
+
+  // 연습 장부·테스트도 폰과 같은 규칙: 규칙을 놓친 흐름이 테스트에서 "저장했어요"로 지나가지 않게 (#172)
+  it.each(BROKEN_PAYERS)('SPEC-010 가드에 어긋난 데이터를 저장하면 저장소 값이 그대로이고 저장 실패로 알린다 — %s', (_, payers) => {
+    const repository = new MemoryRepository(duesData())
+
+    expect(repository.save(duesData(payers))).toEqual({ ok: false, reason: 'invalid-data' })
+    expect(repository.restore(duesData(payers))).toEqual({ ok: false, reason: 'invalid-data' })
+    expect(repository.load()).toEqual({ status: 'ok', data: duesData() })
   })
 })
