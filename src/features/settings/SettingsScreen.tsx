@@ -101,6 +101,8 @@ type SettingsScreenProps = {
   dues?: DuesSettings
   // "엑셀" 묶음 [엑셀 파일 불러오기] (SPEC-010 8·9절): 폰 파일 고르기를 연다. 없으면 묶음이 없다
   onImportExcel?: () => void
+  // "엑셀" 묶음 맨 위 [엑셀 파일로 내보내기] (SPEC-010 9절 #167): 지금 장부의 모든 해를 엑셀 파일로
+  onExportExcel?: () => void
 }
 
 // 이월금 값: 적자는 빼기표 대신 "적자" (장부 잔액 카드와 같은 말)
@@ -138,6 +140,7 @@ export function SettingsScreen({
   version = browserAppVersion(),
   dues,
   onImportExcel,
+  onExportExcel,
 }: SettingsScreenProps) {
   const installAction = useInstallAction(install, sheets, INSTALL_GUIDE_SHEET)
   // 다른 방법으로 옮기기: 설정을 열 때마다 처음엔 접혀 있다 (편집·불러오기 화면에 다녀와도 그대로)
@@ -248,10 +251,15 @@ export function SettingsScreen({
         </div>
       )}
 
-      {/* 엑셀 (SPEC-010 9절): 기록 지키기(서버 주소 없는 빌드는 기록 파일 카드) 다음, 장부 정보 앞. [내보내기] 줄은 #167 */}
-      {onImportExcel && (
+      {/* 엑셀 (SPEC-010 9절): 기록 지키기(서버 주소 없는 빌드는 기록 파일 카드) 다음, 장부 정보 앞. 장부 종류와 상관없이 늘 */}
+      {(onExportExcel || onImportExcel) && (
         <SettingsGroup title="엑셀" testId="settings-block-excel">
-          <SettingRow icon="file-in" title="엑셀 파일 불러오기" description="엑셀 장부로 새 장부 만들기" onClick={onImportExcel} />
+          {onExportExcel && (
+            <SettingRow icon="excel" title="엑셀 파일로 내보내기" description="컴퓨터에서 보고 고칠 수 있는 표" onClick={onExportExcel} />
+          )}
+          {onImportExcel && (
+            <SettingRow icon="file-in" title="엑셀 파일 불러오기" description="엑셀 장부로 새 장부 만들기" onClick={onImportExcel} />
+          )}
         </SettingsGroup>
       )}
 

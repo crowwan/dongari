@@ -1,13 +1,12 @@
 // 엑셀 파일 읽기 → 읽은 내용 확인 (SPEC-010 8절 "흐름"·"읽은 내용 확인", #166). 이 파일은 엑셀 조각이다:
 // 화면을 열 때 ExcelImportSlot 이 동적 import 로 받는다 (엑셀 읽기 규칙이 첫 화면 파일에 들어가지 않게).
 // [새 장부 만들기]를 누르기 전에는 아무것도 저장하지 않는다. 읽는 중에 화면을 떠나면 읽기를 버린다
-import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { EntryDeps } from '../../domain/ledger'
 import type { StoredData } from '../../domain/types'
 import { BottomActionBar } from '../../ui/BottomActionBar'
 import { BottomSheet } from '../../ui/BottomSheet'
 import { Button } from '../../ui/Button'
-import { Icon, type IconName } from '../../ui/Icon'
 import { formatAmount } from '../../ui/money'
 import { MoneyInput } from '../../ui/MoneyInput'
 import { NoticeBar } from '../../ui/NoticeBar'
@@ -17,6 +16,7 @@ import { EditPage } from '../settings/EditPage'
 import type { SheetHistory } from '../useScreenHistory'
 import { readExcelFile, type ExcelFileProblem, type PickedFile } from './excelFile'
 import { EXCEL_CREATE_FAILED, type BackupFileRoute } from './excelMessages'
+import { ExcelFact, ExcelFactValue, ExcelFacts, ExcelNote } from './ExcelParts'
 import { ExcelProblem, ExcelReading } from './ExcelStatus'
 import {
   balanceCheckText,
@@ -156,33 +156,33 @@ export function ExcelImportScreen({
       <div className="excel-import__group excel-import__notes">
         <BalanceNote summary={summary} />
         {summary.unassignedDuesCount > 0 && (
-          <ImportNote tone="info" title={`낸 분을 다 못 나눈 회비 ${formatAmount(summary.unassignedDuesCount)}건`}>
+          <ExcelNote tone="info" title={`낸 분을 다 못 나눈 회비 ${formatAmount(summary.unassignedDuesCount)}건`}>
             회원 이름이 섞인 입금은 회비로 넣고, 낸 분은 나중에 회비 표에서 붙여요. 회원 이름이 없는 입금(이자·찬조)은 엑셀 글이 항목
             이름이 돼요.
-          </ImportNote>
+          </ExcelNote>
         )}
         {summary.changedDates.length > 0 && (
-          <ImportNote
+          <ExcelNote
             tone="warn"
             title={`날짜를 바꾼 줄 ${formatAmount(summary.changedDates.length)}건`}
             onOpen={() => sheets.openSheet(CHANGED_DATES_SHEET)}
           >
             그 달에 없는 날은 그 달 마지막 날로, 날을 읽을 수 없는 줄은 날짜 없이 넣었어요.
-          </ImportNote>
+          </ExcelNote>
         )}
         {summary.unreadLines.length > 0 && (
-          <ImportNote
+          <ExcelNote
             tone="warn"
             title={`읽지 못한 줄 ${formatAmount(summary.unreadLines.length)}건`}
             onOpen={() => sheets.openSheet(UNREAD_LINES_SHEET)}
           >
             금액이나 날짜를 읽지 못해 넣지 않았어요. 필요하면 만든 뒤 직접 적어 주세요.
-          </ImportNote>
+          </ExcelNote>
         )}
         {phase.nearKeepLimit && (
-          <ImportNote tone="warn" title="기록이 많아 자동으로 지키기를 못 할 수 있어요">
+          <ExcelNote tone="warn" title="기록이 많아 자동으로 지키기를 못 할 수 있어요">
             장부는 만들 수 있어요. 가끔 기록 파일을 보내 두세요.
-          </ImportNote>
+          </ExcelNote>
         )}
       </div>
 
@@ -221,30 +221,6 @@ export function ExcelImportScreen({
   )
 }
 
-type FactProps = {
-  label: string
-  children: ReactNode
-}
-
-// 사실 카드 한 줄: 왼쪽 이름(보조 글자) + 오른쪽 값(굵게, 아래 작은 글자). 큰 글씨에서 한 줄에 안 들어가면 값이 아래 줄로
-function Fact({ label, children }: FactProps) {
-  return (
-    <div className="excel-facts__row">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  )
-}
-
-function FactValue({ main, sub }: { main: string; sub?: string }) {
-  return (
-    <>
-      <span className="excel-facts__main">{main}</span>
-      {sub && <span className="excel-facts__sub">{sub}</span>}
-    </>
-  )
-}
-
 // 사실 카드 (8절): 해 → 기록 → 회원 → 월 회비 → 회비 표. 흰 카드, 줄 사이 선 없음
 export function ImportFacts({ summary }: { summary: ExcelImportSummary }) {
   const years = yearsText(summary.years)
@@ -252,33 +228,33 @@ export function ImportFacts({ summary }: { summary: ExcelImportSummary }) {
   const [startYear, startMonth] = summary.startMonth.split('-').map(Number)
   const total = summary.incomeCount + summary.expenseCount
   return (
-    <dl className="excel-facts" aria-label="읽은 내용" data-testid="excel-facts">
-      <Fact label="해">
-        <FactValue main={years.main} sub={years.sub} />
-      </Fact>
-      <Fact label="기록">
-        <FactValue
+    <ExcelFacts label="읽은 내용" testId="excel-facts">
+      <ExcelFact label="해">
+        <ExcelFactValue main={years.main} sub={years.sub} />
+      </ExcelFact>
+      <ExcelFact label="기록">
+        <ExcelFactValue
           main={`${formatAmount(total)}건`}
           sub={`수입 ${formatAmount(summary.incomeCount)} · 지출 ${formatAmount(summary.expenseCount)}`}
         />
-      </Fact>
-      <Fact label="회원">
-        <FactValue
+      </ExcelFact>
+      <ExcelFact label="회원">
+        <ExcelFactValue
           main={`${formatAmount(summary.memberCount)}명`}
           sub={summary.memberCount > 0 ? `${lastYear}년 회원 ${formatAmount(summary.lastYearMemberCount)}명` : undefined}
         />
-      </Fact>
-      <Fact label="월 회비">
+      </ExcelFact>
+      <ExcelFact label="월 회비">
         {feeLines(summary.monthlyFees).map((line) => (
           <span key={line} className="excel-facts__main">
             {line}
           </span>
         ))}
-      </Fact>
-      <Fact label="회비 표">
-        <FactValue main={`${startYear}년 ${startMonth}월부터`} />
-      </Fact>
-    </dl>
+      </ExcelFact>
+      <ExcelFact label="회비 표">
+        <ExcelFactValue main={`${startYear}년 ${startMonth}월부터`} />
+      </ExcelFact>
+    </ExcelFacts>
   )
 }
 
@@ -288,74 +264,27 @@ function BalanceNote({ summary }: { summary: ExcelImportSummary }) {
   const carryover = '이월금은 엑셀에 적힌 값을 그대로 써요.'
   if (check.kind === 'ok') {
     return (
-      <ImportNote tone="ok" title="해마다 잔액이 맞아요">
+      <ExcelNote tone="ok" title="해마다 잔액이 맞아요">
         엑셀 잔액과 앱 계산을 해마다 맞춰 봤어요. {carryover}
-      </ImportNote>
+      </ExcelNote>
     )
   }
   if (check.kind === 'none') {
     return (
-      <ImportNote tone="info" title="엑셀에 잔액이 없어 맞춰 보지 못했어요">
+      <ExcelNote tone="info" title="엑셀에 잔액이 없어 맞춰 보지 못했어요">
         {carryover}
-      </ImportNote>
+      </ExcelNote>
     )
   }
   return (
-    <ImportNote tone="warn" title={check.title}>
+    <ExcelNote tone="warn" title={check.title}>
       <ul className="excel-note__items">
         {check.items.map((item) => (
           <li key={item}>{item}</li>
         ))}
       </ul>
       {carryover} 다른 곳은 만든 뒤 고칠 수 있어요.
-    </ImportNote>
-  )
-}
-
-const NOTE_ICONS: Readonly<Record<ImportNoteProps['tone'], IconName>> = { ok: 'ok', info: 'info', warn: 'alert' }
-
-type ImportNoteProps = {
-  // ok: 흰 면 + 체크(맞음) / info: 알아 둘 것(--info-bg) / warn: 확인할 것(--warn-bg)
-  tone: 'ok' | 'info' | 'warn'
-  title: string
-  children: ReactNode
-  // 있으면 줄 전체가 버튼이고 끝에 [보기 ›] (목록을 연다)
-  onOpen?: () => void
-}
-
-// 확인 화면의 알림 줄 한 개: 아이콘 + 굵은 제목 + 설명 (+ [보기 ›]). 색만이 아니라 아이콘 모양으로도 갈린다.
-// [보기 ›] 는 글이 좁아지면(큰 글씨) 글 아래 줄로 내려간다 (PATTERNS A5)
-export function ImportNote({ tone, title, children, onOpen }: ImportNoteProps) {
-  // 버튼 안에는 글자 덩어리(span)만 둘 수 있다. 버튼이 아니면 설명에 목록(검산 차이)을 넣을 수 있게 div
-  const Text = onOpen ? 'span' : 'div'
-  const content = (
-    <>
-      <Icon name={NOTE_ICONS[tone]} />
-      <Text className="excel-note__main">
-        <Text className="excel-note__text">
-          <Text className="excel-note__title">{title}</Text>
-          <Text className="excel-note__body">{children}</Text>
-        </Text>
-        {onOpen && (
-          <span className="excel-note__open">
-            보기
-            <Icon name="right" />
-          </span>
-        )}
-      </Text>
-    </>
-  )
-  if (!onOpen) {
-    return (
-      <div className="excel-note" data-tone={tone} data-testid="excel-note">
-        {content}
-      </div>
-    )
-  }
-  return (
-    <button type="button" className="excel-note" data-tone={tone} data-testid="excel-note" onClick={onOpen}>
-      {content}
-    </button>
+    </ExcelNote>
   )
 }
 
