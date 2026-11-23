@@ -9,7 +9,7 @@ export interface NewMember {
   joined: YearMonth
 }
 
-// 회원 정보 편집에서 고치는 것. 쉬는 달은 한 분 보기에서 넣는다(#163)
+// 회원 정보 편집에서 고치는 것. 쉬는 달은 한 분 보기에서 넣는다(restMember·resumeMember, #163)
 export interface MemberChanges {
   name: string
   joined: YearMonth
@@ -114,6 +114,40 @@ export function memberHasRecords(book: Book, id: string): boolean {
 export function deleteMember(book: Book, id: string): Book {
   if (memberHasRecords(book, id)) throw new InvalidLedgerInputError('회비 기록에 낸 분으로 들어간 회원은 지울 수 없다')
   return { ...book, members: (book.members ?? []).filter((member) => member.id !== id) }
+}
+
+// 회원 한 분의 쉬는 달만 바꾼다
+function changeOff(book: Book, id: string, change: (off: readonly YearMonth[]) => YearMonth[]): Book {
+  return {
+    ...book,
+    members: (book.members ?? []).map((member) => (member.id === id ? { ...member, off: change(member.off) } : member)),
+  }
+}
+
+// 쉬는 기간 넣기 (SPEC-010 5절 한 분 보기 [N월부터 쉬어요]): from 부터 until 까지(둘 다 포함) 달마다 쉬는 달로 저장한다.
+// 이미 쉬는 달은 한 번만, 달 순서로 둔다 ('YYYY-MM' 글자 순서 = 달 순서)
+export function restMember(book: Book, id: string, from: YearMonth, until: YearMonth): Book {
+  const first = checkYearMonth(from, '쉬는 달')
+  const last = checkYearMonth(until, '쉬는 끝 달')
+  if (last < first) throw new InvalidLedgerInputError(`쉬는 끝 달이 첫 달보다 앞이다: ${first} ~ ${last}`)
+  const months: YearMonth[] = []
+  for (let month = first; month <= last; month = nextMonth(month)) months.push(month)
+  return changeOff(book, id, (off) => [...new Set([...off, ...months])].sort())
+}
+
+// 다시 내기 (5절 [N월부터 다시 내요]): from 부터 이어진 쉬는 달을 지운다. 앞의 쉬는 달·사이가 떨어진 쉬는 달은 남긴다
+export function resumeMember(book: Book, id: string, from: YearMonth): Book {
+  return changeOff(book, id, (off) => {
+    const resting = new Set(off)
+    for (let month = checkYearMonth(from, '다시 내는 달'); resting.has(month); month = nextMonth(month)) resting.delete(month)
+    return off.filter((month) => resting.has(month))
+  })
+}
+
+// [아직 몰라요]의 끝 달: 쉬는 달은 달마다 저장해 끝이 있어야 하니, 그 달의 해와 올해 중 늦은 해의 다음 해 12월까지 (#163).
+// "언제까지 쉬나요?" 달 고르기의 마지막 해와 같다. 다시 내면 [N월부터 다시 내요]로 지운다
+export function openEndedRestUntil(from: YearMonth, today: Date): YearMonth {
+  return yearMonth(Math.max(splitYearMonth(from).year, today.getFullYear()) + 1, 12)
 }
 
 // 회비 표 시작 달 바꾸기. "낸 분을 안 적은 회비" 카드 숨김은 그대로

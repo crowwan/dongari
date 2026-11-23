@@ -570,15 +570,16 @@ function CarryoverEdit({ label, ledger, onSave, onBack }: CarryoverEditProps) {
 }
 
 type MonthlyFeeEditProps = {
-  year: number // 지금 장부 연도
+  year: number // 고치는 해 (설정은 지금 장부 연도, 회비 표는 보고 있는 해)
   fee: MonthlyFeeSource | undefined // 지금 쓰는 값과 그 값을 정한 해 (그 해에 없으면 그 전 해 값)
   onSave: (fee: number) => void
   onBack: () => void
+  backLabel?: string // 맨 위 [‹ …]: 설정 "설정", 회비 표 [바꾸기]·[정하기] "회비 표" (#163)
 }
 
 // 월 회비 (SPEC-010 6절): 지금 장부 연도의 한 분 한 달 금액. 이월금 편집과 같은 모양.
 // 그 전 해 값을 이어 쓰는 중이면 그 해에 저장된 값이 없으니 같은 금액 그대로도 [저장]해 이 해 값으로 정할 수 있다
-function MonthlyFeeEdit({ year, fee, onSave, onBack }: MonthlyFeeEditProps) {
+export function MonthlyFeeEdit({ year, fee, onSave, onBack, backLabel }: MonthlyFeeEditProps) {
   const [amount, setAmount] = useState(fee?.amount ?? 0)
   const inheritedFrom = fee !== undefined && fee.year !== year ? fee.year : undefined
   const savedThisYear = inheritedFrom === undefined ? fee?.amount : undefined
@@ -589,6 +590,7 @@ function MonthlyFeeEdit({ year, fee, onSave, onBack }: MonthlyFeeEditProps) {
       canSave={amount > 0 && amount !== savedThisYear}
       onSave={() => onSave(amount)}
       onBack={onBack}
+      backLabel={backLabel}
     >
       <div className="settings__field">
         <MoneyInput label={`${year}년 월 회비`} labelRole="label" value={amount} onChange={setAmount} />

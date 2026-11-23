@@ -65,6 +65,8 @@ type LedgerScreenProps = {
   unsavedEntryIds?: ReadonlySet<string>
   // 복구 코드 안내 말풍선이 가리키는 위쪽 [설정] (SPEC-008)
   settingsRef?: Ref<HTMLButtonElement>
+  // [👥 회비 표] (SPEC-010 4절, 동아리·모임 장부만). behind: 올해 지난달까지 덜 낸 분 수 (명단이 없으면 0 — 숫자 없이 "회비 표")
+  dues?: { behind: number; onOpen: () => void }
 }
 
 // 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 [결산][설정] → 잔액 카드 → ‹ N월 ▾ › → [N월 정리 보기] → 그 달 카드 → 아래 고정 [+ 내역 적기].
@@ -92,6 +94,7 @@ export function LedgerScreen({
   onEditEntry,
   unsavedEntryIds,
   settingsRef,
+  dues,
 }: LedgerScreenProps) {
   const group = monthGroup(ledger.entries, month)
 
@@ -148,6 +151,20 @@ export function LedgerScreen({
           <div className="ledger__month-action">
             <IconButton icon="receipt" variant="surface" onClick={() => onOpenMonthSummary(month)}>
               {`${month}월 정리 보기`}
+            </IconButton>
+          </div>
+        )}
+
+        {/* [N월 정리 보기] 바로 아래(없으면 그 자리) 회비 표 (SPEC-010 4절) */}
+        {dues && (
+          <div className="ledger__month-action">
+            <IconButton
+              icon="users"
+              variant="surface"
+              note={dues.behind > 0 ? `지난달까지 덜 낸 분 ${dues.behind}명` : undefined}
+              onClick={dues.onOpen}
+            >
+              회비 표
             </IconButton>
           </div>
         )}

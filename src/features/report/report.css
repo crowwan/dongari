@@ -346,6 +346,7 @@
 
 /* 비율 막대: 회색 홈 안에 그해 합계 대비 길이. 아주 작은 비율도 보이게 최소 굵기만큼 */
 .item-totals__track {
+  display: block;
   height: var(--bar-thickness);
   margin-top: var(--space-2);
   border-radius: var(--corner-pill);
@@ -354,6 +355,7 @@
 }
 
 .item-totals__bar {
+  display: block;
   min-width: var(--bar-thickness);
   height: 100%;
   border-radius: var(--corner-pill);
@@ -362,6 +364,50 @@
 
 .item-totals[data-kind='income'] .item-totals__bar {
   background: var(--income-bar);
+}
+
+/* 회비 기록 줄 → 회비 표 (SPEC-010 4절, #163): 줄 위아래 여백까지 누르는 곳(56 이상)이 되게 줄 여백만큼 바깥으로 */
+.item-totals__open {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  margin-block: calc(var(--space-3) * -1);
+  padding: var(--space-3) 0;
+  border: 0;
+  border-radius: var(--corner-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.item-totals__open:focus-visible {
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
+
+.item-totals__open:active {
+  background: var(--pressed);
+}
+
+.item-totals__chevron {
+  flex: none;
+  align-self: center;
+  display: flex;
+  color: var(--faint);
+}
+
+.item-totals__chevron .ui-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+/* 사진에는 누르는 표시(›)를 넣지 않는다 */
+.share-summary[data-capturing] .item-totals__chevron {
+  display: none;
 }
 
 /* ---------- 연습 장부 결산 띠 (SPEC-008) ---------- */

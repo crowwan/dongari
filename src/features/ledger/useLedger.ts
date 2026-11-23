@@ -26,6 +26,8 @@ import {
   changeDuesStart as changeDuesStartOf,
   changeMonthlyFee as changeMonthlyFeeOf,
   deleteMember as deleteMemberFrom,
+  restMember as restMemberIn,
+  resumeMember as resumeMemberIn,
   updateMember as updateMemberIn,
   type MemberChanges,
   type NewMember,
@@ -96,7 +98,10 @@ export interface LedgerState {
   updateMember: (id: string, changes: MemberChanges) => boolean
   deleteMember: (id: string) => boolean // 기록에 낸 분으로 들어간 회원은 지우지 않는다 (화면은 버튼 대신 안내)
   changeDuesStart: (month: YearMonth) => boolean
-  changeMonthlyFee: (fee: number) => boolean // 이 연도 월 회비
+  changeMonthlyFee: (fee: number, feeYear?: number) => boolean // 그 해(없으면 이 연도) 월 회비. 회비 표는 보고 있는 해를 넘긴다 (#163)
+  // 쉬는 기간 넣기·빼기 (SPEC-010 5절 한 분 보기, #163)
+  restMember: (id: string, from: YearMonth, until: YearMonth) => boolean
+  resumeMember: (id: string, from: YearMonth) => boolean
   changeYear: (year: number) => void
   // 장부를 고른다: 마지막에 본 장부로 저장하고 그 장부의 올해 장부를 연다 (기록 변경은 아니라 변경 시각은 그대로)
   switchBook: (id: string) => void
@@ -185,13 +190,13 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     return result
   }
 
-  // 지금 장부의 이 연도 장부를 바꾼다
-  function changeLedger(change: (ledger: Ledger, book: Book) => Book, entryId?: string): boolean {
+  // 지금 장부의 이 연도(ledgerYear, 기본 보고 있는 연도) 장부를 바꾼다
+  function changeLedger(change: (ledger: Ledger, book: Book) => Book, entryId?: string, ledgerYear = year): boolean {
     return commit(
       (current) => {
         const target = currentBook(current)
-        const ledger = target?.ledgers[String(year)]
-        if (!target || !ledger) throw new Error(`${year}년 장부가 없다`)
+        const ledger = target?.ledgers[String(ledgerYear)]
+        if (!target || !ledger) throw new Error(`${ledgerYear}년 장부가 없다`)
         return replaceBook(current, change(ledger, target))
       },
       { entryId },
@@ -308,7 +313,10 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     updateMember: (id, changes) => changeBook((target) => updateMemberIn(target, id, changes)),
     deleteMember: (id) => changeBook((target) => deleteMemberFrom(target, id)),
     changeDuesStart: (month) => changeBook((target) => changeDuesStartOf(target, month)),
-    changeMonthlyFee: (fee) => changeLedger((item, target) => withLedger(target, changeMonthlyFeeOf(item, fee))),
+    changeMonthlyFee: (fee, feeYear = year) =>
+      changeLedger((item, target) => withLedger(target, changeMonthlyFeeOf(item, fee)), undefined, feeYear),
+    restMember: (id, from, until) => changeBook((target) => restMemberIn(target, id, from, until)),
+    resumeMember: (id, from) => changeBook((target) => resumeMemberIn(target, id, from)),
     changeYear: setYear,
     switchBook: (id) => {
       commit((current) => ({ ...current, settings: { ...current.settings, lastBookId: id } }), { recordChange: false })
