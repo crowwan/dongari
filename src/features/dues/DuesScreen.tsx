@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState, type Ref } from 'react'
 import { duesTable, duesYears, monthlyFeeSource, unassignedDues, type DuesGroup, type DuesTable } from '../../domain/duesTable'
 import { splitYearMonth, thisMonthOf } from '../../domain/members'
 import type { Book, YearMonth } from '../../domain/types'
@@ -58,12 +58,14 @@ export function DuesScreen({ book, today, initialYear, ledgerYears, settings, on
   const [feeYear, setFeeYear] = useState<number>()
   const table = duesTable(book, year, today)
   const unassigned = unassignedDues(book)
+  const { assign } = settings
+  const summaryRef = useRef<HTMLElement>(null)
   const member = book.members?.find((item) => item.id === memberId)
   const openMember = () => sheets.openSheet(MEMBER_PAGE)
 
   if (isRosterPage(sheets.sheet)) return <RosterPages dues={settings} sheets={sheets} backLabel="회비 표" />
-  if (sheets.sheet === ASSIGN_PAGE && settings.assign) {
-    return <AssignPayersPage assign={settings.assign} sheets={sheets} backLabel="회비 표" onClose={sheets.closeSheet} />
+  if (sheets.sheet === ASSIGN_PAGE && assign) {
+    return <AssignPayersPage assign={assign} sheets={sheets} backLabel="회비 표" onClose={sheets.closeSheet} />
   }
   if (sheets.sheet === FEE_PAGE && feeYear !== undefined) {
     return (
@@ -149,6 +151,7 @@ export function DuesScreen({ book, today, initialYear, ledgerYears, settings, on
       ) : (
         <>
           <DuesSummary
+            ref={summaryRef}
             table={table}
             filter={filter}
             onFilter={setFilter}
@@ -156,11 +159,15 @@ export function DuesScreen({ book, today, initialYear, ledgerYears, settings, on
             onSetFee={openFee}
           />
           {/* 7절 "낸 분을 안 적은 회비 N건": 대상이 있고 [이 카드 숨기기] 전일 때만 */}
-          {settings.assign && !book.dues?.hideUnassigned && unassigned.items.length > 0 && (
+          {assign && !book.dues?.hideUnassigned && unassigned.items.length > 0 && (
             <UnassignedDuesCard
               unassigned={unassigned}
               onAssign={() => sheets.openSheet(ASSIGN_PAGE)}
-              onHide={settings.assign.onHide}
+              onHide={() => {
+                // 누른 버튼이 카드와 함께 사라져도 포커스가 화면 밖(body)으로 떨어지지 않게 바로 위 요약 카드로 (#181 리뷰)
+                summaryRef.current?.focus()
+                assign.onHide()
+              }}
             />
           )}
           <DuesRows
@@ -194,15 +201,17 @@ type DuesSummaryProps = {
   onFilter: (filter: DuesGroup | null) => void
   canSetFee: (year: number) => boolean // 그 해 장부가 있어 월 회비를 저장할 수 있는가
   onSetFee: (year: number) => void
+  // 화면 읽기용 포커스 자리 ([이 카드 숨기기] 뒤, 7절 #181 리뷰)
+  ref?: Ref<HTMLElement>
 }
 
 // 요약 카드: 월 회비 [바꾸기] / 월 회비가 없는 첫 해 "YYYY년 월 회비를 정해 주세요" [정하기] → 알약 [덜 낸 분 N명][다 낸 분 N명][쉬는 분 N명]
 // (누르면 그 묶음만, 다시 누르면 모두. 0명인 묶음은 알약이 없다). 시작 해보다 이른 해는 알약 대신 안내
-function DuesSummary({ table, filter, onFilter, canSetFee, onSetFee }: DuesSummaryProps) {
+function DuesSummary({ table, filter, onFilter, canSetFee, onSetFee, ref }: DuesSummaryProps) {
   const { year, monthlyFee, missingFeeYear, summary, startMonth } = table
   const shown = activeFilter(table, filter)
   return (
-    <section className="dues-summary" aria-label={`${year}년 회비 요약`} data-testid="dues-summary">
+    <section ref={ref} tabIndex={-1} className="dues-summary" aria-label={`${year}년 회비 요약`} data-testid="dues-summary">
       {monthlyFee !== undefined && (
         <div className="dues-summary__line">
           <span className="dues-summary__fee">

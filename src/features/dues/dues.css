@@ -50,6 +50,11 @@
   gap: var(--space-2);
 }
 
+/* [이 카드 숨기기] 뒤 요약 카드에 주는 포커스는 화면 읽기용 (화면 제목 h1 과 같이 테두리를 그리지 않는다, 7절 #181 리뷰) */
+.dues-summary[tabindex='-1']:focus {
+  outline: none;
+}
+
 .dues-summary__line {
   display: flex;
   flex-wrap: wrap;
@@ -524,6 +529,12 @@ button.dues-calendar__cell[data-state='full']:active,
   font-size: var(--text-label-size);
   font-weight: var(--weight-semibold);
   cursor: pointer;
+}
+
+/* 눌림: 알아 둘 것 면(--info-bg) 위에서는 --pressed(옅은 회색)가 면과 거의 같아 안 보이니, 청록 글자에 맞춘 옅은 청록 눌림 면 (#181 리뷰) */
+.dues-unassigned__hide:active,
+[data-preview-pressed] .dues-unassigned__hide {
+  background: var(--primary-soft-pressed);
 }
 
 /* 붙이기 화면 진행 "3 / 12" + 막대 (7절) */

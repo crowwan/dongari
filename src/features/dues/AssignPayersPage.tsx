@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { unassignedDues, type DatedEntry } from '../../domain/duesTable'
 import { itemIcon } from '../../domain/itemIcon'
 import { yearMonth } from '../../domain/members'
@@ -48,6 +48,16 @@ export function AssignPayersPage({ assign, sheets, backLabel, onClose }: AssignP
   const [picks, setPicks] = useState(NO_PICKS)
   const [assigned, setAssigned] = useState(0)
   const item = items[index]
+  // 다음 기록으로 넘긴 뒤 포커스를 "이 기록" 카드 머리로: 고른 분이 비어 누른 [다음] 이 비활성이 되면 포커스가 화면 밖(body)으로
+  // 떨어져 화면 읽기가 맨 위부터 다시 읽게 되므로 (#181 리뷰). 넘길 때만 옮긴다 (처음 열 때는 화면 제목, useScreenHeading)
+  const recordTitleRef = useRef<HTMLParagraphElement>(null)
+  const focusRecord = useRef(false)
+
+  useEffect(() => {
+    if (!focusRecord.current) return
+    focusRecord.current = false
+    recordTitleRef.current?.focus({ preventScroll: true })
+  }, [index])
 
   if (item === undefined) {
     return (
@@ -66,13 +76,14 @@ export function AssignPayersPage({ assign, sheets, backLabel, onClose }: AssignP
   const last = index === items.length - 1
   const status = assignNote(picks.memberIds.length, entry.amount, picks.shares)
 
-  // 다음 기록으로 (마지막이면 끝): 고른 분은 넘기지 않고 화면 맨 위부터
+  // 다음 기록으로 (마지막이면 끝): 고른 분은 넘기지 않고 화면 맨 위부터, 포커스는 새 기록 카드 머리로
   function advance(done: number) {
     if (last) {
       onClose()
       assign.onFinish(done)
       return
     }
+    focusRecord.current = true
     setIndex(index + 1)
     setPicks(NO_PICKS)
     window.scrollTo(0, 0)
@@ -147,11 +158,11 @@ export function AssignPayersPage({ assign, sheets, backLabel, onClose }: AssignP
             <span className="assign__bar-fill" style={{ width: `${((index + 1) / items.length) * 100}%` }} />
           </span>
         </div>
-        {/* [다음]·[건너뛰기] 뒤 화면 읽기에 새 기록을 알린다 (포커스는 아래 버튼에 남는다) */}
+        {/* [다음]·[건너뛰기] 뒤 화면 읽기에 몇 번째 어떤 기록인지 알린다 (포커스는 카드 머리 "이 기록"으로 옮긴다) */}
         <p className="ui-visually-hidden" aria-live="polite">
           {index > 0 ? `${items.length}건 중 ${index + 1}번째 기록이에요. ${dateText(item, thisYear)} ${formatAmount(entry.amount)}원` : ''}
         </p>
-        <EntryCard title="이 기록" rows={rows}>
+        <EntryCard title="이 기록" rows={rows} titleRef={recordTitleRef}>
           <div className="entry__part">
             {entry.sourceText !== undefined && <SourceText text={entry.sourceText} />}
             <h2 className="entry__question">누가 냈어요?</h2>

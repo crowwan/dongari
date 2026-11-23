@@ -691,12 +691,12 @@ describe('SPEC-010 낸 분 붙이기 (7절)', () => {
     { id: 'm1', name: '김도윤', joined: '2026-01', off: [] },
     { id: 'm2', name: '강민지', joined: '2026-01', off: [] },
   ]
-  // 엑셀에서 불러와 낸 분을 못 나눈 회비 기록 (날짜 없는 예전 기록, 사진 묶음)
+  // 엑셀에서 불러와 낸 분을 못 나눈 회비 기록 (날짜 없는 예전 기록, 사진 묶음, 저장 형식이 받는 끝 띄어쓰기가 남은 이름)
   const unassigned = entry({
     id: 'u',
     month: 3,
     type: 'income',
-    name: '회비(2인)',
+    name: '회비(2인) ',
     amount: 50_000,
     batchId: 'batch-1',
     sourceText: '3월 -2명: 김도윤(3만원),강민지',
@@ -708,7 +708,7 @@ describe('SPEC-010 낸 분 붙이기 (7절)', () => {
     { memberId: 'm2', amount: 20_000 },
   ]
 
-  it('AC-22 그 기록에 낸 분만 붙이고 날짜·항목·금액·엑셀 글·묶음·적은 시각·순서는 그대로 둔다', () => {
+  it('AC-22 그 기록에 낸 분만 붙이고 날짜·항목(이름을 다듬지도 않음)·금액·엑셀 글·묶음·적은 시각·순서는 그대로 둔다 (#181 리뷰)', () => {
     const next = assignPayers(ledger({ entries: [other, unassigned] }), 'u', shares, MEMBERS)
 
     expect(next.entries).toEqual([other, { ...unassigned, payers: shares }])
@@ -729,11 +729,16 @@ describe('SPEC-010 낸 분 붙이기 (7절)', () => {
   it.each([
     ['몫의 합이 기록 금액과 다름', [{ memberId: 'm1', amount: 20_000 }]],
     ['명단에 없는 회원', [{ memberId: 'nobody', amount: 50_000 }]],
+    ['같은 회원이 두 번', [{ memberId: 'm1', amount: 25_000 }, { memberId: 'm1', amount: 25_000 }]],
+    ['붙일 분이 없음', []],
   ])('저장 형식 검사와 어긋나는 낸 분은 붙이지 않는다: %s', (_label, payers) => {
     expect(() => assignPayers(ledger({ entries: [unassigned] }), 'u', payers, MEMBERS)).toThrow(InvalidLedgerInputError)
   })
 
-  it('없는 기록에는 붙이지 않는다', () => {
+  it('없는 기록·회비가 아닌 기록에는 붙이지 않는다', () => {
     expect(() => assignPayers(ledger({ entries: [other] }), 'u', shares, MEMBERS)).toThrow(InvalidLedgerInputError)
+    expect(() => assignPayers(ledger({ entries: [other] }), 'x', [{ memberId: 'm1', amount: 10_000 }], MEMBERS)).toThrow(
+      InvalidLedgerInputError,
+    )
   })
 })

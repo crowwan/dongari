@@ -124,6 +124,8 @@ describe('SPEC-010 낸 분 붙이기 (7절, #164)', () => {
       await userEvent.click(screen.getByRole('button', { name: '이 카드 숨기기' }))
 
       expect(card()).not.toBeInTheDocument()
+      // 누른 버튼이 사라져도 포커스가 화면 밖으로 떨어지지 않게 바로 위 요약 카드로 옮긴다 (#181 리뷰)
+      expect(screen.getByRole('region', { name: '2026년 회비 요약' })).toHaveFocus()
       expect(screen.getByRole('status')).toHaveTextContent('카드를 숨겼어요. 회원 명단에서 붙일 수 있어요')
       const saved = repository.load().data
       expect(saved.books[0]?.dues).toEqual({ startMonth: '2025-07', hideUnassigned: true })
@@ -188,6 +190,8 @@ describe('SPEC-010 낸 분 붙이기 (7절, #164)', () => {
       expect(savedEntry(repository, 2025, 'u1')?.sourceText).toBe('9월 -3명: 김도윤,강민지,박서연(가을)')
       expect(isStoredData(repository.load().data)).toBe(true)
       expect(screen.getByText('2 / 3')).toBeInTheDocument()
+      // 고른 분이 비어 [다음] 이 비활성이 되므로 포커스를 새 기록 카드 머리로 옮긴다 (#181 리뷰)
+      expect(within(thisRecord()).getByText('이 기록')).toHaveFocus()
       expect(within(thisRecord()).getByText('2월 3일')).toBeInTheDocument()
       expect(within(thisRecord()).getByText('회비(14인)')).toBeInTheDocument()
       expect(screen.queryByRole('note', { name: '엑셀에 적혀 있던 글' })).not.toBeInTheDocument()
@@ -201,6 +205,7 @@ describe('SPEC-010 낸 분 붙이기 (7절, #164)', () => {
 
       await userEvent.click(within(bar()).getByRole('button', { name: '건너뛰기' }))
       expect(screen.getByText('2 / 3')).toBeInTheDocument()
+      expect(within(thisRecord()).getByText('이 기록')).toHaveFocus()
       await userEvent.click(within(bar()).getByRole('button', { name: '건너뛰기' }))
       expect(screen.getByText('3 / 3')).toBeInTheDocument()
       expect(within(thisRecord()).getByText('5월 7일')).toBeInTheDocument()
