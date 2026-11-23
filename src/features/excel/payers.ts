@@ -1,9 +1,11 @@
 // 엑셀 수입 줄의 내용 글로 낸 분 나누기 (SPEC-010 8절 "낸 분"). 예: "4월 -2명: 강민지(12만원),김도윤"
+import { MEMBER_NAME_SEPARATORS } from '../../domain/members'
 import { ENTRY_AMOUNT_MAX, type Payer } from '../../domain/types'
 import { parseWonText } from './won'
 
 // 쉼표로 나눈 조각 하나: 이름과 (있으면) 그분 고정 금액
 export interface PayerPiece {
+  text: string // 조각 전체 (괄호까지) — 괄호가 든 회원 이름("김민지(91)")을 먼저 맞춰 본다
   name: string
   fixed?: number
 }
@@ -21,7 +23,7 @@ export type PayerMatch = { kind: 'no-member' } | { kind: 'mixed' } | { kind: 'me
 
 // 앞의 머리말: "4월 -2명:", "12월-2명 :", "1~3월 -3명:", "4월:", "2명："
 const PAYER_HEADER = /^\s*(?:(?:\d{1,2}\s*월?\s*[~～∼-]\s*)?\d{1,2}\s*월[^:：,，、]*|\d+\s*명\s*)[:：]\s*/
-const SEPARATORS = new Set([',', '，', '、'])
+const SEPARATORS = new Set(MEMBER_NAME_SEPARATORS)
 const PIECE_WITH_NOTE = /^(.*?)[(（]([^)）]*)[)）]$/
 
 // 괄호 밖의 쉼표로만 나눈다 ("이서준(15,000원)"의 쉼표는 금액)
@@ -44,10 +46,10 @@ function splitTopLevel(text: string): string[] {
 
 function pieceOf(text: string): PayerPiece {
   const match = PIECE_WITH_NOTE.exec(text)
-  if (!match) return { name: text }
+  if (!match) return { text, name: text }
   const fixed = parseWonText(match[2], true)
   const name = match[1].trim()
-  return fixed !== undefined && fixed >= 1 && fixed <= ENTRY_AMOUNT_MAX ? { name, fixed } : { name }
+  return fixed !== undefined && fixed >= 1 && fixed <= ENTRY_AMOUNT_MAX ? { text, name, fixed } : { text, name }
 }
 
 // 머리말을 떼고 쉼표(`,` `，` `、`)로 나눈 조각들. 조각마다 앞뒤 공백을 지우고 빈 조각은 뺀다
@@ -58,16 +60,24 @@ export function payerPieces(content: string): PayerPiece[] {
     .map(pieceOf)
 }
 
+// 조각 하나의 회원: 조각 전체가 명단 이름이면 그 회원(괄호가 든 이름 "김민지(91)", 금액 없음),
+// 아니면 괄호를 뗀 이름 (#180 리뷰 — 같은 이름 두 분을 괄호로 구분한 명단도 다시 읽히게)
+function matchPiece(piece: PayerPiece, roster: ReadonlyMap<string, string>): MatchedPayer | undefined {
+  const whole = roster.get(piece.text)
+  if (whole !== undefined) return { memberId: whole }
+  const memberId = roster.get(piece.name)
+  if (memberId === undefined) return undefined
+  return piece.fixed === undefined ? { memberId } : { memberId, fixed: piece.fixed }
+}
+
 // 조각을 회원 명단(이름 → 회원 번호)과 맞춘다
 export function matchPayers(content: string, roster: ReadonlyMap<string, string>): PayerMatch {
-  const pieces = payerPieces(content)
-  const ids = pieces.map((piece) => roster.get(piece.name))
-  if (ids.every((id) => id === undefined)) return { kind: 'no-member' }
+  const matched = payerPieces(content).map((piece) => matchPiece(piece, roster))
+  if (matched.every((item) => item === undefined)) return { kind: 'no-member' }
   const members: MatchedPayer[] = []
-  for (const [index, memberId] of ids.entries()) {
-    if (memberId === undefined || members.some((member) => member.memberId === memberId)) return { kind: 'mixed' }
-    const { fixed } = pieces[index]
-    members.push(fixed === undefined ? { memberId } : { memberId, fixed })
+  for (const item of matched) {
+    if (item === undefined || members.some((member) => member.memberId === item.memberId)) return { kind: 'mixed' }
+    members.push(item)
   }
   return { kind: 'members', members }
 }

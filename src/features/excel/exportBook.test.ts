@@ -285,6 +285,36 @@ describe('SPEC-010 엑셀 내보내기 — 다시 불러오기 (9절, AC-33)', (
     expect(summary.balanceMismatches).toEqual([])
   })
 
+  it('AC-33 괄호로 구분한 같은 이름 두 분("김민지"·"김민지(91)")도 회원·낸 분이 같다 (#180 리뷰)', async () => {
+    const twins: Member[] = [
+      { id: 't1', name: '김민지', joined: '2026-01', off: [] },
+      { id: 't2', name: '김민지(91)', joined: '2026-01', off: [] },
+    ]
+    const club = bookOf(
+      [
+        {
+          year: 2026,
+          carryover: 0,
+          monthlyFee: 10_000,
+          entries: [
+            entry(1, 5, 'income', '회비', 20_000, { payers: [{ memberId: 't1', amount: 10_000 }, { memberId: 't2', amount: 10_000 }] }),
+            entry(2, 5, 'income', '회비', 30_000, { payers: [{ memberId: 't2', amount: 30_000 }] }),
+          ],
+        },
+      ],
+      { members: twins, dues: { startMonth: '2026-01' } },
+    )
+    expect(sheetNamed(exportBook(club, TODAY).sheets, '2026년 입출금내역').rows.slice(3).map((row) => row[3])).toEqual([
+      '김민지,김민지(91)',
+      '김민지(91)(3만원)',
+    ])
+
+    const { book: again } = await roundTrip(club)
+
+    expect(memberKeys(again.members)).toEqual(memberKeys(twins))
+    expect(entryKeys(again, 2026)).toEqual(entryKeys(club, 2026))
+  })
+
   it('AC-33 낸 분을 못 나눈 회비(엑셀 글)가 이름만 있는 줄보다 많아도 "월 회비" 칸 값으로 다시 나눠 낸 분·월 회비가 같다 (#180 리뷰)', async () => {
     // 한 분 1만 원 줄 하나 + 엑셀 글 "김도윤" 1만5천 원 셋: 추정하면 1만5천이 가장 흔해 1만 원 줄의 낸 분이 빠지고 1만5천 줄에 낸 분이 생긴다
     const unassigned = () => entry(2, 5, 'income', '회비', 15_000, { sourceText: '김도윤' })

@@ -1,7 +1,9 @@
 import { useId, useState } from 'react'
 import type { MonthlyFeeSource } from '../../domain/duesTable'
 import {
+  hasNameSeparator,
   hasSameName,
+  NAME_SEPARATOR_ERROR,
   nextMonth,
   previousMonth,
   splitYearMonth,
@@ -234,13 +236,15 @@ function MemberAddPage({ members, thisMonth, sheets, onAdd, onBack }: MemberAddP
   const [name, setName] = useState('')
   const [joined, setJoined] = useState(thisMonth)
   const named = name.trim() !== ''
+  // 쉼표는 엑셀 낸 분을 가르는 글자라 이름에 못 쓴다 (#180 리뷰)
+  const separated = hasNameSeparator(name)
 
   return (
     <EditPage
       title="회원 넣기"
       backLabel="회원 명단"
       saveLabel="넣기"
-      canSave={named}
+      canSave={named && !separated}
       onSave={() => onAdd({ name, joined })}
       onBack={onBack}
     >
@@ -249,6 +253,7 @@ function MemberAddPage({ members, thisMonth, sheets, onAdd, onBack }: MemberAddP
         labelRole="label"
         value={name}
         onChange={setName}
+        error={separated ? NAME_SEPARATOR_ERROR : undefined}
         note={named && hasSameName(members, name) ? SAME_NAME_NOTE : undefined}
       />
       <PickerField label="들어온 달" value={fullMonthText(joined)} onClick={() => sheets.openDialog(JOINED_SHEET)} />
@@ -309,6 +314,8 @@ export function MemberEditPage({
   // 금액이 0 이어도 고른 쪽을 기억한다 (처음엔 덜 낸 돈 — 엑셀 "미수합계" 를 옮기는 일이 많다)
   const [owed, setOwed] = useState((member.opening ?? 0) <= 0)
   const named = name.trim() !== ''
+  // 쉼표를 새로 넣는 것만 막는다 (예전부터 쉼표가 든 이름은 그대로 둘 수 있다, #180 리뷰)
+  const separated = name.trim() !== member.name && hasNameSeparator(name)
   const changed =
     name.trim() !== member.name || joined !== member.joined || left !== member.left || opening !== (member.opening ?? 0)
 
@@ -326,7 +333,7 @@ export function MemberEditPage({
     <EditPage
       title="회원 정보 바꾸기"
       backLabel={backLabel}
-      canSave={named && changed}
+      canSave={named && !separated && changed}
       onSave={() => onSave({ name, joined, left, opening })}
       onBack={onBack}
       footer={footer}
@@ -336,7 +343,7 @@ export function MemberEditPage({
         labelRole="label"
         value={name}
         onChange={setName}
-        error={named ? undefined : '이름을 적어 주세요'}
+        error={!named ? '이름을 적어 주세요' : separated ? NAME_SEPARATOR_ERROR : undefined}
         note={named && hasSameName(members, name, member.id) ? SAME_NAME_NOTE : undefined}
       />
       <PickerField label="들어온 달" value={fullMonthText(joined)} onClick={() => sheets.openDialog(JOINED_SHEET)} />

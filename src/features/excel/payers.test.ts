@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { equalShare, matchPayers, payerPieces, splitPayers, type MatchedPayer } from './payers'
+import { equalShare, matchPayers, payerPieces, splitPayers, type MatchedPayer, type PayerPiece } from './payers'
 
 // 지어낸 회원 명단: 이름 → 회원 번호
 const roster = new Map([
@@ -12,6 +12,11 @@ function members(content: string): MatchedPayer[] {
   const match = matchPayers(content, roster)
   if (match.kind !== 'members') throw new Error(`회원으로 나누지 못했다: ${match.kind}`)
   return match.members
+}
+
+// 조각의 이름·고정 금액만 (조각 전체 글 text 는 회원 맞추기에서 본다)
+function nameAndFixed({ name, fixed }: PayerPiece) {
+  return fixed === undefined ? { name } : { name, fixed }
 }
 
 describe('SPEC-010 엑셀 낸 분 조각 읽기 (8절 "낸 분")', () => {
@@ -31,7 +36,7 @@ describe('SPEC-010 엑셀 낸 분 조각 읽기 (8절 "낸 분")', () => {
   })
 
   it('"이름(…)"은 괄호 앞 이름만 보고, "이름(N만원)"·"이름(N원)"은 그분 금액을 고정한다', () => {
-    expect(payerPieces('강민지(3개월),김도윤(12만원),이서준(15,000원),박하늘(2만),최유나（5000원）')).toEqual([
+    expect(payerPieces('강민지(3개월),김도윤(12만원),이서준(15,000원),박하늘(2만),최유나（5000원）').map(nameAndFixed)).toEqual([
       { name: '강민지' },
       { name: '김도윤', fixed: 120_000 },
       { name: '이서준', fixed: 15_000 },
@@ -41,7 +46,7 @@ describe('SPEC-010 엑셀 낸 분 조각 읽기 (8절 "낸 분")', () => {
   })
 
   it('괄호 안이 만·원 없는 숫자(달 수 같은 것)면 금액이 아니라 이름만 본다', () => {
-    expect(payerPieces('강민지(3),김도윤(2)')).toEqual([{ name: '강민지' }, { name: '김도윤' }])
+    expect(payerPieces('강민지(3),김도윤(2)').map(nameAndFixed)).toEqual([{ name: '강민지' }, { name: '김도윤' }])
   })
 
   it('머리말 모양이 아닌 쌍점 앞 글은 떼지 않는다', () => {
@@ -67,6 +72,19 @@ describe('SPEC-010 엑셀 낸 분 회원과 맞추기 (8절 "낸 분")', () => {
 
   it('같은 회원이 두 번 나오면 나누지 못한 입금이다 (낸 분에 같은 회원 두 번 없음)', () => {
     expect(matchPayers('강민지,강민지(1만원)', roster)).toEqual({ kind: 'mixed' })
+  })
+
+  it('조각 전체가 명단 이름과 같으면(괄호가 든 이름 "김민지(91)") 괄호를 떼기 전에 그 회원으로 본다 (#180 리뷰)', () => {
+    // 같은 이름 두 분을 괄호로 구분한 명단
+    const twins = new Map([
+      ['김민지', 'k1'],
+      ['김민지(91)', 'k2'],
+    ])
+
+    expect(matchPayers('김민지(91)', twins)).toEqual({ kind: 'members', members: [{ memberId: 'k2' }] })
+    expect(matchPayers('김민지,김민지(91)', twins)).toEqual({ kind: 'members', members: [{ memberId: 'k1' }, { memberId: 'k2' }] })
+    // 괄호가 든 이름 뒤 금액: 마지막 괄호가 금액
+    expect(matchPayers('김민지(91)(2만원)', twins)).toEqual({ kind: 'members', members: [{ memberId: 'k2', fixed: 20_000 }] })
   })
 
   it.each([
