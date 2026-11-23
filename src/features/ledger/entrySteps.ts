@@ -117,16 +117,24 @@ function asksPayers({ dues }: StepState, draft: EntryDraft): boolean {
   return dues !== undefined && draft.type !== undefined && isDuesEntry({ type: draft.type, name: draft.name })
 }
 
-// 항목을 정한 뒤: 회비 기록이면 "누가 냈어요?", 아니면 금액 (회비가 아니게 됐으면 고른 분은 버린다)
-function afterItem(state: StepState, draft: EntryDraft): StepState {
-  if (asksPayers(state, draft)) return { ...state, step: 'payers', draft }
-  return { ...state, step: 'amount', draft, payers: NO_PAYERS }
+// "누가 냈어요?" 에 답했나: 고른 분이 있게 [다음] 을 눌렀거나 [이름 없이 적기]
+function answeredPayers({ answer, memberIds }: PayerDraft): boolean {
+  return answer === 'nameless' || (answer === 'picked' && memberIds.length > 0)
 }
 
-// [다음] 이 채우는 금액: 고른 사람 수 × 월 회비. 월 회비가 없으면(또는 상한을 넘으면) 적던 금액 그대로 (처음엔 빈칸)
-function filledAmount({ dues, draft }: StepState, count: number): number {
-  const filled = dues?.fee === undefined ? undefined : dues.fee * count
-  return filled === undefined || filled > ENTRY_AMOUNT_MAX ? draft.amount : filled
+// 항목을 정한 뒤: 회비 기록이면 "누가 냈어요?", 아니면 금액 (회비가 아니게 됐으면 고른 분은 버린다).
+// 회비 항목끼리 바꾸면("회비" → "회비(14인)") 이미 답한 낸 분·한 분씩 금액·금액을 그대로 두고 금액으로 (항목 바꾸기는 금액 유지, AC-16)
+function afterItem(state: StepState, draft: EntryDraft): StepState {
+  if (!asksPayers(state, draft)) return { ...state, step: 'amount', draft, payers: NO_PAYERS }
+  if (answeredPayers(state.payers)) return { ...state, step: 'amount', draft }
+  return { ...state, step: 'payers', draft }
+}
+
+// [다음] 이 채우는 금액: 고른 사람 수 × 월 회비. 월 회비가 없거나 상한(999,999,999원)을 넘으면 채우지 않는다(undefined)
+export function feeTotal(count: number, fee: number | undefined): number | undefined {
+  if (fee === undefined) return undefined
+  const total = count * fee
+  return total > ENTRY_AMOUNT_MAX ? undefined : total
 }
 
 function toggled(memberIds: readonly string[], memberId: string): string[] {
@@ -196,7 +204,8 @@ export function stepReducer(state: StepState, action: StepAction): StepState {
       return {
         ...state,
         step: 'amount',
-        draft: { ...draft, amount: filledAmount(state, count) },
+        // 채우지 못하면 적던 금액 그대로 (처음엔 빈칸)
+        draft: { ...draft, amount: feeTotal(count, state.dues?.fee) ?? draft.amount },
         payers: { ...state.payers, answer: 'picked', shares: undefined },
       }
     }
@@ -235,10 +244,13 @@ export function entryToSave(state: StepState): EntrySave {
   return payers ? { kind: 'save', input: { ...check.input, payers } } : { kind: 'shares' }
 }
 
-// "누가 냈어요?" 아래 안내 (SPEC-010 3절): "4명 · 80,000원 (한 분 20,000원)", 월 회비가 없으면 "4명"
+// "누가 냈어요?" 아래 안내 (SPEC-010 3절): "4명 · 80,000원 (한 분 20,000원)", 월 회비가 없으면 "4명".
+// 합계가 상한을 넘으면(금액을 채우지 못함) 합계 없이 "4명 (한 분 300,000,000원)"
 export function payersSummary(count: number, fee: number | undefined): string {
   if (fee === undefined) return `${count}명`
-  return `${count}명 · ${formatAmount(count * fee)}원 (한 분 ${formatAmount(fee)}원)`
+  const total = feeTotal(count, fee)
+  const each = `(한 분 ${formatAmount(fee)}원)`
+  return total === undefined ? `${count}명 ${each}` : `${count}명 · ${formatAmount(total)}원 ${each}`
 }
 
 // 항목 고르기·새 이름의 수입/지출 단계는 누르면 바로 넘어가서 버튼이 없다(#111). "며칠인가요?" 는 숫자 칸이라 [다음] (빈칸·없는 날이면 비활성 + 안내)
@@ -274,8 +286,7 @@ export function answerRows(state: StepState): AnswerRow[] {
     rows.push({ kind: 'item', name: draft.name, type: draft.type })
   }
   const nameless = payers.answer === 'nameless'
-  const answered = nameless || (payers.answer === 'picked' && payers.memberIds.length > 0)
-  if (step !== 'payers' && answered && asksPayers(state, draft)) {
+  if (step !== 'payers' && answeredPayers(payers) && asksPayers(state, draft)) {
     rows.push({ kind: 'payers', memberIds: nameless ? [] : payers.memberIds, nameless })
   }
   return rows

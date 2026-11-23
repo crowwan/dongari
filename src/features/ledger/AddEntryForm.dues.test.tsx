@@ -169,6 +169,38 @@ describe('SPEC-010 회비 적기 (3절)', () => {
     expect(screen.getByLabelText('얼마인가요?')).toHaveValue('')
   })
 
+  it('월 회비 × 사람 수가 상한을 넘어 금액을 못 채우면 "채웠어요" 안내가 없다', async () => {
+    renderDues(clubBook(MEMBERS, 300_000_000))
+    await toPayers()
+    await userEvent.click(screen.getByRole('button', { name: '모두 4명' }))
+    expect(actionNote()).toHaveTextContent('4명 (한 분 300,000,000원)')
+
+    await userEvent.click(actionButton())
+
+    expect(screen.getByLabelText('얼마인가요?')).toHaveValue('')
+    expect(screen.queryByText(/으로 채웠어요/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '한 분만 금액이 달라요' })).toBeInTheDocument()
+  })
+
+  it('AC-14 [+ 회원 넣기] 로 넣은 분이 가나다로 접힌 자리(8번째 뒤)에 가도 목록이 펼쳐져 체크된 채 보인다', async () => {
+    const many: Member[] = ['가', '나', '다', '라', '마', '바', '사', '아', '자'].map((name, index) => ({
+      id: `m${index}`,
+      name: `${name}예시`,
+      joined: '2026-01',
+      off: [],
+    }))
+    renderDues(clubBook(many))
+    await toPayers()
+    expect(screen.getAllByRole('checkbox')).toHaveLength(7)
+
+    await userEvent.click(screen.getByRole('button', { name: '회원 넣기' }))
+    await userEvent.type(within(screen.getByRole('dialog', { name: '회원 넣기' })).getByLabelText('이름'), '하예시')
+    await userEvent.click(within(screen.getByRole('dialog', { name: '회원 넣기' })).getByRole('button', { name: '넣기' }))
+
+    expect(screen.getAllByRole('checkbox')).toHaveLength(10)
+    expect(box('하예시')).toBeChecked()
+  })
+
   it('AC-11 낸 분 줄 [바꾸기] 로 돌아가면 고른 분이 체크된 채다', async () => {
     renderDues()
     await toPayers()

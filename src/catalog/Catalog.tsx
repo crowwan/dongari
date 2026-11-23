@@ -258,8 +258,8 @@ const CHECK_NAMES: CheckOption[] = [
 ]
 const PAYER_CHOICES: PayerChoices = {
   members: [
-    ...CHECK_NAMES.slice(0, 5).map(({ value, label }) => ({ id: value, name: label, resting: false })),
-    { id: 'm-rest', name: '홍서진', resting: true },
+    ...CHECK_NAMES.slice(0, 5).map(({ value, label }) => ({ id: value, name: label, resting: false, left: false })),
+    { id: 'm-rest', name: '홍서진', resting: true, left: false },
   ],
   last: ['m-kang', 'm-kim', 'm-lee', 'm-jung'],
   fee: 20000,

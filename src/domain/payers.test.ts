@@ -57,10 +57,10 @@ describe('SPEC-010 "누가 냈어요?" 목록 (3절)', () => {
     const choices = payerChoices(clubBook(), 2026, 10)
 
     expect(choices.members).toEqual([
-      { id: 'm-kim', name: '김도윤', resting: false },
-      { id: 'm-lee', name: '이준호', resting: false },
-      { id: 'm-jung', name: '정하늘', resting: false },
-      { id: 'm-kang', name: '강민지', resting: true },
+      { id: 'm-kim', name: '김도윤', resting: false, left: false },
+      { id: 'm-lee', name: '이준호', resting: false, left: false },
+      { id: 'm-jung', name: '정하늘', resting: false, left: false },
+      { id: 'm-kang', name: '강민지', resting: true, left: false },
     ])
   })
 
@@ -68,10 +68,10 @@ describe('SPEC-010 "누가 냈어요?" 목록 (3절)', () => {
     expect(payerChoices(clubBook(), 2026, 3).members.map((choice) => choice.name)).toEqual(['강민지', '김도윤', '이준호', '정하늘'])
   })
 
-  it('고치기에서 이미 낸 분으로 들어간 그만둔 분은 목록에 남긴다', () => {
-    const names = payerChoices(clubBook(), 2026, 3, ['m-park']).members.map((choice) => choice.name)
+  it('고치기에서 이미 낸 분으로 들어간 그만둔 분은 목록에 남기고 그만둔 분이라고 표시한다 ([모두] 에서 빼려고)', () => {
+    const park = payerChoices(clubBook(), 2026, 3, ['m-park']).members.find((choice) => choice.name === '박서연')
 
-    expect(names).toContain('박서연')
+    expect(park).toEqual({ id: 'm-park', name: '박서연', resting: false, left: true })
   })
 
   it('그 해 월 회비를, 그 해에 없으면 그 전 해 값을 쓰고, 어느 해에도 없으면 없다', () => {

@@ -89,10 +89,14 @@ describe('SPEC-010 회비 기록 고치기 (3절 "고치기 화면")', () => {
     expect(box('정하늘')).not.toBeChecked()
   })
 
-  it('AC-15 그 기록에 낸 분으로 들어간 그만둔 분은 목록에 남는다', () => {
+  it('AC-15 그 기록에 낸 분으로 들어간 그만둔 분은 목록에 남지만 [모두] 에는 들지 않는다', async () => {
     renderEdit({ ...PAID, payers: even(['m-kim', 'm-park'], 20_000) })
 
     expect(box('박서연')).toBeChecked()
+    await userEvent.click(screen.getByRole('button', { name: '모두 3명' }))
+
+    expect(box('박서연')).not.toBeChecked()
+    expect(['김도윤', '이준호', '정하늘'].map((name) => box(name).getAttribute('aria-checked'))).toEqual(['true', 'true', 'true'])
   })
 
   it('AC-15 아무것도 바꾸지 않고 저장하면 지금 낸 분 그대로 (이 값)', async () => {

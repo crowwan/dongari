@@ -444,4 +444,20 @@ describe('SPEC-010 장부 줄의 낸 분 수 (3절)', () => {
     expect(screen.getByRole('button', { name: '회비 17일 · 수입 · 4명 +80,000원' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '회비 18일 · 수입 +30,000원' })).toBeInTheDocument()
   })
+
+  it('개인 가계부로 바꾼 장부는 명단·회비 값을 숨기므로 낸 분 수를 붙이지 않는다 (6절)', () => {
+    const payers = ['m1', 'm2'].map((memberId) => ({ memberId, amount: 20_000 }))
+    renderScreen(
+      {
+        year: 2026,
+        carryover: 0,
+        entries: [{ id: 'a', month: 10, day: 17, type: 'income', name: '회비', amount: 40_000, createdAt: '2026-10-17T00:00:00.000Z', payers }],
+      },
+      10,
+      {},
+      { books: [{ id: 'club', name: '한랑드림', kind: 'household', balance: 0 }] },
+    )
+
+    expect(screen.getByRole('button', { name: '회비 17일 · 수입 +40,000원' })).toBeInTheDocument()
+  })
 })

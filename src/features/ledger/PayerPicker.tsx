@@ -21,7 +21,8 @@ export function PayerPicker({ choices, checked, onToggle, onPick, onAddMember }:
   const active = choices.members.filter((member) => !member.resting)
   const resting = choices.members.filter((member) => member.resting)
   const option = ({ id, name }: { id: string; name: string }) => ({ value: id, label: name })
-  const everyone = active.map((member) => member.id)
+  // [모두 N명]: 지금 회원 중 그 달 쉬는 분을 뺀 분 (고치기에서 남겨 둔 그만둔 분도 뺀다)
+  const everyone = active.filter((member) => !member.left).map((member) => member.id)
 
   return (
     <div className="entry__payers">

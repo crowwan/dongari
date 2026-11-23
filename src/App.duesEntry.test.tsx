@@ -97,6 +97,14 @@ describe('SPEC-010 회비 적기·고치기 (3절)', () => {
     expect(screen.getByRole('button', { name: '회비 17일 · 수입 · 2명 +40,000원' })).toBeInTheDocument()
   })
 
+  it('개인 가계부로 바꾼 장부의 줄에는 낸 분 수가 붙지 않는다 (명단·회비 값은 숨김, 6절)', async () => {
+    renderApp(new MemoryRepository(stored({ kind: 'household' })))
+
+    await userEvent.click(screen.getByRole('button', { name: '이전 달' }))
+
+    expect(screen.getByRole('button', { name: '회비 3일 · 수입 +40,000원' })).toBeInTheDocument()
+  })
+
   it('AC-14 [+ 회원 넣기] 로 넣은 분은 명단에 저장되고(들어온 달 = 이 기록의 달) 그분이 낸 회비로 저장된다', async () => {
     const repository = renderApp(new MemoryRepository(stored()))
 

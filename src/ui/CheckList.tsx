@@ -28,8 +28,11 @@ export function CheckList({ label, options, tail, checked, onToggle, collapse, a
   const tailOptions = tail?.options ?? []
   const all = [...options, ...tailOptions]
   const limit = collapse && all.length > collapse.visible + 1 ? collapse.visible : all.length
-  // 고른 줄이 접힌 자리에 있으면 펼친 채 시작한다 (고치기에서 이미 낸 분)
-  const [expanded, setExpanded] = useState(() => all.slice(limit).some((option) => checked.includes(option.value)))
+  // 고른 줄이 접힌 자리에 있으면 펼친다: 처음 그릴 때(고치기에서 이미 낸 분)뿐 아니라 그 뒤에 생겨도([+ 회원 넣기]로 넣은 분이
+  // 가나다로 뒤에 가거나 그분이 들어와 처음 접힐 때). 한 번 펼치면 접지 않는다 — 누른 줄이 손 밑에서 사라지지 않게
+  const hiddenChecked = all.slice(limit).some((option) => checked.includes(option.value))
+  const [expanded, setExpanded] = useState(hiddenChecked)
+  if (hiddenChecked && !expanded) setExpanded(true)
   const shown = expanded ? all.length : limit
   // 더 보기를 눌러 펼쳤을 때만 처음 펼친 줄로 포커스를 옮긴다
   const focusFirstMore = useRef(false)

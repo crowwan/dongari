@@ -4,11 +4,13 @@ import { monthlyFeeOf } from './duesTable'
 import { yearMonth } from './members'
 import type { Book, Member } from './types'
 
-// 목록 한 줄: 회원 번호·이름, 그 기록의 달이 쉬는 달인지 (쉬는 분은 목록 맨 아래 "쉬는 분" 묶음)
+// 목록 한 줄: 회원 번호·이름, 그 기록의 달이 쉬는 달인지 (쉬는 분은 목록 맨 아래 "쉬는 분" 묶음),
+// 그만둔 분인지 (고치기에서 이미 낸 분이라 남겨 둔 분. [모두] 에는 들지 않는다)
 export interface PayerChoice {
   id: string
   name: string
   resting: boolean
+  left: boolean
 }
 
 export interface PayerChoices {
@@ -33,7 +35,7 @@ export function payerChoices(book: Book, year: number, month: number, keep: read
   const listed = (book.members ?? []).filter((member) => member.left === undefined || keep.includes(member.id))
   const resting = (member: Member) => member.off.includes(entryMonth)
   const ordered = [...listed.filter((member) => !resting(member)).sort(byName), ...listed.filter(resting).sort(byName)]
-  const members = ordered.map((member) => ({ id: member.id, name: member.name, resting: resting(member) }))
+  const members = ordered.map((member) => ({ id: member.id, name: member.name, resting: resting(member), left: member.left !== undefined }))
   const shown = new Set(members.map((member) => member.id))
   return {
     members,

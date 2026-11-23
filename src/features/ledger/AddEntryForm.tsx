@@ -26,6 +26,7 @@ import { startingShares } from './payerShares'
 import {
   answerRows,
   entryToSave,
+  feeTotal,
   isStepDirty,
   offersFinish,
   quickDays,
@@ -268,7 +269,8 @@ function amountNote({ draft, payers }: StepState, fee: number | undefined): stri
   if (payers.shares !== undefined && payers.shares.reduce((sum, share) => sum + share.amount, 0) === draft.amount) {
     return `한 분씩 정한 금액을 더했어요 (${count}명)`
   }
-  if (fee === undefined) return undefined
+  // 월 회비가 없거나 합계가 상한을 넘어 채우지 못했으면 없다
+  if (fee === undefined || feeTotal(count, fee) === undefined) return undefined
   return `${count}명 × ${formatAmount(fee)}원으로 채웠어요. 고쳐도 돼요.`
 }
 

@@ -22,6 +22,7 @@ function Harness({ options, initial = [], tail }: { options: CheckOption[]; init
 }
 
 const boxes = () => screen.getAllByRole('checkbox').map((box) => box.textContent)
+const COLLAPSE = { visible: 7, label: (hidden: number) => `회원 ${hidden}명 더 보기` }
 
 describe('CheckList 세로 체크 목록 (SPEC-010 3절, PATTERNS N12)', () => {
   it('줄을 누를 때마다 체크하고 풀며, 체크 상태가 화면 읽기에도 들린다', async () => {
@@ -47,6 +48,32 @@ describe('CheckList 세로 체크 목록 (SPEC-010 3절, PATTERNS N12)', () => {
     expect(boxes()).toHaveLength(9)
     expect(screen.queryByRole('button', { name: /더 보기/ })).not.toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: '홍서진' })).toHaveFocus()
+  })
+
+  it('접힌 자리의 줄이 나중에 체크되면(회원 넣기로 넣은 분) 펼친다', () => {
+    const { rerender } = render(<CheckList label="회원" options={NINE} checked={[]} onToggle={vi.fn()} collapse={COLLAPSE} />)
+    expect(boxes()).toHaveLength(7)
+
+    rerender(<CheckList label="회원" options={NINE} checked={['황보람']} onToggle={vi.fn()} collapse={COLLAPSE} />)
+
+    expect(boxes()).toHaveLength(9)
+    expect(screen.getByRole('checkbox', { name: '황보람' })).toBeChecked()
+  })
+
+  it('8명에서 9명이 되어 처음 접힐 때 새로 체크된 분이 뒤에 있으면 펼친 채다', () => {
+    const { rerender } = render(<CheckList label="회원" options={NINE.slice(0, 8)} checked={[]} onToggle={vi.fn()} collapse={COLLAPSE} />)
+
+    rerender(<CheckList label="회원" options={NINE} checked={['황보람']} onToggle={vi.fn()} collapse={COLLAPSE} />)
+
+    expect(boxes()).toHaveLength(9)
+  })
+
+  it('펼친 뒤 접힌 자리였던 줄의 체크를 풀어도 다시 접지 않는다 (누른 줄이 사라지지 않게)', async () => {
+    render(<Harness options={NINE} initial={['황보람']} />)
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '황보람' }))
+
+    expect(boxes()).toHaveLength(9)
   })
 
   it('8명이면 접지 않는다', () => {

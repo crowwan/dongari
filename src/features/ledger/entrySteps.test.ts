@@ -486,6 +486,48 @@ describe('SPEC-010 회비 적기 단계 (3절)', () => {
     expect(save.kind === 'save' && save.input).not.toHaveProperty('payers')
   })
 
+  describe('AC-16 항목 줄 [바꾸기] 는 금액 유지 — 회비 항목끼리 바꿀 때', () => {
+    const DUES_14: FrequentChoice = { name: '회비(14인)', type: 'income' }
+    const shares = [...['m1', 'm2', 'm3'].map((memberId) => ({ memberId, amount: 20_000 })), { memberId: 'm4', amount: 120_000 }]
+
+    it('낸 분·한 분씩 금액·금액을 그대로 두고 바로 "얼마인가요?" 로 간다', () => {
+      const before = dues(...FOUR, { kind: 'submit-payers' }, { kind: 'set-shares', shares })
+      const state = stepReducer(stepReducer(before, { kind: 'revisit-item' }), { kind: 'pick-item', choice: DUES_14 })
+
+      expect(state.step).toBe('amount')
+      expect(state.draft).toMatchObject({ name: '회비(14인)', amount: 180_000 })
+      expect(state.payers).toEqual(before.payers)
+      const save = entryToSave(state)
+      expect(save.kind === 'save' && save.input.payers).toEqual(shares)
+    })
+
+    it('손으로 고친 금액도 그대로이고, [이름 없이 적기] 로 답했으면 이름 없이 그대로다', () => {
+      const typed = dues(...FOUR, { kind: 'submit-payers' }, { kind: 'change-amount', amount: 100_000 }, { kind: 'revisit-item' }, { kind: 'pick-item', choice: DUES_14 })
+      expect(typed.draft.amount).toBe(100_000)
+
+      const nameless = dues({ kind: 'pick-item', choice: DUES }, { kind: 'skip-payers' }, { kind: 'change-amount', amount: 30_000 }, { kind: 'revisit-item' }, { kind: 'pick-item', choice: DUES_14 })
+      expect(nameless.step).toBe('amount')
+      expect(nameless.draft.amount).toBe(30_000)
+      expect(answerRows(nameless).at(-1)).toEqual({ kind: 'payers', memberIds: [], nameless: true })
+    })
+
+    it('아직 답하지 않았으면(누가 냈어요? 에서 항목 바꾸기) 다시 "누가 냈어요?" 로', () => {
+      const state = dues({ kind: 'pick-item', choice: DUES }, { kind: 'toggle-payer', memberId: 'm1' }, { kind: 'revisit-item' }, { kind: 'pick-item', choice: DUES_14 })
+
+      expect(state.step).toBe('payers')
+      expect(state.payers.memberIds).toEqual(['m1'])
+    })
+  })
+
+  describe('월 회비 × 사람 수가 상한(999,999,999원)을 넘을 때', () => {
+    const big = () => from(startSteps({ year: 2026, month: 10, dues: { fee: 300_000_000 } }), { kind: 'pick-day', day: 17 }, ...FOUR)
+
+    it('안내에 합계를 쓰지 않고, [다음] 은 금액을 채우지 않는다', () => {
+      expect(stepButton(big())?.note).toBe('4명 (한 분 300,000,000원)')
+      expect(stepReducer(big(), { kind: 'submit-payers' }).draft.amount).toBe(0)
+    })
+  })
+
   it('"누가 냈어요?" 에서 날짜 줄 [바꾸기] 로 갔다 오면 다시 "누가 냈어요?" 로 돌아온다', () => {
     const state = dues(...FOUR, { kind: 'revisit-day' }, { kind: 'pick-day', day: 18 })
 
