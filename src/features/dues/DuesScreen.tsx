@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { duesTable, duesYears, monthlyFeeSource, type DuesGroup, type DuesTable } from '../../domain/duesTable'
+import { useRef, useState, type Ref } from 'react'
+import { duesTable, duesYears, monthlyFeeSource, unassignedDues, type DuesGroup, type DuesTable } from '../../domain/duesTable'
 import { splitYearMonth, thisMonthOf } from '../../domain/members'
 import type { Book, YearMonth } from '../../domain/types'
 import { Button } from '../../ui/Button'
@@ -11,15 +11,18 @@ import { fullMonthText, isRosterPage, ROSTER_PAGE } from '../settings/roster'
 import { MemberEditPage, RosterPages, type DuesSettings } from '../settings/RosterPages'
 import { MonthlyFeeEdit } from '../settings/SettingsScreen'
 import type { SheetHistory } from '../useScreenHistory'
+import { AssignPayersPage } from './AssignPayersPage'
 import { DuesStrip } from './DuesStrip'
 import { rowStatus } from './duesWords'
 import { MemberDuesPage } from './MemberDuesPage'
+import { UnassignedDuesCard } from './UnassignedDuesCard'
 import './dues.css'
 
 // 회비 표 위에 뜨는 화면 (선택 창 칸 하나를 바꿔 끼운다 — 뒤로 버튼은 한 분 보기 → 회비 표 → 장부)
 const MEMBER_PAGE = 'dues-member'
 const MEMBER_EDIT_PAGE = 'dues-member-edit'
 const FEE_PAGE = 'dues-fee'
+const ASSIGN_PAGE = 'dues-assign' // 낸 분 붙이기 (7절)
 
 // 요약 알약 (4절): 덜 낸 분 → 다 낸 분 → 쉬는 분
 const GROUPS: readonly { group: DuesGroup; label: string }[] = [
@@ -41,7 +44,7 @@ type DuesScreenProps = {
 }
 
 // 회비 표 (SPEC-010 4절): [‹ 장부로] → 해 넘기기 [‹] 2026년 회비 [›](장부 연도는 그대로) → 요약 카드(월 회비 [바꾸기], 알약으로 묶음 거르기)
-// → (7절 "낸 분을 안 적은 회비" 카드 자리, #164) → 사람별 줄(덜 낸 분 먼저). 줄 → 한 분 보기, 이름 [›] → 회원 정보.
+// → 7절 "낸 분을 안 적은 회비" 카드([낸 분 붙이기] → 붙이기 화면) → 사람별 줄(덜 낸 분 먼저). 줄 → 한 분 보기, 이름 [›] → 회원 정보.
 // 명단이 비었으면 안내 + [회원 넣기](회원 명단). 회원 명단·월 회비·회원 정보 화면은 설정 것을 그대로 쓰고 [‹ 회비 표] 로 돌아온다
 export function DuesScreen({ book, today, initialYear, ledgerYears, settings, onRest, onResume, sheets, onBack }: DuesScreenProps) {
   const years = duesYears(book, today)
@@ -54,10 +57,16 @@ export function DuesScreen({ book, today, initialYear, ledgerYears, settings, on
   const [memberId, setMemberId] = useState<string>()
   const [feeYear, setFeeYear] = useState<number>()
   const table = duesTable(book, year, today)
+  const unassigned = unassignedDues(book)
+  const { assign } = settings
+  const summaryRef = useRef<HTMLElement>(null)
   const member = book.members?.find((item) => item.id === memberId)
   const openMember = () => sheets.openSheet(MEMBER_PAGE)
 
   if (isRosterPage(sheets.sheet)) return <RosterPages dues={settings} sheets={sheets} backLabel="회비 표" />
+  if (sheets.sheet === ASSIGN_PAGE && assign) {
+    return <AssignPayersPage assign={assign} sheets={sheets} backLabel="회비 표" onClose={sheets.closeSheet} />
+  }
   if (sheets.sheet === FEE_PAGE && feeYear !== undefined) {
     return (
       <MonthlyFeeEdit
@@ -142,13 +151,25 @@ export function DuesScreen({ book, today, initialYear, ledgerYears, settings, on
       ) : (
         <>
           <DuesSummary
+            ref={summaryRef}
             table={table}
             filter={filter}
             onFilter={setFilter}
             canSetFee={(target) => ledgerYears.includes(target)}
             onSetFee={openFee}
           />
-          {/* 7절 "낸 분을 안 적은 회비 N건" 카드 자리 (#164) */}
+          {/* 7절 "낸 분을 안 적은 회비 N건": 대상이 있고 [이 카드 숨기기] 전일 때만 */}
+          {assign && !book.dues?.hideUnassigned && unassigned.items.length > 0 && (
+            <UnassignedDuesCard
+              unassigned={unassigned}
+              onAssign={() => sheets.openSheet(ASSIGN_PAGE)}
+              onHide={() => {
+                // 누른 버튼이 카드와 함께 사라져도 포커스가 화면 밖(body)으로 떨어지지 않게 바로 위 요약 카드로 (#181 리뷰)
+                summaryRef.current?.focus()
+                assign.onHide()
+              }}
+            />
+          )}
           <DuesRows
             table={table}
             thisMonth={thisMonthOf(today)}
@@ -180,15 +201,17 @@ type DuesSummaryProps = {
   onFilter: (filter: DuesGroup | null) => void
   canSetFee: (year: number) => boolean // 그 해 장부가 있어 월 회비를 저장할 수 있는가
   onSetFee: (year: number) => void
+  // 화면 읽기용 포커스 자리 ([이 카드 숨기기] 뒤, 7절 #181 리뷰)
+  ref?: Ref<HTMLElement>
 }
 
 // 요약 카드: 월 회비 [바꾸기] / 월 회비가 없는 첫 해 "YYYY년 월 회비를 정해 주세요" [정하기] → 알약 [덜 낸 분 N명][다 낸 분 N명][쉬는 분 N명]
 // (누르면 그 묶음만, 다시 누르면 모두. 0명인 묶음은 알약이 없다). 시작 해보다 이른 해는 알약 대신 안내
-function DuesSummary({ table, filter, onFilter, canSetFee, onSetFee }: DuesSummaryProps) {
+function DuesSummary({ table, filter, onFilter, canSetFee, onSetFee, ref }: DuesSummaryProps) {
   const { year, monthlyFee, missingFeeYear, summary, startMonth } = table
   const shown = activeFilter(table, filter)
   return (
-    <section className="dues-summary" aria-label={`${year}년 회비 요약`} data-testid="dues-summary">
+    <section ref={ref} tabIndex={-1} className="dues-summary" aria-label={`${year}년 회비 요약`} data-testid="dues-summary">
       {monthlyFee !== undefined && (
         <div className="dues-summary__line">
           <span className="dues-summary__fee">
