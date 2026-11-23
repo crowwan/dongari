@@ -15,6 +15,11 @@ function withText(selector: string, text: string, textSelector?: string): HTMLEl
   return candidates.find((element) => (textSelector ? element.querySelector(textSelector) : element)?.textContent?.trim() === text) ?? null
 }
 
+// selector 에 맞는 요소 중 글자가 text 로 시작하는 것 (장부 [회비 표] 는 뒤에 "· 지난달까지 덜 낸 분 N명" 이 붙는다)
+function startingWith(selector: string, text: string): HTMLElement | null {
+  return [...document.querySelectorAll<HTMLElement>(selector)].find((element) => element.textContent?.trim().startsWith(text)) ?? null
+}
+
 const ADD_BAR = '[data-testid="add-entry-form"] [data-testid="bottom-action-bar"] button'
 
 export function findPracticeTarget(target: PracticeTarget, example: PracticeExample): HTMLElement | null {
@@ -33,6 +38,8 @@ export function findPracticeTarget(target: PracticeTarget, example: PracticeExam
       return withText('[data-testid="add-entry-form"] .ui-options__option', example.income.name, '.ui-options__label')
     case 'item-expense':
       return withText('[data-testid="add-entry-form"] .ui-options__option', example.expense.name, '.ui-options__label')
+    case 'payer':
+      return example.payer ? withText('[data-testid="add-entry-form"] .ui-checks__option', example.payer.name, '.ui-checks__label') : null
     case 'plus-10k':
       return first('[data-testid="amount-display"] [aria-label="1만 원 더하기"]')
     case 'amount-field':
@@ -46,7 +53,8 @@ export function findPracticeTarget(target: PracticeTarget, example: PracticeExam
     case 'month-summary':
       return first('[data-testid="ledger-screen"] .ledger__month-action button')
     case 'back-to-ledger':
-      return first('[data-testid="month-summary-screen"] .screen__back button')
+      // 월 정리·결산·회비 표 맨 위 [‹ 장부로] (연습 App 의 화면 칸 하나)
+      return first('.app__main .screen__back button')
     case 'expense-row':
       return withText('[data-testid="month-card"] [data-testid="list-row"]', example.expense.name, '.ui-row__title')
     case 'delete':
@@ -57,6 +65,14 @@ export function findPracticeTarget(target: PracticeTarget, example: PracticeExam
       return first('[data-testid="year-summary-screen"] .ui-bottom-bar__pair > button:last-child')
     case 'save-picture':
       return first('[data-testid="year-summary-screen"] [data-testid="bottom-action-bar"] button')
+    case 'dues':
+      return startingWith('[data-testid="ledger-screen"] .ledger__month-action button', '회비 표')
+    case 'book':
+      return first('[data-testid="book-button"]')
+    case 'excel-entry':
+      return withText('[data-testid="bottom-sheet"] .books__new', '엑셀 파일로 새 장부')
+    case 'excel-create':
+      return first('[data-testid="excel-import-screen"] [data-testid="bottom-action-bar"] button')
   }
 }
 

@@ -21,8 +21,12 @@ import {
   click,
   deleteExpense,
   fakeSaver,
+  finishAfterYear,
   HOUSEHOLD,
+  leaveYear,
+  lookAtDues,
   lookAtMonth,
+  openPracticeExcel,
   pressBack,
   PRACTICE_TODAY,
   reachYear,
@@ -85,10 +89,16 @@ const coach = () => screen.queryByTestId('coach-mark')
 const band = () => screen.queryByTestId('practice-band')
 const isLocked = (element: HTMLElement) => element.closest('[inert]') !== null
 
-// 가리키는 곳의 설명 끝이 말풍선 글 + "연습 N / 4" (버튼 자기 안내가 앞에 있을 수 있다)
-function expectCoachOn(target: HTMLElement, message: string, stage: number) {
+// 가리키는 곳의 설명 끝이 말풍선 글 + "연습 N / 6" (버튼 자기 안내가 앞에 있을 수 있다). 가계부 연습은 다섯 단계 (SPEC-010 10절)
+function expectCoachOn(target: HTMLElement, message: string, stage: number, stages = 6) {
   expect(coach()).toBeInTheDocument()
-  expect(target).toHaveAccessibleDescription(new RegExp(`${escapeRegExp(message)} 연습 ${stage} / 4$`))
+  expect(target).toHaveAccessibleDescription(new RegExp(`${escapeRegExp(message)} 연습 ${stage} / ${stages}$`))
+}
+
+// ① 회비 예시의 "누가 냈어요?": 김예시 → [다음] (금액이 10,000원으로 채워진다)
+async function pickKim() {
+  await userEvent.click(screen.getByRole('checkbox', { name: '김예시' }))
+  await click('다음')
 }
 
 function escapeRegExp(text: string): string {
@@ -105,7 +115,7 @@ afterEach(() => {
 })
 
 describe('SPEC-008 첫 실행 물음', () => {
-  it('AC-1 장부가 하나도 없는 폰에서 앱을 열면 "처음이세요?" 와 따라 해 볼 것 네 줄, [연습해 보기]·[바로 시작] 이 뜬다', () => {
+  it('AC-1 장부가 하나도 없는 폰에서 앱을 열면 "처음이세요?" 와 따라 해 볼 것 여섯 줄(SPEC-010 10절 회비 표·엑셀 포함), [연습해 보기]·[바로 시작] 이 뜬다', () => {
     openWith(undefined)
 
     expect(screen.getByRole('heading', { level: 1, name: '처음이세요?' })).toBeInTheDocument()
@@ -114,6 +124,8 @@ describe('SPEC-008 첫 실행 물음', () => {
       '2이번 달 정리 보기',
       '3잘못 적은 줄 지우기',
       '4결산 사진 보내 보기',
+      '5회비 표 보기',
+      '6엑셀 장부 불러오기',
     ])
     expect(button('연습해 보기')).toBeInTheDocument()
     expect(button('바로 시작')).toBeInTheDocument()
@@ -138,7 +150,7 @@ describe('SPEC-008 첫 실행 물음', () => {
     expect(await screen.findByRole('heading', { level: 1, name: '처음이세요?' })).toBeInTheDocument()
   })
 
-  it('AC-3 [연습해 보기] 를 누르면 "연습 장부"(올해, 잔액 0원)에 연습 띠와 말풍선(연습 1 / 4)이 [+ 내역 적기] 를 가리킨다', async () => {
+  it('AC-3 [연습해 보기] 를 누르면 "연습 장부"(올해, 잔액 0원)에 연습 띠와 말풍선(연습 1 / 6)이 [+ 내역 적기] 를 가리킨다', async () => {
     openWith(undefined)
 
     await startPracticeFromQuestion()
@@ -161,7 +173,7 @@ describe('SPEC-008 연습 장부는 폰에 남지 않는다', () => {
     await startPracticeFromQuestion()
     await reachYear()
     await click('사진 보내기')
-    await screen.findByRole('heading', { level: 1, name: '잘 보냈어요!' })
+    await finishAfterYear()
 
     expect(setItem).not.toHaveBeenCalled()
     expect({ ...localStorage }).toEqual(before)
@@ -176,7 +188,7 @@ describe('SPEC-008 연습 장부는 폰에 남지 않는다', () => {
     await click('내역 적기')
     await click('오늘 16일')
     await click(/^회비/)
-    await click('1만 원 더하기')
+    await pickKim()
     await click('저장')
     unmount()
 
@@ -220,7 +232,7 @@ describe('SPEC-008 연습 띠', () => {
     expectBandOpen()
     await click('오늘 16일')
     await click(/^회비/)
-    await click('1만 원 더하기')
+    await pickKim()
     await click('저장')
     await click('방금 16일')
     await click(/^간식비/)
@@ -307,13 +319,13 @@ describe('SPEC-008 연습 띠', () => {
 })
 
 describe('SPEC-008 단계 말풍선', () => {
-  it('AC-10 연습 말풍선에는 [알겠어요]·[✕] 가 없고 "연습 N / 4" 가 있으며, 가리키는 곳을 누르면 다음 말풍선으로 넘어간다', async () => {
+  it('AC-10 연습 말풍선에는 [알겠어요]·[✕] 가 없고 "연습 N / 6" 이 있으며, 가리키는 곳을 누르면 다음 말풍선으로 넘어간다', async () => {
     openWith(undefined)
     await startPracticeFromQuestion()
 
     expect(screen.queryByRole('button', { name: '알겠어요' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '안내 닫기' })).not.toBeInTheDocument()
-    expect(within(screen.getByTestId('coach-mark')).getByText('연습 1 / 4')).toBeInTheDocument()
+    expect(within(screen.getByTestId('coach-mark')).getByText('연습 1 / 6')).toBeInTheDocument()
 
     await click('내역 적기')
 
@@ -336,7 +348,7 @@ describe('SPEC-008 단계 말풍선', () => {
     expect(isLocked(button('그만하기'))).toBe(false)
   })
 
-  it('AC-12 ① 오늘 날짜 → 회비 → 10,000원 저장 → 간식비 → 5,000원 저장 → [다 적었어요] 순서로 말풍선이 옮겨 가고, 장부로 오면 잔액 5,000원이다', async () => {
+  it('AC-12 ① 오늘 날짜 → 회비 → 김예시 → 10,000원 저장 → 간식비 → 5,000원 저장 → [다 적었어요] 순서로 말풍선이 옮겨 가고, 장부로 오면 잔액 5,000원이다', async () => {
     openWith(undefined)
     await startPracticeFromQuestion()
 
@@ -345,9 +357,9 @@ describe('SPEC-008 단계 말풍선', () => {
     await click('오늘 16일')
     expectCoachOn(button(/^회비/), '회비를 눌러요', 1)
     await click(/^회비/)
-    expectCoachOn(button('1만 원 더하기'), '+1만을 눌러 10,000원을 만들어요', 1)
-    await click('1만 원 더하기')
-    expectCoachOn(button('저장'), '10,000원이 됐으면 [저장]을 눌러요', 1)
+    expectCoachOn(screen.getByRole('checkbox', { name: '김예시' }), '김예시 님을 눌러 보세요. 여러 분을 고를 수 있어요.', 1)
+    await pickKim()
+    expectCoachOn(button('저장'), '금액이 10,000원으로 채워졌어요. [저장]을 눌러요', 1)
     await click('저장')
     expectCoachOn(await screen.findByRole('button', { name: '방금 16일' }), '간식비 5,000원도 적어 볼까요? 날짜를 눌러요', 1)
     await click('방금 16일')
@@ -368,19 +380,21 @@ describe('SPEC-008 단계 말풍선', () => {
     expectCoachOn(button('10월 정리 보기'), '이번 달에 얼마 쓰고 남았는지 여기서 봐요', 2)
   })
 
-  it('AC-13 금액 질문에서 10000 을 치면 말풍선이 [저장] 으로 옮겨 가고, 10,000원이 아니면 [+1만]·금액 칸에 머문다', async () => {
-    openWith(undefined)
-    await startPracticeFromQuestion()
+  it('AC-13 (가계부 — 동아리는 금액이 채워져 온다) 금액 질문에서 10000 을 치면 말풍선이 [저장] 으로 옮겨 가고, 10,000원이 아니면 [+1만]·금액 칸에 머문다', async () => {
+    openWith(realPhone('household'))
+    await click(/^설정/)
+    await click(/연습해 보기/)
+    await screen.findByTestId('ledger-screen')
     await click('내역 적기')
     await click('오늘 16일')
-    await click(/^회비/)
+    await click(/^용돈/)
     const amount = screen.getByRole('textbox', { name: '얼마인가요?' })
 
     await userEvent.type(amount, '10000')
-    expectCoachOn(button('저장'), '10,000원이 됐으면 [저장]을 눌러요', 1)
+    expectCoachOn(button('저장'), '10,000원이 됐으면 [저장]을 눌러요', 1, 5)
 
     await click('1만 원 더하기')
-    expectCoachOn(button('1만 원 더하기'), '+1만을 눌러 10,000원을 만들어요', 1)
+    expectCoachOn(button('1만 원 더하기'), '+1만을 눌러 10,000원을 만들어요', 1, 5)
     expect(isLocked(amount)).toBe(false)
   })
 
@@ -451,7 +465,7 @@ describe('SPEC-008 연습 결산 사진', () => {
     expect(make.mock.calls.at(-1)?.[0].textContent?.startsWith(RIBBON)).toBe(true)
   })
 
-  it('AC-18 공유가 끝나면 바로 끝 화면 "잘 보냈어요!" 가 뜬다', async () => {
+  it('AC-18 공유가 끝나면(navigator.share 완료) 말풍선이 "잘 보냈어요! 여기를 눌러 장부로 돌아가요" 로 [‹ 장부로] 를 가리킨다 (끝 화면은 ⑥ 뒤)', async () => {
     const { saver, send } = fakeSaver(['shared'])
     openWith(undefined, saver)
     await startPracticeFromQuestion()
@@ -459,13 +473,12 @@ describe('SPEC-008 연습 결산 사진', () => {
 
     await click('사진 보내기')
 
-    expect(await screen.findByRole('heading', { level: 1, name: '잘 보냈어요!' })).toBeInTheDocument()
+    expectCoachOn(await screen.findByRole('button', { name: /장부로/ }), '잘 보냈어요! 여기를 눌러 장부로 돌아가요', 4)
     expect(send).toHaveBeenCalledOnce()
-    const rows = within(screen.getByRole('list')).getAllByRole('listitem')
-    expect(rows.map((row) => row.dataset.done)).toEqual(['true', 'true', 'true', 'true'])
+    expect(screen.queryByTestId('practice-end')).not.toBeInTheDocument()
   })
 
-  it('AC-19 공유 창을 그냥 닫으면 말풍선이 "아직 안 보냈어요…" 로 바뀌고 [다음에 할게요] 가 생기며, 누르면 "연습 끝!"', async () => {
+  it('AC-19 공유 창을 그냥 닫으면 말풍선이 "아직 안 보냈어요…" 로 바뀌고 [다음에 할게요] 가 생기며, 누르면 [‹ 장부로] 를 가리킨다', async () => {
     const { saver } = fakeSaver(['cancelled'])
     openWith(undefined, saver)
     await startPracticeFromQuestion()
@@ -475,10 +488,10 @@ describe('SPEC-008 연습 결산 사진', () => {
 
     expectCoachOn(button('사진 보내기'), '아직 안 보냈어요. 다시 눌러 보거나, 나중에 해도 돼요', 4)
     await click('다음에 할게요')
-    expect(await screen.findByRole('heading', { level: 1, name: '연습 끝!' })).toBeInTheDocument()
+    expectCoachOn(button(/장부로/), '다음에 보내도 돼요. 여기를 눌러 장부로 돌아가요', 4)
   })
 
-  it('AC-20 공유를 못 쓰는 기기는 [사진으로 저장] 을 가리키는 말풍선과 [다음에 할게요] 가 뜨고, 사진을 저장하면 "연습 끝!"', async () => {
+  it('AC-20 공유를 못 쓰는 기기는 [사진으로 저장] 을 가리키는 말풍선과 [다음에 할게요] 가 뜨고, 사진을 저장하면 [‹ 장부로] 를 가리킨다', async () => {
     const { saver } = fakeSaver()
     openWith(undefined, saver)
     await startPracticeFromQuestion()
@@ -490,7 +503,7 @@ describe('SPEC-008 연습 결산 사진', () => {
 
     await click('사진으로 저장')
 
-    expect(await screen.findByRole('heading', { level: 1, name: '연습 끝!' })).toBeInTheDocument()
+    expectCoachOn(await screen.findByRole('button', { name: /장부로/ }), '다음에 보내도 돼요. 여기를 눌러 장부로 돌아가요', 4)
   })
 
   it('AC-21 공유가 NotAllowedError 로 거부되면 말풍선이 [한 번 더 눌러 보내기] 를 가리킨 채 "사진이 준비됐어요. 한 번 더 눌러 주세요"', async () => {
@@ -503,20 +516,21 @@ describe('SPEC-008 연습 결산 사진', () => {
 
     expectCoachOn(button('한 번 더 눌러 보내기'), '사진이 준비됐어요. 한 번 더 눌러 주세요', 4)
     await click('한 번 더 눌러 보내기')
-    expect(await screen.findByRole('heading', { level: 1, name: '잘 보냈어요!' })).toBeInTheDocument()
+    expectCoachOn(await screen.findByRole('button', { name: /장부로/ }), '잘 보냈어요! 여기를 눌러 장부로 돌아가요', 4)
   })
 })
 
 describe('SPEC-008 끝 화면', () => {
-  it('AC-22 첫 실행 연습의 끝 화면에 배운 것 네 줄(보내지 않았으면 넷째 줄 빈 동그라미)·다시 하는 길·[새 장부 만들기] 가 있고 연습 띠는 없다', async () => {
+  it('AC-22 첫 실행 연습의 끝 화면 "연습 끝!" 에 배운 것 여섯 줄(보내지 않았으면 넷째 줄 빈 동그라미)·다시 하는 길·[새 장부 만들기] 가 있고 연습 띠는 없다', async () => {
     const { saver } = fakeSaver(['cancelled'])
     openWith(undefined, saver)
     await startPracticeFromQuestion()
     await reachYear()
     await click('사진 보내기')
     await click('다음에 할게요')
+    await finishAfterYear()
 
-    await screen.findByTestId('practice-end')
+    expect(screen.getByRole('heading', { level: 1, name: '연습 끝!' })).toBeInTheDocument()
     expect(screen.getByText('이제 진짜 장부를 만들어요. 연습으로 적은 내역은 지웠어요.')).toBeInTheDocument()
     const rows = within(screen.getByRole('list')).getAllByRole('listitem')
     expect(rows.map((row) => [row.textContent, row.dataset.done])).toEqual([
@@ -524,6 +538,8 @@ describe('SPEC-008 끝 화면', () => {
       ['[10월 정리 보기]로 한 달 보기', 'true'],
       ['줄을 눌러 고치고 지우기', 'true'],
       ['결산 사진 보내기 (아직 안 해 봤어요)', 'false'],
+      ['[회비 표]로 누가 냈나 보기', 'true'],
+      ['엑셀 장부 불러오기', 'true'],
     ])
     expect(rows[3].querySelector('[data-icon="circle"]')).toBeInTheDocument()
     expect(screen.getByText('다시 해 보고 싶으면 설정 → 연습해 보기')).toBeInTheDocument()
@@ -537,7 +553,7 @@ describe('SPEC-008 끝 화면', () => {
     await startPracticeFromQuestion()
     await reachYear()
     await click('사진 보내기')
-    await screen.findByTestId('practice-end')
+    await finishAfterYear()
 
     await click('새 장부 만들기')
     await click('동아리·모임')
@@ -559,7 +575,7 @@ describe('SPEC-008 끝 화면', () => {
     await startPracticeFromQuestion()
     await reachYear()
     await click('사진 보내기')
-    await screen.findByTestId('practice-end')
+    await finishAfterYear()
     await act(async () => new Promise((resolve) => setTimeout(resolve, 20)))
 
     await pressBack()
@@ -571,7 +587,7 @@ describe('SPEC-008 끝 화면', () => {
 })
 
 describe('SPEC-008 설정 [연습해 보기]', () => {
-  it('AC-25 설정 [연습해 보기] 는 물음 없이 연습(연습 1 / 4)을 열고, "연습 끝!"·"장부로 돌아가요" [장부로] 로 진짜 장부에 돌아온다. 진짜 장부·자동으로 지키기는 그대로다', async () => {
+  it('AC-25 설정 [연습해 보기] 는 물음 없이 연습(연습 1 / 6)을 열고, "연습 끝!"·"장부로 돌아가요" [장부로] 로 진짜 장부에 돌아온다. 진짜 장부·자동으로 지키기는 그대로다', async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(realPhone()))
     localStorage.setItem(GUIDE_KEY, JSON.stringify(ACTIVE_GUIDE))
     const { send } = fakeSaver(['shared'])
@@ -587,8 +603,9 @@ describe('SPEC-008 설정 [연습해 보기]', () => {
     expectCoachOn(button('내역 적기'), '회비 10,000원을 적어 볼게요. 여기를 눌러요', 1)
     await reachYear()
     await click('사진 보내기')
+    await finishAfterYear()
 
-    expect(await screen.findByRole('heading', { level: 1, name: '연습 끝!' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: '연습 끝!' })).toBeInTheDocument()
     expect(screen.getByText('장부로 돌아가요')).toBeInTheDocument()
     expect(screen.queryByText('다시 해 보고 싶으면 설정 → 연습해 보기')).not.toBeInTheDocument()
     await click('장부로')
@@ -608,10 +625,10 @@ describe('SPEC-008 설정 [연습해 보기]', () => {
     await click(/연습해 보기/)
     await screen.findByTestId('ledger-screen')
 
-    expectCoachOn(button('내역 적기'), '용돈 10,000원을 적어 볼게요. 여기를 눌러요', 1)
+    expectCoachOn(button('내역 적기'), '용돈 10,000원을 적어 볼게요. 여기를 눌러요', 1, 5)
     await writeTwoLines(HOUSEHOLD)
     await lookAtMonth()
-    expectCoachOn(button(/^장보기/), '잘못 적었으면 줄을 눌러 고칠 수 있어요. 장보기 줄을 눌러 봐요', 3)
+    expectCoachOn(button(/^장보기/), '잘못 적었으면 줄을 눌러 고칠 수 있어요. 장보기 줄을 눌러 봐요', 3, 5)
     await deleteExpense(HOUSEHOLD)
     expect(screen.getByTestId('balance-card-amount')).toHaveTextContent('10,000원')
   })
@@ -629,5 +646,182 @@ describe('SPEC-008 설정 [연습해 보기]', () => {
     expect(screen.getByTestId('ledger-screen')).toBeInTheDocument()
     expect(screen.getByTestId('book-button')).toHaveTextContent('한랑드림 2026년')
     expect(band()).not.toBeInTheDocument()
+  })
+})
+
+const EXCEL_MESSAGE = '엑셀 장부가 있으면 이렇게 읽은 내용을 먼저 보여 줘요. [새 장부 만들기]를 눌러 보세요.'
+const REAL_EXCEL_WAY = '진짜 엑셀은 카톡으로 폰에 받아 두고 장부 이름 ⌄ › [엑셀 파일로 새 장부]'
+const bookButton = () => screen.getByRole('button', { name: /장부 바꾸기$/ })
+
+// 첫 실행 동아리 연습을 ④ 결산 사진 보내기까지 마치고 결산 [‹ 장부로] 로 장부에 온다
+async function finishYearAndLeave() {
+  await startPracticeFromQuestion()
+  await reachYear()
+  await click('사진 보내기')
+  await leaveYear()
+}
+
+describe('SPEC-010 10절 연습 장부의 회비 이름 고르기·회비 표·연습용 엑셀', () => {
+  it('AC-36 ① 회비 예시의 "누가 냈어요?" 에서 말풍선이 김예시를 가리키고(다른 분·[이름 없이 적기] 는 잠김), 고르면 [다음] 뒤 금액이 10,000원으로 채워져 [+1만] 없이 [저장] 한다', async () => {
+    openWith(undefined)
+    await startPracticeFromQuestion()
+    await click('내역 적기')
+    await click('오늘 16일')
+    await click(/^회비/)
+
+    const kim = screen.getByRole('checkbox', { name: '김예시' })
+    expectCoachOn(kim, '김예시 님을 눌러 보세요. 여러 분을 고를 수 있어요.', 1)
+    expect(isLocked(screen.getByRole('checkbox', { name: '박예시' }))).toBe(true)
+    expect(isLocked(button('이름 없이 적기'))).toBe(true)
+    expect(isLocked(button('그만하기'))).toBe(false)
+
+    await userEvent.click(kim)
+    expectCoachOn(button('다음'), '김예시 님을 골랐어요. [다음]을 눌러요', 1)
+    await click('다음')
+
+    expect(screen.getByLabelText('얼마인가요?')).toHaveValue('10,000')
+    expect(screen.queryByRole('button', { name: '1만 원 더하기' })).toBeInTheDocument()
+    expectCoachOn(button('저장'), '금액이 10,000원으로 채워졌어요. [저장]을 눌러요', 1)
+    await click('저장')
+    expectCoachOn(await screen.findByRole('button', { name: '방금 16일' }), '간식비 5,000원도 적어 볼까요? 날짜를 눌러요', 1)
+  })
+
+  it('AC-36 ⑤ ④ 를 마치고 장부로 오면 [회비 표](연습 5 / 6), 회비 표를 연 뒤 1초쯤은 말풍선 없이 읽고 그 뒤 [‹ 장부로] 를 가리킨다', async () => {
+    const { saver } = fakeSaver(['shared'])
+    openWith(undefined, saver)
+    await finishYearAndLeave()
+
+    expectCoachOn(button(/^회비 표/), '회비 표를 열어 볼게요. 여기를 눌러요', 5)
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    await click(/^회비 표/)
+
+    expect(screen.getByRole('heading', { level: 1, name: '2026년 회비' })).toBeInTheDocument()
+    expect(coach()).not.toBeInTheDocument()
+    expect(screen.getByTestId('practice-reading')).toBeInTheDocument()
+    // 예시 회원 3명: 김예시는 ① 에서 낸 10,000원
+    expect(button(/^김예시 10,000원/)).toBeInTheDocument()
+    expect(button(/^박예시 0원/)).toBeInTheDocument()
+    expect(button(/^이예시 0원/)).toBeInTheDocument()
+
+    await act(() => vi.advanceTimersByTimeAsync(1000))
+
+    expectCoachOn(button(/장부로/), '누가 몇 월까지 냈는지 여기서 봐요. 다 봤으면 여기를 눌러 장부로 돌아가요', 5)
+    expect(screen.queryByTestId('practice-reading')).not.toBeInTheDocument()
+    expect(isLocked(button(/^김예시/))).toBe(true)
+    expect(isLocked(button('그만하기'))).toBe(false)
+  })
+
+  it('AC-36 ⑥ 장부 이름 ⌄ → 장부 고르기 창 [엑셀 파일로 새 장부] 를 가리키고, 창 위에서도 [그만하기] 는 잠기지 않는다', async () => {
+    const { saver } = fakeSaver(['shared'])
+    openWith(undefined, saver)
+    await finishYearAndLeave()
+    await lookAtDues()
+
+    expectCoachOn(bookButton(), '엑셀로 쓰던 장부도 불러올 수 있어요. 장부 이름을 눌러요', 6)
+    await userEvent.click(bookButton())
+
+    const sheet = screen.getByRole('dialog', { name: '어느 장부를 볼까요?' })
+    const excelEntry = within(sheet).getByRole('button', { name: '엑셀 파일로 새 장부' })
+    expectCoachOn(excelEntry, '여기를 눌러요. 연습이라 파일을 고르지 않고 연습용 엑셀을 읽어요', 6)
+    expect(isLocked(excelEntry)).toBe(false)
+    expect(isLocked(within(sheet).getByRole('button', { name: '새 장부 만들기' }))).toBe(true)
+    expect(isLocked(within(sheet).getByRole('button', { name: /^연습 장부/ }))).toBe(true)
+    expect(isLocked(button('그만하기'))).toBe(false)
+
+    await click('그만하기')
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleName('연습을 그만할까요?')
+    expect(coach()).not.toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '계속하기' }))
+    expectCoachOn(within(screen.getByRole('dialog', { name: '어느 장부를 볼까요?' })).getByRole('button', { name: '엑셀 파일로 새 장부' }), '여기를 눌러요. 연습이라 파일을 고르지 않고 연습용 엑셀을 읽어요', 6)
+  })
+
+  it('AC-36 ⑥ [엑셀 파일로 새 장부] 는 파일 고르기 창을 열지 않고 연습용 엑셀(예시 회원 3명, 두 해)을 읽어 확인 화면을 보이고, [새 장부 만들기] 를 누르면 진짜 장부 없이 연습이 끝난다', async () => {
+    const { send } = fakeSaver(['shared'])
+    const { server } = phone({ saver: { make: vi.fn(async () => new Blob(['png'])), download: vi.fn(), send } })
+    const before = { ...localStorage }
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+    const openFilePicker = vi.spyOn(HTMLInputElement.prototype, 'click')
+    await finishYearAndLeave()
+    await lookAtDues()
+
+    await userEvent.click(bookButton())
+    await click('엑셀 파일로 새 장부')
+
+    expect(openFilePicker).not.toHaveBeenCalled()
+    const create = await screen.findByRole('button', { name: '새 장부 만들기' })
+    expectCoachOn(create, EXCEL_MESSAGE, 6)
+    expect(screen.getByRole('heading', { level: 1, name: '엑셀 파일을 읽었어요' })).toBeInTheDocument()
+    expect(screen.getByText('연습용 동아리 장부.xlsx · 시트 4개 중 4개를 읽었어요')).toBeInTheDocument()
+    expect(screen.getByLabelText('장부 이름')).toHaveValue('연습용 동아리 장부')
+    const facts = within(screen.getByLabelText('읽은 내용'))
+    expect(facts.getByText('2025 ~ 2026년')).toBeInTheDocument()
+    expect(facts.getByText('3명')).toBeInTheDocument()
+    expect(screen.getByText('해마다 잔액이 맞아요')).toBeInTheDocument()
+    expect(band()).toBeInTheDocument()
+    expect(isLocked(screen.getByLabelText('장부 이름'))).toBe(true)
+
+    await userEvent.click(create)
+
+    await screen.findByTestId('practice-end')
+    expect(setItem).not.toHaveBeenCalled()
+    expect({ ...localStorage }).toEqual(before)
+    expect(new LocalStorageRepository().load().data.books).toEqual([])
+    expect(server.put).not.toHaveBeenCalled()
+  })
+
+  it('AC-36 가계부 연습은 다섯 단계: [회비 표] 단계 없이 ④ 뒤 바로 ⑤ 연습용 가계부 엑셀 (연습 5 / 5)', async () => {
+    const { saver } = fakeSaver(['shared'])
+    openWith(realPhone('household'), saver)
+    await click(/^설정/)
+    await click(/연습해 보기/)
+    await screen.findByTestId('ledger-screen')
+    expect(screen.queryByRole('button', { name: /^회비 표/ })).not.toBeInTheDocument()
+
+    await reachYear(HOUSEHOLD)
+    await click('사진 보내기')
+    await leaveYear()
+
+    expectCoachOn(bookButton(), '엑셀로 쓰던 장부도 불러올 수 있어요. 장부 이름을 눌러요', 5, 5)
+    await openPracticeExcel()
+    expect(screen.getByText('연습용 가계부.xlsx · 시트 2개 중 2개를 읽었어요')).toBeInTheDocument()
+    expectCoachOn(button('새 장부 만들기'), EXCEL_MESSAGE, 5, 5)
+    await click('새 장부 만들기')
+
+    await screen.findByTestId('practice-end')
+    const rows = within(screen.getByRole('list')).getAllByRole('listitem')
+    expect(rows.map((row) => row.textContent)).toEqual([
+      '[+ 내역 적기]로 한 줄씩 적기',
+      '[10월 정리 보기]로 한 달 보기',
+      '줄을 눌러 고치고 지우기',
+      '결산 사진 보내기',
+      '엑셀 장부 불러오기',
+    ])
+    expect(screen.getByText(REAL_EXCEL_WAY)).toBeInTheDocument()
+    await click('장부로')
+    await screen.findByTestId('ledger-screen')
+    expect(screen.getByTestId('book-button')).toHaveTextContent('한랑드림 2026년')
+  })
+
+  it('AC-37 연습 끝 화면에 새 배운 것 "[회비 표]로 누가 냈나 보기"·"엑셀 장부 불러오기" 와 진짜 엑셀 여는 길 Caption 이 있다', async () => {
+    const { saver } = fakeSaver(['shared'])
+    openWith(undefined, saver)
+    await finishYearAndLeave()
+    await lookAtDues()
+    await openPracticeExcel()
+    await click('새 장부 만들기')
+
+    await screen.findByTestId('practice-end')
+    expect(screen.getByRole('heading', { level: 1, name: '연습 끝!' })).toBeInTheDocument()
+    const rows = within(screen.getByRole('list')).getAllByRole('listitem')
+    expect(rows.map((row) => [row.textContent, row.dataset.done])).toEqual([
+      ['[+ 내역 적기]로 한 줄씩 적기', 'true'],
+      ['[10월 정리 보기]로 한 달 보기', 'true'],
+      ['줄을 눌러 고치고 지우기', 'true'],
+      ['결산 사진 보내기', 'true'],
+      ['[회비 표]로 누가 냈나 보기', 'true'],
+      ['엑셀 장부 불러오기', 'true'],
+    ])
+    expect(screen.getByText(REAL_EXCEL_WAY)).toBeInTheDocument()
+    expect(screen.getByText('다시 해 보고 싶으면 설정 → 연습해 보기')).toBeInTheDocument()
   })
 })

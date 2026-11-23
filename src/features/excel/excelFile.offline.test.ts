@@ -25,6 +25,20 @@ describe('SPEC-010 엑셀 라이브러리를 받지 못함 (8절 예외)', () =>
     expect(result).toEqual({ ok: false, problem: 'load-failed' })
   })
 
+  it('AC-36 연습용 엑셀(시트 배열)은 SheetJS 를 받지 못해도 읽힌다 — 연습에서는 SheetJS 를 부르지 않는다 (SPEC-010 10절)', async () => {
+    vi.resetModules()
+    vi.doMock('xlsx', () => {
+      throw new TypeError('Failed to fetch dynamically imported module')
+    })
+    const { readExcelSource } = await import('./excelFile')
+
+    const club = await readExcelSource({ practice: 'club' }, deps)
+    const household = await readExcelSource({ practice: 'household' }, deps)
+
+    expect(club.ok && club.summary.memberCount).toBe(3)
+    expect(household.ok && household.summary.years).toEqual([2025, 2026])
+  })
+
   it('엑셀 파일을 만들 때도 받지 못함을 따로 된 오류로 알린다 (#167 내보내기)', async () => {
     vi.resetModules()
     vi.doMock('xlsx', () => {

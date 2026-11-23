@@ -20,9 +20,9 @@ import type { SheetHistory } from '../useScreenHistory'
 import type { BookChoice } from './useLedger'
 import './ledger.css'
 
-// 장부 화면의 선택 창 이름
+// 장부 화면의 선택 창 이름. 장부 고르기 창은 연습 ⑥ 말풍선이 그 안을 가리켜 App 도 안다 (SPEC-010 10절)
 const MONTH_SHEET = 'ledger-month'
-const BOOK_SHEET = 'ledger-books'
+export const LEDGER_BOOK_SHEET = 'ledger-books'
 
 // 줄 보조 줄: 색만으로 구분하지 않게 수입/지출을 글자로도
 const TYPE_LABEL: Record<EntryType, string> = { income: '수입', expense: '지출' }
@@ -111,7 +111,7 @@ export function LedgerScreen({
             className="ledger__book"
             aria-haspopup="dialog"
             data-testid="book-button"
-            onClick={() => sheets.openSheet(BOOK_SHEET)}
+            onClick={() => sheets.openSheet(LEDGER_BOOK_SHEET)}
           >
             <span className="ledger__book-text">
               <span className="ledger__book-name">{bookName}</span>{' '}
@@ -194,7 +194,7 @@ export function LedgerScreen({
         />
       </BottomSheet>
 
-      <BottomSheet open={sheets.sheet === BOOK_SHEET} title="어느 장부를 볼까요?" onClose={sheets.closeSheet}>
+      <BottomSheet open={sheets.sheet === LEDGER_BOOK_SHEET} title="어느 장부를 볼까요?" onClose={sheets.closeSheet}>
         <BookPicker
           books={books}
           currentId={bookId}

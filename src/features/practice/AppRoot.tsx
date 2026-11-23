@@ -23,8 +23,8 @@ type AppRootProps = Omit<ComponentProps<typeof App>, 'practice' | 'onStartPracti
 // 연습을 어디서 열었나: 첫 실행 물음 / 설정 [연습해 보기] (돌아갈 진짜 장부 데이터)
 type PracticeOrigin = { firstRun: true } | { firstRun: false; back: LoadResult }
 
-// 연습 끝 화면. asksInstall: 다음에 "홈 화면에 추가하시겠어요?" 를 묻는다 (SPEC-009 B)
-type EndMode = { name: 'end'; origin: PracticeOrigin; sent: boolean; month: number; asksInstall: boolean }
+// 연습 끝 화면. asksInstall: 다음에 "홈 화면에 추가하시겠어요?" 를 묻는다 (SPEC-009 B). kind: 연습 장부 종류 (배운 것 줄, SPEC-010 10절)
+type EndMode = { name: 'end'; origin: PracticeOrigin; kind: BookKind; sent: boolean; month: number; asksInstall: boolean }
 
 type Mode =
   | { name: 'in-app'; kind: InAppKind } // 카톡 안에서 열렸어요 ① (장부 없음, SPEC-009 C): 물음보다 먼저
@@ -123,7 +123,7 @@ export function AppRoot({ practiceMarkStore, fromKakao = false, ...props }: AppR
   }
 
   // 연습이 끝 화면에 닿았다: 첫 실행이면 이 폰에 표시를 남기고, 홈 화면에 추가를 물을지 정한다
-  function reachEnd(origin: PracticeOrigin, sent: boolean, month: number) {
+  function reachEnd(origin: PracticeOrigin, kind: BookKind, sent: boolean, month: number) {
     if (origin.firstRun) practiceMarkStore?.save()
     const asksInstall = asksInstallAfterPractice({
       firstRun: origin.firstRun,
@@ -132,7 +132,7 @@ export function AppRoot({ practiceMarkStore, fromKakao = false, ...props }: AppR
       // 카톡 안 판단은 진입점이 inAppKind(user agent) 로 한 번 한 것 (SPEC-009 C, features/install/inAppBrowser)
       inApp: inApp !== undefined,
     })
-    setMode({ name: 'end', origin, sent, month, asksInstall })
+    setMode({ name: 'end', origin, kind, sent, month, asksInstall })
   }
 
   const onPopState = useEffectEvent(() => {
@@ -215,7 +215,7 @@ export function AppRoot({ practiceMarkStore, fromKakao = false, ...props }: AppR
           onFinish={(sent) => {
             // 끝 화면은 연습이 쌓은 칸을 표시 칸까지 되돌린 자리에 둔다 (끝 화면의 뒤로 버튼 = 주 버튼)
             pendingTask.current = { steps: entriesAboveLedger(window.history.state), then: markHere }
-            reachEnd(origin, sent, mode.now.getMonth() + 1)
+            reachEnd(origin, mode.kind, sent, mode.now.getMonth() + 1)
           }}
         />
       )
@@ -225,6 +225,7 @@ export function AppRoot({ practiceMarkStore, fromKakao = false, ...props }: AppR
         <PracticeEnd
           firstRun={mode.origin.firstRun}
           asksInstall={mode.asksInstall}
+          kind={mode.kind}
           sent={mode.sent}
           month={mode.month}
           onDone={() => leaveEnd(mode, false)}

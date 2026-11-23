@@ -38,16 +38,22 @@ export async function startPracticeFromQuestion() {
   await screen.findByTestId('ledger-screen')
 }
 
-export type Example = { income: string; expense: string }
-export const CLUB: Example = { income: '회비', expense: '간식비' }
+// payer: 동아리 회비 예시에서 "누가 냈어요?" 에 고를 분 (SPEC-010 10절). 가계부는 없다 (+1만 으로 금액을 만든다)
+export type Example = { income: string; expense: string; payer?: string }
+export const CLUB: Example = { income: '회비', expense: '간식비', payer: '김예시' }
 export const HOUSEHOLD: Example = { income: '용돈', expense: '장보기' }
 
-// ① 수입 10,000원 → 지출 5,000원 → [다 적었어요]
-export async function writeTwoLines({ income, expense }: Example = CLUB) {
+// ① 수입 10,000원 → 지출 5,000원 → [다 적었어요]. 동아리는 김예시 → [다음] 으로 금액이 채워진다
+export async function writeTwoLines({ income, expense, payer }: Example = CLUB) {
   await click('내역 적기')
   await click('오늘 16일')
   await click(new RegExp(`^${income}`))
-  await click('1만 원 더하기')
+  if (payer) {
+    await userEvent.click(screen.getByRole('checkbox', { name: payer }))
+    await click('다음')
+  } else {
+    await click('1만 원 더하기')
+  }
   await click('저장')
   await click('방금 16일')
   await click(new RegExp(`^${expense}`))
@@ -80,4 +86,36 @@ export async function reachYear(example: Example = CLUB) {
   await deleteExpense(example)
   await click('결산')
   await screen.findByTestId('year-summary-screen')
+}
+
+// ④ 를 마친 결산 화면(보냄·[다음에 할게요]·사진으로 저장)에서 [‹ 장부로]
+export async function leaveYear() {
+  await screen.findByText(/여기를 눌러 장부로 돌아가요$/)
+  await click(/장부로/)
+  await screen.findByTestId('ledger-screen')
+}
+
+// ⑤ 장부 [회비 표] → 1초쯤 뒤 말풍선이 뜨면 [‹ 장부로] (동아리만, SPEC-010 10절)
+export async function lookAtDues() {
+  await click(/^회비 표/)
+  await screen.findByText('누가 몇 월까지 냈는지 여기서 봐요. 다 봤으면 여기를 눌러 장부로 돌아가요', {}, { timeout: 3000 })
+  await click(/장부로/)
+  await screen.findByTestId('ledger-screen')
+}
+
+// ⑥ 장부 이름 ⌄ → [엑셀 파일로 새 장부] → 연습용 엑셀 읽은 내용 (말풍선이 [새 장부 만들기] 를 가리킬 때까지)
+export async function openPracticeExcel() {
+  await userEvent.click(screen.getByTestId('book-button'))
+  await click('엑셀 파일로 새 장부')
+  await screen.findByTestId('excel-import-screen')
+  await screen.findByText('엑셀 장부가 있으면 이렇게 읽은 내용을 먼저 보여 줘요. [새 장부 만들기]를 눌러 보세요.')
+}
+
+// 결산 화면에서 ④ 를 마친 뒤 끝까지: [‹ 장부로] → (동아리) ⑤ 회비 표 → ⑥ 연습용 엑셀 [새 장부 만들기] → 끝 화면
+export async function finishAfterYear(example: Example = CLUB) {
+  await leaveYear()
+  if (example.payer) await lookAtDues()
+  await openPracticeExcel()
+  await click('새 장부 만들기')
+  await screen.findByTestId('practice-end')
 }

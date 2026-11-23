@@ -17,7 +17,7 @@ type CoachMarkProps = {
   onDismiss?: () => void
   // 가리키는 버튼을 눌렀다 (버튼의 원래 일보다 먼저 불린다)
   onTargetPress?: () => void
-  // 아래 줄 왼쪽 진행 ("연습 1 / 4"). 가리키는 버튼의 설명에도 붙는다
+  // 아래 줄 왼쪽 진행 ("연습 1 / 6"). 가리키는 버튼의 설명에도 붙는다
   progress?: string
   // 아래 줄 오른쪽 버튼 (연습 갈래의 [다음에 할게요])
   action?: { label: string; onClick: () => void }
@@ -111,6 +111,10 @@ export function CoachMark({
     const viewport = window.visualViewport
     window.addEventListener('resize', measure)
     window.addEventListener('scroll', measure, true)
+    // 가리키는 버튼이 움직이는 창 안에 있으면(올라오는 선택 창, SPEC-010 10절 ⑥) 움직임이 끝난 자리로 다시 잰다.
+    // 자리만 바뀌는 transform 움직임은 크기 지켜보기(ResizeObserver)에 잡히지 않는다
+    document.addEventListener('animationend', measure, true)
+    document.addEventListener('transitionend', measure, true)
     viewport?.addEventListener('resize', measure)
     // 폰 글자 크기를 바꾸면 버튼 크기가 바뀐다 (ResizeObserver 가 없는 환경(테스트)에서는 창 크기만)
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
@@ -120,6 +124,8 @@ export function CoachMark({
     return () => {
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure, true)
+      document.removeEventListener('animationend', measure, true)
+      document.removeEventListener('transitionend', measure, true)
       viewport?.removeEventListener('resize', measure)
       observer?.disconnect()
     }

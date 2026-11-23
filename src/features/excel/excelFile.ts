@@ -1,10 +1,12 @@
 // 고른 파일 판별과 읽기 (SPEC-010 8절 "예외와 경계 상황", AC-29). 안내 문구는 excelMessages (#166)
 import type { EntryDeps } from '../../domain/ledger'
 import { readBackup } from '../../storage/backup'
+import { practiceWorkbook } from '../practice/practiceExcel'
 import { isExcelBytes } from './excelBytes'
 import { readExcelBook, type ExcelImportSummary, type ImportedBook } from './readExcelBook'
 import type { ExcelWorkbook } from './sheet'
 import { readWorkbook, SheetJsLoadError } from './sheetjs'
+import type { ExcelSource } from './useExcelImport'
 
 // 엑셀 파일 크기 상한 (SPEC-010 "파일이 너무 커요(5MB 까지)")
 export const EXCEL_FILE_MAX_BYTES = 5 * 1024 * 1024
@@ -42,6 +44,14 @@ export async function readExcelFile(file: PickedFile, deps: EntryDeps): Promise<
 
   const workbook = await workbookOf(bytes)
   if (typeof workbook === 'string') return { ok: false, problem: workbook }
+  const read = readExcelBook(workbook, deps)
+  return read.ok ? { ...read, workbook } : { ok: false, problem: read.problem }
+}
+
+// 고른 파일이나 연습용 엑셀을 읽는다. 연습용 엑셀(SPEC-010 10절)은 시트 배열이라 파일 판별·SheetJS 없이 읽는 규칙만 돈다
+export async function readExcelSource(source: ExcelSource, deps: EntryDeps): Promise<ExcelFileRead> {
+  if ('file' in source) return readExcelFile(source.file, deps)
+  const workbook = practiceWorkbook(source.practice, deps.now())
   const read = readExcelBook(workbook, deps)
   return read.ok ? { ...read, workbook } : { ok: false, problem: read.problem }
 }

@@ -14,7 +14,7 @@ import { TextField } from '../../ui/TextField'
 import { BackToLedger } from '../BackToLedger'
 import { EditPage } from '../settings/EditPage'
 import type { SheetHistory } from '../useScreenHistory'
-import { readExcelFile, type ExcelFileProblem, type PickedFile } from './excelFile'
+import { readExcelSource, type ExcelFileProblem } from './excelFile'
 import { EXCEL_CREATE_FAILED, type BackupFileRoute } from './excelMessages'
 import { ExcelFact, ExcelFactValue, ExcelFacts, ExcelNote } from './ExcelParts'
 import { ExcelProblem, ExcelReading } from './ExcelStatus'
@@ -30,6 +30,7 @@ import {
 import type { LineNote } from './ledgerSheet'
 import { readExcelBook, type ExcelImportSummary, type ImportedBook } from './readExcelBook'
 import type { ExcelWorkbook } from './sheet'
+import { excelSourceName, type ExcelSource } from './useExcelImport'
 import './excelImport.css'
 
 // 확인 화면 위에 뜨는 것 (방문 기록 한 칸 — 뒤로 버튼은 이것만 닫는다)
@@ -38,7 +39,7 @@ const CHANGED_DATES_SHEET = 'excel-changed-dates'
 const UNREAD_LINES_SHEET = 'excel-unread-lines'
 
 export type ExcelImportScreenProps = {
-  file: PickedFile // 고른 파일
+  source: ExcelSource // 고른 파일, 또는 연습 장부의 연습용 엑셀 (SPEC-010 10절)
   deps: EntryDeps // 기록·회원 번호와 적은 시각
   bookNames: readonly string[] // 지금 있는 장부 이름 (같은 이름이면 " (엑셀)")
   data: StoredData // 지금 저장 데이터 (자동으로 지키기 크기 경고)
@@ -48,6 +49,7 @@ export type ExcelImportScreenProps = {
   onPickAgain: () => void // 파일 고르기 창을 다시 연다
   onReload: () => void // [앱 다시 열기] (엑셀 기능을 받지 못했을 때)
   onCreate: (name: string, book: ImportedBook) => boolean // [새 장부 만들기]. 기기에 저장했으면 true
+  onSettled?: (status: 'read' | 'failed') => void // 다 읽어 확인 화면이 떴다 / 못 읽어 안내가 떴다 (연습 말풍선이 본다)
 }
 
 type Read = { book: ImportedBook; summary: ExcelImportSummary; workbook: ExcelWorkbook }
@@ -60,7 +62,7 @@ type Phase =
   | { name: 'read'; read: Read; nearKeepLimit: boolean }
 
 export function ExcelImportScreen({
-  file,
+  source,
   deps,
   bookNames,
   data,
@@ -70,6 +72,7 @@ export function ExcelImportScreen({
   onPickAgain,
   onReload,
   onCreate,
+  onSettled,
 }: ExcelImportScreenProps) {
   const [phase, setPhase] = useState<Phase>({ name: 'reading' })
   // 장부 이름 칸. 손대기 전에는 파일 이름에서 정한 값
@@ -82,8 +85,10 @@ export function ExcelImportScreen({
   const created = useRef(false)
 
   const readPhase = (read: Read): Phase => ({ name: 'read', read, nearKeepLimit: isNearKeepLimit(data, read.book) })
-  const readFile = useEffectEvent(() => readExcelFile(file, deps))
+  const fileName = excelSourceName(source)
+  const readFile = useEffectEvent(() => readExcelSource(source, deps))
   const showRead = useEffectEvent((read: Read) => setPhase(readPhase(read)))
+  const settled = useEffectEvent((status: 'read' | 'failed') => onSettled?.(status))
   useEffect(() => {
     // 화면을 떠나면(읽는 중 [‹ 장부로]·뒤로 버튼) 읽은 결과를 버린다
     let alive = true
@@ -93,13 +98,14 @@ export function ExcelImportScreen({
         if (!alive) return
         if (result.ok) showRead(result)
         else setPhase({ name: 'failed', problem: result.problem })
+        settled(result.ok ? 'read' : 'failed')
       })
     return () => {
       alive = false
     }
   }, [])
 
-  if (phase.name === 'reading') return <ExcelReading fileName={file.name} onBack={onBack} />
+  if (phase.name === 'reading') return <ExcelReading fileName={fileName} onBack={onBack} />
   if (phase.name === 'failed') {
     return <ExcelProblem problem={phase.problem} route={backupRoute} onBack={onBack} onPickAgain={onPickAgain} onReload={onReload} />
   }
@@ -126,7 +132,7 @@ export function ExcelImportScreen({
     )
   }
 
-  const bookName = name ?? importedBookName(file.name, bookNames)
+  const bookName = name ?? importedBookName(fileName, bookNames)
   const missingName = bookName.trim() === ''
   const unreadSheets = unreadSheetsText(summary.unreadSheets)
 
@@ -139,7 +145,7 @@ export function ExcelImportScreen({
         <h1 className="screen__title">엑셀 파일을 읽었어요</h1>
       </div>
       <p className="excel-import__file">
-        {file.name} · 시트 {summary.sheetCount}개 중 {summary.readSheets.length}개를 읽었어요
+        {fileName} · 시트 {summary.sheetCount}개 중 {summary.readSheets.length}개를 읽었어요
       </p>
 
       <div className="excel-import__group">

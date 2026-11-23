@@ -2,10 +2,10 @@ import { useEffect, useEffectEvent, useRef, useState, type RefObject } from 'rea
 import { CoachMark } from '../../ui/CoachMark'
 import { ConfirmDialog } from '../../ui/ConfirmDialog'
 import { Icon } from '../../ui/Icon'
-import type { SheetHistory } from '../useScreenHistory'
+import type { Screen, SheetHistory } from '../useScreenHistory'
 import type { PracticeExample } from './practiceScript'
 import { PRACTICE_STOP_DIALOG } from './practiceSlot'
-import { practiceCoach, type PracticeCoach, type PracticeProgress, type PracticeView } from './practiceSteps'
+import { practiceCoach, practiceStageCount, type PracticeCoach, type PracticeProgress, type PracticeView } from './practiceSteps'
 import { practiceTargetRef } from './practiceTargets'
 import './practice.css'
 
@@ -14,24 +14,33 @@ type PracticeOverlayProps = {
   dialogs: SheetHistory
   example: PracticeExample
   progress: PracticeProgress
-  // 월 정리를 열었다 (② — 1초쯤 뒤 [‹ 장부로] 를 가리킨다)
-  onMonthOpened: () => void
+  // 화면이 바뀌었다 (월 정리·회비 표 — 1초쯤 뒤 [‹ 장부로] 를 가리킨다)
+  onOpened: (screen: Screen['name']) => void
   // 그만할까요 확인 창 [그만하기]
   onStop: () => void
   // 공유 갈래의 [다음에 할게요]
   onLater: () => void
 }
 
+// 말풍선 없이 읽는 동안: 월 정리·회비 표를 연 뒤 1초쯤, 연습용 엑셀을 읽는 동안 (SPEC-010 10절)
+function isReading(view: PracticeView, progress: PracticeProgress): boolean {
+  if (view.covered) return false
+  if (view.screen === 'month-summary') return !progress.monthReady
+  if (view.screen === 'dues') return !progress.duesReady
+  return view.screen === 'excel-import' && view.excel === 'reading'
+}
+
 // 연습 동안 App 위에 얹는 것 (SPEC-008): 맨 위 연습 띠, 단계 말풍선 하나, 그만할까요 확인 창.
-// 월 정리를 연 뒤 1초쯤은 말풍선 없이 읽게 하되 뒤 화면은 그대로 막아 둔다(띠 [그만하기] 만)
-export function PracticeOverlay({ view, dialogs, example, progress, onMonthOpened, onStop, onLater }: PracticeOverlayProps) {
+// 월 정리·회비 표를 연 뒤 1초쯤은 말풍선 없이 읽게 하되 뒤 화면은 그대로 막아 둔다(띠 [그만하기] 만)
+export function PracticeOverlay({ view, dialogs, example, progress, onOpened, onStop, onLater }: PracticeOverlayProps) {
   const bandRef = useRef<HTMLDivElement>(null)
   const coach = practiceCoach(view, progress, example)
-  const reading = view.screen === 'month-summary' && !progress.monthReady && !view.covered
+  const reading = isReading(view, progress)
+  const stages = practiceStageCount(example)
 
-  const monthOpened = useEffectEvent(onMonthOpened)
+  const screenOpened = useEffectEvent(onOpened)
   useEffect(() => {
-    if (view.screen === 'month-summary') monthOpened()
+    screenOpened(view.screen)
   }, [view.screen])
 
   return (
@@ -48,7 +57,16 @@ export function PracticeOverlay({ view, dialogs, example, progress, onMonthOpene
         </div>
       </div>
       {reading && <div className="practice-reading" data-testid="practice-reading" />}
-      {coach && <PracticeCoachMark key={`${coach.step}:${coach.target}:${coach.message}`} coach={coach} example={example} bandRef={bandRef} onLater={onLater} />}
+      {coach && (
+        <PracticeCoachMark
+          key={`${coach.step}:${coach.target}:${coach.message}`}
+          coach={coach}
+          stages={stages}
+          example={example}
+          bandRef={bandRef}
+          onLater={onLater}
+        />
+      )}
       <ConfirmDialog
         open={dialogs.dialog === PRACTICE_STOP_DIALOG}
         title="연습을 그만할까요?"
@@ -64,6 +82,7 @@ export function PracticeOverlay({ view, dialogs, example, progress, onMonthOpene
 
 type PracticeCoachMarkProps = {
   coach: PracticeCoach
+  stages: number // 단계 수 ("연습 N / 6", 가계부 5)
   example: PracticeExample
   bandRef: RefObject<HTMLDivElement | null>
   onLater: () => void
@@ -71,7 +90,7 @@ type PracticeCoachMarkProps = {
 
 // 단계 말풍선 하나. 가리키는 곳·같이 열어 둘 곳(+ 연습 띠)은 이 단계 동안 바뀌지 않게 처음 한 번 만든다.
 // 글이 바뀌면(공유 갈래) 새로 띄운다: 가리키는 버튼이 제 안내(aria-describedby)를 바꾸며 말풍선 설명을 덮어써도 다시 붙는다
-function PracticeCoachMark({ coach, example, bandRef, onLater }: PracticeCoachMarkProps) {
+function PracticeCoachMark({ coach, stages, example, bandRef, onLater }: PracticeCoachMarkProps) {
   const [refs] = useState(() => ({
     target: practiceTargetRef(coach.target, example),
     alsoOpen: [...coach.alsoOpen.map((target) => practiceTargetRef(target, example)), bandRef],
@@ -85,7 +104,7 @@ function PracticeCoachMark({ coach, example, bandRef, onLater }: PracticeCoachMa
       alsoOpen={refs.alsoOpen}
       spotlight={refs.spotlight}
       message={coach.message}
-      progress={`연습 ${coach.stage} / 4`}
+      progress={`연습 ${coach.stage} / ${stages}`}
       action={coach.later ? { label: '다음에 할게요', onClick: onLater } : undefined}
     />
   )

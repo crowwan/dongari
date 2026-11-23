@@ -168,6 +168,18 @@ describe('SPEC-008 연습 말풍선 (CoachMark)', () => {
 
     expect(onLater).toHaveBeenCalledOnce()
   })
+
+  it('SPEC-010 10절 가리키는 버튼이 올라오는 창(선택 창) 안에 있으면, 창이 다 올라온 뒤(애니메이션 끝) 자리를 다시 잰다', () => {
+    render(<Sample />)
+    const target = screen.getByRole('button', { name: '설정' })
+    const layer = screen.getByTestId('coach-mark')
+    // 창이 다 올라온 자리 (처음 잴 때는 jsdom 이라 0)
+    vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(20, 600, 300, 56))
+
+    target.dispatchEvent(new Event('animationend', { bubbles: true }))
+
+    expect(layer.style.getPropertyValue('--coach-hole-top')).toBe('600px')
+  })
 })
 
 describe('SPEC-008 말풍선 모양 기준 (coachMark.css)', () => {
