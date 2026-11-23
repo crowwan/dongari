@@ -9,9 +9,10 @@ export type ExcelFileMade =
   | { ok: true; file: File; contents: { years: string; sheets: string } }
   | { ok: false; problem: 'load-failed' | 'failed' }
 
+// 던지지 않는다: SheetJS 를 받지 못한 것만 load-failed, 시트 만들기·파일 쓰기 오류는 failed (#180 리뷰)
 export async function makeExcelFile(book: Book, today: Date): Promise<ExcelFileMade> {
-  const exported = exportBook(book, today)
   try {
+    const exported = exportBook(book, today)
     const blob = await writeWorkbook(exported.sheets)
     return { ok: true, file: new File([blob], exported.fileName, { type: XLSX_MIME }), contents: exportContents(exported) }
   } catch (error) {

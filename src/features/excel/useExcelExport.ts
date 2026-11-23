@@ -3,7 +3,7 @@
 // 파일 공유가 되는 폰은 보내기 창(그동안 이 창은 "만드는 중"), 안 되면 다운로드 폴더로 내려받는다(features/backup/sendFile)
 import { useRef, useState } from 'react'
 import type { Book } from '../../domain/types'
-import { sendFile, type ShareApi } from '../backup/sendFile'
+import { sendFile, type SendResult, type ShareApi } from '../backup/sendFile'
 import type { SheetHistory } from '../useScreenHistory'
 import type { ExcelFileMade } from './excelExport'
 import { EXCEL_EXPORT_WORDS } from './excelMessages'
@@ -35,12 +35,27 @@ interface ExcelExportOptions {
 }
 
 async function makeFile(book: Book, today: Date): Promise<ExcelFileMade> {
+  let chunk: typeof import('./excelExport')
   try {
-    const { makeExcelFile } = await import('./excelExport')
-    return await makeExcelFile(book, today)
+    chunk = await import('./excelExport')
   } catch {
-    // 내보내기 조각을 받지 못함 (오프라인인데 서비스 워커가 아직 못 받음, 배포 뒤 옛 조각 주소가 사라짐)
+    // 내보내기 조각을 받지 못함 (오프라인인데 서비스 워커가 아직 못 받음, 배포 뒤 옛 조각 주소가 사라짐).
+    // 받지 못함은 이것과 SheetJS 를 받지 못한 경우뿐이다 — 조각을 받은 뒤의 오류는 failed (#180 리뷰)
     return { ok: false, problem: 'load-failed' }
+  }
+  try {
+    return await chunk.makeExcelFile(book, today)
+  } catch {
+    return { ok: false, problem: 'failed' }
+  }
+}
+
+// 보내기 창·내려받기. 내려받기가 던지면(파일 주소를 못 만듦 등) 만들지 못함으로 (#180 리뷰: "만드는 중" 창이 버튼 없이 남지 않게)
+async function sendOrFail(file: File, share: ShareApi | undefined, download: ((file: File) => void) | undefined): Promise<SendResult | 'failed'> {
+  try {
+    return await sendFile(file, share, download)
+  } catch {
+    return 'failed'
   }
 }
 
@@ -60,8 +75,12 @@ export function useExcelExport({ book, now, sheets, onSent, share, download }: E
       setState({ step: made.problem })
       return
     }
-    const result = await sendFile(made.file, share, download)
+    const result = await sendOrFail(made.file, share, download)
     if (run.current !== id) return
+    if (result === 'failed') {
+      setState({ step: 'failed' })
+      return
+    }
     if (result === 'downloaded') {
       setState({ step: 'saved', fileName: made.file.name, ...made.contents })
       return

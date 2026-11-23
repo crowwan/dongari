@@ -199,6 +199,10 @@ describe('SPEC-010 엑셀 내보내기 — 파일 이름과 담긴 것 (9절)', 
     expect(exportContents(exportBook({ ...CLUB, kind: 'household' }, TODAY))).toEqual({ years: '2025~2026년', sheets: '해마다 입출금내역' })
     expect(exportContents(exportBook(bookOf([LEDGER_2026]), TODAY))).toEqual({ years: '2026년', sheets: '입출금내역' })
   })
+
+  it('담긴 해가 없으면 "undefined년" 대신 "기록 없음" (#180 리뷰)', () => {
+    expect(exportContents({ years: [], hasDues: false })).toEqual({ years: '기록 없음', sheets: '입출금내역' })
+  })
 })
 
 // 다시 읽은 장부를 이름으로 맞춰 보는 모양 (기록 번호·적은 시각·회원 번호는 새로 생긴다)

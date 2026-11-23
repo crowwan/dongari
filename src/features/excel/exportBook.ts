@@ -180,6 +180,8 @@ export function exportContents({ years, hasDues }: Pick<ExcelExport, 'years' | '
   const first = years[0]
   const last = years[years.length - 1]
   const kinds = hasDues ? '입출금내역 · 회비내역' : '입출금내역'
+  // 해가 없는 장부(시트가 없어 파일을 만들지 못하는 경우라 화면에는 보이지 않지만) "undefined년" 이 되지 않게 (#180 리뷰)
+  if (first === undefined || last === undefined) return { years: '기록 없음', sheets: kinds }
   return {
     years: first === last ? `${first}년` : `${first}~${last}년`,
     sheets: years.length > 1 ? `해마다 ${kinds}` : kinds,

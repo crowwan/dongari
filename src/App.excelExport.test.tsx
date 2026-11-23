@@ -171,6 +171,22 @@ describe('SPEC-010 엑셀 내보내기 — 넘기기 (9절, AC-34)', () => {
     expect(files).toHaveLength(1)
   })
 
+  it('내려받기가 오류로 끝나면(파일 주소를 못 만듦) "만드는 중" 창이 버튼 없이 남지 않고 "엑셀 파일을 만들지 못했어요" + [닫기] (#180 리뷰)', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: () => {
+        throw new Error('파일 주소를 만들지 못함')
+      },
+      configurable: true,
+    })
+    renderApp(new MemoryRepository(stored(CLUB)))
+
+    await exportFromSettings()
+
+    const dialog = await screen.findByRole('dialog', { name: '엑셀 파일을 만들지 못했어요' })
+    await userEvent.click(within(dialog).getByRole('button', { name: '닫기' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('보내기 창을 그냥 닫으면 이 창도 아무 알림 없이 닫힌다', async () => {
     const { shareMock } = stubShare(() => Promise.reject(new DOMException('취소', 'AbortError')))
     const { click } = stubDownload()

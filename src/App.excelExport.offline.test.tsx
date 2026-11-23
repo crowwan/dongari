@@ -12,6 +12,7 @@ afterEach(() => {
   vi.doUnmock('xlsx')
   vi.doUnmock('./features/excel/excelExport')
   vi.doUnmock('./features/excel/sheetjs')
+  vi.doUnmock('./features/excel/exportBook')
   vi.resetModules()
   Reflect.deleteProperty(navigator, 'canShare')
   Reflect.deleteProperty(navigator, 'share')
@@ -69,6 +70,22 @@ describe('SPEC-010 엑셀 내보내기 — 엑셀 기능을 받지 못함 (9절�
     await userEvent.click(within(dialog).getByRole('button', { name: '닫기' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(repository.load().data).toEqual(ONE_BOOK)
+  })
+
+  it('시트를 만들다 오류가 나면(엑셀 기능은 받음) 받지 못함이 아니라 "엑셀 파일을 만들지 못했어요" (#180 리뷰)', async () => {
+    vi.resetModules()
+    vi.doMock('./features/excel/exportBook', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('./features/excel/exportBook')>()),
+      exportBook: () => {
+        throw new TypeError('시트를 만들다 오류')
+      },
+    }))
+    await renderFreshApp(new MemoryRepository(ONE_BOOK))
+
+    await exportFromSettings()
+
+    expect(await screen.findByRole('dialog', { name: '엑셀 파일을 만들지 못했어요' }, { timeout: 5_000 })).toBeInTheDocument()
+    expect(screen.queryByText('인터넷에 연결된 뒤 [앱 다시 열기]를 눌러 주세요')).not.toBeInTheDocument()
   })
 
   it('그 밖에 파일을 만들지 못하면 "엑셀 파일을 만들지 못했어요"와 다시 누르라는 안내', async () => {
