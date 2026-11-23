@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addEntry,
+  assignPayers,
   calculateTotals,
   createLedger,
   deleteEntry,
@@ -682,5 +683,62 @@ describe('SPEC-010 낸 분을 넣어 적고 고치기 (3절)', () => {
       expect(() => edited({ amount: 50_000 }, { kind: 'set', payers: twoPaid })).toThrow(InvalidLedgerInputError)
       expect(() => edited({ name: '찬조금' }, { kind: 'set', payers: twoPaid })).toThrow(InvalidLedgerInputError)
     })
+  })
+})
+
+describe('SPEC-010 낸 분 붙이기 (7절)', () => {
+  const MEMBERS = [
+    { id: 'm1', name: '김도윤', joined: '2026-01', off: [] },
+    { id: 'm2', name: '강민지', joined: '2026-01', off: [] },
+  ]
+  // 엑셀에서 불러와 낸 분을 못 나눈 회비 기록 (날짜 없는 예전 기록, 사진 묶음, 저장 형식이 받는 끝 띄어쓰기가 남은 이름)
+  const unassigned = entry({
+    id: 'u',
+    month: 3,
+    type: 'income',
+    name: '회비(2인) ',
+    amount: 50_000,
+    batchId: 'batch-1',
+    sourceText: '3월 -2명: 김도윤(3만원),강민지',
+    createdAt: '2025-12-01T00:00:00.000Z',
+  })
+  const other = entry({ id: 'x', month: 2 })
+  const shares = [
+    { memberId: 'm1', amount: 30_000 },
+    { memberId: 'm2', amount: 20_000 },
+  ]
+
+  it('AC-22 그 기록에 낸 분만 붙이고 날짜·항목(이름을 다듬지도 않음)·금액·엑셀 글·묶음·적은 시각·순서는 그대로 둔다 (#181 리뷰)', () => {
+    const next = assignPayers(ledger({ entries: [other, unassigned] }), 'u', shares, MEMBERS)
+
+    expect(next.entries).toEqual([other, { ...unassigned, payers: shares }])
+  })
+
+  it('AC-22 붙인 결과는 저장 형식 검사를 통과한다', () => {
+    const target = duesBook()
+    const year = target.ledgers['2026']
+    if (!year) throw new Error('2026년 장부가 없다')
+
+    const next = assignPayers(year, 'dues-2', [{ memberId: 'm1', amount: 30_000 }], target.members ?? [])
+
+    expect(next.entries.find((item) => item.id === 'dues-2')?.payers).toEqual([{ memberId: 'm1', amount: 30_000 }])
+    const data: StoredData = { ...storedWith(), books: [{ ...target, ledgers: { '2026': next } }] }
+    expect(isStoredData(data)).toBe(true)
+  })
+
+  it.each([
+    ['몫의 합이 기록 금액과 다름', [{ memberId: 'm1', amount: 20_000 }]],
+    ['명단에 없는 회원', [{ memberId: 'nobody', amount: 50_000 }]],
+    ['같은 회원이 두 번', [{ memberId: 'm1', amount: 25_000 }, { memberId: 'm1', amount: 25_000 }]],
+    ['붙일 분이 없음', []],
+  ])('저장 형식 검사와 어긋나는 낸 분은 붙이지 않는다: %s', (_label, payers) => {
+    expect(() => assignPayers(ledger({ entries: [unassigned] }), 'u', payers, MEMBERS)).toThrow(InvalidLedgerInputError)
+  })
+
+  it('없는 기록·회비가 아닌 기록에는 붙이지 않는다', () => {
+    expect(() => assignPayers(ledger({ entries: [other] }), 'u', shares, MEMBERS)).toThrow(InvalidLedgerInputError)
+    expect(() => assignPayers(ledger({ entries: [other] }), 'x', [{ memberId: 'm1', amount: 10_000 }], MEMBERS)).toThrow(
+      InvalidLedgerInputError,
+    )
   })
 })

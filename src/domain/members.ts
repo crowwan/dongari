@@ -167,6 +167,13 @@ export function changeDuesStart(book: Book, startMonth: YearMonth): Book {
   return { ...book, dues: { ...book.dues, startMonth: checkYearMonth(startMonth, '회비 표 시작 달') } }
 }
 
+// "낸 분을 안 적은 회비" 카드 숨기기 (SPEC-010 7절 [이 카드 숨기기]). 장부에 저장해 새로 생긴 기록이 있어도 다시 뜨지 않는다.
+// 시작 달이 없는 장부(명단을 넣기 전)에는 카드가 없고 저장 형식의 회비 표 값(BookDues)도 만들 수 없어 바꾸지 않는다
+export function hideUnassignedDues(book: Book): Book {
+  if (book.dues === undefined) throw new InvalidLedgerInputError('회비 표 시작 달이 없는 장부에는 숨길 카드가 없다')
+  return { ...book, dues: { ...book.dues, hideUnassigned: true } }
+}
+
 // 그 해 월 회비 바꾸기: 기록 금액과 같은 범위(1 ~ ENTRY_AMOUNT_MAX 정수)
 export function changeMonthlyFee(ledger: Ledger, fee: number): Ledger {
   if (!Number.isInteger(fee) || fee < 1 || fee > ENTRY_AMOUNT_MAX) {

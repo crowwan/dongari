@@ -1096,3 +1096,55 @@ describe('SPEC-010 useLedger 회원 명단·월 회비·시작 달 (6절)', () =
     expect(result.current.book?.dues).toEqual({ startMonth: '2025-01' })
   })
 })
+
+describe('SPEC-010 useLedger 낸 분 붙이기 (7절)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  // 2025년 회비 기록 하나에 낸 분이 없고, 장부 연도는 2026년 (회비 표 시작 달 2025년 1월)
+  function withUnassigned(): StoredData {
+    const data = storedWith(
+      {
+        year: 2025,
+        carryover: 0,
+        entries: [{ id: 'old', month: 4, day: 2, type: 'income', name: '회비', amount: 40_000, createdAt: '2025-04-02T00:00:00.000Z' }],
+      },
+      ledger2026(),
+    )
+    const [target] = data.books
+    if (!target) throw new Error('장부가 없다')
+    return {
+      ...data,
+      books: [{ ...target, members: [{ id: 'm1', name: '김도윤', joined: '2025-01', off: [] }], dues: { startMonth: '2025-01' } }],
+    }
+  }
+
+  it('AC-22 보고 있는 장부 연도와 다른 해의 기록에도 낸 분을 붙여 저장하고, 다시 읽어도 깨진 데이터가 아니다', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(withUnassigned()))
+    const { result } = renderLedger(new LocalStorageRepository())
+
+    let saved = false
+    act(() => {
+      saved = result.current.assignPayers(2025, 'old', [{ memberId: 'm1', amount: 40_000 }])
+    })
+
+    expect(saved).toBe(true)
+    expect(result.current.year).toBe(2026)
+    expect(result.current.book?.ledgers['2025']?.entries[0]?.payers).toEqual([{ memberId: 'm1', amount: 40_000 }])
+    const reloaded = new LocalStorageRepository().load()
+    expect(reloaded.status).toBe('ok')
+    expect(reloaded.data).toEqual(result.current.data)
+  })
+
+  it('AC-22 [이 카드 숨기기] 를 장부에 저장한다', () => {
+    const repository = new MemoryRepository(withUnassigned())
+    const { result } = renderLedger(repository)
+
+    act(() => {
+      result.current.hideUnassignedDues()
+    })
+
+    expect(repository.load().data.books[0]?.dues).toEqual({ startMonth: '2025-01', hideUnassigned: true })
+  })
+})

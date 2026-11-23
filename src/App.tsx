@@ -37,6 +37,7 @@ import { MonthSummaryScreen } from './features/report/MonthSummaryScreen'
 import { pictureSaver, type PictureSaver } from './features/report/savePicture'
 import { YearSummaryScreen } from './features/report/YearSummaryScreen'
 import { DuesScreen } from './features/dues/DuesScreen'
+import { payerAssign } from './features/dues/payerAssign'
 import { useBehindCount } from './features/dues/useBehindCount'
 import type { DuesSettings } from './features/settings/RosterPages'
 import { SettingsScreen } from './features/settings/SettingsScreen'
@@ -118,6 +119,7 @@ function duesSettings(state: LedgerState, today: Date, notify: (message: string)
     onDeleteMember: (id) => notifyIfSaved(state.deleteMember(id), '지웠어요'),
     onChangeStartMonth: (month) => notifyIfSaved(state.changeDuesStart(month), '바꿨어요'),
     onChangeMonthlyFee: (fee, year) => notifyIfSaved(state.changeMonthlyFee(fee, year), '바꿨어요'),
+    assign: payerAssign(state, today, notify),
   }
 }
 

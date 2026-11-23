@@ -6,9 +6,10 @@ import type { Member, YearMonth } from '../../domain/types'
 export const ROSTER_PAGE = 'settings-roster'
 export const MEMBER_ADD_PAGE = 'settings-roster-add'
 export const MEMBER_PAGE = 'settings-roster-member'
+export const ROSTER_ASSIGN_PAGE = 'settings-roster-assign' // 회원 명단 맨 아래 [낸 분 붙이기] (SPEC-010 7절)
 
 export function isRosterPage(sheet: string | null): boolean {
-  return sheet === ROSTER_PAGE || sheet === MEMBER_ADD_PAGE || sheet === MEMBER_PAGE
+  return sheet === ROSTER_PAGE || sheet === MEMBER_ADD_PAGE || sheet === MEMBER_PAGE || sheet === ROSTER_ASSIGN_PAGE
 }
 
 export interface RosterGroups {

@@ -191,6 +191,18 @@ function keptOnEdit(
   return kept
 }
 
+// 낸 분 붙이기 (SPEC-010 7절): 기록 칸(날짜·항목·금액·묶음·엑셀 글·적은 시각)과 순서는 손대지 않고 낸 분만 넣는다.
+// 고치기처럼 입력을 다듬으면(normalizeEntryInput) 이름 끝 띄어쓰기 같은 기록 내용이 바뀌어서 updateEntry 를 거치지 않는다 (#181 리뷰).
+// 검사는 고치기 set 과 같은 규칙(checkPayers: 회비 기록·같은 회원 두 번 없음·명단에 있는 회원·1원 이상·합 = 기록 금액)이라
+// 결과는 늘 저장 형식 검사를 통과한다. 붙일 분이 없으면(빈 목록) 붙이는 일이 아니라 넣지 않는다
+export function assignPayers(ledger: Ledger, id: string, payers: readonly Payer[], members: readonly Member[]): Ledger {
+  const entry = ledger.entries.find((item) => item.id === id)
+  if (!entry) throw new InvalidLedgerInputError(`없는 기록이다: ${id}`)
+  const checked = checkPayers(payers, entry, members)
+  if (!checked) throw new InvalidLedgerInputError('붙일 낸 분이 없다')
+  return { ...ledger, entries: ledger.entries.map((item) => (item.id === id ? { ...item, payers: checked } : item)) }
+}
+
 function payersOnEdit(before: Entry, content: EntryInput, edit: PayersEdit, members: readonly Member[]): Payer[] | undefined {
   switch (edit.kind) {
     case 'recalculate':
