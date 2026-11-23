@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
-import type { Ledger, StoredData } from './domain/types'
+import { CURRENT_SCHEMA_VERSION, type Ledger, type StoredData } from './domain/types'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { LocalStorageRepository, STORAGE_KEY } from './storage/LocalStorageRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
@@ -231,7 +231,7 @@ describe('SPEC-002 기록 파일 보내기·불러오기', () => {
     it.each([
       ['깨진 JSON', '{"schemaVersion": 2,', '우리 장부에서 보낸 기록 파일인지 확인해 주세요'],
       ['다른 형식', JSON.stringify({ name: '가계부' }), '우리 장부에서 보낸 기록 파일인지 확인해 주세요'],
-      ['상위 버전', JSON.stringify({ schemaVersion: 4, books: [], settings: {} }), '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
+      ['상위 버전', JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION + 1, books: [], settings: {} }), '앱을 닫았다가 다시 연 뒤 불러와 주세요'],
     ])('AC-4 %s 파일은 불러오지 않고 "이 파일은 열 수 없어요" 를 알리며 기존 데이터를 유지한다', async (_label, text, description) => {
       const repository = renderApp(new MemoryRepository(storedWith(LEDGER_2026)))
       await openSettings()

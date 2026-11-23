@@ -21,7 +21,7 @@ describe('SPEC-002 저장 (메모리)', () => {
   })
 
   it('처음에는 빈 초기값을 돌려준다', () => {
-    expect(new MemoryRepository().load()).toEqual({ status: 'ok', data: { schemaVersion: 3, books: [], settings: {} } })
+    expect(new MemoryRepository().load()).toEqual({ status: 'ok', data: { schemaVersion: 4, books: [], settings: {} } })
   })
 
   it('저장한 뒤 원본 객체를 바꿔도 저장된 값은 바뀌지 않는다', () => {

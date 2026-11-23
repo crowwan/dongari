@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { keepIdOf as appKeepIdOf, sealKeep } from '../src/features/keep/keepCrypto'
 import { normalizeRecoveryCode as appNormalize } from '../src/features/keep/recoveryCode'
 import { createBackup, readBackup } from '../src/storage/backup'
-import { book, ledger, storedWith } from '../src/test/ledgerFixtures'
+import { book, duesBook, ledger, storedWith } from '../src/test/ledgerFixtures'
 import {
   APP_ORIGIN,
   BROKEN_ENVELOPE,
@@ -80,6 +80,23 @@ describe('#154 보관본 꺼내기 스크립트', () => {
       expect(readBackup(result.plain)).toMatchObject({ ok: true, summary: { bookCount: 2, entryCount: 3 } })
       expect(result.savedAt).toBe(SAVED_AT)
       expect(result.summary).toEqual({ bookNames: ['꽃동아리', '우리집 가계부'], entryCount: 3 })
+    })
+  })
+
+  describe('SPEC-010 저장 형식 v4', () => {
+    it('AC-3 앱이 만든 v4 보관본(회원 명단·월 회비·낸 분·엑셀 글)을 풀면 기록 파일로 그대로 읽힌다', async () => {
+      const data = { ...storedWith(), books: [duesBook()], settings: { recoveryCode: CODE } }
+      const plain = createBackup(data, new Date(SAVED_AT)).text
+      const server = fakeServer(async () => jsonResponse(await sealKeep(CODE, plain, SAVED_AT)))
+
+      const result = await rescueKeep(CODE, KEEP_URL, server.fetchFn)
+
+      if (!result.ok) throw new Error(result.message)
+      expect(result.summary).toEqual({ bookNames: ['한랑드림'], entryCount: 2 })
+      const read = readBackup(result.plain)
+      if (!read.ok) throw new Error(read.reason)
+      expect(read.data.schemaVersion).toBe(4)
+      expect(read.data.books).toEqual(data.books)
     })
   })
 

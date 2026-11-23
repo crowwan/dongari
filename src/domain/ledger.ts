@@ -1,6 +1,7 @@
 // 장부 계산·변경 순수 함수 (SPEC-001). 화면·저장소와 무관하게 Ledger 만 다룬다
+import { isDuesEntry } from './dues'
 import { byDate, isDayInMonth } from './entryDate'
-import { ENTRY_AMOUNT_MAX, type Book, type BookKind, type Entry, type EntryType, type Ledger } from './types'
+import { ENTRY_AMOUNT_MAX, type Book, type BookKind, type Entry, type EntryType, type Ledger, type Payer } from './types'
 
 // 사용자가 입력하는 기록 내용. id·createdAt 은 앱이 붙인다. 날짜(일)는 새로 적을 때 꼭 있고, 날짜 없는 예전 기록을 고칠 때만 빠진다
 export type EntryInput = Pick<Entry, 'month' | 'day' | 'type' | 'name' | 'amount' | 'batchId'>
@@ -124,18 +125,43 @@ export function addEntry(ledger: Ledger, input: EntryInput, deps: EntryDeps): Le
   return { ...ledger, entries: [...ledger.entries, entry] }
 }
 
-// id·입력 시각·순서는 그대로 두고 내용만 바꾼다. 입력에 묶음이 없으면 원래 묶음(사진으로 함께 넣은 것)도 그대로.
+// id·입력 시각·순서는 그대로 두고 내용만 바꾼다. 입력에 없는 칸은 keptOnEdit 대로 남긴다.
 // 날짜는 입력 그대로: 날짜 없는 예전 기록은 날짜 없이도 저장된다 (AC-25)
 export function updateEntry(ledger: Ledger, id: string, input: EntryInput): Ledger {
   const content = normalizeEntryInput(ledger.year, input)
   return {
     ...ledger,
-    entries: ledger.entries.map((entry) => {
-      if (entry.id !== id) return entry
-      const updated: Entry = { id, ...content, createdAt: entry.createdAt }
-      return content.batchId === undefined && entry.batchId !== undefined ? { ...updated, batchId: entry.batchId } : updated
-    }),
+    entries: ledger.entries.map((entry) =>
+      entry.id === id ? { id, ...content, ...keptOnEdit(entry, content), createdAt: entry.createdAt } : entry,
+    ),
   }
+}
+
+// 고쳐도 남기는 칸 (고치기 화면이 입력으로 넘기지 않는 것). 없는 값은 키째 뺀다
+// - 사진으로 함께 넣은 묶음: 입력에 묶음이 없으면 원래 묶음 그대로
+// - 엑셀에 적혀 있던 글: 늘 그대로 (SPEC-010 8절, 엑셀 원래 글)
+// - 낸 분: payersAfterEdit 규칙대로 (SPEC-010 3절 "고치기 화면")
+function keptOnEdit(before: Entry, content: EntryInput): Pick<Entry, 'batchId' | 'sourceText' | 'payers'> {
+  const kept: Pick<Entry, 'batchId' | 'sourceText' | 'payers'> = {}
+  if (content.batchId === undefined && before.batchId !== undefined) kept.batchId = before.batchId
+  if (before.sourceText !== undefined) kept.sourceText = before.sourceText
+  const payers = payersAfterEdit(before, content)
+  if (payers !== undefined) kept.payers = payers
+  return kept
+}
+
+// 고친 기록의 낸 분 (SPEC-010 3절 "고치기 화면"). 저장 형식 검사(낸 분 금액 합 = 기록 금액)와 어긋나게 남기지 않는다
+// - 회비 기록이 아니게 됐으면 뺀다 (화면은 저장 전에 "낸 분 기록이 지워져요" 확인 창)
+// - 금액이 같으면 그대로
+// - 금액이 바뀌었고 낸 분이 모두 같은 금액이며 새 금액이 사람 수로 나눠떨어지면 똑같이 다시 나눈다
+// - 그 밖은 뺀다 (화면은 저장 전에 "한 분씩 금액"으로 보낸다)
+function payersAfterEdit(before: Entry, content: EntryInput): Payer[] | undefined {
+  const { payers } = before
+  if (payers === undefined || !isDuesEntry(content)) return undefined
+  if (content.amount === before.amount) return payers
+  const share = content.amount / payers.length
+  const evenlySplit = new Set(payers.map((payer) => payer.amount)).size === 1
+  return evenlySplit && Number.isInteger(share) ? payers.map((payer) => ({ ...payer, amount: share })) : undefined
 }
 
 export function deleteEntry(ledger: Ledger, id: string): Ledger {

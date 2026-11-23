@@ -47,8 +47,16 @@ function booksFromV2(data: unknown): unknown {
   return { schemaVersion: 3, books: [book], settings: { ...data.settings, lastBookId: FIRST_BOOK_ID } }
 }
 
+// v3 → v4 (SPEC-010 1절): 회원 명단·회비 값·월 회비·낸 분·엑셀 글은 모두 선택 칸이라 옮길 것이 없다. 번호만 바꾼다.
+// 번호를 올리는 이유: 옛 앱(v2.7)이 v4 데이터를 고쳐 저장하면 낸 분이 조용히 빠진다(ADR 001 "v4").
+// 나머지 형식(v3 때와 같다)은 옮긴 뒤 현재 스키마 검증이 본다
+function duesFieldsFromV3(data: unknown): unknown {
+  if (!isRecord(data)) throw new InvalidDataError('v3 형식이 아니다')
+  return { ...data, schemaVersion: 4 }
+}
+
 // 실제 등록된 마이그레이션. v2 가 첫 버전이다 (v1 데이터는 옮기지 않는다, SPEC-002 범위 밖)
-const MIGRATIONS: MigrationSteps = { 2: booksFromV2 }
+const MIGRATIONS: MigrationSteps = { 2: booksFromV2, 3: duesFieldsFromV3 }
 
 // 이 앱보다 새 버전 앱이 저장한 데이터. 새로고침(앱 업데이트)이 필요하다
 export class NewerSchemaError extends Error {

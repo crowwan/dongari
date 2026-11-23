@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Ledger, StoredData } from '../../domain/types'
+import { CURRENT_SCHEMA_VERSION, type Ledger, type StoredData } from '../../domain/types'
 import type { LedgerRepository, LoadResult, SaveResult } from '../../storage/LedgerRepository'
 import { LocalStorageRepository, STORAGE_KEY } from '../../storage/LocalStorageRepository'
 import { MemoryRepository } from '../../storage/MemoryRepository'
@@ -293,7 +293,7 @@ describe('SPEC-001 useLedger', () => {
     })
 
     it('새 버전 데이터라 저장할 수 없으면 read-only 로 알리고, 바꾸면 저장 실패를 노출한다', () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 4 }))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION + 1 }))
       const { result } = renderLedger(new LocalStorageRepository())
 
       expect(result.current.startup).toEqual({ status: 'read-only', reason: 'newer-version' })
@@ -452,7 +452,7 @@ describe('SPEC-001 useLedger', () => {
     })
 
     it('새 버전 기록이 있어 저장을 막은 상태에서는 불러오기도 막고 지금 화면을 그대로 둔다', () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 4 }))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION + 1 }))
       const { result } = renderLedger(new LocalStorageRepository())
 
       let restored: SaveResult = { ok: true }
@@ -842,7 +842,7 @@ describe('SPEC-002 v2.6 useLedger 저장 안 된 기록', () => {
   })
 
   it('AC-11 읽기 전용으로 시작했으면(새 버전 기록) 적은 기록이 모두 저장 안 된 것으로 남는다', () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 4 }))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: CURRENT_SCHEMA_VERSION + 1 }))
     const { result } = renderLedger(new LocalStorageRepository())
     act(() => {
       result.current.createBook({ name: '한랑드림', kind: 'club', carryover: 0 })

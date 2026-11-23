@@ -16,7 +16,9 @@ import {
   updateEntry,
   type EntryInput,
 } from './ledger'
-import type { Book, Entry, Ledger } from './types'
+import { isStoredData } from '../storage/schema'
+import { duesBook, storedWith } from '../test/ledgerFixtures'
+import type { Book, Entry, Ledger, StoredData } from './types'
 
 const NOW = new Date('2026-10-03T09:00:00.000Z')
 
@@ -490,5 +492,101 @@ describe('SPEC-001 장부 계산', () => {
     it('장부가 하나도 없으면 빈 이름과 이월금 0 이다', () => {
       expect(newLedgerDefaults(undefined, 2026)).toEqual({ name: '', carryover: 0 })
     })
+  })
+})
+
+describe('SPEC-010 고치기에서 낸 분·엑셀 글 (3절 "고치기 화면")', () => {
+  // 두 분이 2만 원씩 낸 회비 기록 (엑셀에서 불러와 엑셀 글이 있다)
+  const paid = entry({
+    id: 'a',
+    month: 3,
+    day: 5,
+    type: 'income',
+    name: '회비',
+    amount: 40_000,
+    payers: [
+      { memberId: 'm1', amount: 20_000 },
+      { memberId: 'm2', amount: 20_000 },
+    ],
+    sourceText: '3월 -2명: 김도윤,강민지',
+  })
+  const paidInput: EntryInput = { month: 3, day: 5, type: 'income', name: '회비', amount: 40_000 }
+
+  function edited(before: Entry, input: Partial<EntryInput>): Entry {
+    const [result] = updateEntry(ledger({ entries: [before] }), before.id, { ...paidInput, ...input }).entries
+    if (!result) throw new Error('고친 기록이 없다')
+    return result
+  }
+
+  it('날짜만 고치면 낸 분과 엑셀 글이 그대로 남는다', () => {
+    expect(edited(paid, { day: 9 })).toEqual({ ...paid, day: 9 })
+  })
+
+  it('이름을 바꿔도 회비 기록이고 금액이 같으면 낸 분이 그대로 남는다 ("회비(2인)")', () => {
+    expect(edited(paid, { name: '회비(2인)' }).payers).toEqual(paid.payers)
+  })
+
+  it('금액을 바꾸면 모두 같은 금액이던 낸 분을 새 금액으로 똑같이 다시 나눈다', () => {
+    expect(edited(paid, { amount: 60_000 }).payers).toEqual([
+      { memberId: 'm1', amount: 30_000 },
+      { memberId: 'm2', amount: 30_000 },
+    ])
+  })
+
+  it.each([
+    ['새 금액이 사람 수로 나눠떨어지지 않음', paid, 50_001],
+    ['새 금액이 사람 수보다 적음 (한 분 1원도 안 됨)', paid, 1],
+    [
+      '낸 분 금액이 서로 다름',
+      {
+        ...paid,
+        payers: [
+          { memberId: 'm1', amount: 10_000 },
+          { memberId: 'm2', amount: 30_000 },
+        ],
+      },
+      60_000,
+    ],
+  ])('금액을 바꿨는데 똑같이 나눌 수 없으면 낸 분이 빠지고 엑셀 글은 남는다: %s', (_label, before, amount) => {
+    const result = edited(before, { amount })
+
+    expect(result).not.toHaveProperty('payers')
+    expect(result.sourceText).toBe(paid.sourceText)
+  })
+
+  it.each<[string, Partial<EntryInput>]>([
+    ['수입 "찬조금"', { name: '찬조금' }],
+    ['지출 "회비"', { type: 'expense' }],
+  ])('항목을 회비가 아닌 것으로 바꾸면 낸 분이 빠지고 엑셀 글은 남는다: %s', (_label, input) => {
+    const result = edited(paid, input)
+
+    expect(result).not.toHaveProperty('payers')
+    expect(result.sourceText).toBe(paid.sourceText)
+  })
+
+  it('낸 분·엑셀 글이 없는 기록은 고쳐도 그 칸이 생기지 않는다', () => {
+    const result = edited(entry({ id: 'b', type: 'income', name: '회비', amount: 40_000 }), { amount: 60_000 })
+
+    expect(result).not.toHaveProperty('payers')
+    expect(result).not.toHaveProperty('sourceText')
+  })
+
+  // v4 칸이 든 장부(duesBook)의 두 분이 낸 회비 기록(dues-1)을 고친다
+  it.each<[string, Partial<EntryInput>]>([
+    ['날짜만', { day: 9 }],
+    ['금액을 나눠떨어지게', { amount: 60_000 }],
+    ['금액을 나눠떨어지지 않게', { amount: 50_001 }],
+    ['금액을 1원으로', { amount: 1 }],
+    ['수입 "찬조금"으로', { name: '찬조금' }],
+    ['지출로', { type: 'expense' }],
+  ])('고친 결과는 늘 저장 형식 검사를 통과한다 (가드와 어긋나지 않음): %s', (_label, input) => {
+    const book = duesBook()
+    const before = book.ledgers['2026']
+    if (!before) throw new Error('2026년 장부가 없다')
+
+    const after = updateEntry(before, 'dues-1', { ...paidInput, ...input })
+    const data: StoredData = { ...storedWith(), books: [{ ...book, ledgers: { '2026': after } }] }
+
+    expect(isStoredData(data)).toBe(true)
   })
 })

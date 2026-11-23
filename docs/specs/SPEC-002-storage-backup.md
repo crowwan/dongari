@@ -5,7 +5,7 @@ status: done
 milestone: v2.7
 issue: "#1"
 prototype:
-updated: 2026-10-16
+updated: 2026-11-23
 ---
 
 # SPEC-002 안전한 저장과 백업
@@ -23,7 +23,7 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 ### 저장
 
 - 모든 변경은 즉시 저장된다. "저장" 개념을 사용자에게 노출하지 않는다(입력창의 [저장] 은 기록 확정 의미).
-- 저장 형식: `dongari:v2` 키 하나에 `{ schemaVersion: 3, books: Book[], settings }` — 장부마다 `ledgers: { [year]: Ledger }` (v2.4 여러 장부, SPEC-005). 키 이름은 그대로. 상세 근거는 [ADR 001](../decisions/001-storage.md). `settings.recoveryCode`(복구 코드, 선택 칸, v2.5 SPEC-006)는 버전을 올리지 않았다.
+- 저장 형식: `dongari:v2` 키 하나에 `{ schemaVersion: 4, books: Book[], settings }` — 장부마다 `ledgers: { [year]: Ledger }` (v2.4 여러 장부, SPEC-005). 키 이름은 그대로. 상세 근거는 [ADR 001](../decisions/001-storage.md). `settings.recoveryCode`(복구 코드, 선택 칸, v2.5 SPEC-006)는 버전을 올리지 않았다. v2.8 회원 명단·월 회비·낸 분(SPEC-010)은 선택 칸이지만 옛 앱이 고쳐 저장하면 낸 분이 빠져 4 로 올렸다(v3 → v4 는 번호만, 옛 원본 `dongari:v2:schema-3`).
 - 형식을 올릴 때(마이그레이션) 이전 버전 원본을 `dongari:v2:schema-<버전>` 키에 그대로 보관한 뒤 새 형식으로 읽는다. 보관하지 못하면 옮긴 기록은 보여 주되 저장을 막는다(아래 시작 상태 `old-version-unpreserved`).
 - 기록 날짜(일, `Entry.day`, v2.2)는 선택 칸이다. 날짜 칸이 생기기 전에 적은 기록과 그때 만든 백업 파일은 날짜 없이 그대로 읽힌다. 칸을 더할 때는 `schemaVersion` 을 올리지 않았다(근거와 기준: ADR 001 "스키마 버전을 올리는 기준", #77).
 - **오래 보관 요청**: 브라우저가 저장 공간이 모자랄 때 이 앱 기록을 먼저 지우지 않도록 `navigator.storage.persist()` 를 요청한다 (#93).
@@ -205,6 +205,7 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 - 공유: `navigator.canShare({ files })` → `navigator.share`, 아니면 `<a download>` + Blob URL. 공유 취소(`AbortError`)는 조용히 끝내고, 그 밖의 공유 실패는 내려받기로 대신한다. 공유 화면은 누른 순간에만 열리므로 파일은 클릭 처리 안에서 동기로 만든다 (#8).
 - 백업 파일: `src/storage/backup.ts` 의 `createBackup`·`readBackup`. 읽기는 `JSON.parse` 실패(`broken`) / 형식 다름(`not-backup`) / 상위 버전(`newer-version`)을 구분하고, 저장소와 같은 `migrate` 를 거친다. 저장소 교체는 `LedgerRepository.restore` (저장 막힘 해제 규칙 포함) (#8).
 - 스키마 v3(장부 여러 개, SPEC-005 #87): `migrate.ts` 의 `MIGRATIONS[2]` 가 v2 → v3(장부 하나로), `LocalStorageRepository.load` 가 이전 버전 원본을 `dongari:v2:schema-<버전>` 에 보관(`OLD_VERSION_KEY_PREFIX`). 가드는 `isBook`(id 빈 문자열·겹침 거부, 종류 `club`/`household`), `settings.lastBookId` 는 선택 문자열(없는 장부를 가리키면 첫 장부). 결정 근거 ADR 001 "v3: 장부 여러 개".
+- 스키마 v4(회원 명단·월 회비·낸 분, SPEC-010 #159): `MIGRATIONS[3]` 이 v3 → v4(번호만). 가드는 `isEntry`(낸 분 금액 합 = 기록 금액, 같은 회원 두 번 없음, 엑셀 글 문자열), `isLedger`(월 회비 1 ~ `ENTRY_AMOUNT_MAX` 정수), `isBook`(회원 번호 겹침 없음, 달 `YYYY-MM`, 낸 분은 그 장부 명단의 번호만, 종류와 상관없이 받음). v3 기록 파일·보관본도 같은 `migrate` 로 v4 가 된다. 결정 근거 ADR 001 "v4".
 - PWA: `vite-plugin-pwa` (`src/pwa/pwaOptions.ts`). 빌드 경로(`APP_BASE`, 기본 `/dongari/`)를 `vite.config.ts` 가 `base` 와 `pwaOptions(tokens, base)` 에 함께 넘겨 id·scope·start_url 과 서비스 워커 범위를 맞춘다. 릴리스 전 QA 미리보기는 #128 부터 다른 출처 Cloudflare Pages `https://uri-jangbu-preview.pages.dev/`(빌드 경로 `/`, localStorage·서비스 워커가 본 주소와 따로, ADR 008). 배포는 GitHub Actions(`deploy.yml`, #52·#128): main 머지 → 미리보기(Cloudflare Pages), 태그 `v*` → 본 주소(gh-pages 전체 교체). 주의는 `CLAUDE.md` 실행·배포. `registerType: 'autoUpdate'` + `injectRegister: 'script'`(등록만 하는 스크립트, 자동 새로고침 코드 없음), workbox 프리캐시(화면 파일 js·css·html + 아이콘 + manifest), 옛 캐시 정리. 본 주소 빌드에만 `navigateFallbackDenylist`(base 아래 `preview`·`lab` 화면 요청은 본 앱 `index.html` 로 답하지 않음 — 본 주소 서비스 워커가 옛 미리보기·실험 폴더를 덮지 않게, v2.1.0 서비스 워커가 깔린 뒤부터, #54. 경로 `/` 미리보기 빌드에는 없음, #128). manifest 색은 빌드 때 `tokens.css` 에서 읽는다. 아이콘은 `scripts/make-icons.mjs` 로 토큰 색 SVG → PNG (#10).
 - 30일 백업 안내: `features/backup/backupReminder.ts` 의 `needsBackupReminder({ lastBackupAt, lastChangedAt, firstRecordedAt, now })`(시각 주입 순수 함수)와 저장 데이터에서 판단하는 `backupReminderFor(data, now)`. 점 표시는 `IconButton` 의 `dotLabel` (#46, 전 `TopTextButton`). 띠 하나만 고르는 순서는 `App.tsx` (#9).
 - 홈 화면에 추가 줄: `features/install` (`installRules` 줄 표시 조건 `shouldOfferInstall`·브라우저 구분 `browserKind`, `installPrompt` 설치 제안을 화면 밖에서 받아 둠 — 설정 화면을 떠났다 와도 잃지 않게, `InstallGuide` 브라우저별 순서). 줄과 방법 안내 선택 창은 `SettingsScreen` 이 그린다(선택 창 이름 `settings-install-guide`, #135 부터 누름 동작은 `useInstallAction`·창은 `InstallGuideSheet` 로 권하기 카드와 같이 쓴다). iOS 전용 메타(apple-*)는 두지 않는다 (#10, #56).
@@ -253,3 +254,4 @@ v1 은 localStorage 에 형식 버전 없이 저장해서, 구조를 바꾸면 �
 | 2026-10-16 | v2.6.0 릴리스 (#137) |
 | 2026-10-16 | v2.7 보강: 홈 화면 추가 절에 SPEC-009 참고 줄(그림 설치 안내, 연습 끝 묻기에 대답한 분께 권하기 카드 안 띄움·`done` 덮지 않기, 카톡 안 [인터넷 앱으로 열기] 줄). status done → approved, milestone v2.7 |
 | 2026-10-16 | v2.7.0 릴리스 (#152) |
+| 2026-11-23 | 저장 형식 v4(SPEC-010 #159): 저장 형식 줄을 `schemaVersion: 4` 로, 기술 메모에 v4 가드·v3 → v4 옮기기. 사용자 동작은 그대로 |

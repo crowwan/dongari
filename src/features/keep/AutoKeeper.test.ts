@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CURRENT_SCHEMA_VERSION, type StoredData } from '../../domain/types'
-import { book, ledger } from '../../test/ledgerFixtures'
+import { book, duesBook, ledger } from '../../test/ledgerFixtures'
 import { AutoKeeper, type KeepState, type KeepStateStore } from './AutoKeeper'
 import { keepIdOf, openKeep, type KeepEnvelope } from './keepCrypto'
 import type { KeepPutResult, KeepServer, KeepStatus } from './keepServer'
@@ -490,5 +490,19 @@ describe('SPEC-009 C 카톡 안 장부 옮기기: 지금 올리기 (keepNow)', (
     await expect(keeper.keepNow(stored())).resolves.toBe(false)
 
     expect(fake.puts).toHaveLength(0)
+  })
+})
+
+describe('SPEC-010 자동으로 지키기 보관본 v4', () => {
+  it('AC-3 보관본은 v4 기록 파일 내용이고 회원 명단·월 회비·낸 분·엑셀 글이 그대로 담긴다', async () => {
+    const fake = fakeServer()
+    const keeper = new AutoKeeper({ server: fake.server, store: memoryStore(), now: () => START })
+    const data: StoredData = { schemaVersion: CURRENT_SCHEMA_VERSION, books: [duesBook()], settings: { recoveryCode: CODE } }
+
+    await expect(keeper.keepNow(data)).resolves.toBe(true)
+
+    const kept = await uploaded(fake.puts[0]?.envelope)
+    expect(kept.schemaVersion).toBe(4)
+    expect(kept.books).toEqual(data.books)
   })
 })

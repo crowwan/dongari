@@ -57,22 +57,30 @@ updated: 2026-10-03
 ## 데이터 모델 (개요)
 
 ```
-StoredData { schemaVersion: 3, books: Book[], settings }   // v2.4 여러 장부 (SPEC-005)
+StoredData { schemaVersion: 4, books: Book[], settings }   // v2.4 여러 장부 (SPEC-005), v4 회비 칸 (SPEC-010)
 Book (장부 1개: 동아리·모임 / 개인 가계부)
 ├─ id, name(장부 이름), kind('club'|'household'), createdAt
+├─ members?: Member[]   // 회원 명단 (v4, SPEC-010)
+│    Member { id(바뀌지 않는 번호), name, joined('YYYY-MM' 들어온 달), left?('YYYY-MM' 그만둔 달, 그 달부터 회원 아님), off('YYYY-MM'[] 쉬는 달), opening?(시작할 때 남은 돈: 양수 미리 낸 돈 / 음수 덜 낸 돈) }
+├─ dues?: { startMonth('YYYY-MM' 회비 표 시작 달), hideUnassigned?("낸 분을 안 적은 회비" 카드 숨김) }   // v4
 └─ ledgers: { [연도]: Ledger }
      Ledger (연도별 장부 1개)
-     ├─ year, carryover(전년도 이월금)
+     ├─ year, carryover(전년도 이월금), monthlyFee?(월 회비, v4)
      └─ entries: Entry[]
-          Entry { id, month(1~12), day?(1~그 달 마지막 날, v2.2 — 예전 기록엔 없음), type('income'|'expense'), name, amount, createdAt, batchId? }  // batchId: 사진으로 함께 넣은 묶음 (되돌리기용)
+          Entry { id, month(1~12), day?(1~그 달 마지막 날, v2.2 — 예전 기록엔 없음), type('income'|'expense'), name, amount, createdAt, batchId?, payers?, sourceText? }
+          // batchId: 사진으로 함께 넣은 묶음 (되돌리기용)
+          // payers: 낸 분 [{ memberId, amount }] — 금액 합 = 기록 금액, 같은 회원 두 번 없음, 그 장부 명단에 있는 회원만 (v4)
+          // sourceText: 엑셀에 적혀 있던 글 (엑셀에서 불러온 기록만, v4)
 
-Settings { lastBackupAt?, lastChangedAt?, lastBookId?(마지막에 본 장부) }
+Settings { lastBackupAt?, lastChangedAt?, lastBookId?(마지막에 본 장부), recoveryCode?(복구 코드, SPEC-006) }
 ```
 
 - 월별 수입·지출, 지출 상세표, 수입내역(항목별 합)은 전부 `entries` 에서 **계산**한다. 저장하지 않는다.
 - 자주 쓰는 항목도 저장하지 않고 그 장부의 전체 연도 `entries` 에서 최근 사용 순으로 계산한다 (SPEC-001 결정, #11. 장부끼리는 섞지 않는다, SPEC-005).
 - 장부 이름은 장부(`Book.name`)에 하나다. v2.3 까지는 연도별 장부마다 `clubName` 이 있었다 (#87).
-- 저장 형식에 `schemaVersion` 을 둔다. 상세는 [ADR 001](decisions/001-storage.md).
+- 회비 표(누가 몇 월까지 냈나·덜 낸 돈)도 계산이다. 저장하는 것은 사실(낸 날·금액·낸 분, 명단, 월 회비, 시작 달)뿐이다 (SPEC-010 2절). 회비 기록 = 수입이면서 항목 이름이 "회비"로 시작(`domain/dues.isDuesEntry`).
+- 회원 명단·회비 값은 동아리·모임 장부에서 생기고, 가계부로 바꿔도 지우지 않고 숨긴다 (SPEC-010 6절).
+- 저장 형식에 `schemaVersion` 을 둔다. 지금 4 (v3 → v4 는 번호만 바꾼다, #159). 상세는 [ADR 001](decisions/001-storage.md).
 
 ## 기술 스택
 

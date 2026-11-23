@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Book, Entry, Ledger, StoredData } from '../domain/types'
-import { book } from '../test/ledgerFixtures'
+import { book, duesBook } from '../test/ledgerFixtures'
 import { createBackup, readBackup } from './backup'
 import { FIRST_BOOK_ID } from './migrate'
 import { createEmptyData } from './schema'
@@ -54,7 +54,7 @@ describe('SPEC-002·SPEC-005 백업 파일 만들기', () => {
     const { text } = createBackup(data, NOW)
 
     expect(JSON.parse(text)).toEqual(withBackupAt(data, NOW))
-    expect(text).toContain('\n  "schemaVersion": 3')
+    expect(text).toContain('\n  "schemaVersion": 4')
   })
 
   it('파일의 마지막 백업 시각은 그 파일을 만든 시각이다', () => {
@@ -127,7 +127,7 @@ describe('SPEC-002·SPEC-005 백업 파일 읽기', () => {
     expect(result).toEqual({
       ok: true,
       data: {
-        schemaVersion: 3,
+        schemaVersion: 4,
         books: [
           {
             id: FIRST_BOOK_ID,
@@ -168,7 +168,8 @@ describe('SPEC-002·SPEC-005 백업 파일 읽기', () => {
   it.each([
     ['다른 앱의 JSON', JSON.stringify({ name: '가계부', items: [] })],
     ['schemaVersion 이 없음', JSON.stringify({ books: [], settings: {} })],
-    ['현재 버전인데 형식이 틀림', JSON.stringify({ schemaVersion: 3, books: {}, settings: {} })],
+    ['현재 버전인데 형식이 틀림', JSON.stringify({ schemaVersion: 4, books: {}, settings: {} })],
+    ['SPEC-010 이전 버전(v3)인데 형식이 틀림', JSON.stringify({ schemaVersion: 3, books: {}, settings: {} })],
     ['이전 버전(v2)인데 형식이 틀림', JSON.stringify({ schemaVersion: 2, ledgers: [], settings: {} })],
     ['금액 범위를 벗어난 기록', JSON.stringify(storedWith({ ...ledger(2026, 1), entries: [{ ...ledger(2026, 1).entries[0], amount: 0 }] }))],
     ['그 달에 없는 날짜의 기록 (3월 32일)', JSON.stringify(storedWith({ ...ledger(2026, 1), entries: [{ ...ledger(2026, 1).entries[0], day: 32 }] }))],
@@ -178,9 +179,45 @@ describe('SPEC-002·SPEC-005 백업 파일 읽기', () => {
   })
 
   it('AC-4 앱보다 높은 버전 파일은 newer-version 으로 거부한다', () => {
-    const newer = JSON.stringify({ schemaVersion: 4, books: [], settings: {} })
+    const newer = JSON.stringify({ schemaVersion: 5, books: [], settings: {} })
 
     expect(readBackup(newer)).toEqual({ ok: false, reason: 'newer-version' })
+  })
+})
+
+describe('SPEC-010 기록 파일 v4', () => {
+  it('AC-3 기록 파일은 v4 로 만들고, 회원 명단·회비 표 시작 달·월 회비·낸 분·엑셀 글이 그대로 다시 읽힌다', () => {
+    const data = storedWithBooks(duesBook())
+    const { text } = createBackup(data, NOW)
+
+    expect(JSON.parse(text)).toMatchObject({ schemaVersion: 4 })
+    expect(readBackup(text)).toEqual({ ok: true, data: withBackupAt(data, NOW), summary: { bookCount: 1, entryCount: 2 } })
+  })
+
+  it('AC-3 v3 기록 파일(v2.7 앱이 만든 것)을 불러오면 v4 로 옮겨 열리고 장부·기록·이월금은 그대로다', () => {
+    const data = storedWithBooks(
+      book([ledger(2025, 2), ledger(2026, 3)]),
+      book([ledger(2026, 1)], { id: 'book-2', name: '우리집 가계부', kind: 'household' }),
+    )
+    const v3File = JSON.stringify({ ...withBackupAt(data, NOW), schemaVersion: 3 }, null, 2)
+
+    expect(readBackup(v3File)).toEqual({ ok: true, data: withBackupAt(data, NOW), summary: { bookCount: 2, entryCount: 6 } })
+  })
+
+  it('AC-2 낸 분 금액 합이 기록 금액과 다른 기록 파일은 형식이 다른 파일로 본다', () => {
+    // 40,000원 기록에 낸 분은 한 분 20,000원뿐
+    const wrongSum: Entry = {
+      id: 'dues-1',
+      month: 3,
+      type: 'income',
+      name: '회비',
+      amount: 40_000,
+      createdAt: '2026-03-05T00:00:00.000Z',
+      payers: [{ memberId: 'm1', amount: 20_000 }],
+    }
+    const broken = storedWithBooks({ ...duesBook(), ledgers: { '2026': { year: 2026, carryover: 0, entries: [wrongSum] } } })
+
+    expect(readBackup(JSON.stringify(broken))).toEqual({ ok: false, reason: 'not-backup' })
   })
 })
 

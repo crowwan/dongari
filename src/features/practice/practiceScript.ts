@@ -1,5 +1,5 @@
 // 연습 장부 예시 값 (SPEC-008 "가계부 예시"). 장부 종류별로 한 곳에 둔다
-import type { BookKind, StoredData } from '../../domain/types'
+import { CURRENT_SCHEMA_VERSION, type BookKind, type StoredData } from '../../domain/types'
 
 export const PRACTICE_BOOK_NAME = '연습 장부'
 
@@ -19,7 +19,7 @@ export function practiceData(kind: BookKind, now: Date): StoredData {
   const year = now.getFullYear()
   const createdAt = now.toISOString()
   return {
-    schemaVersion: 3,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     books: [{ id: 'practice', name: PRACTICE_BOOK_NAME, kind, createdAt, ledgers: { [String(year)]: { year, carryover: 0, entries: [] } } }],
     // 기록 파일을 막 보낸 것으로 두어 30일 안내가 생길 일이 없다 (연습 화면에서는 어차피 그리지 않는다)
     settings: { lastBookId: 'practice', lastBackupAt: createdAt },
