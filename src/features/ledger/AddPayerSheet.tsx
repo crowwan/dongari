@@ -45,7 +45,7 @@ function AddPayerForm({ members, joinedText, onAdd }: Pick<AddPayerSheetProps, '
         onChange={setName}
         note={hasSameName(members, name) ? '같은 이름이 있어요. 구분할 수 있게 적어 주세요' : undefined}
       />
-      <p className="screen__note">{joinedText}에 들어온 분으로 넣고, 회원 명단에도 저장해요</p>
+      <p className="screen__note entry__note">{joinedText}에 들어온 분으로 넣고, 회원 명단에도 저장해요</p>
       <Button type="submit" icon="plus" disabled={empty}>
         넣기
       </Button>

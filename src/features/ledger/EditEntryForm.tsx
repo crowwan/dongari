@@ -254,7 +254,7 @@ export function EditEntryForm({
             onPick={setPayerIds}
             onAddMember={() => sheets.openSheet(ADD_PAYER_SHEET)}
           />
-          <p className="screen__note">아무도 고르지 않으면 낸 분 없이 저장돼요</p>
+          <p className="screen__note entry__note">아무도 고르지 않으면 낸 분 없이 저장돼요</p>
         </section>
       )}
 

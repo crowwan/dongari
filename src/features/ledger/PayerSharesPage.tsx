@@ -35,7 +35,7 @@ export function PayerSharesPage({ backLabel, members, initial, onDone, onBack }:
       <div className="entry__page-head">
         <BackButton label={backLabel} onBack={onBack} />
         <h1 className="screen__title">한 분씩 금액</h1>
-        <p className="screen__note">달라진 분만 고치면 돼요. 합계가 이 기록의 금액이 돼요.</p>
+        <p className="screen__note entry__note">달라진 분만 고치면 돼요. 합계가 이 기록의 금액이 돼요.</p>
       </div>
       <div className="entry__shares">
         {members.map((member) => (

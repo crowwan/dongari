@@ -417,7 +417,7 @@ function StepQuestion({
             autoFocus
             onChange={(amount) => dispatch({ kind: 'change-amount', amount })}
           />
-          {note && <p className="screen__note">{note}</p>}
+          {note && <p className="screen__note entry__note">{note}</p>}
           {picked && (
             <div className="entry__aside">
               <IconButton icon="users" onClick={onOpenShares}>
