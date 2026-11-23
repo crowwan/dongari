@@ -43,11 +43,13 @@ import { MonthPicker } from '../ui/MonthPicker'
 import { MonthStepper } from '../ui/MonthStepper'
 import { NoticeBar } from '../ui/NoticeBar'
 import { OptionList, type Option } from '../ui/OptionList'
+import { PickerField } from '../ui/PickerField'
 import { SavedEntries, type SavedEntry } from '../ui/SavedEntries'
 import { SegmentedControl, type SegmentOptions } from '../ui/SegmentedControl'
 import { SlideGuide } from '../ui/SlideGuide'
 import { TextField } from '../ui/TextField'
 import { Toast } from '../ui/Toast'
+import { YearMonthPicker } from '../ui/YearMonthPicker'
 import './catalog.css'
 
 type ThemeChoice = 'system' | 'light' | 'dark'
@@ -131,6 +133,7 @@ const ACTION_ICONS: { icon: IconName; label: string }[] = [
   { icon: 'cloud', label: '자동으로 지키기' },
   { icon: 'key', label: '복구 코드로 불러오기' },
   { icon: 'alert', label: '저장 안 됨' },
+  { icon: 'coin', label: '월 회비' },
 ]
 
 // 복구 코드로 불러오기 미리보기용 서버: 어떤 코드든 보관본이 없다고 답한다
@@ -240,6 +243,7 @@ export function Catalog() {
   const [pickedYear, setPickedYear] = useState('2026')
   const [pickedItem, setPickedItem] = useState('대관료')
   const [dayText, setDayText] = useState('')
+  const [pickedYearMonth, setPickedYearMonth] = useState({ year: 2026, month: 7 })
 
   return (
     <div className="catalog" data-theme={theme === 'system' ? undefined : theme} data-testid="design-catalog">
@@ -374,6 +378,13 @@ export function Catalog() {
                 onClick={noop}
                 end={<AmountText type="expense" amount={40000} />}
               />
+            </div>
+          </State>
+          <State label="아이콘 없는 줄 (회원 명단, SPEC-010): 이름 + 보조 줄 + 줄 끝 ›">
+            <div className="catalog__card">
+              <ListRow title="강민지" description="10월부터 쉬어요" onClick={noop} chevron />
+              <ListRow title="김도윤" onClick={noop} chevron />
+              <ListRow title="정하늘" description="7월에 들어왔어요" onClick={noop} chevron />
             </div>
           </State>
           <State label="저장 안 됨 (SPEC-002 v2.6, 저장에 실패한 뒤 적은 줄)">
@@ -572,6 +583,32 @@ export function Catalog() {
           <Button variant="secondary" onClick={() => setSheetOpen(true)}>
             선택 창 실제로 열어 보기
           </Button>
+        </Section>
+
+        <Section title="YearMonthPicker (해·달 고르기, SPEC-010)">
+          <State
+            label={`해 넘기기(창 안이라 회색 화살표) + 열두 달, 이번 달(2026년 11월) 테두리 (눌러 보기) · ${pickedYearMonth.year}년 ${pickedYearMonth.month}월`}
+          >
+            <div className="catalog__frame catalog__frame--sheet">
+              <BottomSheet inline open title="언제 들어왔나요?" onClose={noop}>
+                <YearMonthPicker
+                  value={pickedYearMonth}
+                  current={{ year: 2026, month: 11 }}
+                  firstYear={2000}
+                  lastYear={2027}
+                  onChange={(year, month) => setPickedYearMonth({ year, month })}
+                />
+              </BottomSheet>
+            </div>
+          </State>
+          <State label="마지막 해(다음 해 화살표 비활성) · 안내 Caption (회비 표 시작 달)">
+            <div className="catalog__frame catalog__frame--sheet">
+              <BottomSheet inline open title="회비 표를 언제부터 계산할까요?" onClose={noop}>
+                <p className="screen__note">바꾸면 그 전 기록은 회비 표에 들어가지 않아요</p>
+                <YearMonthPicker value={{ year: 2027, month: 1 }} firstYear={2000} lastYear={2027} onChange={noop} />
+              </BottomSheet>
+            </div>
+          </State>
         </Section>
 
         <Section title="EntryCard (지금 적는 내역 카드)">
@@ -775,6 +812,26 @@ export function Catalog() {
           </State>
           <State label="보조 이름 (labelRole=label, 내역 적기 직접 적기)">
             <TextField label="직접 적기" labelRole="label" value="" placeholder="예: 꽃값" onChange={noop} />
+          </State>
+          <State label="막지 않는 안내 note (회원 넣기 같은 이름, SPEC-010) — 오류 색 아님">
+            <TextField
+              label="이름"
+              labelRole="label"
+              value="김도윤"
+              onChange={noop}
+              note="같은 이름이 있어요. 구분할 수 있게 적어 주세요"
+            />
+          </State>
+        </Section>
+
+        <Section title="PickerField (고르는 칸, SPEC-010)">
+          <State label="이름 + 입력칸 모양 버튼(값 + ▾), 누르면 해·달 선택 창 (회원 넣기·회원 정보)">
+            <PickerField label="들어온 달" value="2026년 7월" onClick={() => setSheetOpen(true)} />
+          </State>
+          <State label="그만둔 달 · 눌림">
+            <div data-preview-pressed="">
+              <PickerField label="그만둔 달" value="2025년 12월까지" onClick={noop} />
+            </div>
           </State>
         </Section>
 

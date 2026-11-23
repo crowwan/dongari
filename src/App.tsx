@@ -30,12 +30,14 @@ import type { PracticeView } from './features/practice/practiceSteps'
 import { MonthSummaryScreen } from './features/report/MonthSummaryScreen'
 import { pictureSaver, type PictureSaver } from './features/report/savePicture'
 import { YearSummaryScreen } from './features/report/YearSummaryScreen'
+import type { DuesSettings } from './features/settings/RosterPages'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
 import { useScreenHeading } from './features/useScreenHeading'
 import { useScreenHistory } from './features/useScreenHistory'
 import { totalEntryCount } from './domain/book'
 import type { BookSetup, EntryInput } from './domain/ledger'
+import { memberHasRecords, thisMonthOf } from './domain/members'
 import type { BookKind, StoredData } from './domain/types'
 import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
 import { requestPersistentStorage } from './storage/persist'
@@ -87,6 +89,27 @@ const SHARE_CODE_MESSAGES: Record<Exclude<ShareCodeResult, 'cancelled'>, string>
 // 연습이 끝나면 다시 그릴 진짜 장부: 지금 데이터 + 앱을 열 때의 시작 상태 (저장 안 됨 표시·마지막 저장 실패는 다시 그리면 없어진다)
 function currentLoad({ startup, data }: LedgerState): LoadResult {
   return startup.status === 'read-only' ? { status: 'read-only', reason: startup.reason, data } : { status: startup.status, data }
+}
+
+// 설정 회원 명단·월 회비 (SPEC-010 6절): 지금 장부 값과 바꾸는 동작. 기기에 저장했을 때만 알린다 (실패면 위쪽 안내 띠만)
+function duesSettings(state: LedgerState, today: Date, notify: (message: string) => void): DuesSettings | undefined {
+  const { book } = state
+  if (!book) return undefined
+  const notifyIfSaved = (saved: boolean, message: string) => {
+    if (saved) notify(message)
+  }
+  return {
+    members: book.members ?? [],
+    startMonth: book.dues?.startMonth,
+    monthlyFee: state.monthlyFee,
+    hasRecords: (id) => memberHasRecords(book, id),
+    thisMonth: thisMonthOf(today),
+    onAddMember: (member) => notifyIfSaved(state.addMember(member), '회원을 넣었어요'),
+    onUpdateMember: (id, changes) => notifyIfSaved(state.updateMember(id, changes), '바꿨어요'),
+    onDeleteMember: (id) => notifyIfSaved(state.deleteMember(id), '지웠어요'),
+    onChangeStartMonth: (month) => notifyIfSaved(state.changeDuesStart(month), '바꿨어요'),
+    onChangeMonthlyFee: (fee) => notifyIfSaved(state.changeMonthlyFee(fee), '바꿨어요'),
+  }
 }
 
 // 자동 보관이 없는 빌드에서 상태 구독 자리
@@ -422,6 +445,7 @@ export default function App({
             onPractice={onStartPractice && (() => onStartPractice(ledger.book?.kind ?? 'club', currentLoad(ledger)))}
             install={install}
             inApp={inApp && { kind: inApp.kind, move: ledgerMove }}
+            dues={duesSettings(ledger, today, setToast)}
           />
         )
       case 'month-summary':

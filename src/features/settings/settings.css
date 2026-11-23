@@ -53,6 +53,13 @@
   font-size: var(--text-body-size);
 }
 
+/* 편집 화면 칸 + 그 아래 보조 설명 (월 회비) 은 한 덩어리 */
+.settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
 /* 편집 화면 머리: [‹ 설정] 과 제목은 한 덩어리 */
 .settings__edit-head {
   display: flex;
@@ -199,4 +206,79 @@
 
 .settings__version-action {
   padding: 0 var(--card-pad-inline) var(--space-3);
+}
+
+/*
+ * 회원 명단 (SPEC-010 6절, 시안 D): [‹ 설정] + 제목 → 지금 회원 목록 → [+ 회원 넣기] → "그만둔 분" 묶음 → 시작 달 안내 + [시작 달 바꾸기].
+ * 목록은 설정 줄 목록과 같은 흰 카드(줄 사이 선 없음), 회원 줄은 원형 아이콘 없이 이름부터
+ */
+.roster {
+  gap: var(--stack);
+}
+
+.roster__list {
+  margin: 0;
+  list-style: none;
+}
+
+/* 다른 묶음(그만둔 분·시작 달)은 묶음 간격만큼 띄운다 */
+.roster__group,
+.roster__start {
+  margin-top: calc(var(--group-gap) - var(--stack));
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+/* 시작 달 [바꾸기] 는 글자 폭만큼 (폭 채움 아님) */
+.roster__start {
+  align-items: flex-start;
+}
+
+/* [+ 회원 넣기]: 줄 목록과 다른 일이라 장부 고르기 창 [+ 새 장부 만들기](books__new) 와 같은 흰 면 + 점선 둘레 + 청록 글자 */
+.roster__add {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--touch-primary);
+  border: var(--hairline) dashed var(--line-strong);
+  border-radius: var(--corner-md);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--accent-ink);
+  font-family: var(--typeface);
+  font-size: var(--text-label-size);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--letter-body);
+  line-height: var(--line-tight);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.roster__add:focus-visible {
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
+
+.roster__add:active {
+  background: var(--pressed);
+}
+
+/* 회원 정보: 그만둔 달 칸 + [다시 회원으로], 시작할 때 남은 돈 칸 + 스위치 + 안내는 각각 한 덩어리 */
+.roster__left,
+.roster__opening {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+/* [이 회원 지우기] / 지울 수 없는 이유: [저장] 과 떨어진 큰 구획, 가운데 (설정 [이 장부 지우기] 와 같은 자리) */
+.roster__danger {
+  margin-top: calc(var(--section-gap) - var(--group-gap));
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  word-break: keep-all;
 }

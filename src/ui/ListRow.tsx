@@ -3,7 +3,8 @@ import { Icon, type IconName } from './Icon'
 import './ui.css'
 
 type ListRowProps = {
-  icon: IconName
+  // 줄 앞 원형 아이콘. 없으면 이름부터 (회원 명단 줄처럼 줄마다 같은 아이콘이 될 때, SPEC-010)
+  icon?: IconName
   // 수입 줄은 청록 원(아이콘 모양 + 원 색 + 금액 부호로 세 번 구분), 그 밖은 회색 원
   tone?: 'income' | 'neutral'
   // 줄 이름 (예: "대관료")
@@ -26,9 +27,11 @@ export function ListRow({ icon, tone = 'neutral', title, description, end, onCli
   // 줄(.ui-row)은 폭을 재는 컨테이너, 안쪽(.ui-row__inner)이 배치. 아주 좁으면 안쪽 배치를 바꾼다 (ui.css)
   const content = (
     <span className="ui-row__inner">
-      <span className="ui-row__icon">
-        <Icon name={icon} />
-      </span>
+      {icon && (
+        <span className="ui-row__icon">
+          <Icon name={icon} />
+        </span>
+      )}
       <span className="ui-row__body">
         <span className="ui-row__text">
           <span className="ui-row__title">{title}</span>
