@@ -8,6 +8,8 @@ export type EntryCardRow = {
   icon: IconName
   // 답한 값 (예: "10월 7일", "대관료 · 지출")
   value: string
+  // 값 아래 둘째 줄 작은 글자 (낸 분 줄의 "4명", SPEC-010 3절). 화면 읽기는 값과 띄어 한 번에 읽는다
+  detail?: string
   // [바꾸기]: 그 값 고치기. 없으면 [바꾸기] 를 그리지 않는다 (지금 그 값을 묻고 있을 때)
   onChange?: () => void
 }
@@ -19,7 +21,7 @@ type EntryCardProps = {
 }
 
 // 하나씩 채우기에서 지금 적는 내역 하나 (SPEC-001 기록 입력, AC-16·23): 흰 면 + 청록 둘레 카드 "지금 적는 내역" 안에
-// 답한 줄(작은 이름표 + 굵은 값 + [바꾸기], 줄 사이 가는 선) → 맨 아래 옅은 면에 지금 질문. ✓ 는 "장부에 들어감" 에만 써서 여기엔 없다
+// 답한 줄(작은 이름표 + 굵은 값(+ 둘째 줄 작은 글자) + [바꾸기], 줄 사이 가는 선) → 맨 아래 옅은 면에 지금 질문. ✓ 는 "장부에 들어감" 에만 써서 여기엔 없다
 export function EntryCard({ rows, children }: EntryCardProps) {
   const titleId = useId()
   return (
@@ -29,14 +31,23 @@ export function EntryCard({ rows, children }: EntryCardProps) {
         지금 적는 내역
       </p>
       <ul className="ui-entry-card__list">
-        {rows.map(({ label, icon, value, onChange }) => (
+        {rows.map(({ label, icon, value, detail, onChange }) => (
           <li key={label} className="ui-entry-card__row" data-testid="entry-card-row">
             <span className="ui-entry-card__label" data-testid="entry-card-label">
               {label}
             </span>{' '}
             <span className="ui-entry-card__value" data-testid="entry-card-value">
               <Icon name={icon} />
-              {value}
+              {detail === undefined ? (
+                value
+              ) : (
+                <span className="ui-entry-card__lines">
+                  {value}{' '}
+                  <span className="ui-entry-card__detail" data-testid="entry-card-detail">
+                    {detail}
+                  </span>
+                </span>
+              )}
             </span>
             {onChange && (
               <button type="button" className="ui-entry-card__change" onClick={onChange}>

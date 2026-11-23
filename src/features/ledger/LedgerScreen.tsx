@@ -30,9 +30,11 @@ const TYPE_LABEL: Record<EntryType, string> = { income: '수입', expense: '지�
 // 이 폰에 저장되지 않은 줄의 알약 (SPEC-002 v2.6): 앱을 닫으면 사라질 내역
 const UNSAVED_BADGE = '저장 안 됨'
 
-// 줄 보조 줄: "7일 · 지출", 날짜 없는 예전 기록은 "지출"만 (AC-9)
-function rowDescription({ day, type }: Entry): string {
-  return day === undefined ? TYPE_LABEL[type] : `${day}일 · ${TYPE_LABEL[type]}`
+// 줄 보조 줄: "7일 · 지출", 날짜 없는 예전 기록은 "지출"만 (AC-9). 동아리·모임 장부에서 낸 분이 있는 회비 기록은 "17일 · 수입 · 4명" (SPEC-010 3절).
+// 개인 가계부로 바꾼 장부는 명단·회비 값을 숨기므로(6절) 낸 분 수도 붙이지 않는다
+function rowDescription({ day, type, payers }: Entry, showsPayers: boolean): string {
+  const payerCount = showsPayers && payers?.length ? [`${payers.length}명`] : []
+  return [...(day === undefined ? [] : [`${day}일`]), TYPE_LABEL[type], ...payerCount].join(' · ')
 }
 
 type LedgerScreenProps = {
@@ -171,7 +173,12 @@ export function LedgerScreen({
           </div>
         )}
 
-        <MonthCard group={group} onEditEntry={onEditEntry} unsavedEntryIds={unsavedEntryIds} />
+        <MonthCard
+          group={group}
+          onEditEntry={onEditEntry}
+          unsavedEntryIds={unsavedEntryIds}
+          showsPayers={books.find((book) => book.id === bookId)?.kind === 'club'}
+        />
       </div>
 
       <BottomActionBar icon="plus" label="내역 적기" onClick={() => onAddEntry?.(month)} />
@@ -207,11 +214,13 @@ type MonthCardProps = {
   group: MonthGroup
   onEditEntry?: (id: string) => void
   unsavedEntryIds?: ReadonlySet<string>
+  // 낸 분 수를 보조 줄에 붙이는 장부인가 (동아리·모임, SPEC-010 3절)
+  showsPayers: boolean
 }
 
 // 그 달 카드: 수입·지출 소계 두 칸 → 기록 줄(날짜순, 원형 아이콘, 보조 줄 "7일 · 지출", 줄 끝 ›, 저장 안 된 줄은 "저장 안 됨" 알약).
 // 기록이 없으면 안내 한 줄만
-function MonthCard({ group, onEditEntry, unsavedEntryIds }: MonthCardProps) {
+function MonthCard({ group, onEditEntry, unsavedEntryIds, showsPayers }: MonthCardProps) {
   const { month } = group
 
   return (
@@ -241,7 +250,7 @@ function MonthCard({ group, onEditEntry, unsavedEntryIds }: MonthCardProps) {
                 icon={itemIcon(entry.name)}
                 tone={entry.type === 'income' ? 'income' : 'neutral'}
                 title={entry.name}
-                description={rowDescription(entry)}
+                description={rowDescription(entry, showsPayers)}
                 end={<AmountText type={entry.type} amount={entry.amount} />}
                 onClick={() => onEditEntry?.(entry.id)}
                 chevron

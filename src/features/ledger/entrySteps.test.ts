@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { FrequentChoice } from '../../domain/ledger'
 import {
   answerRows,
+  entryToSave,
   isStepDirty,
   offersFinish,
   quickDays,
@@ -336,5 +337,201 @@ describe('SPEC-001 하나씩 채우기 단계', () => {
     it('달을 바꿨다가 처음 달로 되돌리면 적던 내용이 없다', () => {
       expect(isStepDirty(run({ kind: 'change-month', month: 3 }, { kind: 'change-month', month: 10 }), 10)).toBe(false)
     })
+  })
+})
+
+describe('SPEC-010 회비 적기 단계 (3절)', () => {
+  // 명단이 있는 동아리 장부, 2026년 월 회비 20,000원
+  const DUES_START = startSteps({ year: 2026, month: 10, dues: { fee: 20_000 } })
+  const DUES: FrequentChoice = { name: '회비', type: 'income' }
+
+  function dues(...actions: StepAction[]): StepState {
+    return from(DUES_START, { kind: 'pick-day', day: 17 }, ...actions)
+  }
+
+  // 회비를 골라 "누가 냈어요?" 에서 네 분을 고른 상태
+  const FOUR: StepAction[] = [{ kind: 'pick-item', choice: DUES }, { kind: 'pick-payers', memberIds: ['m1', 'm2', 'm3', 'm4'] }]
+
+  describe('AC-10 "누가 냈어요?" 를 묻는 조건', () => {
+    it.each<[string, FrequentChoice]>([
+      ['수입 "회비"', DUES],
+      ['수입 "회비(14인)"', { name: '회비(14인)', type: 'income' }],
+    ])('명단이 있는 장부에서 %s 를 고르면 "누가 냈어요?" 단계로 간다', (_label, choice) => {
+      expect(dues({ kind: 'pick-item', choice }).step).toBe('payers')
+    })
+
+    it('직접 적은 이름이 회비 기록이어도 묻는다 (예전에 쓴 이름·처음 쓰는 이름의 수입)', () => {
+      expect(dues({ kind: 'start-custom' }, { kind: 'type-custom-name', name: '회비(5월분)' }, { kind: 'submit-custom-name', knownType: 'income' }).step).toBe('payers')
+      expect(
+        dues({ kind: 'start-custom' }, { kind: 'type-custom-name', name: '회비 추가' }, { kind: 'submit-custom-name', knownType: undefined }, { kind: 'pick-type', entryType: 'income' })
+          .step,
+      ).toBe('payers')
+    })
+
+    it.each<[string, StepState]>([
+      ['지출 "회비"', dues({ kind: 'pick-item', choice: { name: '회비', type: 'expense' } })],
+      ['수입 "찬조금"', dues({ kind: 'pick-item', choice: { name: '찬조금', type: 'income' } })],
+      ['명단이 빈 장부·개인 가계부 (dues 없음)', run({ kind: 'pick-day', day: 7 }, { kind: 'pick-item', choice: DUES })],
+    ])('묻지 않고 바로 "얼마인가요?" 로 간다: %s', (_label, state) => {
+      expect(state.step).toBe('amount')
+      expect(answerRows(state).map((row) => row.kind)).toEqual(['date', 'item'])
+    })
+  })
+
+  describe('AC-11 고르기와 금액 채우기', () => {
+    it('아무도 안 고르면 [다음] 이 비활성이고 "누가 냈는지 골라 주세요"', () => {
+      const state = dues({ kind: 'pick-item', choice: DUES })
+
+      expect(stepButton(state)).toEqual({ label: '다음', missing: '누가 냈는지 골라 주세요' })
+      expect(stepReducer(state, { kind: 'submit-payers' })).toBe(state)
+    })
+
+    it('고르면 아래 안내가 "N명 · M원 (한 분 F원)" 이다', () => {
+      expect(stepButton(dues(...FOUR))).toEqual({ label: '다음', missing: undefined, note: '4명 · 80,000원 (한 분 20,000원)' })
+    })
+
+    it('월 회비가 없으면 안내는 금액 없이 "N명" 이고 [다음] 뒤 금액은 빈칸이다', () => {
+      const state = from(startSteps({ year: 2026, month: 10, dues: { fee: undefined } }), { kind: 'pick-day', day: 17 }, ...FOUR)
+
+      expect(stepButton(state)?.note).toBe('4명')
+      expect(stepReducer(state, { kind: 'submit-payers' }).draft.amount).toBe(0)
+    })
+
+    it('체크를 누를 때마다 고르고 풀고, 빠른 고르기는 그 분들로 바꾼다', () => {
+      const state = dues(
+        { kind: 'pick-item', choice: DUES },
+        { kind: 'toggle-payer', memberId: 'm1' },
+        { kind: 'toggle-payer', memberId: 'm2' },
+        { kind: 'toggle-payer', memberId: 'm1' },
+      )
+      expect(state.payers.memberIds).toEqual(['m2'])
+      expect(stepReducer(state, { kind: 'pick-payers', memberIds: ['m3', 'm4'] }).payers.memberIds).toEqual(['m3', 'm4'])
+    })
+
+    it('[다음] 을 누르면 금액이 고른 사람 수 × 월 회비로 채워지고, 카드에 낸 분 줄이 생긴다', () => {
+      const state = dues(...FOUR, { kind: 'submit-payers' })
+
+      expect(state.step).toBe('amount')
+      expect(state.draft.amount).toBe(80_000)
+      expect(answerRows(state)).toEqual([
+        { kind: 'date', month: 10, day: 17 },
+        { kind: 'item', name: '회비', type: 'income' },
+        { kind: 'payers', memberIds: ['m1', 'm2', 'm3', 'm4'], nameless: false },
+      ])
+    })
+
+    it('사람 수로 나눠떨어지는 금액이면 똑같이 나눠 저장한다', () => {
+      const state = dues(...FOUR, { kind: 'submit-payers' }, { kind: 'change-amount', amount: 100_000 })
+
+      expect(entryToSave(state)).toEqual({
+        kind: 'save',
+        input: {
+          month: 10,
+          day: 17,
+          type: 'income',
+          name: '회비',
+          amount: 100_000,
+          payers: ['m1', 'm2', 'm3', 'm4'].map((memberId) => ({ memberId, amount: 25_000 })),
+        },
+      })
+    })
+
+    it('낸 분 줄 [바꾸기] 로 돌아가면 고른 분이 그대로 체크돼 있다', () => {
+      const state = dues(...FOUR, { kind: 'submit-payers' }, { kind: 'revisit-payers' })
+
+      expect(state.step).toBe('payers')
+      expect(state.payers.memberIds).toEqual(['m1', 'm2', 'm3', 'm4'])
+      expect(answerRows(state).map((row) => row.kind)).toEqual(['date', 'item'])
+    })
+  })
+
+  describe('AC-12 한 분씩 금액', () => {
+    it('금액이 사람 수로 안 나눠떨어지면 [저장] 은 저장하지 않고 "한 분씩 금액" 으로 보낸다', () => {
+      const state = dues(...FOUR, { kind: 'submit-payers' }, { kind: 'change-amount', amount: 90_001 })
+
+      expect(stepButton(state)).toEqual({ label: '저장', missing: undefined })
+      expect(entryToSave(state)).toEqual({ kind: 'shares' })
+    })
+
+    it('"한 분씩 금액" 에서 정한 몫의 합이 기록 금액이 되고 그 몫으로 저장한다', () => {
+      const shares = [...['m1', 'm2', 'm3'].map((memberId) => ({ memberId, amount: 20_000 })), { memberId: 'm4', amount: 120_000 }]
+      const state = dues(...FOUR, { kind: 'submit-payers' }, { kind: 'change-amount', amount: 90_001 }, { kind: 'set-shares', shares })
+
+      expect(state.step).toBe('amount')
+      expect(state.draft.amount).toBe(180_000)
+      const save = entryToSave(state)
+      expect(save.kind === 'save' && save.input.payers).toEqual(shares)
+    })
+  })
+
+  describe('AC-13 이름 없이 적기', () => {
+    it('[이름 없이 적기] 는 금액을 채우지 않고 "얼마인가요?" 로 가고, 낸 분 없이 저장한다', () => {
+      const state = dues({ kind: 'pick-item', choice: DUES }, { kind: 'toggle-payer', memberId: 'm1' }, { kind: 'skip-payers' })
+
+      expect(state.step).toBe('amount')
+      expect(state.draft.amount).toBe(0)
+      expect(answerRows(state).at(-1)).toEqual({ kind: 'payers', memberIds: [], nameless: true })
+      const save = entryToSave(stepReducer(state, { kind: 'change-amount', amount: 30_000 }))
+      expect(save.kind === 'save' && save.input).not.toHaveProperty('payers')
+    })
+  })
+
+  it('항목을 회비가 아닌 것으로 바꾸면 고른 분을 버리고 낸 분 없이 저장한다 (금액 유지)', () => {
+    const state = dues(...FOUR, { kind: 'submit-payers' }, { kind: 'revisit-item' }, { kind: 'pick-item', choice: RENT })
+
+    expect(state.step).toBe('amount')
+    expect(state.draft.amount).toBe(80_000)
+    expect(state.payers.memberIds).toEqual([])
+    const save = entryToSave(state)
+    expect(save.kind === 'save' && save.input).not.toHaveProperty('payers')
+  })
+
+  describe('AC-16 항목 줄 [바꾸기] 는 금액 유지 — 회비 항목끼리 바꿀 때', () => {
+    const DUES_14: FrequentChoice = { name: '회비(14인)', type: 'income' }
+    const shares = [...['m1', 'm2', 'm3'].map((memberId) => ({ memberId, amount: 20_000 })), { memberId: 'm4', amount: 120_000 }]
+
+    it('낸 분·한 분씩 금액·금액을 그대로 두고 바로 "얼마인가요?" 로 간다', () => {
+      const before = dues(...FOUR, { kind: 'submit-payers' }, { kind: 'set-shares', shares })
+      const state = stepReducer(stepReducer(before, { kind: 'revisit-item' }), { kind: 'pick-item', choice: DUES_14 })
+
+      expect(state.step).toBe('amount')
+      expect(state.draft).toMatchObject({ name: '회비(14인)', amount: 180_000 })
+      expect(state.payers).toEqual(before.payers)
+      const save = entryToSave(state)
+      expect(save.kind === 'save' && save.input.payers).toEqual(shares)
+    })
+
+    it('손으로 고친 금액도 그대로이고, [이름 없이 적기] 로 답했으면 이름 없이 그대로다', () => {
+      const typed = dues(...FOUR, { kind: 'submit-payers' }, { kind: 'change-amount', amount: 100_000 }, { kind: 'revisit-item' }, { kind: 'pick-item', choice: DUES_14 })
+      expect(typed.draft.amount).toBe(100_000)
+
+      const nameless = dues({ kind: 'pick-item', choice: DUES }, { kind: 'skip-payers' }, { kind: 'change-amount', amount: 30_000 }, { kind: 'revisit-item' }, { kind: 'pick-item', choice: DUES_14 })
+      expect(nameless.step).toBe('amount')
+      expect(nameless.draft.amount).toBe(30_000)
+      expect(answerRows(nameless).at(-1)).toEqual({ kind: 'payers', memberIds: [], nameless: true })
+    })
+
+    it('아직 답하지 않았으면(누가 냈어요? 에서 항목 바꾸기) 다시 "누가 냈어요?" 로', () => {
+      const state = dues({ kind: 'pick-item', choice: DUES }, { kind: 'toggle-payer', memberId: 'm1' }, { kind: 'revisit-item' }, { kind: 'pick-item', choice: DUES_14 })
+
+      expect(state.step).toBe('payers')
+      expect(state.payers.memberIds).toEqual(['m1'])
+    })
+  })
+
+  describe('월 회비 × 사람 수가 상한(999,999,999원)을 넘을 때', () => {
+    const big = () => from(startSteps({ year: 2026, month: 10, dues: { fee: 300_000_000 } }), { kind: 'pick-day', day: 17 }, ...FOUR)
+
+    it('안내에 합계를 쓰지 않고, [다음] 은 금액을 채우지 않는다', () => {
+      expect(stepButton(big())?.note).toBe('4명 (한 분 300,000,000원)')
+      expect(stepReducer(big(), { kind: 'submit-payers' }).draft.amount).toBe(0)
+    })
+  })
+
+  it('"누가 냈어요?" 에서 날짜 줄 [바꾸기] 로 갔다 오면 다시 "누가 냈어요?" 로 돌아온다', () => {
+    const state = dues(...FOUR, { kind: 'revisit-day' }, { kind: 'pick-day', day: 18 })
+
+    expect(state.step).toBe('payers')
+    expect(state.payers.memberIds).toHaveLength(4)
   })
 })

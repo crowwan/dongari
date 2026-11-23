@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { carryoverWords } from '../domain/book'
 import { itemIcon } from '../domain/itemIcon'
+import type { PayerChoices } from '../domain/payers'
 import { yearReport } from '../domain/report'
 import type { EntryType } from '../domain/types'
 import type { DuesCell, DuesCellState } from '../domain/duesTable'
@@ -24,6 +25,8 @@ import type { SheetHistory } from '../features/useScreenHistory'
 import { KEEP_REMINDER_MESSAGE } from '../features/keep/keepStatus'
 import { STORAGE_NOTICE } from '../features/storage/storageNotices'
 import { CarryoverField } from '../features/ledger/CarryoverField'
+import { PayerPicker } from '../features/ledger/PayerPicker'
+import { PayerSharesPage } from '../features/ledger/PayerSharesPage'
 import { tidyDayText } from '../features/ledger/entryDraft'
 import type { BookChoice } from '../features/ledger/useLedger'
 import { ItemTotalsCards } from '../features/report/ItemTotalsCards'
@@ -38,6 +41,7 @@ import { BalanceCard } from '../ui/BalanceCard'
 import { BottomActionBar } from '../ui/BottomActionBar'
 import { BottomSheet } from '../ui/BottomSheet'
 import { Button } from '../ui/Button'
+import { CheckList, type CheckOption } from '../ui/CheckList'
 import { CoachMark } from '../ui/CoachMark'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { DayInput } from '../ui/DayInput'
@@ -243,6 +247,26 @@ const EXPENSE_ONLY_REPORT = itemReport([
 
 const noop = () => {}
 
+// 회비 "누가 냈어요?" 견본 (지어낸 이름, SPEC-010 3절)
+const CHECK_NAMES: CheckOption[] = [
+  { value: 'm-kang', label: '강민지' },
+  { value: 'm-kim', label: '김도윤' },
+  { value: 'm-lee', label: '이준호' },
+  { value: 'm-jung', label: '정하늘' },
+  { value: 'm-park', label: '박서연' },
+  { value: 'm-choi', label: '최유나' },
+  { value: 'm-han', label: '한지우' },
+  { value: 'm-hwang', label: '황보람' },
+]
+const PAYER_CHOICES: PayerChoices = {
+  members: [
+    ...CHECK_NAMES.slice(0, 5).map(({ value, label }) => ({ id: value, name: label, resting: false, left: false })),
+    { id: 'm-rest', name: '홍서진', resting: true, left: false },
+  ],
+  last: ['m-kang', 'm-kim', 'm-lee', 'm-jung'],
+  fee: 20000,
+}
+
 // 카톡 안 ② 미리보기 복구 코드
 const CATALOG_CODE = 'HK7M-29QF-MX4P-8R2D'
 
@@ -307,6 +331,8 @@ export function Catalog() {
   const [dayText, setDayText] = useState('')
   const [pickedYearMonth, setPickedYearMonth] = useState({ year: 2026, month: 7 })
   const [duesYear, setDuesYear] = useState(2026)
+  const [payers, setPayers] = useState<string[]>(['m-kang', 'm-kim'])
+  const togglePayer = (id: string) => setPayers((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
 
   return (
     <div className="catalog" data-theme={theme === 'system' ? undefined : theme} data-testid="design-catalog">
@@ -534,6 +560,59 @@ export function Catalog() {
               <MonthButton month={pickedMonth} onClick={() => setSheetOpen(true)} />
               <div data-preview-pressed="">
                 <MonthButton month={2} onClick={noop} />
+              </div>
+            </div>
+          </State>
+        </Section>
+
+        <Section title="CheckList (세로 체크 목록, SPEC-010 누가 냈어요?)">
+          <State label="여럿 고르기: 고른 줄 옅은 청록 면 + 굵게 + 채운 체크, 안 고른 줄 빈 동그라미 · 맨 아래 [+ 회원 넣기] (눌러 보기)">
+            <CheckList
+              label="회원"
+              options={CHECK_NAMES.slice(0, 4)}
+              checked={payers}
+              onToggle={togglePayer}
+              action={{ label: '회원 넣기', icon: 'plus', onClick: noop }}
+            />
+          </State>
+          <State label="8명 넘으면 7명 + [⌄ 회원 N명 더 보기] · 맨 아래 쉬는 분 묶음">
+            <CheckList
+              label="회원"
+              options={CHECK_NAMES}
+              tail={{ title: '쉬는 분', options: [{ value: 'm-rest', label: '홍서진' }] }}
+              checked={payers}
+              onToggle={togglePayer}
+              collapse={{ visible: 7, label: (hidden) => `회원 ${hidden}명 더 보기` }}
+            />
+          </State>
+          <State label="눌림 (안 고른 줄·더 보기·회원 넣기)">
+            <div data-preview-pressed="">
+              <CheckList
+                label="회원"
+                options={CHECK_NAMES.slice(0, 2)}
+                checked={[]}
+                onToggle={noop}
+                action={{ label: '회원 넣기', icon: 'plus', onClick: noop }}
+              />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="한 분씩 금액 (PayerSharesPage, SPEC-010)">
+          <State label="한 분마다 이름 + 금액 칸 → 합계 줄 → [이대로 할게요] (빈칸이면 비활성 + 안내)">
+            <div className="catalog__frame catalog__frame--screen">
+              <div className="app__main">
+                <PayerSharesPage
+                  backLabel="내역 적기"
+                  members={CHECK_NAMES.slice(0, 3).map(({ value, label }) => ({ id: value, name: label }))}
+                  initial={[
+                    { memberId: 'm-kang', amount: 20000 },
+                    { memberId: 'm-kim', amount: 20000 },
+                    { memberId: 'm-lee', amount: 120000 },
+                  ]}
+                  onDone={noop}
+                  onBack={noop}
+                />
               </div>
             </div>
           </State>
@@ -786,6 +865,40 @@ export function Catalog() {
                     { tag: '방금', day: 5 },
                   ]}
                 />
+              </div>
+            </EntryCard>
+          </State>
+          <State label="누가 냈어요? 단계 (SPEC-010): 빠른 고르기 → 세로 체크 목록(쉬는 분 맨 아래) → [+ 회원 넣기] → [이름 없이 적기] — 눌러 보기">
+            <EntryCard
+              rows={[
+                { label: '날짜', icon: 'calendar', value: '10월 17일', onChange: noop },
+                { label: '항목', icon: itemIcon('회비'), value: '회비 · 수입', onChange: noop },
+              ]}
+            >
+              <div className="catalog__stack">
+                <h2 className="catalog__question">누가 냈어요?</h2>
+                <PayerPicker choices={PAYER_CHOICES} checked={payers} onToggle={togglePayer} onPick={setPayers} onAddMember={noop} />
+                <IconButton icon="pen" onClick={noop}>
+                  이름 없이 적기
+                </IconButton>
+              </div>
+            </EntryCard>
+          </State>
+          <State label="회비 금액 단계 (SPEC-010): 낸 분 줄(이름 쉼표 + 둘째 줄 N명) → 채운 금액 + 안내 + [한 분만 금액이 달라요]">
+            <EntryCard
+              rows={[
+                { label: '날짜', icon: 'calendar', value: '10월 17일', onChange: noop },
+                { label: '항목', icon: itemIcon('회비'), value: '회비 · 수입', onChange: noop },
+                { label: '낸 분', icon: 'users', value: '강민지, 김도윤, 이준호, 정하늘', detail: '4명', onChange: noop },
+              ]}
+            >
+              <div className="catalog__stack">
+                <h2 className="catalog__question">얼마인가요?</h2>
+                <AmountDisplay label="얼마인가요?" value={80000} onChange={noop} />
+                <p className="catalog__state">4명 × 20,000원으로 채웠어요. 고쳐도 돼요.</p>
+                <IconButton icon="users" onClick={noop}>
+                  한 분만 금액이 달라요
+                </IconButton>
               </div>
             </EntryCard>
           </State>
