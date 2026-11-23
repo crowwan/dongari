@@ -327,6 +327,24 @@ describe('SPEC-010 엑셀 불러오기 — 낸 분과 회비 (8절 "낸 분"·"�
     expect(result.book.ledgers['2025'].monthlyFee).toBe(10_000)
     expect(entriesOf(result, 2025).every((entry) => entry.payers?.length === 2)).toBe(true)
   })
+
+  it('확인 화면에서 고친 해별 월 회비를 주면 그 값으로 배수 판정을 다시 해 낸 분을 나누고, 다 나눈 줄이 없는 다음 해는 고친 값을 이어 쓴다 (#166)', () => {
+    const sheets = workbook(
+      ledgerSheet(2024, 0, [[1, 5, 20_000, '강민지,김도윤', null], [2, 5, 40_000, '강민지,김도윤', null]]),
+      ledgerSheet(2025, 0, [[1, 5, 7_000, '이자', null]]),
+      threeMembers(2024),
+    )
+    expect(read(sheets).summary.monthlyFees).toEqual([{ year: 2024, fee: 10_000 }, { year: 2025, fee: 10_000 }])
+
+    const fixed = readExcelBook(sheets, deps(), { monthlyFees: new Map([[2024, 20_000]]) })
+
+    if (!fixed.ok) throw new Error(fixed.problem)
+    expect(fixed.summary.monthlyFees).toEqual([{ year: 2024, fee: 20_000 }, { year: 2025, fee: 20_000 }])
+    expect(fixed.book.ledgers['2024'].monthlyFee).toBe(20_000)
+    // 한 분 1만 원 줄은 2만 원의 배수가 아니라 낸 분 없는 회비, 한 분 2만 원 줄은 그대로 낸 분
+    expect(fixed.book.ledgers['2024'].entries.map((entry) => entry.payers?.length)).toEqual([undefined, 2])
+    expect(fixed.summary.unassignedDuesCount).toBe(1)
+  })
 })
 
 describe('SPEC-010 엑셀 불러오기 — 검산과 확인 화면 요약 (8절 "검산", "읽은 내용 확인")', () => {

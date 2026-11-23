@@ -3,6 +3,10 @@
 // inert 인 곳은 Tab·화면 읽기(TalkBack)·누르기가 닿지 않아, 지우기 확인 창에서 Tab 이 뒤 화면 [저장] 으로 빠져나가지 않는다
 import { useEffect, type RefObject } from 'react'
 
+// 창이 떠 있어도 잠그지 않는 요소 표시 (body 바로 아래에 둔다). 보이지도 포커스되지도 않는 숨은 파일 고르기 칸처럼,
+// 창 안 버튼이 click() 으로 여는 것: 잠긴(inert) 칸의 click() 은 브라우저가 무시할 수 있다 (SPEC-010 #178 장부 고르기 창 [엑셀 파일로 새 장부])
+export const OUTSIDE_LAYER = 'data-outside-layer'
+
 // 열어 둘 요소들(창, 말풍선이 가리키는 버튼)과 그 조상 줄은 남기고, 그 줄의 형제를 모두 잠근 뒤 푸는 함수를 돌려준다.
 // 이미 잠긴 것(아래 창이 잠근 앱 뿌리)은 건드리지 않아, 창 위에 창이 떴다 닫혀도 아래 창의 잠금은 그대로다
 function lockOutside(openElements: HTMLElement[]): () => void {
@@ -13,7 +17,7 @@ function lockOutside(openElements: HTMLElement[]): () => void {
   const locked: Element[] = []
   for (const node of kept) {
     for (const sibling of node.parentElement?.children ?? []) {
-      if (kept.has(sibling) || sibling.hasAttribute('inert')) continue
+      if (kept.has(sibling) || sibling.hasAttribute('inert') || sibling.hasAttribute(OUTSIDE_LAYER)) continue
       sibling.setAttribute('inert', '')
       locked.push(sibling)
     }

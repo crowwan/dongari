@@ -136,7 +136,8 @@ describe('SPEC-002 v2.6 저장 실패 안내·저장 안 됨 표시', () => {
     renderApp(repository, { status: 'read-only', reason: 'unreadable-original', data: storedWith(LEDGER_2026) })
 
     await addExpense('간식비', '5000')
-    await editAmount(/^회비/, '150000')
+    // 동아리 장부에는 [회비 표] 버튼도 있어 줄 보조 줄까지 (SPEC-010 #163)
+    await editAmount(/^회비 1일/, '150000')
 
     expect(unsavedRowTitles()).toEqual(['회비', '간식비'])
     expect(screen.getAllByTestId('notice-bar')).toHaveLength(1)

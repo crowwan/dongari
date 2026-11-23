@@ -303,17 +303,17 @@ describe('SPEC-003 단톡방용 요약 (v2.6)', () => {
     const income = screen.getByRole('region', { name: '수입 항목별' })
     expect(within(income).getByTestId('item-totals-total')).toHaveTextContent('1,777,203원')
     expect(within(income).getAllByTestId('item-total-row').map((row) => row.textContent)).toEqual([
-      '회비(14인)10건1,630,000원',
-      '행사지원금2건145,050원',
-      '예금이자2건2,153원',
+      '회비(14인) 10건 1,630,000원',
+      '행사지원금 2건 145,050원',
+      '예금이자 2건 2,153원',
     ])
 
     const expense = screen.getByRole('region', { name: '지출 항목별' })
     expect(within(expense).getByTestId('item-totals-total')).toHaveTextContent('1,994,780원')
     const expenseRows = within(expense).getAllByTestId('item-total-row')
     expect(expenseRows).toHaveLength(7)
-    expect(expenseRows[0]).toHaveTextContent('야유회1건627,230원')
-    expect(expenseRows[2]).toHaveTextContent('대관료10건400,000원')
+    expect(expenseRows[0]).toHaveTextContent('야유회 1건 627,230원')
+    expect(expenseRows[2]).toHaveTextContent('대관료 10건 400,000원')
   })
 
   it('비율 막대 길이는 그해 그쪽 합계 대비 금액 비율이다', () => {

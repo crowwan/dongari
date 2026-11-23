@@ -10,6 +10,9 @@
 // - 고르자마자 장부로 갈 때(설정의 연도) 는 closeSheet 없이 backToLedger() 하나만 부른다 → 두 칸을 go(-2) 로 한 번에
 // - 창에서 다른 화면을 열 때(장부 고르기 창의 [+ 새 장부 만들기]) 는 closeSheet 없이 open() 하나만 부른다 → 창의 칸을 그 화면 칸으로 바꿔 끼운다
 // - 선택 창에서 확인 창으로 넘어갈 때(자동 보관 [끄기] → "보관해 둔 기록도 지울까요?") 는 openSheet(확인 창 이름) 으로 칸을 바꿔 끼운다
+// - 선택 창 위에 확인 창이 떠 있을 때 closeSheet() 는 두 칸을 go(-2) 로 한 번에 되돌린다 (회비 표 한 분 보기 › 회원 정보에서 지운 뒤 회비 표로, #163)
+//
+// 다른 화면으로 바로 갈 때(결산 회비 줄 → 회비 표, #163) 는 replace(화면): 지금 화면 칸을 바꿔 끼워 뒤로 버튼 한 번에 장부로 온다
 //
 // 확인 창(ConfirmDialog)도 방문 기록 한 칸으로 연다 (#110 접근성 점검 09). 화면·선택 창(편집 화면) 위에 한 칸 더 쌓는다:
 // - openDialog('delete', onBack) → { screen, sheet?, dialog } 칸을 쌓고 dialog 가 'delete' 가 된다
@@ -32,12 +35,15 @@ export type Screen =
   | { name: 'edit-entry'; id: string } // 내역 고치기. id: 고칠 기록
   | { name: 'new-book' } // 새 장부 만들기 (SPEC-005, 장부 고르기 창에서)
   | { name: 'keep-restore' } // 복구 코드로 불러오기 (SPEC-006, 첫 실행 화면에서. 설정에서는 설정 위 편집 화면으로)
+  | { name: 'dues'; year?: number } // 회비 표 (SPEC-010 4절). year: 처음 볼 해 (결산에서 오면 그 해, 없으면 올해)
+  | { name: 'excel-import' } // 엑셀 파일 읽기 → 읽은 내용 확인 (SPEC-010 8절, 장부 고르기 창·설정·첫 실행에서 파일을 고르면)
 
 const LEDGER: Screen = { name: 'ledger' }
 
 export interface ScreenHistory extends SheetHistory {
   screen: Screen
   open: (screen: Screen) => void // 장부에서 다른 화면을 연다
+  replace: (screen: Screen) => void // 지금 화면 칸을 다른 화면으로 바꿔 끼운다 (장부 화면이면 open 과 같다)
   requestBack: () => void // [← 장부로]: 닫기 전 확인이 필요하면 묻고, 아니면 장부로
   backToLedger: () => void // 묻지 않고 장부로 (저장·지우기 뒤, 설정에서 연도 고른 뒤)
   confirmBeforeLeave: (needed: boolean) => void // 지금 화면이 닫히기 전 확인을 받을지 (적던 내용이 있는지)
@@ -104,6 +110,8 @@ export function useScreenHistory({ backOpensDialog }: ScreenHistoryOptions = {})
   const dialogBack = useRef<(() => void) | undefined>(undefined)
   // 화면에서 선택 창·확인 창을 닫아 그 칸을 되돌리는 중. 이 popstate 는 화면을 바꾸지 않는다
   const closingLayer = useRef(false)
+  // replace() 가 창 칸을 되돌리는 중: 그 popstate 에서 드러난 화면 칸을 이 화면 이름으로 바꿔 끼운다 (리뷰 #177)
+  const replacingScreen = useRef<Screen['name'] | null>(null)
 
   function changeSheet(next: string | null, onBack?: () => void) {
     sheetRef.current = next
@@ -145,11 +153,19 @@ export function useScreenHistory({ backOpensDialog }: ScreenHistoryOptions = {})
     }
   }
 
+  // 그 위에 뜬 확인 창 칸까지 한 번에 되돌린다 (back() 을 두 번 부르면 브라우저마다 다르게 움직인다)
+  // 그 위에 뜬 확인 창 칸(맨 위 칸이 확인 창)까지 한 번에 되돌린다 (back() 을 두 번 부르면 브라우저마다 다르게 움직인다).
+  // 선택 창보다 먼저 열린 확인 창(그 칸은 선택 창 칸 아래)은 그대로 둔다
   function closeSheet() {
     if (sheetRef.current === null) return
+    const top: unknown = window.history.state
     changeSheet(null)
-    if (isSheetEntry(window.history.state)) {
-      closingLayer.current = true
+    if (!isSheetEntry(top)) return
+    closingLayer.current = true
+    if (isDialogEntry(top)) {
+      changeDialog(null)
+      window.history.go(-2)
+    } else {
       window.history.back()
     }
   }
@@ -185,6 +201,13 @@ export function useScreenHistory({ backOpensDialog }: ScreenHistoryOptions = {})
 
   // 장부 밖에서 뒤로 버튼을 누르면 쌓아 둔 기록이 빠지며 여기로 온다. 장부에서 누르면 앱 기본 동작(나가기)
   const onPopState = useEffectEvent(() => {
+    // replace() 가 창 칸을 걷어 냈다: 드러난 화면 칸을 새 화면으로 바꿔 끼운다 (화면은 이미 바뀌어 있다)
+    if (replacingScreen.current !== null) {
+      const state: HistoryState = { screen: replacingScreen.current }
+      replacingScreen.current = null
+      window.history.replaceState(state, '')
+      return
+    }
     // 화면에서 닫은 선택 창·확인 창의 칸이 빠졌다: 이미 닫혔으니 할 일 없음
     if (closingLayer.current) {
       closingLayer.current = false
@@ -234,6 +257,27 @@ export function useScreenHistory({ backOpensDialog }: ScreenHistoryOptions = {})
       enterScreen(next.name)
       show(next)
       window.scrollTo(0, 0)
+    },
+    replace: (next) => {
+      // 이 화면이 쌓은 창 칸 수 (열려 있는 선택 창·확인 창의 칸만 센다 — enterScreen 과 같이)
+      const top: unknown = window.history.state
+      const layers =
+        (sheetRef.current !== null && isSheetEntry(top) ? 1 : 0) + (dialogRef.current !== null && isDialogEntry(top) ? 1 : 0)
+      // 장부 칸을 바꾸면 뒤로 버튼에 앱이 닫히니 장부에서는 open 과 같이 칸을 쌓는다
+      const fromLedger = screen.name === 'ledger'
+      if (fromLedger) enterScreen(next.name)
+      show(next)
+      window.scrollTo(0, 0)
+      if (fromLedger) return
+      if (layers > 0) {
+        // 창 칸을 먼저 되돌리고, 그 popstate 에서 아래 화면 칸을 바꿔 끼운다 (창 칸만 바꾸면 화면 칸이 남아 뒤로 버튼 한 번이 헛돈다)
+        replacingScreen.current = next.name
+        if (layers === 1) window.history.back()
+        else window.history.go(-layers)
+      } else {
+        const state: HistoryState = { screen: next.name }
+        window.history.replaceState(state, '')
+      }
     },
     requestBack: () => {
       if (leaveNeedsConfirm.current) setConfirmingLeave(true)

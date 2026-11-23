@@ -43,6 +43,7 @@ type LedgerScreenProps = {
   carryoverWords: CarryoverWords // 잔액 카드 보조 줄의 이월금 이름 (장부 종류별)
   onPickBook: (id: string) => void // 창에서 장부를 골랐다 (창은 이 화면이 닫는다)
   onNewBook: () => void // 창의 [+ 새 장부 만들기] (창의 방문 기록 칸은 새 장부 만들기 화면이 이어 쓴다)
+  onImportExcel?: () => void // 창의 [엑셀 파일로 새 장부] (SPEC-010 8절): 파일 고르기. 고르면 창의 칸을 읽은 내용 화면이 이어 쓴다
   year: number
   ledger: Ledger
   totals: LedgerTotals
@@ -66,6 +67,8 @@ type LedgerScreenProps = {
   unsavedEntryIds?: ReadonlySet<string>
   // 복구 코드 안내 말풍선이 가리키는 위쪽 [설정] (SPEC-008)
   settingsRef?: Ref<HTMLButtonElement>
+  // [👥 회비 표] (SPEC-010 4절, 동아리·모임 장부만). behind: 올해 지난달까지 덜 낸 분 수 (명단이 없으면 0 — 숫자 없이 "회비 표")
+  dues?: { behind: number; onOpen: () => void }
 }
 
 // 장부 첫 화면 (SPEC-001): 위쪽 이름·연도와 [결산][설정] → 잔액 카드 → ‹ N월 ▾ › → [N월 정리 보기] → 그 달 카드 → 아래 고정 [+ 내역 적기].
@@ -78,6 +81,7 @@ export function LedgerScreen({
   carryoverWords,
   onPickBook,
   onNewBook,
+  onImportExcel,
   year,
   ledger,
   totals,
@@ -93,6 +97,7 @@ export function LedgerScreen({
   onEditEntry,
   unsavedEntryIds,
   settingsRef,
+  dues,
 }: LedgerScreenProps) {
   const group = monthGroup(ledger.entries, month)
 
@@ -153,6 +158,20 @@ export function LedgerScreen({
           </div>
         )}
 
+        {/* [N월 정리 보기] 바로 아래(없으면 그 자리) 회비 표 (SPEC-010 4절) */}
+        {dues && (
+          <div className="ledger__month-action">
+            <IconButton
+              icon="users"
+              variant="surface"
+              note={dues.behind > 0 ? `지난달까지 덜 낸 분 ${dues.behind}명` : undefined}
+              onClick={dues.onOpen}
+            >
+              회비 표
+            </IconButton>
+          </div>
+        )}
+
         <MonthCard group={group} onEditEntry={onEditEntry} unsavedEntryIds={unsavedEntryIds} />
       </div>
 
@@ -178,6 +197,7 @@ export function LedgerScreen({
             sheets.closeSheet()
           }}
           onNew={onNewBook}
+          onImportExcel={onImportExcel}
         />
       </BottomSheet>
     </div>

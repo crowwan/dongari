@@ -2,6 +2,8 @@
 import { useState, type ChangeEvent } from 'react'
 import { createBackup, readBackup, type BackupSummary } from '../../storage/backup'
 import type { StoredData } from '../../domain/types'
+import { isExcelBytes, isExcelFileName } from '../excel/excelBytes'
+import { EXCEL_IN_BACKUP_IMPORT } from '../excel/excelMessages'
 import type { LedgerState } from '../ledger/useLedger'
 import type { SheetHistory } from '../useScreenHistory'
 import { importConfirmTitle, importFailureMessage, REPLACE_WARNING, restoreFailureMessage } from './backupMessages'
@@ -57,15 +59,22 @@ export function useBackup(
   }
 
   async function readChosenFile(file: File) {
-    let text: string
+    let bytes: ArrayBuffer
     try {
-      text = await file.text()
+      bytes = await file.arrayBuffer()
     } catch {
       setNotice(importFailureMessage('broken'))
       showDialog()
       return
     }
-    const result = readBackup(text)
+    // 엑셀 파일을 골랐으면 엑셀 불러오기로 안내한다 (SPEC-010 8절, AC-29). .xlsx 머리(zip)는 .zip·.docx·.hwpx 와 같아
+    // 파일 이름(.xlsx·.xls)도 같이 본다 (#178 리뷰)
+    if (isExcelFileName(file.name) && isExcelBytes(bytes)) {
+      setNotice(EXCEL_IN_BACKUP_IMPORT)
+      showDialog()
+      return
+    }
+    const result = readBackup(new TextDecoder().decode(bytes))
     if (result.ok) setPending({ data: result.data, summary: result.summary })
     else setNotice(importFailureMessage(result.reason))
     showDialog()

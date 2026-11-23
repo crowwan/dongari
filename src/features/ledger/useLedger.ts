@@ -27,12 +27,15 @@ import {
   changeDuesStart as changeDuesStartOf,
   changeMonthlyFee as changeMonthlyFeeOf,
   deleteMember as deleteMemberFrom,
+  restMember as restMemberIn,
+  resumeMember as resumeMemberIn,
   updateMember as updateMemberIn,
   type MemberChanges,
   type NewMember,
 } from '../../domain/members'
 import { monthlyFeeSource, type MonthlyFeeSource } from '../../domain/duesTable'
 import type { Book, BookKind, EntryType, Ledger, StoredData, YearMonth } from '../../domain/types'
+import type { ImportedBook } from '../excel/readExcelBook'
 import { createRecoveryCode, recoveryCodeOf, withRecoveryCode } from '../keep/recoveryCode'
 import type {
   LedgerRepository,
@@ -98,12 +101,18 @@ export interface LedgerState {
   updateMember: (id: string, changes: MemberChanges) => boolean
   deleteMember: (id: string) => boolean // 기록에 낸 분으로 들어간 회원은 지우지 않는다 (화면은 버튼 대신 안내)
   changeDuesStart: (month: YearMonth) => boolean
-  changeMonthlyFee: (fee: number) => boolean // 이 연도 월 회비
+  changeMonthlyFee: (fee: number, feeYear?: number) => boolean // 그 해(없으면 이 연도) 월 회비. 회비 표는 보고 있는 해를 넘긴다 (#163)
+  // 쉬는 기간 넣기·빼기 (SPEC-010 5절 한 분 보기, #163)
+  restMember: (id: string, from: YearMonth, until: YearMonth) => boolean
+  resumeMember: (id: string, from: YearMonth) => boolean
   changeYear: (year: number) => void
   // 장부를 고른다: 마지막에 본 장부로 저장하고 그 장부의 올해 장부를 연다 (기록 변경은 아니라 변경 시각은 그대로)
   switchBook: (id: string) => void
   // 새 장부를 만들어 지금 장부로 정하고 올해 장부를 연다. 저장에 성공했는지 (성공일 때만 "새 장부를 만들었어요")
   createBook: (setup: BookSetup) => boolean
+  // 엑셀에서 읽은 내용으로 동아리·모임 장부를 만들어 지금 장부로 정하고 마지막 해 장부를 연다 (SPEC-010 8절 #166).
+  // 저장에 성공했는지. 저장하지 못하면 아무것도 바꾸지 않는다 (화면 데이터에도 넣지 않음, 성공일 때만 "엑셀 장부를 만들었어요")
+  importBook: (name: string, imported: ImportedBook) => boolean
   // 장부를 지우고 남은 첫 장부의 올해 장부를 연다. 저장하지 못하면 아무것도 지우지 않고 false. 하나뿐인 장부는 지우지 않는다
   deleteBook: (id: string) => boolean
   // 백업 파일 데이터로 통째로 바꾼다 (SPEC-002). 저장에 성공했을 때만 화면을 바꾸고 올해 장부로 연다
@@ -187,13 +196,13 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     return result
   }
 
-  // 지금 장부의 이 연도 장부를 바꾼다
-  function changeLedger(change: (ledger: Ledger, book: Book) => Book, entryId?: string): boolean {
+  // 지금 장부의 이 연도(ledgerYear, 기본 보고 있는 연도) 장부를 바꾼다
+  function changeLedger(change: (ledger: Ledger, book: Book) => Book, entryId?: string, ledgerYear = year): boolean {
     return commit(
       (current) => {
         const target = currentBook(current)
-        const ledger = target?.ledgers[String(year)]
-        if (!target || !ledger) throw new Error(`${year}년 장부가 없다`)
+        const ledger = target?.ledgers[String(ledgerYear)]
+        if (!target || !ledger) throw new Error(`${ledgerYear}년 장부가 없다`)
         return replaceBook(current, change(ledger, target))
       },
       { entryId },
@@ -214,21 +223,24 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     return changeLedger((ledger, target) => withLedger(target, change(ledger, target)), entryId)
   }
 
-  // 새 장부는 올해 장부 하나로 시작해 만든 순 맨 뒤에 들어가고 지금 장부가 된다 (같은 이름이어도 id 로 구분).
+  // 새 장부는 만든 순 맨 뒤에 들어가고 지금 장부가 된다 (같은 이름이어도 id 로 구분).
   // 첫 장부면 복구 코드도 이때 생긴다 (SPEC-006 AC-1)
-  function addBook(current: StoredData, setup: BookSetup): StoredData {
-    const thisYear = now().getFullYear()
-    const created: Book = {
-      id: createId(),
-      name: setup.name.trim(),
-      kind: setup.kind,
-      ledgers: { [String(thisYear)]: createLedger(thisYear, setup.carryover) },
-      createdAt: now().toISOString(),
-    }
+  function appendBook(current: StoredData, content: Pick<Book, 'name' | 'kind' | 'ledgers'> & Partial<Pick<Book, 'members' | 'dues'>>): StoredData {
+    const created: Book = { id: createId(), ...content, name: content.name.trim(), createdAt: now().toISOString() }
     return withRecoveryCode(
       { ...current, books: [...current.books, created], settings: { ...current.settings, lastBookId: created.id } },
       createCode,
     )
+  }
+
+  // 손으로 만든 새 장부는 올해 장부 하나로 시작한다
+  function addBook(current: StoredData, setup: BookSetup): StoredData {
+    const thisYear = now().getFullYear()
+    return appendBook(current, {
+      name: setup.name,
+      kind: setup.kind,
+      ledgers: { [String(thisYear)]: createLedger(thisYear, setup.carryover) },
+    })
   }
 
   // 불러올 데이터의 복구 코드: 파일(보관본)의 코드를 쓴다 (SPEC-006 AC-7). 코드가 없는 옛 백업 파일이면
@@ -314,7 +326,10 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     updateMember: (id, changes) => changeBook((target) => updateMemberIn(target, id, changes)),
     deleteMember: (id) => changeBook((target) => deleteMemberFrom(target, id)),
     changeDuesStart: (month) => changeBook((target) => changeDuesStartOf(target, month)),
-    changeMonthlyFee: (fee) => changeLedger((item, target) => withLedger(target, changeMonthlyFeeOf(item, fee))),
+    changeMonthlyFee: (fee, feeYear = year) =>
+      changeLedger((item, target) => withLedger(target, changeMonthlyFeeOf(item, fee)), undefined, feeYear),
+    restMember: (id, from, until) => changeBook((target) => restMemberIn(target, id, from, until)),
+    resumeMember: (id, from) => changeBook((target) => resumeMemberIn(target, id, from)),
     changeYear: setYear,
     switchBook: (id) => {
       commit((current) => ({ ...current, settings: { ...current.settings, lastBookId: id } }), { recordChange: false })
@@ -324,6 +339,18 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
       const saved = commit((current) => addBook(current, setup))
       openThisYear()
       return saved
+    },
+    importBook: (name, imported) => {
+      // 엑셀로 만든 장부는 늘 동아리·모임 장부다 (회원 명단·월 회비가 있는 장부, SPEC-010 8절)
+      const created = appendBook(latest.current, { name, kind: 'club', ...imported })
+      const next: StoredData = { ...created, settings: { ...created.settings, lastChangedAt: now().toISOString() } }
+      // 저장했을 때만 화면에 들인다 (deleteBook·restoreBackup 과 같이, #178 리뷰): 큰 장부를 저장하지 못했는데(용량 초과 등)
+      // 화면 데이터에 남기면 그 뒤 저장마다 그 장부까지 쓰려다 모두 실패한다. 못 했으면 지금 데이터·저장 상태 그대로
+      const result = replace(next, (changed) => repository.save(changed))
+      if (!result.ok) return false
+      // 장부 연도는 엑셀의 마지막 해
+      setYear(Math.max(...Object.values(imported.ledgers).map((item) => item.year)))
+      return true
     },
     deleteBook: (id) => {
       // 저장하지 못하면 지운 것처럼 보였다가 새로고침 때 되살아나지 않게 화면도 그대로 둔다 (SPEC-005 예외)

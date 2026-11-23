@@ -12,7 +12,10 @@ import {
   isYearMonth,
   memberHasRecords,
   nextMonth,
+  openEndedRestUntil,
   previousMonth,
+  restMember,
+  resumeMember,
   splitYearMonth,
   thisMonthOf,
   updateMember,
@@ -207,11 +210,57 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 (6절)', () => {
     })
   })
 
+  describe('쉬는 기간 (5절 한 분 보기, AC-19)', () => {
+    it('AC-19 고른 달부터 끝 달까지(둘 다 포함) 달마다 쉬는 달로 넣는다 — 해를 넘어가도', () => {
+      const next = restMember(duesBook(), 'm1', '2026-11', '2027-02')
+
+      expect(next.members?.[0]?.off).toEqual(['2026-11', '2026-12', '2027-01', '2027-02'])
+    })
+
+    it('한 달만 쉬면 그 달 하나, 이미 쉬는 달은 한 번만 남기고 달 순서로 둔다', () => {
+      expect(restMember(duesBook(), 'm1', '2026-11', '2026-11').members?.[0]?.off).toEqual(['2026-11'])
+
+      const next = restMember(duesBook(), 'm2', '2026-01', '2026-03')
+      expect(next.members?.[1]?.off).toEqual(['2026-01', '2026-02', '2026-03'])
+    })
+
+    it('다른 회원과 장부 기록은 그대로 둔다', () => {
+      const target = duesBook()
+      const next = restMember(target, 'm1', '2026-11', '2026-12')
+
+      expect(next.members?.[1]).toEqual(target.members?.[1])
+      expect(next.ledgers).toEqual(target.ledgers)
+    })
+
+    it('끝 달이 고른 달보다 앞이거나 달 형식이 아니면 넣지 않는다', () => {
+      expect(() => restMember(duesBook(), 'm1', '2026-11', '2026-10')).toThrow(InvalidLedgerInputError)
+      expect(() => restMember(duesBook(), 'm1', '2026-1', '2026-03')).toThrow(InvalidLedgerInputError)
+      expect(() => restMember(duesBook(), 'm1', '2026-01', '2026-13')).toThrow(InvalidLedgerInputError)
+    })
+
+    it('[N월부터 다시 내요] 그 달부터 이어진 쉬는 달만 지운다 (앞의 쉬는 달·떨어진 쉬는 달은 남긴다)', () => {
+      const resting = { ...duesBook(), members: [{ id: 'm1', name: '김도윤', joined: '2026-01', off: ['2026-02', '2026-05', '2026-06', '2026-07', '2026-10'] }] }
+
+      expect(resumeMember(resting, 'm1', '2026-06').members?.[0]?.off).toEqual(['2026-02', '2026-05', '2026-10'])
+      expect(resumeMember(resting, 'm1', '2026-02').members?.[0]?.off).toEqual(['2026-05', '2026-06', '2026-07', '2026-10'])
+    })
+
+    it('[아직 몰라요] 끝 달은 그 달의 해와 올해 중 늦은 해의 다음 해 12월이다', () => {
+      const today = new Date('2026-11-23T09:00:00.000+09:00')
+
+      expect(openEndedRestUntil('2026-11', today)).toBe('2027-12')
+      expect(openEndedRestUntil('2025-03', today)).toBe('2027-12')
+      expect(openEndedRestUntil('2027-02', today)).toBe('2028-12')
+    })
+  })
+
   it('명단·시작 달·월 회비를 바꾼 장부는 저장 형식 검사(v4)를 늘 통과한다', () => {
     let target = addMember(plainBook(), { name: '김도윤', joined: '2026-11' }, { createId: ids('m1'), year: 2026 })
     target = addMember(target, { name: '김도윤', joined: '2026-03' }, { createId: ids('m2'), year: 2026 })
     target = updateMember(target, 'm2', { name: '김도윤(작은)', joined: '2026-01', left: '2026-12', opening: -20_000 })
     target = changeDuesStart(target, '2025-01')
+    target = restMember(target, 'm2', '2026-05', '2026-08')
+    target = resumeMember(target, 'm2', '2026-07')
     target = deleteMember(target, 'm1')
     const ledger = target.ledgers['2026']
     if (!ledger) throw new Error('2026년 장부가 없다')

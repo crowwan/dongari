@@ -1,0 +1,231 @@
+/*
+ * 읽은 내용 확인 화면 (SPEC-010 8절, #166). 엑셀 조각(ExcelImportScreen)과 함께 받는다. 값은 tokens.css 변수만 쓴다.
+ * 묶음(장부 이름 / 사실 카드 / 알림 줄들)은 여백으로 나누고 줄 사이 선은 쓰지 않는다 (design.md 4)
+ * 토큰·화면 틀·.excel 공통은 첫 화면 CSS(excel.css ← ExcelStatus)에 이미 있어 여기서 @import 하지 않는다 —
+ * 하면 조각 CSS 에 tokens.css·screens.css 가 한 벌 더 들어간다
+ */
+
+/* 묶음이 시작되는 요소는 --stack 화면 간격에 더해 --group-gap 까지 띄운다 (장부 화면 달 넘기기 묶음과 같은 셈) */
+.excel-import__group {
+  margin-top: calc(var(--group-gap) - var(--stack));
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+/* "파일이름.xlsx · 시트 N개 중 M개를 읽었어요": 긴 파일 이름은 아무 데서나 줄바꿈 */
+.excel-import__file {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--line-body);
+  overflow-wrap: anywhere;
+}
+
+/* 사실 카드: 흰 카드 안 이름 ··· 값. 큰 글씨에서 한 줄에 안 들어가면 값이 아래 줄 오른쪽으로 */
+.excel-facts {
+  margin: 0;
+  padding: var(--space-1) var(--card-pad-inline);
+  border-radius: var(--corner-lg);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.excel-facts__row {
+  padding: var(--space-3) 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+.excel-facts__row dt {
+  color: var(--muted);
+  font-size: var(--text-body-size);
+  line-height: var(--line-tight);
+}
+
+.excel-facts__row dd {
+  margin: 0 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  text-align: right;
+}
+
+.excel-facts__main {
+  color: var(--strong);
+  font-size: var(--text-row-size);
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+}
+
+.excel-facts__sub {
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+}
+
+/* 알림 줄들 */
+.excel-import__notes {
+  gap: var(--space-3);
+}
+
+/* 알림 줄 한 개: 아이콘 + 굵은 제목 + 설명 (+ [보기 ›]). 맞음은 흰 면, 알아 둘 것은 --info-bg, 확인할 것은 --warn-bg */
+.excel-note {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--corner-md);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--strong);
+  font-family: var(--typeface);
+  font-size: var(--text-body-size);
+  letter-spacing: var(--letter-body);
+  line-height: var(--line-body);
+  text-align: left;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.excel-note[data-tone='ok'] {
+  background: var(--surface);
+}
+
+.excel-note[data-tone='ok'] > .ui-icon {
+  color: var(--income-amount);
+}
+
+.excel-note[data-tone='info'] {
+  background: var(--info-bg);
+  color: var(--info-ink);
+}
+
+.excel-note[data-tone='warn'] {
+  background: var(--warn-bg);
+}
+
+.excel-note > .ui-icon {
+  flex: none;
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+/* 글 + [보기 ›]: 글이 본문 8자 폭을 못 가지면(큰 글씨) [보기 ›] 가 글 아래 줄 오른쪽으로 내려간다 */
+.excel-note__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.excel-note__text {
+  flex: 1 1 8rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.excel-note__title {
+  font-weight: var(--weight-bold);
+  line-height: var(--line-tight);
+}
+
+.excel-note__body {
+  display: block;
+  font-size: var(--text-caption-size);
+}
+
+/* 흰 면 위·노란 면 위 설명은 보조 글자색, 회청 면 위는 면 글자색(--info-ink, AA) 그대로 */
+.excel-note[data-tone='ok'] .excel-note__body,
+.excel-note[data-tone='warn'] .excel-note__body {
+  color: var(--ink);
+}
+
+.excel-note__items {
+  margin: 0 0 var(--space-1);
+  padding-left: var(--space-5);
+}
+
+/* 누르면 목록이 열리는 줄: 끝에 흰 면 [보기 ›] (누를 수 있게 보이게, PATTERNS N9) */
+button.excel-note {
+  min-height: var(--touch-min);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.excel-note:focus-visible {
+  outline: var(--focus-ring) solid var(--accent-ink);
+  outline-offset: var(--stroke);
+}
+
+button.excel-note:active .excel-note__open {
+  background: var(--pressed);
+}
+
+.excel-note__open {
+  flex: none;
+  margin-left: auto;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border-radius: var(--corner-sm);
+  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--strong);
+  font-size: var(--text-label-size);
+  font-weight: var(--text-row-weight);
+  white-space: nowrap;
+}
+
+.excel-note__open > .ui-icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--muted);
+}
+
+/* 날짜를 바꾼 줄·읽지 못한 줄 목록 (선택 창 안): 해·달 + 엑셀 원래 글, 줄 사이 선 없음 */
+.excel-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.excel-lines__line {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--corner-md);
+  background: var(--fill);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.excel-lines__where {
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-row-weight);
+  line-height: var(--line-tight);
+}
+
+.excel-lines__text {
+  color: var(--strong);
+  font-size: var(--text-body-size);
+  line-height: var(--line-body);
+  overflow-wrap: anywhere;
+}

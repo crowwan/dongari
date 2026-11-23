@@ -11,6 +11,7 @@ import {
   Circle,
   CirclePlay,
   CloudCheck,
+  CircleCheck,
   CircleMinus,
   CirclePlus,
   Coffee,
@@ -19,6 +20,8 @@ import {
   Ellipsis,
   EllipsisVertical,
   ExternalLink,
+  FileDown,
+  FileSpreadsheet,
   Flower2,
   FolderDown,
   Gift,
@@ -86,6 +89,9 @@ export type IconName =
   | 'open'
   | 'more'
   | 'coin'
+  | 'excel'
+  | 'file-in'
+  | 'ok'
 
 const ICONS: Record<IconName, LucideIcon> = {
   // 항목 (domain/itemIcon 이 이름으로 고른다)
@@ -147,6 +153,11 @@ const ICONS: Record<IconName, LucideIcon> = {
   more: Ellipsis,
   // 설정 [월 회비] 줄 (SPEC-010 6절): 동전 더미
   coin: Coins,
+  // 엑셀 (SPEC-010 8절 #166): 엑셀 파일(장부 고르기 창 [엑셀 파일로 새 장부]·첫 실행 [엑셀 파일 불러오기]),
+  // 설정 [엑셀 파일 불러오기] 는 파일을 들여오는 화살표, 확인 화면 검산이 맞으면 동그라미 체크
+  excel: FileSpreadsheet,
+  'file-in': FileDown,
+  ok: CircleCheck,
 }
 
 // 꾸밈 아이콘: 화면 읽기에서 숨기고(뜻은 옆 글자가 전한다), 크기·색은 놓인 자리의 CSS 가 정한다
