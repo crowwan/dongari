@@ -434,7 +434,7 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 설정 (6절)', () => {
       await userEvent.click(screen.getByRole('button', { name: '시작 달 바꾸기' }))
       const sheet = screen.getByRole('dialog', { name: '회비 표를 언제부터 계산할까요?' })
       expect(within(sheet).getByText('바꾸면 그 전 기록은 회비 표에 들어가지 않아요')).toBeInTheDocument()
-      expect(within(sheet).getByTestId('year-month-picker-year')).toHaveTextContent('2026년')
+      expect(within(sheet).getByText('2026년')).toBeInTheDocument()
       expect(within(sheet).getByRole('button', { name: '1월' })).toHaveAttribute('aria-pressed', 'true')
       await userEvent.click(within(sheet).getByRole('button', { name: '이전 해' }))
       await userEvent.click(within(sheet).getByRole('button', { name: '7월' }))

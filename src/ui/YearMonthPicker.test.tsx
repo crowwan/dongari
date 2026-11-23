@@ -7,7 +7,7 @@ describe('YearMonthPicker (해·달 고르기, SPEC-010 6절)', () => {
   it('고른 해를 가운데에 보이고 그 해의 고른 달을 칠한다', () => {
     render(<YearMonthPicker value={{ year: 2025, month: 7 }} firstYear={2000} lastYear={2027} onChange={vi.fn()} />)
 
-    expect(screen.getByTestId('year-month-picker-year')).toHaveTextContent('2025년')
+    expect(screen.getByText('2025년')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '7월' })).toHaveAttribute('aria-pressed', 'true')
   })
 
@@ -17,7 +17,7 @@ describe('YearMonthPicker (해·달 고르기, SPEC-010 6절)', () => {
 
     await user.click(screen.getByRole('button', { name: '다음 해' }))
 
-    expect(screen.getByTestId('year-month-picker-year')).toHaveTextContent('2026년')
+    expect(screen.getByText('2026년')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '7월' })).toHaveAttribute('aria-pressed', 'false')
     await user.click(screen.getByRole('button', { name: '이전 해' }))
     expect(screen.getByRole('button', { name: '7월' })).toHaveAttribute('aria-pressed', 'true')
@@ -50,7 +50,7 @@ describe('YearMonthPicker (해·달 고르기, SPEC-010 6절)', () => {
     const user = userEvent.setup()
     render(<YearMonthPicker value={null} current={{ year: 2026, month: 11 }} firstYear={2000} lastYear={2027} onChange={vi.fn()} />)
 
-    expect(screen.getByTestId('year-month-picker-year')).toHaveTextContent('2026년')
+    expect(screen.getByText('2026년')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '11월' })).toHaveAttribute('aria-current', 'date')
     expect(screen.queryAllByRole('button', { pressed: true })).toHaveLength(0)
 
