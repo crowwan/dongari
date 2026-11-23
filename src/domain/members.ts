@@ -55,9 +55,19 @@ export function previousMonth(value: YearMonth): YearMonth {
   return month === 1 ? yearMonth(year - 1, 12) : yearMonth(year, month - 1)
 }
 
+// 회원 이름에 못 쓰는 글자: 엑셀 내용 칸에서 낸 분을 가르는 쉼표(`,` `，` `、`, SPEC-010 8절 "낸 분").
+// 이름에 있으면 내보낸 엑셀을 다시 읽을 때 두 분으로 갈린다 (6·9절, #180 리뷰). 같은 이름 구분은 괄호("김민지(91)")로
+export const MEMBER_NAME_SEPARATORS: readonly string[] = [',', '，', '、']
+export const NAME_SEPARATOR_ERROR = '이름에 쉼표(,)는 쓸 수 없어요. 구분하려면 괄호를 써 주세요'
+
+export function hasNameSeparator(name: string): boolean {
+  return MEMBER_NAME_SEPARATORS.some((separator) => name.includes(separator))
+}
+
 function checkName(name: string): string {
   const trimmed = name.trim()
   if (trimmed.length === 0) throw new InvalidLedgerInputError('회원 이름이 비어 있다')
+  if (hasNameSeparator(trimmed)) throw new InvalidLedgerInputError(`회원 이름에 쉼표를 쓸 수 없다: ${trimmed}`)
   return trimmed
 }
 
@@ -87,7 +97,9 @@ export function addMember(book: Book, input: NewMember, deps: { createId: () => 
 
 // 회원 정보 편집. 번호·쉬는 달은 그대로 두고, 그만둔 달·남은 돈이 없으면(0) 칸째 뺀다
 export function updateMember(book: Book, id: string, changes: MemberChanges): Book {
-  const name = checkName(changes.name)
+  // 예전부터 쉼표가 든 이름(엑셀에서 불러온 명단)은 그대로 두면 다른 칸을 고칠 수 있다 — 새로 쉼표를 넣는 것만 막는다
+  const current = (book.members ?? []).find((member) => member.id === id)?.name
+  const name = current !== undefined && changes.name.trim() === current ? current : checkName(changes.name)
   const opening = checkOpening(changes.opening)
   const joined = checkYearMonth(changes.joined, '들어온 달')
   const left = changes.left === undefined ? undefined : checkYearMonth(changes.left, '그만둔 달')

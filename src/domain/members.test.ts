@@ -8,6 +8,7 @@ import {
   changeDuesStart,
   changeMonthlyFee,
   deleteMember,
+  hasNameSeparator,
   hasSameName,
   isYearMonth,
   memberHasRecords,
@@ -91,6 +92,15 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 (6절)', () => {
       )
     })
 
+    it('이름에 쉼표(, ， 、)가 있으면 넣지 않는다 — 엑셀 내용 칸에서 낸 분을 가르는 글자라서 (#180 리뷰). 괄호는 된다', () => {
+      for (const name of ['김민지,총무', '김민지，총무', '김민지、총무']) {
+        expect(hasNameSeparator(name)).toBe(true)
+        expect(() => addMember(duesBook(), { name, joined: '2026-11' }, { createId: ids('m3'), year: 2026 })).toThrow(InvalidLedgerInputError)
+      }
+      const next = addMember(duesBook(), { name: '김민지(91)', joined: '2026-11' }, { createId: ids('m3'), year: 2026 })
+      expect(next.members?.at(-1)?.name).toBe('김민지(91)')
+    })
+
     it('들어온 달이 "YYYY-MM" 이 아니면 넣지 않는다 (엑셀 불러오기 등 다른 곳에서 불러도)', () => {
       for (const joined of ['2026-7', '2026-13', '2026-11-01']) {
         expect(() => addMember(duesBook(), { name: '박서연', joined }, { createId: ids('m3'), year: 2026 })).toThrow(
@@ -137,6 +147,14 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 (6절)', () => {
       expect(change('', 0)).toThrow(InvalidLedgerInputError)
       expect(change('김도윤', 1.5)).toThrow(InvalidLedgerInputError)
       expect(change('김도윤', -1_000_000_000)).toThrow(InvalidLedgerInputError)
+    })
+
+    it('이름을 쉼표가 든 이름으로 바꾸지 않는다. 예전부터 쉼표가 든 이름(엑셀에서 불러옴)은 그대로 두고 다른 칸을 고칠 수 있다 (#180 리뷰)', () => {
+      expect(() => updateMember(duesBook(), 'm1', { name: '김도윤,총무', joined: '2026-01', opening: 0 })).toThrow(InvalidLedgerInputError)
+
+      const legacy = duesBook({ members: [{ id: 'm1', name: '김도윤,총무', joined: '2026-01', off: [] }] })
+      const next = updateMember(legacy, 'm1', { name: ' 김도윤,총무 ', joined: '2025-03', opening: 0 })
+      expect(next.members?.[0]).toEqual({ id: 'm1', name: '김도윤,총무', joined: '2025-03', off: [] })
     })
 
     it('들어온 달·그만둔 달이 "YYYY-MM" 이 아니면 바꾸지 않는다', () => {

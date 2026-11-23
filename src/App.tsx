@@ -3,8 +3,10 @@ import { BackupDialogs } from './features/backup/BackupDialogs'
 import { BACKUP_DOT_LABEL, BACKUP_REMINDER_MESSAGE, backupReminderFor } from './features/backup/backupReminder'
 import { useBackup } from './features/backup/useBackup'
 import { NewBookScreen } from './features/books/NewBookScreen'
+import { ExcelExportSheet } from './features/excel/ExcelExportSheet'
 import { ExcelFileInput, ExcelImportSlot } from './features/excel/ExcelImportSlot'
 import type { ImportedBook } from './features/excel/readExcelBook'
+import { useExcelExport } from './features/excel/useExcelExport'
 import { useExcelImport } from './features/excel/useExcelImport'
 import { FirstUseGuideMark } from './features/guide/FirstUseGuideMark'
 import type { GuideStore } from './features/guide/guideStore'
@@ -172,6 +174,8 @@ export default function App({
   })
   // 엑셀 불러오기 (SPEC-010 8절): 장부 고르기 창·설정·첫 실행이 같은 파일 고르기를 쓴다
   const excelImport = useExcelImport(navigation)
+  // 엑셀 내보내기 (SPEC-010 9절): 설정 [엑셀 파일로 내보내기] → 지금 장부의 모든 해를 한 파일로
+  const excelExport = useExcelExport({ book: ledger.book, now, sheets: navigation, onSent: setToast })
   const createId = options?.createId ?? (() => crypto.randomUUID())
 
   // 홈 화면에 추가 (SPEC-002): 권하기 카드는 첫 장부를 만든 직후부터 [나중에]·설치 전까지 (#135)
@@ -499,6 +503,7 @@ export default function App({
             inApp={inApp && { kind: inApp.kind, move: ledgerMove }}
             dues={duesSettings(ledger, today, setToast)}
             onImportExcel={excelImport.start}
+            onExportExcel={excelExport.start}
           />
         )
       case 'month-summary':
@@ -702,6 +707,7 @@ export default function App({
       />
       <BackupDialogs backup={backup} />
       <ExcelFileInput flow={excelImport} />
+      <ExcelExportSheet flow={excelExport} onReload={() => window.location.reload()} />
       <FirstUseGuideMark guide={guide} />
       <Toast message={toast} onDone={() => setToast(null)} />
     </div>

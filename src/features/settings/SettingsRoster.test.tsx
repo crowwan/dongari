@@ -314,6 +314,31 @@ describe('SPEC-010 회원 명단·월 회비·시작 달 설정 (6절)', () => {
       expect(within(screen.getByRole('list', { name: '지금 회원' })).getAllByRole('button', { name: /^김도윤/ })).toHaveLength(2)
     })
 
+    it('이름에 쉼표가 있으면 "이름에 쉼표(,)는 쓸 수 없어요. 구분하려면 괄호를 써 주세요" 와 함께 [넣기]를 누를 수 없다 (#180 리뷰)', async () => {
+      render(<Harness />)
+      await openRoster()
+      await userEvent.click(screen.getByRole('button', { name: '회원 넣기' }))
+
+      await userEvent.type(screen.getByLabelText('이름'), '김민지,총무')
+
+      expect(screen.getByLabelText('이름')).toHaveAccessibleDescription('이름에 쉼표(,)는 쓸 수 없어요. 구분하려면 괄호를 써 주세요')
+      expect(screen.getByRole('button', { name: '넣기' })).toBeDisabled()
+      await userEvent.clear(screen.getByLabelText('이름'))
+      await userEvent.type(screen.getByLabelText('이름'), '김민지(91)')
+      expect(screen.getByRole('button', { name: '넣기' })).toBeEnabled()
+    })
+
+    it('회원 정보에서 이름을 쉼표가 든 이름으로 바꾸면 안내와 함께 [저장]을 누를 수 없다 (#180 리뷰)', async () => {
+      render(<Harness />)
+      await openRoster()
+      await userEvent.click(screen.getByRole('button', { name: /^김도윤/ }))
+
+      await userEvent.type(screen.getByLabelText('이름'), ',총무')
+
+      expect(screen.getByLabelText('이름')).toHaveAccessibleDescription('이름에 쉼표(,)는 쓸 수 없어요. 구분하려면 괄호를 써 주세요')
+      expect(screen.getByRole('button', { name: '저장' })).toBeDisabled()
+    })
+
     it('이름을 적기 전에는 [넣기]를 누를 수 없다', async () => {
       render(<Harness />)
       await openRoster()

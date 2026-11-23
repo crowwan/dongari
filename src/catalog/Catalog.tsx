@@ -8,7 +8,9 @@ import type { DuesCell, DuesCellState } from '../domain/duesTable'
 import { BookPicker } from '../features/books/BookPicker'
 import { DuesCalendar } from '../features/dues/DuesCalendar'
 import { DuesStrip } from '../features/dues/DuesStrip'
-import { ImportFacts, ImportNote } from '../features/excel/ExcelImportScreen'
+import { ImportFacts } from '../features/excel/ExcelImportScreen'
+import { ExcelExportSheet } from '../features/excel/ExcelExportSheet'
+import { ExcelNote } from '../features/excel/ExcelParts'
 import { ExcelProblem, ExcelReading } from '../features/excel/ExcelStatus'
 import type { ExcelImportSummary } from '../features/excel/readExcelBook'
 import { BrowserBar, BrowserMenu, BrowserPage, BrowserPicture } from '../features/install/BrowserPicture'
@@ -738,28 +740,54 @@ export function Catalog() {
             <ImportFacts summary={CATALOG_EXCEL_SUMMARY} />
           </State>
           <State label="알림 줄 ok: 흰 면 + 동그라미 체크 (검산이 맞음)">
-            <ImportNote tone="ok" title="해마다 잔액이 맞아요">
+            <ExcelNote tone="ok" title="해마다 잔액이 맞아요">
               엑셀 잔액과 앱 계산을 해마다 맞춰 봤어요. 이월금은 엑셀에 적힌 값을 그대로 써요.
-            </ImportNote>
+            </ExcelNote>
           </State>
           <State label="알림 줄 info: --info-bg (낸 분을 다 못 나눈 회비)">
-            <ImportNote tone="info" title="낸 분을 다 못 나눈 회비 118건">
+            <ExcelNote tone="info" title="낸 분을 다 못 나눈 회비 118건">
               회원 이름이 섞인 입금은 회비로 넣고, 낸 분은 나중에 회비 표에서 붙여요.
-            </ImportNote>
+            </ExcelNote>
           </State>
           <State label="알림 줄 warn: --warn-bg + 목록 (검산이 다름)">
-            <ImportNote tone="warn" title="잔액을 맞춰 보니 2곳이 달라요">
+            <ExcelNote tone="warn" title="잔액을 맞춰 보니 2곳이 달라요">
               <ul className="excel-note__items">
                 <li>2019년 마지막 잔액 4원 차이</li>
                 <li>2020년 이월금 4원 차이</li>
               </ul>
               이월금은 엑셀에 적힌 값을 그대로 써요.
-            </ImportNote>
+            </ExcelNote>
           </State>
           <State label="알림 줄 warn 버튼: 줄 전체를 누르면 목록 (끝에 흰 면 [보기 ›], 눌러 보기)">
-            <ImportNote tone="warn" title="날짜를 바꾼 줄 3건" onOpen={noop}>
+            <ExcelNote tone="warn" title="날짜를 바꾼 줄 3건" onOpen={noop}>
               그 달에 없는 날은 그 달 마지막 날로, 날을 읽을 수 없는 줄은 날짜 없이 넣었어요.
-            </ImportNote>
+            </ExcelNote>
+          </State>
+        </Section>
+
+        <Section title="엑셀 내보내기 (SPEC-010 9절 #167)">
+          <State label="만드는 중 (엑셀 기능을 처음 받는 시간 포함, 보내기 창이 떠 있는 동안도 이 모습)">
+            <div className="catalog__frame catalog__frame--sheet">
+              <ExcelExportSheet inline flow={{ state: { step: 'making' }, open: true, close: noop }} onReload={noop} />
+            </div>
+          </State>
+          <State label="저장했어요 (파일 공유가 안 되는 폰: 다운로드 폴더): 회색 면 사실 카드 + 카톡으로 보내는 길(info) + [닫기]">
+            <div className="catalog__frame catalog__frame--sheet">
+              <ExcelExportSheet
+                inline
+                flow={{
+                  state: { step: 'saved', fileName: '다솜회 장부 2026-11-24.xlsx', years: '2013~2026년', sheets: '해마다 입출금내역 · 회비내역' },
+                  open: true,
+                  close: noop,
+                }}
+                onReload={noop}
+              />
+            </div>
+          </State>
+          <State label="엑셀 기능을 받지 못함: 불러오기와 같은 문구 + [앱 다시 열기] + [닫기]">
+            <div className="catalog__frame catalog__frame--sheet">
+              <ExcelExportSheet inline flow={{ state: { step: 'load-failed' }, open: true, close: noop }} onReload={noop} />
+            </div>
           </State>
         </Section>
 

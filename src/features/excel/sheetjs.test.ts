@@ -115,4 +115,20 @@ describe('SPEC-010 AC-35 ADR 009 SheetJS 는 어댑터 한 곳에서, 누를 때
     expect(adapter).toMatch(/import\(\s*'xlsx'\s*\)/)
     expect(adapter.match(/^import\s+(?!type\b).*from\s+['"]xlsx['"]/m)).toBeNull()
   })
+
+  it('엑셀 내보내기(#167) 규칙·파일 만들기는 누를 때 받는 조각이다: 첫 화면 쪽 useExcelExport 가 excelExport 를 동적 import 로만 부르고, exportBook 은 그 조각만 부른다', () => {
+    // import 문마다 (여러 줄이어도 첫 from '…' 까지). 타입만 부르는 import type 은 번들에 들어가지 않아 뺀다
+    const staticallyImports = (name: string) =>
+      sourceFiles
+        .filter(({ text }) =>
+          (text.match(/^import\s[\s\S]*?\sfrom\s+'[^']+'/gm) ?? []).some(
+            (statement) => !/^import\s+type\b/.test(statement) && statement.endsWith(`'./${name}'`),
+          ),
+        )
+        .map(({ file }) => file)
+
+    expect(staticallyImports('excelExport')).toEqual([])
+    expect(staticallyImports('exportBook')).toEqual(['features/excel/excelExport.ts'])
+    expect(sourceFiles.find(({ file }) => file === 'features/excel/useExcelExport.ts')?.text).toMatch(/import\(\s*'\.\/excelExport'\s*\)/)
+  })
 })

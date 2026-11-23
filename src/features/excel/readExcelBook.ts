@@ -125,7 +125,8 @@ function mostCommon(values: readonly number[]): number | undefined {
 type Roster = ReadonlyMap<string, string>
 
 // 해마다 월 회비 (8절 "월 회비"): 그 해 낸 분을 다 나눈 줄의 한 분 몫 중 가장 흔한 값, 없으면 전 해 값.
-// 확인 화면에서 고친 해는 그 값을 쓴다(fixed, #166) — 다 나눈 줄이 없는 다음 해는 고친 값을 이어 쓴다
+// 확인 화면에서 고친 해는 그 값을 쓴다(fixed, #166) — 다 나눈 줄이 없는 다음 해는 고친 값을 이어 쓴다.
+// 앱이 내보낸 엑셀(9절)은 입출금내역 제목 줄에 그 해 월 회비가 적혀 있어 추정하지 않고 그 값을 쓴다(고친 값이 먼저, #180 리뷰)
 function monthlyFees(yearReads: readonly YearRead[], roster: Roster, fixed: ReadonlyMap<number, number>): Map<number, number | undefined> {
   const fees = new Map<number, number | undefined>()
   let previous: number | undefined
@@ -136,7 +137,7 @@ function monthlyFees(yearReads: readonly YearRead[], roster: Roster, fixed: Read
       const share = match.kind === 'members' ? equalShare(match.members, income) : undefined
       return share === undefined ? [] : [share]
     })
-    const fee = fixed.get(year) ?? mostCommon(shares) ?? previous
+    const fee = fixed.get(year) ?? sheet.monthlyFee ?? mostCommon(shares) ?? previous
     fees.set(year, fee)
     previous = fee
   }

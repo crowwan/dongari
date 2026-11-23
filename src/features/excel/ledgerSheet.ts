@@ -26,6 +26,7 @@ export interface LedgerSheetRead {
   unreadLines: LineNote[]
   changedDates: LineNote[]
   lastBalance?: number // 검산용: 잔액 열의 마지막 숫자
+  monthlyFee?: number // 앱이 내보낸 엑셀(9절)의 제목 줄 "월 회비" 칸 값. 있으면 월 회비를 추정하지 않는다 (8절 "월 회비")
 }
 
 interface Columns {
@@ -92,6 +93,20 @@ function parseAmount(cell: SheetCell): AmountCell {
 // 병합 범위 안 칸(왼쪽 위가 아닌 칸)은 빈칸과 같이 윗줄 값을 이어받는다
 function ownCell(sheet: SheetData, r: number, c: number): SheetCell {
   return isMergedAway(sheet, r, c) ? null : cellAt(sheet, r, c)
+}
+
+const FEE_LABEL = '월회비'
+
+// 앱이 내보낸 엑셀(9절)의 그 해 월 회비: 머리 줄 위(제목 줄)에 "월 회비" 칸이 있으면 바로 오른쪽 칸의 금액(1 ~ 상한 정수).
+// 기록 줄은 보지 않는다(내용 칸에 "월 회비"라고 적은 기록과 섞이지 않게)
+function monthlyFeeAbove(sheet: SheetData, headerRow: number): number | undefined {
+  for (let r = 0; r < headerRow; r += 1) {
+    const c = sheet.rows[r].findIndex((cell) => compactText(cell) === FEE_LABEL)
+    if (c < 0) continue
+    const fee = wonOf(cellAt(sheet, r, c + 1))
+    return fee !== undefined && Number.isInteger(fee) && fee >= 1 && fee <= ENTRY_AMOUNT_MAX ? fee : undefined
+  }
+  return undefined
 }
 
 // 시트를 읽는다. 머리 줄이나 이월금 줄이 없으면 모양이 다른 시트라 undefined (AC-27)
@@ -165,5 +180,7 @@ export function readLedgerSheet(sheet: SheetData, year: number): LedgerSheetRead
 
   const read: LedgerSheetRead = { carryover: carryoverOk ? carryover : 0, lines, unreadLines, changedDates }
   if (lastBalance !== undefined) read.lastBalance = lastBalance
+  const monthlyFee = monthlyFeeAbove(sheet, header.row)
+  if (monthlyFee !== undefined) read.monthlyFee = monthlyFee
   return read
 }

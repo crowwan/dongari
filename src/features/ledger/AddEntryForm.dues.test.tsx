@@ -296,6 +296,20 @@ describe('SPEC-010 회비 적기 (3절)', () => {
     expect(actionNote()).toHaveTextContent('1명 · 20,000원')
   })
 
+  it('[+ 회원 넣기] 창에서 이름에 쉼표가 있으면 안내와 함께 [넣기]를 누를 수 없다 — 엑셀 낸 분 구분 글자라서 (#180 리뷰)', async () => {
+    renderDues()
+    await toPayers()
+
+    await userEvent.click(screen.getByRole('button', { name: '회원 넣기' }))
+    const sheet = screen.getByRole('dialog', { name: '회원 넣기' })
+    await userEvent.type(within(sheet).getByLabelText('이름'), '한지우,총무')
+
+    expect(within(sheet).getByLabelText('이름')).toHaveAccessibleDescription('이름에 쉼표(,)는 쓸 수 없어요. 구분하려면 괄호를 써 주세요')
+    expect(within(sheet).getByRole('button', { name: '넣기' })).toBeDisabled()
+    await userEvent.type(within(sheet).getByLabelText('이름'), '{Enter}')
+    expect(screen.getByRole('dialog', { name: '회원 넣기' })).toBeInTheDocument()
+  })
+
   it('회원이 8명 넘으면 7명만 보이고 [회원 N명 더 보기] 로 펼친다', async () => {
     const many: Member[] = ['가', '나', '다', '라', '마', '바', '사', '아', '자'].map((name, index) => ({
       id: `m${index}`,

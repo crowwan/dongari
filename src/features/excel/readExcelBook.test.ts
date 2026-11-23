@@ -345,6 +345,29 @@ describe('SPEC-010 엑셀 불러오기 — 낸 분과 회비 (8절 "낸 분"·"�
     expect(fixed.book.ledgers['2024'].entries.map((entry) => entry.payers?.length)).toEqual([undefined, 2])
     expect(fixed.summary.unassignedDuesCount).toBe(1)
   })
+
+  it('앱이 내보낸 엑셀(9절)의 입출금내역 "월 회비" 칸이 있으면 이름만 있는 줄로 추정하지 않고 그 값으로 낸 분을 나눈다 — 확인 화면에서 고친 값이 먼저 (#180 리뷰)', () => {
+    // 이름만 있는 줄 하나(한 분 1만) + 낸 분을 못 나눈 회비 셋(한 분 1만5천): 추정하면 1만5천이 가장 흔하다
+    const records: LedgerRow[] = [
+      [1, 5, 10_000, '강민지', null],
+      [2, 5, 15_000, '김도윤', null],
+      [3, 5, 15_000, '김도윤', null],
+      [4, 5, 15_000, '김도윤', null],
+    ]
+    const ledger = ledgerSheet(2026, 0, records)
+    const estimated = read(workbook(ledger, threeMembers(2026)))
+    expect(estimated.summary.monthlyFees).toEqual([{ year: 2026, fee: 15_000 }])
+
+    const withFee = { ...ledger, rows: [[...ledger.rows[0], '월 회비', 10_000], ...ledger.rows.slice(1)] }
+    const exported = read(workbook(withFee, threeMembers(2026)))
+
+    expect(exported.summary.monthlyFees).toEqual([{ year: 2026, fee: 10_000 }])
+    const ids = memberIds(exported)
+    expect(entriesOf(exported, 2026).map((entry) => entry.payers)).toEqual([[{ memberId: ids['강민지'], amount: 10_000 }], undefined, undefined, undefined])
+    const fixed = readExcelBook(workbook(withFee, threeMembers(2026)), deps(), { monthlyFees: new Map([[2026, 5_000]]) })
+    if (!fixed.ok) throw new Error(fixed.problem)
+    expect(fixed.summary.monthlyFees).toEqual([{ year: 2026, fee: 5_000 }])
+  })
 })
 
 describe('SPEC-010 엑셀 불러오기 — 검산과 확인 화면 요약 (8절 "검산", "읽은 내용 확인")', () => {

@@ -941,12 +941,15 @@ button.ui-row {
   background: var(--line-strong);
 }
 
+/* 큰 글씨에서 제목이 낱말 가운데("저장했어/요")에서 끊기지 않게 낱말 단위로 줄바꿈 (PATTERNS A4, #167) */
 .ui-sheet__title {
   margin: 0;
   color: var(--strong);
   font-size: var(--text-heading-size);
   font-weight: var(--text-heading-weight);
   line-height: var(--line-tight);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 /* 열두 달: 3열 × 4행. 고른 달 청록 채움 + 굵게, 이번 달 청록 테두리 */

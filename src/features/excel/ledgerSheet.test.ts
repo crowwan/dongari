@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FIRST_RECORD_ROW, ledgerSheet, merge, type LedgerRow } from '../../test/excelFixtures'
 import { readLedgerSheet } from './ledgerSheet'
-import type { SheetData } from './sheet'
+import type { SheetCell, SheetData } from './sheet'
 
 function read(records: readonly LedgerRow[], year = 2025, carryover: number | string | null = 100_000) {
   const result = readLedgerSheet(ledgerSheet(year, carryover, records), year)
@@ -243,6 +243,24 @@ describe('SPEC-010 엑셀 입출금내역 시트 읽기 — 금액·이월금 (8
 
     expect(result.lastBalance).toBe(99_999)
     expect(read([]).lastBalance).toBe(100_000)
+  })
+})
+
+describe('SPEC-010 엑셀 입출금내역 시트 읽기 — 앱이 내보낸 "월 회비" 칸 (8절 "월 회비", 9절)', () => {
+  // 제목 줄(머리 줄 위) 오른쪽에 "월 회비" + 금액 (앱이 내보낸 모양: G1·H1)
+  function withFee(fee: SheetCell, records: readonly LedgerRow[] = [[1, 5, 10_000, '강민지', null]]): SheetData {
+    const sheet = ledgerSheet(2026, 0, records)
+    return { ...sheet, rows: [[...sheet.rows[0], '월 회비', fee], ...sheet.rows.slice(1)] }
+  }
+
+  it('머리 줄 위 "월 회비" 칸 바로 오른쪽 금액을 그 해 월 회비로 읽는다 (글자로 적힌 "2만원"도)', () => {
+    expect(readLedgerSheet(withFee(20_000), 2026)?.monthlyFee).toBe(20_000)
+    expect(readLedgerSheet(withFee('2만원'), 2026)?.monthlyFee).toBe(20_000)
+  })
+
+  it('"월 회비" 칸이 없거나 금액이 아니면(빈칸·0·글자·소수) 월 회비 없음, 기록 줄에 적힌 "월 회비" 글은 보지 않는다', () => {
+    expect(readLedgerSheet(ledgerSheet(2026, 0, [[1, 5, null, '월 회비', 20_000]]), 2026)?.monthlyFee).toBeUndefined()
+    for (const fee of [null, 0, '이만원', 10_000.5]) expect(readLedgerSheet(withFee(fee), 2026)?.monthlyFee).toBeUndefined()
   })
 })
 

@@ -3,7 +3,7 @@
 import { BottomActionBar } from '../../ui/BottomActionBar'
 import { BackToLedger } from '../BackToLedger'
 import type { ExcelFileProblem } from './excelFile'
-import { EXCEL_READING_TITLE, excelProblemMessage, type BackupFileRoute } from './excelMessages'
+import { EXCEL_FIRST_LOAD_NOTE, EXCEL_READING_TITLE, excelProblemMessage, type BackupFileRoute } from './excelMessages'
 import './excel.css'
 
 // 엑셀 파일 고르기 칸에서 받는 형식 (폰 파일 고르기가 이 형식만 보여 준다)
@@ -24,7 +24,7 @@ export function ExcelReading({ fileName, onBack }: ExcelReadingProps) {
         <h1 className="screen__title">{EXCEL_READING_TITLE}</h1>
       </div>
       <p className="excel__file">{fileName}</p>
-      <p className="screen__note">처음 한 번은 엑셀 기능을 받느라 조금 더 걸려요</p>
+      <p className="screen__note">{EXCEL_FIRST_LOAD_NOTE}</p>
     </div>
   )
 }
