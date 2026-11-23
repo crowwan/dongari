@@ -43,3 +43,6 @@
 - **어댑터** (`src/features/excel/sheetjs.ts`)
   - 읽기 `readWorkbook(ArrayBuffer)`: `read(…, { type: 'array', dense: true, cellFormula: false, cellHTML: false })` → 시트마다 `{ name, rows, merges }`. 수식 칸은 계산된 값, 오류 칸은 글자("#REF!"), 참·거짓은 글자, 날짜 서식 칸은 숫자 그대로. SheetJS 값은 `unknown` 으로 받아 런타임 검사로 좁힌다.
   - 쓰기 `writeWorkbook(WriteSheet[])` → xlsx `Blob`(#167): `aoa_to_sheet` + 수식 칸 `{ t: 'n', v, f }` + `!merges` + `!cols`(글자 수 `wch`), `compression: true`. 열 너비는 다시 읽을 때 `cellStyles: true` 여야 보인다.
+  - 조각을 받지 못하면(오프라인인데 서비스 워커가 아직 못 받음, 배포 뒤 옛 조각 주소가 사라짐) 읽기·쓰기 모두 `SheetJsLoadError` 를 던진다. 파일 탓이 아니라 "깨진 파일"과 가른다(`excelFile.readExcelFile` → `load-failed`, #176 리뷰).
+- 실제 이모 엑셀(레포 밖, 시트 37개)을 개발자가 읽어 본 값(#176 리뷰): SheetJS 읽기 65ms·규칙 7ms(맥), 입출금내역 14개에서 수입 1,019·지출 81건, 직렬화 138KB. 이때 회비내역 머리에 번호·이름 글자가 없어 회원을 못 모은 것을 고쳤다(SPEC-010 8절).
+- 빌드 결과물(`dist/index.html`·`sw.js`·`assets`)이 없을 때 검사를 돌리면 ENOENT 대신 무엇이 없는지 한글로 알리고 멈춘다.

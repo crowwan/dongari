@@ -41,27 +41,38 @@ export function ledgerSheet(
 // 입출금내역 시트의 기록 줄 번호(0부터). 4행 = 2
 export const FIRST_RECORD_ROW = 3
 
-// 회비내역 한 줄: [번호, 이름, 1월 … 12월] (+ 미수합계)
+// 회비내역 한 줄: [번호, 이름, 1월 … 12월] + 12월 뒤 칸들(해별 미수 열 차례, 그다음 미수합계)
 export type DuesRow = readonly SheetCell[]
 
-// 회비내역 시트: 1행 제목 / 2행 머리 [번호, 이름, 1월 … 12월, 낸 돈, (미수합계)] / 3행부터 회원.
-// ○ 는 숫자 0 에 "○" 모양 서식이 걸린 칸이라 숫자 0 으로 둔다
-export function duesSheet(year: number, rows: readonly DuesRow[], options: { unpaidColumn?: boolean } = {}): SheetData {
-  const months = Array.from({ length: 12 }, (_, index) => `${index + 1}월`)
-  const header: SheetCell[] = ['번호', '이름', ...months, '낸 돈', ...(options.unpaidColumn ? ['미수합계'] : [])]
+export interface DuesSheetOptions {
+  notice?: boolean // 제목 아래 안내 줄(자동이체 계좌 — 지어낸 값). 기본 있음, 2013년 모양은 없음
+  pastYears?: readonly number[] // 12월 뒤 해별 미수 열 ("2016년", "2015년" …)
+  unpaidColumn?: boolean // 맨 뒤 "미수합계" 열
+  exported?: boolean // 앱이 내보낸 모양(SPEC-010 9절): 2행 머리 [번호, 이름, 1월 … 12월, 낸 돈, 덜 낸 돈]
+}
+
+const MONTH_HEADERS = Array.from({ length: 12 }, (_, index) => `${index + 1}월`)
+
+// 회비내역 시트. ○ 는 숫자 0 에 "○" 모양 서식이 걸린 칸이라 숫자 0 으로 둔다
+// - 이모 엑셀 모양(기본): 1행 제목(A~N 병합) / 2행 안내 글(병합, 해에 따라 없음) / 머리 [빈칸, 빈칸, 1월 … 12월, (해별 미수…), (미수합계)]
+//   — 번호·이름 머리 글자가 없다 / 그 아래 회원 [번호, 이름, 달 칸…]
+// - 앱이 내보낸 모양(exported): 1행 제목 / 2행 머리 [번호, 이름, 1월 … 12월, 낸 돈, 덜 낸 돈] / 3행부터 회원
+export function duesSheet(year: number, rows: readonly DuesRow[], options: DuesSheetOptions = {}): SheetData {
+  const { notice = true, pastYears = [], unpaidColumn = false, exported = false } = options
+  const extraHeaders: SheetCell[] = exported ? ['낸 돈', '덜 낸 돈'] : [...pastYears.map((past) => `${past}년`), ...(unpaidColumn ? ['미수합계'] : [])]
+  const header: SheetCell[] = [exported ? '번호' : null, exported ? '이름' : null, ...MONTH_HEADERS, ...extraHeaders]
+  const members = rows.map((row) => {
+    const [no, name, ...rest] = row
+    const monthCells = Array.from({ length: 12 }, (_, index) => rest[index] ?? null)
+    const extras = extraHeaders.map((_, index) => rest[12 + index] ?? null)
+    return [no, name, ...monthCells, ...extras]
+  })
+  const title: SheetCell[] = [`${year}년 지어낸모임 회비 `]
+  const noticeRows: SheetCell[][] = notice && !exported ? [[...Array<SheetCell>(9).fill(null), '자동이체 계좌 안내: 000-000-000000']] : []
   return {
     name: `${year}년 회비내역`,
-    rows: [
-      [`${year}년 지어낸모임 회비`],
-      header,
-      ...rows.map((row) => {
-        const [no, name, ...rest] = row
-        const monthCells = Array.from({ length: 12 }, (_, index) => rest[index] ?? null)
-        const unpaid = options.unpaidColumn ? [rest[12] ?? null] : []
-        return [no, name, ...monthCells, null, ...unpaid]
-      }),
-    ],
-    merges: [merge(0, 0, 0, 14)],
+    rows: [title, ...noticeRows, header, ...members],
+    merges: [merge(0, 0, 0, 13), ...(noticeRows.length > 0 ? [merge(1, 9, 1, 13)] : [])],
   }
 }
 

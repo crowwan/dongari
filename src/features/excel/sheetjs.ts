@@ -7,11 +7,25 @@ import type { ExcelWorkbook, SheetCell, SheetData, SheetMerge, WriteCell, WriteS
 
 export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
-function loadSheetJs() {
-  return import('xlsx')
+// 엑셀 라이브러리 조각을 받지 못함: 오프라인인데 서비스 워커가 아직 못 받았거나, 배포 뒤 옛 조각 주소가 사라짐.
+// 파일 탓이 아니라서 "엑셀이 아니에요"와 다르게 안내한다 (#166 "인터넷에 연결된 뒤 다시 해 주세요")
+export class SheetJsLoadError extends Error {
+  constructor(cause: unknown) {
+    super('엑셀 라이브러리를 받지 못했어요', { cause })
+    this.name = 'SheetJsLoadError'
+  }
 }
 
-// 칸 하나: 수식 칸은 계산된 값, 오류 칸은 글자("#REF!" — 금액으로 쓰이지 않게), 참·거짓은 글자, 그 밖(빈칸·날짜)은 빈칸
+async function loadSheetJs() {
+  try {
+    return await import('xlsx')
+  } catch (error) {
+    throw new SheetJsLoadError(error)
+  }
+}
+
+// 칸 하나: 수식 칸은 계산된 값, 오류 칸은 글자("#REF!" — 금액으로 쓰이지 않게), 참·거짓은 글자, 빈칸은 null.
+// 날짜 서식 칸은 엑셀이 날짜를 담는 숫자(일련번호) 그대로다 (cellDates 를 켜지 않음)
 function cellValue(cell: unknown): SheetCell {
   if (!isRecord(cell)) return null
   const { t, v, w } = cell
@@ -49,7 +63,8 @@ function sheetData(name: string, sheet: WorkSheet | undefined): SheetData {
   return { name, rows: Array.from(rows, rowValues), merges: mergesOf(sheet?.['!merges']) }
 }
 
-// 파일 바이트(.xlsx·.xls) → 시트들. 엑셀이 아니거나 깨졌으면 SheetJS 오류를 그대로 던진다
+// 파일 바이트(.xlsx·.xls) → 시트들. 라이브러리를 받지 못하면 SheetJsLoadError,
+// 엑셀이 아니거나 깨졌으면 SheetJS 오류를 그대로 던진다
 export async function readWorkbook(bytes: ArrayBuffer): Promise<ExcelWorkbook> {
   const XLSX = await loadSheetJs()
   // dense: 줄 배열로 받는다(병합 좌표와 같은 0부터 센 줄·열). 수식 글·HTML 은 쓰지 않아 받지 않는다

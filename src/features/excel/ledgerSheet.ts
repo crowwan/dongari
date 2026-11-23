@@ -2,6 +2,7 @@
 import { daysInMonth } from '../../domain/entryDate'
 import { ENTRY_AMOUNT_MAX } from '../../domain/types'
 import { cellAt, cellText, compactText, isMergedAway, rowText, type SheetCell, type SheetData } from './sheet'
+import { wonOf } from './won'
 
 // 기록이 될 줄 하나. 수입·지출이 한 줄에 둘 다 있으면 두 기록이 된다
 export interface LedgerLine {
@@ -78,11 +79,12 @@ function parseDay(cell: SheetCell): number | undefined {
 
 type AmountCell = { kind: 'none' } | { kind: 'amount'; value: number } | { kind: 'unreadable' }
 
-// 금액 칸: 비었으면 없음, 1 ~ 상한 정수면 금액, 글자·0·음수·소수·상한 넘음은 읽지 못함
+// 금액 칸: 비었으면 없음, 1 ~ 상한 정수면 금액(글자로 적힌 "30,000원"도), 그 밖의 글자·0·음수·소수·상한 넘음은 읽지 못함
 function parseAmount(cell: SheetCell): AmountCell {
   if (cellText(cell) === '') return { kind: 'none' }
-  if (typeof cell === 'number' && Number.isInteger(cell) && cell > 0 && cell <= ENTRY_AMOUNT_MAX) {
-    return { kind: 'amount', value: cell }
+  const value = wonOf(cell)
+  if (value !== undefined && Number.isInteger(value) && value > 0 && value <= ENTRY_AMOUNT_MAX) {
+    return { kind: 'amount', value }
   }
   return { kind: 'unreadable' }
 }
@@ -104,14 +106,17 @@ export function readLedgerSheet(sheet: SheetData, year: number): LedgerSheetRead
   const changedDates: LineNote[] = []
   const lines: LedgerLine[] = []
 
-  // 이월금: 잔액 칸의 정수 (반올림하지 않는다). 아니면 0 으로 두고 읽지 못한 줄로 센다
+  // 이월금: 잔액 칸의 정수(글자로 적힌 "370,482"도, 반올림하지 않는다). 아니면 0 으로 두고 읽지 못한 줄로 센다
   const carryoverCell = cellAt(sheet, carryoverRow, columns.balance)
-  const carryoverOk = typeof carryoverCell === 'number' && Number.isInteger(carryoverCell)
+  const carryover = wonOf(carryoverCell)
+  const carryoverOk = carryover !== undefined && Number.isInteger(carryover)
   if (!carryoverOk) unreadLines.push({ year, text: rowText(sheet.rows[carryoverRow]) })
   let lastBalance = typeof carryoverCell === 'number' ? carryoverCell : undefined
 
   let month: number | undefined
   let day: number | undefined
+  // 지금 날이 날로 읽을 수 없는 일 칸에서 온 것인가 (이어받은 줄도 "날짜를 바꾼 줄"로 센다)
+  let dayUnreadable = false
   for (let r = header.row + 1; r < sheet.rows.length; r += 1) {
     if (r === carryoverRow) continue
     const row = sheet.rows[r]
@@ -125,11 +130,15 @@ export function readLedgerSheet(sheet: SheetData, year: number): LedgerSheetRead
     const monthChanged = writtenMonth !== undefined && writtenMonth !== month
     if (writtenMonth !== undefined) month = writtenMonth
 
+    // 달을 읽을 수 없는 줄("합계")의 일 칸은 다음 줄에 넘기지 않는다
     const dayCell = ownCell(sheet, r, columns.day)
-    const dayWritten = cellText(dayCell) !== ''
-    const writtenDay = dayWritten ? parseDay(dayCell) : undefined
-    const dayUnreadable = dayWritten && writtenDay === undefined
-    if (!monthUnreadable) day = dayWritten ? writtenDay : monthChanged ? undefined : day
+    if (!monthUnreadable && cellText(dayCell) !== '') {
+      day = parseDay(dayCell)
+      dayUnreadable = day === undefined
+    } else if (monthChanged) {
+      day = undefined
+      dayUnreadable = false
+    }
 
     const income = parseAmount(cellAt(sheet, r, columns.income))
     const expense = parseAmount(cellAt(sheet, r, columns.expense))
@@ -154,7 +163,7 @@ export function readLedgerSheet(sheet: SheetData, year: number): LedgerSheetRead
     lines.push(line)
   }
 
-  const read: LedgerSheetRead = { carryover: carryoverOk ? carryoverCell : 0, lines, unreadLines, changedDates }
+  const read: LedgerSheetRead = { carryover: carryoverOk ? carryover : 0, lines, unreadLines, changedDates }
   if (lastBalance !== undefined) read.lastBalance = lastBalance
   return read
 }

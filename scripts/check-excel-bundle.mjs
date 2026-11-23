@@ -3,12 +3,18 @@
 // dist/index.html 이 처음 받는 파일에 SheetJS 가 없고, SheetJS 조각을 서비스 워커(dist/sw.js)가 미리 받는지 본다.
 // 문제가 있으면 exit 1 로 빌드를 멈춘다(CI·배포도 같이 멈춘다). 판정은 scripts/excelBundle.ts (테스트 excelBundle.test.ts).
 // 의존성 없음. Node 24 가 excelBundle.ts 의 타입만 지우고 바로 불러온다.
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
-import { checkExcelBundle } from './excelBundle.ts'
+import { checkExcelBundle, missingBuiltFiles } from './excelBundle.ts'
 
 const dist = new URL('../dist/', import.meta.url)
 const read = (path) => readFileSync(new URL(path, dist), 'utf8')
+
+const missing = missingBuiltFiles((path) => existsSync(new URL(path, dist)))
+if (missing.length > 0) {
+  console.error(`엑셀 조각 검사 실패: dist 에 ${missing.join('·')} 이(가) 없어요 — vite build 뒤에 돌려 주세요 (npm run build 가 차례대로 돌린다)`)
+  process.exit(1)
+}
 
 const scripts = readdirSync(new URL('assets/', dist))
   .filter((name) => name.endsWith('.js'))

@@ -89,7 +89,7 @@ describe('SPEC-010 엑셀 파일 고르기 판별 (8절 예외, AC-29 의 판별
   })
 })
 
-describe('엑셀 파일 머리 판별 (기록 파일 불러오기에서 엑셀을 고른 경우에도 쓴다, AC-29)', () => {
+describe('SPEC-010 엑셀 파일 머리 판별 (기록 파일 불러오기에서 엑셀을 고른 경우에도 쓴다, AC-29)', () => {
   it('.xlsx(zip) 와 .xls(옛 형식) 머리를 엑셀로 본다', async () => {
     const xlsx = await xlsxFile('a.xlsx', otherSheet('연락처'))
 

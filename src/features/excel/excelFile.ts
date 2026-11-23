@@ -2,7 +2,8 @@
 import type { EntryDeps } from '../../domain/ledger'
 import { readBackup } from '../../storage/backup'
 import { readExcelBook, type ExcelImportSummary, type ImportedBook } from './readExcelBook'
-import { readWorkbook } from './sheetjs'
+import type { ExcelWorkbook } from './sheet'
+import { readWorkbook, SheetJsLoadError } from './sheetjs'
 
 // 엑셀 파일 크기 상한 (SPEC-010 "파일이 너무 커요(5MB 까지)")
 export const EXCEL_FILE_MAX_BYTES = 5 * 1024 * 1024
@@ -11,8 +12,10 @@ export const EXCEL_FILE_MAX_BYTES = 5 * 1024 * 1024
 // - too-large: 5MB 넘음 (읽기 전에 본다)
 // - backup-file: 앱 기록 파일 (.txt 이거나 내용이 기록 파일) → 기록 파일 불러오기로 안내
 // - not-excel: 엑셀이 아니거나 깨졌다
+// - load-failed: 파일은 멀쩡할 수 있는데 엑셀 라이브러리를 받지 못했다(오프라인·서비스 워커가 아직 못 받음·배포 뒤 옛 조각)
+//   → "인터넷에 연결된 뒤 다시 해 주세요"
 // - no-sheets: 읽을 수 있는 입출금내역 시트(2013 이후 "YYYY년 입출금내역")가 없다
-export type ExcelFileProblem = 'too-large' | 'backup-file' | 'not-excel' | 'no-sheets'
+export type ExcelFileProblem = 'too-large' | 'backup-file' | 'not-excel' | 'load-failed' | 'no-sheets'
 
 export type ExcelFileRead = { ok: true; book: ImportedBook; summary: ExcelImportSummary } | { ok: false; problem: ExcelFileProblem }
 
@@ -44,9 +47,17 @@ export async function readExcelFile(file: PickedFile, deps: EntryDeps): Promise<
   const bytes = await file.arrayBuffer()
   if (!isExcelBytes(bytes)) return { ok: false, problem: isBackupText(bytes) ? 'backup-file' : 'not-excel' }
 
-  // 머리는 엑셀인데 SheetJS 가 못 읽으면 깨진 파일
-  const workbook = await readWorkbook(bytes).catch(() => undefined)
-  if (!workbook) return { ok: false, problem: 'not-excel' }
+  const workbook = await workbookOf(bytes)
+  if (typeof workbook === 'string') return { ok: false, problem: workbook }
   const read = readExcelBook(workbook, deps)
   return read.ok ? read : { ok: false, problem: read.problem }
+}
+
+// 라이브러리를 받지 못했으면 load-failed, 머리는 엑셀인데 SheetJS 가 못 읽으면 깨진 파일(not-excel)
+async function workbookOf(bytes: ArrayBuffer): Promise<ExcelWorkbook | 'load-failed' | 'not-excel'> {
+  try {
+    return await readWorkbook(bytes)
+  } catch (error) {
+    return error instanceof SheetJsLoadError ? 'load-failed' : 'not-excel'
+  }
 }

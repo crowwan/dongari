@@ -109,6 +109,42 @@ describe('SPEC-010 엑셀 입출금내역 시트 읽기 — 날짜 (8절 "읽는
     expect(result.changedDates.map((note) => note.month)).toEqual([3, 3, 3])
   })
 
+  it('금액 없는 줄의 일 칸을 날로 읽을 수 없으면, 그 날을 이어받은 줄들도 날짜 없이 넣고 날짜를 바꾼 줄로 센다 (달이 바뀌면 끝)', () => {
+    const result = read([
+      [3, 5, 10_000, '강민지', null],
+      [null, '초순', null, '정기 모임', null],
+      [null, null, 20_000, '김도윤', null],
+      [null, null, null, '간식비', 5_000],
+      [4, null, 10_000, '이서준', null],
+      [null, 9, 10_000, '박하늘', null],
+    ])
+
+    expect(result.lines.map(({ month, day }) => [month, day])).toEqual([
+      [3, 5],
+      [3, undefined],
+      [3, undefined],
+      [4, undefined],
+      [4, 9],
+    ])
+    expect(result.changedDates.map(({ text }) => text)).toEqual([
+      expect.stringContaining('김도윤'),
+      expect.stringContaining('간식비'),
+    ])
+  })
+
+  it('달을 읽을 수 없는 줄("합계")의 일 칸은 다음 줄이 이어받지 않는다', () => {
+    expect(
+      dates([
+        [3, 5, 10_000, '강민지', null],
+        ['합계', 30, 10_000, null, null],
+        [null, null, null, '간식비', 5_000],
+      ]),
+    ).toEqual([
+      [3, 5],
+      [3, 5],
+    ])
+  })
+
   it('금액이 없는 줄은 기록을 만들지 않지만 그 줄의 날짜는 다음 줄이 이어받는다', () => {
     expect(
       dates([
@@ -135,10 +171,21 @@ describe('SPEC-010 엑셀 입출금내역 시트 읽기 — 금액·이월금 (8
   })
 
   it.each([
+    ['"30000"', '30000'],
+    ['"30,000"', '30,000'],
+    ['"30,000원"', ' 30,000 원 '],
+    ['"3만원"', '3만원'],
+  ])('AC-23 글자로 적힌 금액(%s)도 숫자와 같이 읽는다', (_label, income) => {
+    expect(read([[3, 5, income, '강민지', null]]).lines).toEqual([{ month: 3, day: 5, income: 30_000, content: '강민지' }])
+  })
+
+  it.each([
     ['글자', '만원', null],
     ['0', 0, null],
     ['음수', -5_000, null],
+    ['글자 음수', '-5,000원', null],
     ['소수', 1_000.5, null],
+    ['글자 소수', '1,000.5', null],
     ['출금 칸 글자', null, '오천원'],
     ['상한(999,999,999원) 넘음', 1_000_000_000, null],
   ])('AC-23 금액 칸이 %s 이면 그 줄은 기록을 만들지 않고 읽지 못한 줄(해·달·원래 글)로 센다', (_label, income, expense) => {
@@ -169,6 +216,11 @@ describe('SPEC-010 엑셀 입출금내역 시트 읽기 — 금액·이월금 (8
     expect(read([], 2025, 370_482).carryover).toBe(370_482)
     expect(read([], 2025, -12_000).carryover).toBe(-12_000)
     expect(read([], 2025, 0).carryover).toBe(0)
+  })
+
+  it('이월금도 글자로 적힌 금액("370,482", "-12,000원")을 읽는다', () => {
+    expect(read([], 2025, '370,482').carryover).toBe(370_482)
+    expect(read([], 2025, '-12,000원').carryover).toBe(-12_000)
   })
 
   it.each([

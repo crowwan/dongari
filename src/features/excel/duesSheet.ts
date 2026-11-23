@@ -2,7 +2,7 @@
 // (낸 돈은 입출금내역으로 다시 계산한다, 시안 결정 E-3)
 import { ENTRY_AMOUNT_MAX, type Member, type YearMonth } from '../../domain/types'
 import { cellAt, cellText, compactText, type SheetCell, type SheetData } from './sheet'
-import { parseWonText } from './won'
+import { wonOf } from './won'
 
 // 회비내역 달 칸 하나: "/" 쉬는 달, "-" 회원 아닌 달(앱이 내보낸 엑셀, 9절), 그 밖(○·금액·빈칸)은 읽지 않는다
 export type DuesMark = 'off' | 'out' | 'other'
@@ -32,20 +32,34 @@ function isNumberCell(cell: SheetCell): boolean {
   return typeof cell === 'number' || /^\d+$/.test(compactText(cell))
 }
 
-// 시트를 읽는다. 번호·이름 머리 줄이 없으면 모양이 다른 시트라 undefined
+// 머리 줄로 보는 "N월" 머리 수 (제목·안내 줄과 가르는 기준)
+const MIN_MONTH_HEADERS = 6
+
+// 1월 ~ 12월 머리가 있는 열 (없으면 -1)
+function monthColumnsOf(header: readonly string[]): number[] {
+  return Array.from({ length: 12 }, (_, index) => header.findIndex((text) => Number(MONTH_HEADER.exec(text)?.[1]) === index + 1))
+}
+
+// 머리가 있으면 그 열, 없으면 대신 쓸 열
+function columnOr(header: readonly string[], name: string, fallback: number): number {
+  const index = header.indexOf(name)
+  return index < 0 ? fallback : index
+}
+
+// 시트를 읽는다. 머리 줄 = "1월"~"12월" 머리가 여섯 개 이상인 줄(이모 엑셀은 번호·이름 머리 글자가 없다).
+// 이름 열 = "이름" 머리, 없으면 1월 바로 왼쪽 / 번호 열 = "번호" 머리, 없으면 이름 왼쪽 / 미수합계 열 = "미수합계" 머리.
+// 머리 줄이 없으면 모양이 다른 시트라 undefined
 export function readDuesSheet(sheet: SheetData): DuesSheetRow[] | undefined {
-  const headerRow = sheet.rows.findIndex((row) => {
-    const texts = row.map(compactText)
-    return texts.includes('번호') && texts.includes('이름')
-  })
+  const headerRow = sheet.rows.findIndex(
+    (row) => monthColumnsOf(row.map(compactText)).filter((c) => c >= 0).length >= MIN_MONTH_HEADERS,
+  )
   if (headerRow < 0) return undefined
   const header = sheet.rows[headerRow].map(compactText)
-  const noColumn = header.indexOf('번호')
-  const nameColumn = header.indexOf('이름')
+  const monthColumns = monthColumnsOf(header)
+  const nameColumn = columnOr(header, '이름', Math.min(...monthColumns.filter((c) => c >= 0)) - 1)
+  const noColumn = columnOr(header, '번호', nameColumn - 1)
+  if (nameColumn < 0 || noColumn < 0) return undefined
   const unpaidColumn = header.indexOf('미수합계')
-  const monthColumns = Array.from({ length: 12 }, (_, index) =>
-    header.findIndex((text) => Number(MONTH_HEADER.exec(text)?.[1]) === index + 1),
-  )
 
   const rows: DuesSheetRow[] = []
   for (let r = headerRow + 1; r < sheet.rows.length; r += 1) {
@@ -66,7 +80,7 @@ function yearMonth(year: number, month: number): YearMonth {
 
 // 미수합계 → 시작할 때 남은 돈(덜 낸 돈이라 음수). 0·빈칸·읽을 수 없는 값은 없음
 function openingOf(unpaid: SheetCell): number | undefined {
-  const value = typeof unpaid === 'number' ? unpaid : parseWonText(cellText(unpaid), false)
+  const value = wonOf(unpaid)
   if (value === undefined || !Number.isInteger(value) || value === 0 || Math.abs(value) > ENTRY_AMOUNT_MAX) return undefined
   return -value
 }
@@ -76,36 +90,30 @@ interface Appearance {
   row: DuesSheetRow
 }
 
-// 끝쪽에 이어진 "-" 칸이 시작되는 달(1~12). 끝이 "-" 가 아니거나 모든 칸이 "-" 면 없음
-function trailingOutMonth(marks: readonly DuesMark[]): number | undefined {
-  let start = marks.length
-  while (start > 0 && marks[start - 1] === 'out') start -= 1
-  return start === marks.length || start === 0 ? undefined : start + 1
+// 그분이 나온 해들의 달 칸을 차례로 (해 오름차순, 1월 → 12월)
+function timelineOf(appearances: readonly Appearance[]): { month: YearMonth; mark: DuesMark }[] {
+  return appearances.flatMap(({ year, row }) => row.marks.map((mark, index) => ({ month: yearMonth(year, index + 1), mark })))
+}
+
+// 끝쪽에 이어진 "-" 칸이 시작되는 달 (해를 넘어 이어져도). 끝이 "-" 가 아니면 없음
+function trailingOutMonth(timeline: readonly { month: YearMonth; mark: DuesMark }[]): YearMonth | undefined {
+  let start = timeline.length
+  while (start > 0 && timeline[start - 1].mark === 'out') start -= 1
+  return timeline[start]?.month
 }
 
 // 회원 한 분: 들어온 달·그만둔 달·쉬는 달 (SPEC-010 8절)
-// - 들어온 달 = 처음 나온 해에서 "/"("-")가 아닌 첫 달, 모두 그러면 그 해 1월
-// - 그만둔 달 = 마지막으로 나온 해 끝의 "-" 칸이 시작되는 달, 없으면 마지막으로 나온 해의 다음 해 1월(마지막 해에 있으면 그만두지 않음)
+// - 들어온 달 = 나온 해들을 차례로 보며 처음 "/"·"-"가 아닌 칸의 달. 그런 칸이 없으면 처음 나온 해 1월
+// - 그만둔 달 = 끝쪽에 이어진 "-" 칸이 시작되는 달(마지막 해 줄이 모두 "-"면 그 해 1월),
+//   없으면 마지막으로 나온 해의 다음 해 1월(마지막 해에 있으면 그만두지 않음)
 // - 쉬는 달 = 들어온 달과 그만둔 달 사이의 "/" 칸
 function memberOf(name: string, appearances: readonly Appearance[], lastYear: number, startYear: number): MemberDraft {
-  const first = appearances[0]
+  const timeline = timelineOf(appearances)
   const last = appearances[appearances.length - 1]
-  const joinedIndex = first.row.marks.findIndex((mark) => mark === 'other')
-  const joined = yearMonth(first.year, joinedIndex < 0 ? 1 : joinedIndex + 1)
-
-  const outFrom = trailingOutMonth(last.row.marks)
-  const left =
-    outFrom !== undefined
-      ? yearMonth(last.year, outFrom)
-      : last.year < lastYear
-        ? yearMonth(last.year + 1, 1)
-        : undefined
-
-  const off = appearances.flatMap(({ year, row }) =>
-    row.marks.flatMap((mark, index) => {
-      const month = yearMonth(year, index + 1)
-      return mark === 'off' && month >= joined && (left === undefined || month < left) ? [month] : []
-    }),
+  const joined = timeline.find(({ mark }) => mark === 'other')?.month ?? yearMonth(appearances[0].year, 1)
+  const left = trailingOutMonth(timeline) ?? (last.year < lastYear ? yearMonth(last.year + 1, 1) : undefined)
+  const off = timeline.flatMap(({ month, mark }) =>
+    mark === 'off' && month >= joined && (left === undefined || month < left) ? [month] : [],
   )
 
   const member: MemberDraft = { name, joined, off }

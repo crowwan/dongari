@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkExcelBundle, firstScreenScripts, type BuiltApp } from './excelBundle'
+import { BUILT_FILES, checkExcelBundle, firstScreenScripts, missingBuiltFiles, type BuiltApp } from './excelBundle'
 
 // vite 빌드 결과 모양을 흉내 낸 지어낸 산출물
 const indexHtml = `<!doctype html>
@@ -63,6 +63,13 @@ describe('SPEC-010 AC-35 엑셀 라이브러리는 첫 화면 번들에 없고 �
 
   it('index.html 에서 첫 화면 파일을 찾지 못하면 검사가 헛돌지 않게 문제로 알린다', () => {
     expect(checkExcelBundle(app({ indexHtml: '<html></html>' })).problems).toEqual(['index.html 에서 첫 화면 파일을 찾지 못했어요'])
+  })
+
+  it('검사에 필요한 빌드 결과물(index.html·sw.js·assets)이 없으면 무엇이 없는지 알린다 (빌드 전에 돌린 경우)', () => {
+    expect(BUILT_FILES).toEqual(['index.html', 'sw.js', 'assets'])
+    expect(missingBuiltFiles((path) => path !== 'sw.js')).toEqual(['sw.js'])
+    expect(missingBuiltFiles(() => false)).toEqual(['index.html', 'sw.js', 'assets'])
+    expect(missingBuiltFiles(() => true)).toEqual([])
   })
 
   it('아직 화면이 엑셀 기능을 부르지 않아 SheetJS 조각이 없으면 문제는 아니고 조각 목록만 빈다', () => {

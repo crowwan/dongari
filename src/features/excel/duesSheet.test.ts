@@ -128,8 +128,92 @@ describe('SPEC-010 엑셀 회비내역 시트 읽기 — 회원 (8절 "회원")'
     expect(member).not.toHaveProperty('opening')
   })
 
-  it('머리 줄(번호·이름)이 없으면 모양이 다른 시트로 보고 읽지 않는다', () => {
-    const sheet: SheetData = { name: '2025년 회비내역', rows: [['이름', '1월'], ['강민지', 0]], merges: [] }
+  it('AC-24 마지막으로 나온 해의 줄이 모두 "-"면 그 해 1월에 그만둔 것으로 본다', () => {
+    const [member] = membersOf([
+      { year: 2024, rows: [[1, '강민지', ...months(0)]] },
+      { year: 2025, rows: [[1, '강민지', ...months('-')]] },
+    ])
+
+    expect(member).toEqual({ name: '강민지', joined: '2024-01', left: '2025-01', off: [] })
+  })
+
+  it('끝쪽 "-"가 해를 넘어 이어지면 그 첫 칸의 달에 그만둔 것으로 본다', () => {
+    const [member] = membersOf([
+      { year: 2024, rows: [[1, '강민지', ...months(0, { 9: '-', 10: '-', 11: '-', 12: '-' })]] },
+      { year: 2025, rows: [[1, '강민지', ...months('-')]] },
+    ])
+
+    expect(member.left).toBe('2024-09')
+  })
+
+  it('AC-24 처음 나온 해의 줄이 모두 "-"·"/"면 해를 차례로 보며 처음 "-"·"/"가 아닌 칸을 들어온 달로 본다', () => {
+    const members = membersOf([
+      { year: 2024, rows: [[1, '강민지', ...months('-', { 11: '/', 12: '/' })], [2, '김도윤', ...months('/')]] },
+      { year: 2025, rows: [[1, '강민지', ...months(0, { 1: '/', 2: '-' })], [2, '김도윤', ...months(0)]] },
+    ])
+
+    expect(members.map(({ name, joined, off }) => [name, joined, off])).toEqual([
+      ['강민지', '2025-03', []],
+      ['김도윤', '2025-01', []],
+    ])
+  })
+})
+
+describe('SPEC-010 엑셀 회비내역 시트 읽기 — 모양 (8절 "회원", 이모 엑셀과 앱이 내보낸 엑셀)', () => {
+  const members = [
+    [1, '강민지', ...months(0, { 3: '/' })],
+    [2, '김도윤', ...months(null)],
+  ]
+
+  it('이모 엑셀 모양: 제목·안내 줄 아래 "1월"~"12월" 머리를 찾고, 번호·이름 머리 글자가 없으면 1월 바로 왼쪽을 이름, 그 왼쪽을 번호로 본다', () => {
+    const rows = rowsOf(duesSheet(2025, members))
+
+    expect(rows.map(({ name, marks }) => [name, marks[2]])).toEqual([
+      ['강민지', 'off'],
+      ['김도윤', 'other'],
+    ])
+  })
+
+  it('안내 줄이 없는 해(2013년 모양)도 같은 머리 줄을 찾는다', () => {
+    expect(rowsOf(duesSheet(2013, members, { notice: false })).map((row) => row.name)).toEqual(['강민지', '김도윤'])
+  })
+
+  it('12월 뒤에 해별 미수 열("2016년"…)과 "미수합계" 열이 붙은 해는 미수합계 열만 미수합계로 읽는다', () => {
+    const sheet = duesSheet(2016, [[1, '강민지', ...months(0), 50_000, 20_000, '7만원']], { pastYears: [2015, 2014], unpaidColumn: true })
+
+    expect(rowsOf(sheet)).toEqual([{ name: '강민지', marks: Array(12).fill('other'), unpaid: '7만원' }])
+  })
+
+  it('앱이 내보낸 모양(9절: 머리 [번호, 이름, 1월 … 12월, 낸 돈, 덜 낸 돈])도 읽는다', () => {
+    const rows = rowsOf(duesSheet(2025, members, { exported: true }))
+
+    expect(rows.map(({ name, marks }) => [name, marks[2]])).toEqual([
+      ['강민지', 'off'],
+      ['김도윤', 'other'],
+    ])
+  })
+
+  it('번호·이름 머리가 있으면 그 열을 쓴다 (1월 바로 옆이 아니어도)', () => {
+    const sheet: SheetData = {
+      name: '2025년 회비내역',
+      rows: [
+        ['이름', '번호', '메모', ...months(null).map((_, index) => `${index + 1}월`)],
+        ['강민지', 1, '총무', ...months(0, { 1: '/' })],
+      ],
+      merges: [],
+    }
+
+    expect(rowsOf(sheet)).toEqual([{ name: '강민지', marks: ['off', ...Array(11).fill('other')], unpaid: null }])
+  })
+
+  it('번호 칸이 숫자인 줄만 회원으로 본다 (머리 아래 빈 줄·합계 줄은 건너뜀)', () => {
+    const sheet = duesSheet(2025, [[null, null, ...months(null)], ...members, [null, '합계', ...months(20_000)]])
+
+    expect(rowsOf(sheet).map((row) => row.name)).toEqual(['강민지', '김도윤'])
+  })
+
+  it('"N월" 머리가 여섯 개보다 적은 줄뿐이면 모양이 다른 시트로 보고 읽지 않는다', () => {
+    const sheet: SheetData = { name: '2025년 회비내역', rows: [['번호', '이름', '1월', '2월'], [1, '강민지', 0, 0]], merges: [] }
 
     expect(readDuesSheet(sheet)).toBeUndefined()
   })

@@ -19,6 +19,14 @@ export interface ExcelBundleCheck {
 // SheetJS 코드에만 있는 글자 (압축해도 남는 문자열 상수, 예: "SheetJS Table Export")
 const SHEETJS_MARK = 'SheetJS'
 
+// 검사에 필요한 빌드 결과물 (dist 기준)
+export const BUILT_FILES = ['index.html', 'sw.js', 'assets'] as const
+
+// 없는 빌드 결과물. 빌드 전에 돌렸거나 서비스 워커가 안 만들어졌으면 ENOENT 대신 이 목록으로 알린다
+export function missingBuiltFiles(exists: (path: string) => boolean): string[] {
+  return BUILT_FILES.filter((path) => !exists(path))
+}
+
 // index.html 이 처음에 받는 자바스크립트: <script src> 와 <link rel="modulepreload" href> 의 assets/… 경로
 export function firstScreenScripts(indexHtml: string): string[] {
   const tags = indexHtml.match(/<(?:script|link)\b[^>]*>/g) ?? []

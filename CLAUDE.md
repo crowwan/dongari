@@ -164,7 +164,7 @@ src/
 ├── styles/      tokens.css (디자인 토큰, 값의 유일한 기준), font.css + fonts/ (Pretendard 가변 서브셋, scripts/subset-font.py 로 만든다)
 ├── catalog/     디자인 카탈로그 `/#/dev/catalog` (개발 모드 전용, 프로덕션 번들 제외)
 ├── devtools/    개발 확인 화면 `/#/dev/env` (개발 모드·미리보기 빌드 전용, 본 주소 번들 제외, SPEC-009 #141)
-└── test/        Vitest 설정, 여러 테스트가 같이 쓰는 장부 기록(ledgerFixtures: v1 예시 1년치, 장부·저장 데이터 만들기, v4 회비 칸이 든 장부 duesBook), 지어낸 엑셀 표(excelFixtures: 입출금내역·회비내역 시트 모양, 실제 엑셀은 넣지 않음)
+└── test/        Vitest 설정, 여러 테스트가 같이 쓰는 장부 기록(ledgerFixtures: v1 예시 1년치, 장부·저장 데이터 만들기, v4 회비 칸이 든 장부 duesBook), 지어낸 엑셀 표(excelFixtures: 입출금내역·회비내역 시트 모양 — 회비내역은 이모 엑셀 모양과 앱이 내보낸 9절 모양, 실제 엑셀은 넣지 않음)
 public/icons/  앱 아이콘 (scripts/make-icons.mjs 가 토큰 색으로 만든다)
 scripts/       아이콘·글꼴 만들기, 보관 지켜보기(keep-watch.mjs + 판정 keepWatch.ts, 워크플로 keep-watch.yml 이 돌린다), 보관본 꺼내기(keep-rescue.mjs + 풀기 keepRescue.ts, 개발자가 손으로), 엑셀 조각 검사(check-excel-bundle.mjs + 판정 excelBundle.ts, npm run build 끝에서 돈다)
 worker/        자동 보관 서버 (Cloudflare Worker + KV, 따로 있는 패키지). src/index.ts 진입점(기본 내보내기만), src/keep.ts 요청 처리, wrangler.toml

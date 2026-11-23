@@ -164,6 +164,31 @@ describe('SPEC-010 엑셀 불러오기 — 회원 (8절 "회원")', () => {
     expect(result.summary).toMatchObject({ memberCount: 2, lastYearMemberCount: 1, startMonth: '2025-01' })
   })
 
+  it('AC-24 이모 엑셀 모양의 회비내역(번호·이름 머리 글자 없음, 안내 줄 없는 해, 해별 미수 열·미수합계 붙은 해)에서 회원을 모아 낸 분과 월 회비를 정한다', () => {
+    const result = read(
+      workbook(
+        ledgerSheet(2013, 0, [[1, 5, 20_000, '강민지,김도윤', null]]),
+        duesSheet(2013, [[1, '강민지', ...months(0)], [2, '김도윤', ...months(0)]], { notice: false }),
+        ledgerSheet(2014, 20_000, [[1, 5, 20_000, '1월 -2명: 강민지,김도윤', null]]),
+        duesSheet(2014, [[1, '강민지', ...months(0), 30_000, '3만원'], [2, '김도윤', ...months(0), null, null]], {
+          pastYears: [2013],
+          unpaidColumn: true,
+        }),
+      ),
+    )
+
+    expect(result.summary.unreadSheets).toEqual([])
+    expect(result.book.members.map(({ name, opening }) => [name, opening])).toEqual([
+      ['강민지', -30_000],
+      ['김도윤', undefined],
+    ])
+    expect(result.summary.monthlyFees).toEqual([
+      { year: 2013, fee: 10_000 },
+      { year: 2014, fee: 10_000 },
+    ])
+    expect(Object.values(result.book.ledgers).map((ledger) => ledger.entries[0].payers?.length)).toEqual([2, 2])
+  })
+
   it('회비내역 시트가 없는 해의 입금도 다른 해 시트에서 모은 명단으로 낸 분을 짝짓는다', () => {
     const result = read(
       workbook(

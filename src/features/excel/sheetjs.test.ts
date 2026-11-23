@@ -20,7 +20,7 @@ async function bytesOf(blob: Blob): Promise<ArrayBuffer> {
   return blob.arrayBuffer()
 }
 
-describe('ADR 009 SheetJS 어댑터 — 읽기 (시트 이름 + 2차원 칸 + 병합)', () => {
+describe('SPEC-010 ADR 009 SheetJS 어댑터 — 읽기 (시트 이름 + 2차원 칸 + 병합)', () => {
   it('시트 이름·칸 값(글자·숫자·빈칸)·병합을 순서대로 읽는다', async () => {
     const ledger = XLSX.utils.aoa_to_sheet([
       ['2025년 지어낸모임 입출금 내역'],
@@ -65,7 +65,7 @@ describe('ADR 009 SheetJS 어댑터 — 읽기 (시트 이름 + 2차원 칸 + �
   })
 })
 
-describe('ADR 009 SheetJS 어댑터 — 쓰기 (수식+값·병합·열 너비, #167 내보내기)', () => {
+describe('SPEC-010 ADR 009 SheetJS 어댑터 — 쓰기 (수식+값·병합·열 너비, #167 내보내기)', () => {
   const sheet: WriteSheet = {
     name: '2025년 입출금내역',
     rows: [
@@ -98,7 +98,7 @@ describe('ADR 009 SheetJS 어댑터 — 쓰기 (수식+값·병합·열 너비, 
   })
 })
 
-describe('ADR 009 SheetJS 는 어댑터 한 곳에서, 누를 때만 부른다 (SPEC-010 AC-35 첫 화면 번들)', () => {
+describe('SPEC-010 AC-35 ADR 009 SheetJS 는 어댑터 한 곳에서, 누를 때만 부른다 (첫 화면 번들)', () => {
   // 레포 루트 기준 (vitest 는 루트에서 돈다)
   const sourceFiles = readdirSync('src', { recursive: true, encoding: 'utf8' })
     .filter((file) => /\.(ts|tsx)$/.test(file) && !/\.test\.tsx?$/.test(file))
