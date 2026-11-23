@@ -191,6 +191,15 @@ function keptOnEdit(
   return kept
 }
 
+// 낸 분 붙이기 (SPEC-010 7절): 그 기록 내용(날짜·항목·금액·묶음)은 그대로 두고 낸 분만 정한다 — 고치기와 같은 길(updateEntry + set).
+// 엑셀 글·적은 시각·순서는 updateEntry 가 남긴다. 낸 분은 명단(members)으로 검사해 결과는 늘 저장 형식 검사를 통과한다
+export function assignPayers(ledger: Ledger, id: string, payers: readonly Payer[], members: readonly Member[]): Ledger {
+  const entry = ledger.entries.find((item) => item.id === id)
+  if (!entry) throw new InvalidLedgerInputError(`없는 기록이다: ${id}`)
+  const { month, day, type, name, amount, batchId } = entry
+  return updateEntry(ledger, id, { month, day, type, name, amount, batchId }, { kind: 'set', payers }, members)
+}
+
 function payersOnEdit(before: Entry, content: EntryInput, edit: PayersEdit, members: readonly Member[]): Payer[] | undefined {
   switch (edit.kind) {
     case 'recalculate':

@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import type { MonthlyFeeSource } from '../../domain/duesTable'
+import { unassignedDues, type MonthlyFeeSource } from '../../domain/duesTable'
 import {
   hasNameSeparator,
   hasSameName,
@@ -24,9 +24,11 @@ import { SegmentedControl, type SegmentOptions } from '../../ui/SegmentedControl
 import { TextField } from '../../ui/TextField'
 import { YearMonthPicker } from '../../ui/YearMonthPicker'
 import { BackButton } from '../BackToLedger'
+import { AssignPayersPage } from '../dues/AssignPayersPage'
+import type { PayerAssign } from '../dues/payerAssign'
 import type { SheetHistory } from '../useScreenHistory'
 import { EditPage } from './EditPage'
-import { fullMonthText, MEMBER_ADD_PAGE, MEMBER_PAGE, memberNote, ROSTER_PAGE, rosterGroups } from './roster'
+import { fullMonthText, MEMBER_ADD_PAGE, MEMBER_PAGE, memberNote, ROSTER_ASSIGN_PAGE, ROSTER_PAGE, rosterGroups } from './roster'
 import './settings.css'
 
 // 그 화면 위에 뜨는 달 고르기·확인 창 (확인 창 칸 — 뒤로 버튼은 창만 닫는다)
@@ -52,6 +54,7 @@ export interface DuesSettings {
   onDeleteMember: (id: string) => void
   onChangeStartMonth: (month: YearMonth) => void
   onChangeMonthlyFee: (fee: number, year?: number) => void // year: 그 해 (없으면 지금 장부 연도). 회비 표는 보고 있는 해 (#163)
+  assign?: PayerAssign // 낸 분 붙이기 (SPEC-010 7절): 회원 명단 맨 아래 [낸 분 붙이기]·회비 표 카드
 }
 
 type RosterPagesProps = {
@@ -79,6 +82,9 @@ export function RosterPages({ dues, sheets, backLabel = '설정' }: RosterPagesP
         onBack={backToRoster}
       />
     )
+  }
+  if (sheets.sheet === ROSTER_ASSIGN_PAGE && dues.assign) {
+    return <AssignPayersPage assign={dues.assign} sheets={sheets} backLabel="회원 명단" onClose={backToRoster} />
   }
   if (sheets.sheet === MEMBER_PAGE && editing) {
     return (
@@ -113,6 +119,7 @@ export function RosterPages({ dues, sheets, backLabel = '설정' }: RosterPagesP
         setMemberId(id)
         sheets.openSheet(MEMBER_PAGE, backToRoster)
       }}
+      onAssign={() => sheets.openSheet(ROSTER_ASSIGN_PAGE, backToRoster)}
     />
   )
 }
@@ -123,6 +130,7 @@ type RosterScreenProps = {
   backLabel: string
   onAdd: () => void
   onOpen: (memberId: string) => void
+  onAssign: () => void // [낸 분 붙이기]
 }
 
 // 지금 회원 목록 자리의 안내: 명단 전체가 비면 넣어 달라는 말, 모두 그만둔 분이면 지금 회원이 없다는 말 (SPEC-010 6절)
@@ -130,12 +138,14 @@ function emptyCurrentNote(memberCount: number): string {
   return memberCount === 0 ? '아직 회원이 없어요. 회비 표에 나올 분을 넣어 주세요' : '지금 회원이 없어요'
 }
 
-// 회원 명단 (SPEC-010 6절, 시안 D): [‹ 설정] → 제목 → 지금 회원 → [+ 회원 넣기] → 그만둔 분 → 회비 표 시작 달 + [시작 달 바꾸기].
+// 회원 명단 (SPEC-010 6절, 시안 D): [‹ 설정] → 제목 → 지금 회원 → [+ 회원 넣기] → 그만둔 분 → 회비 표 시작 달 + [시작 달 바꾸기]
+// → (낸 분을 안 적은 회비가 있으면, 7절) 맨 아래 [낸 분 붙이기] — 회비 표 카드를 숨겨도 들어가는 길.
 // 시작 달 안내는 명단에 한 분이라도(그만둔 분 포함) 있을 때만 — 마지막 회원을 지워도 시작 달 값은 남지만 보여 줄 표가 없다
-function RosterScreen({ dues, sheets, backLabel, onAdd, onOpen }: RosterScreenProps) {
+function RosterScreen({ dues, sheets, backLabel, onAdd, onOpen, onAssign }: RosterScreenProps) {
   const leftTitleId = useId()
   const { members, startMonth, thisMonth } = dues
   const { current, left } = rosterGroups(members)
+  const unassignedCount = dues.assign ? unassignedDues(dues.assign.book).items.length : 0
   const rows = (group: Member[], label: string) => (
     <ul className="settings__list roster__list" aria-label={label}>
       {group.map((member) => (
@@ -190,6 +200,14 @@ function RosterScreen({ dues, sheets, backLabel, onAdd, onOpen }: RosterScreenPr
             }}
             onClose={sheets.closeDialog}
           />
+        </div>
+      )}
+      {unassignedCount > 0 && (
+        <div className="roster__assign">
+          <p className="screen__note">낸 분을 안 적은 회비가 {unassignedCount}건 있어요</p>
+          <IconButton icon="users" variant="surface" onClick={onAssign}>
+            낸 분 붙이기
+          </IconButton>
         </div>
       )}
     </div>
