@@ -3,11 +3,14 @@ import { carryoverWords } from '../domain/book'
 import { itemIcon } from '../domain/itemIcon'
 import type { PayerChoices } from '../domain/payers'
 import { yearReport } from '../domain/report'
-import type { EntryType } from '../domain/types'
-import type { DuesCell, DuesCellState } from '../domain/duesTable'
+import type { Book, EntryType } from '../domain/types'
+import { unassignedDues, type DuesCell, type DuesCellState } from '../domain/duesTable'
 import { BookPicker } from '../features/books/BookPicker'
+import { AssignPayersPage } from '../features/dues/AssignPayersPage'
 import { DuesCalendar } from '../features/dues/DuesCalendar'
 import { DuesStrip } from '../features/dues/DuesStrip'
+import type { PayerAssign } from '../features/dues/payerAssign'
+import { UnassignedDuesCard } from '../features/dues/UnassignedDuesCard'
 import { ImportFacts } from '../features/excel/ExcelImportScreen'
 import { ExcelExportSheet } from '../features/excel/ExcelExportSheet'
 import { ExcelNote } from '../features/excel/ExcelParts'
@@ -246,6 +249,44 @@ const EXPENSE_ONLY_REPORT = itemReport([
 ])
 
 const noop = () => {}
+
+// 낸 분 붙이기 견본 (지어낸 장부, SPEC-010 7절 #164): 회원 셋, 낸 분 없는 회비 셋(하나는 엑셀 글)
+const ASSIGN_BOOK: Book = {
+  id: 'catalog-assign',
+  name: '다솜회',
+  kind: 'club',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  members: [
+    { id: 'a-kang', name: '강민지', joined: '2026-01', off: [] },
+    { id: 'a-kim', name: '김도윤', joined: '2026-01', off: [] },
+    { id: 'a-lee', name: '이준호', joined: '2026-01', off: [] },
+  ],
+  dues: { startMonth: '2026-01' },
+  ledgers: {
+    '2026': {
+      year: 2026,
+      carryover: 0,
+      monthlyFee: 20_000,
+      entries: [
+        { id: 'a1', month: 3, day: 17, type: 'income', name: '회비', amount: 80_000, createdAt: '2026-03-17T00:00:00.000Z', sourceText: '강민지,김도윤 샘 입금 / 이준호(3~4월)' },
+        { id: 'a2', month: 4, day: 2, type: 'income', name: '회비(14인)', amount: 60_000, createdAt: '2026-04-02T00:00:00.000Z' },
+        { id: 'a3', month: 5, day: 7, type: 'income', name: '회비', amount: 100_000, createdAt: '2026-05-07T00:00:00.000Z' },
+      ],
+    },
+  },
+}
+
+const ASSIGN_PREVIEW: PayerAssign = {
+  book: ASSIGN_BOOK,
+  thisYear: 2026,
+  onAssign: () => true,
+  onAddMember: () => 'a-new',
+  onHide: noop,
+  onFinish: noop,
+}
+
+// 붙이기 화면 미리보기용 칸: 선택 창·확인 창이 뜨지 않는다
+const NO_SHEETS: SheetHistory = { sheet: null, openSheet: noop, closeSheet: noop, ...NO_DIALOGS }
 
 // 회비 "누가 냈어요?" 견본 (지어낸 이름, SPEC-010 3절)
 const CHECK_NAMES: CheckOption[] = [
@@ -613,6 +654,38 @@ export function Catalog() {
                   onDone={noop}
                   onBack={noop}
                 />
+              </div>
+            </div>
+          </State>
+          <State label="금액이 정해진 기록 (낸 분 붙이기, SPEC-010 7절): 합계가 그 금액이 아니면 비활성 + &quot;합계가 50,000원이어야 해요&quot;">
+            <div className="catalog__frame catalog__frame--screen">
+              <div className="app__main">
+                <PayerSharesPage
+                  backLabel="낸 분 붙이기"
+                  members={CHECK_NAMES.slice(0, 3).map(({ value, label }) => ({ id: value, name: label }))}
+                  initial={CHECK_NAMES.slice(0, 3).map(({ value }) => ({ memberId: value, amount: 20000 }))}
+                  total={50000}
+                  onDone={noop}
+                  onBack={noop}
+                />
+              </div>
+            </div>
+          </State>
+        </Section>
+
+        <Section title="낸 분 붙이기 (SPEC-010 7절 #164)">
+          <State label="회비 표 카드: 알아 둘 것 면(--info-bg) + 제목·설명 + [👥 낸 분 붙이기](흰 면) + 글자 버튼 [이 카드 숨기기]">
+            <UnassignedDuesCard unassigned={unassignedDues(ASSIGN_BOOK)} onAssign={noop} onHide={noop} />
+          </State>
+          <State label="눌림">
+            <div data-preview-pressed="">
+              <UnassignedDuesCard unassigned={unassignedDues(ASSIGN_BOOK)} onAssign={noop} onHide={noop} />
+            </div>
+          </State>
+          <State label="붙이기 화면: 진행 1 / 3 + 막대 → 카드 &quot;이 기록&quot;(날짜·항목·금액) 안 엑셀 글 회색 상자 → 누가 냈어요? → [건너뛰기] [다음]">
+            <div className="catalog__frame catalog__frame--screen">
+              <div className="app__main">
+                <AssignPayersPage assign={ASSIGN_PREVIEW} sheets={NO_SHEETS} backLabel="회비 표" onClose={noop} />
               </div>
             </div>
           </State>

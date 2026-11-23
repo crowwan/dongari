@@ -284,6 +284,19 @@ describe('SPEC-010 낸 분 붙이기 (7절, #164)', () => {
       expect(screen.getByText('3 / 3')).toBeInTheDocument()
     })
 
+    it('한 분씩 정한 뒤 고른 분을 바꾸면 정한 몫은 버리고 다시 사람 수로 나눈다', async () => {
+      renderApp(clubData())
+      await openAssign()
+      await userEvent.click(screen.getByRole('checkbox', { name: '김도윤' }))
+      await userEvent.click(screen.getByRole('button', { name: '한 분만 금액이 달라요' }))
+      await userEvent.click(screen.getByRole('button', { name: '이대로 할게요' }))
+      expect(await screen.findByText('1명 · 한 분씩 정한 금액')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('checkbox', { name: '강민지' }))
+
+      expect(within(bar()).getByText('2명 · 한 분 30,000원')).toBeInTheDocument()
+    })
+
     it('[한 분만 금액이 달라요] 로도 "한 분씩 금액" 을 열고, 뒤로 버튼은 그 화면만 닫아 고른 분이 그대로다', async () => {
       renderApp(clubData())
       await openAssign()
