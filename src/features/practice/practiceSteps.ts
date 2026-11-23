@@ -158,6 +158,7 @@ export function practiceCoach(view: PracticeView, progress: PracticeProgress, ex
     case 'settings':
     case 'new-book':
     case 'keep-restore':
+    case 'dues':
       return undefined
   }
 }

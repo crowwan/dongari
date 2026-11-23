@@ -912,6 +912,40 @@ describe('SPEC-010 useLedger 회원 명단·월 회비·시작 달 (6절)', () =
     expect(result.current.ledger?.monthlyFee).toBe(20_000)
   })
 
+  it('회비 표에서 보는 해의 월 회비를 바꾸면 그 해 장부에 저장한다 (보고 있는 장부 연도는 그대로, #163)', () => {
+    const repository = new MemoryRepository(storedWith({ ...ledger2026(), year: 2025 }, ledger2026()))
+    const { result } = renderLedger(repository)
+
+    act(() => {
+      result.current.changeMonthlyFee(15_000, 2025)
+    })
+
+    expect(result.current.year).toBe(2026)
+    expect(savedLedger(repository, 2025)?.monthlyFee).toBe(15_000)
+    expect(savedLedger(repository, 2026)?.monthlyFee).toBeUndefined()
+  })
+
+  it('AC-19 쉬는 기간을 넣고 빼면 지금 장부 회원의 쉬는 달로 저장되고 다시 읽어도 깨진 데이터가 아니다 (#163)', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(storedWith(ledger2026())))
+    const { result } = renderLedger(new LocalStorageRepository())
+    act(() => {
+      result.current.addMember({ name: '김도윤', joined: '2026-01' })
+    })
+
+    act(() => {
+      result.current.restMember('id-1', '2026-11', '2027-02')
+    })
+    expect(result.current.book?.members?.[0]?.off).toEqual(['2026-11', '2026-12', '2027-01', '2027-02'])
+    act(() => {
+      result.current.resumeMember('id-1', '2027-01')
+    })
+
+    expect(result.current.book?.members?.[0]?.off).toEqual(['2026-11', '2026-12'])
+    const reloaded = new LocalStorageRepository().load()
+    expect(reloaded.status).toBe('ok')
+    expect(reloaded.data).toEqual(result.current.data)
+  })
+
   it('회원 넣기·고치기·지우기·시작 달·월 회비를 지금 장부에 저장하고, 다시 읽어도 깨진 데이터가 아니다 (v4 가드)', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(storedWith(ledger2026())))
     const { result } = renderLedger(new LocalStorageRepository())

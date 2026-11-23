@@ -16,7 +16,7 @@ export interface ExcelImportFlow {
   pick: ExcelPick | undefined // 지금 읽는(읽은) 파일
 }
 
-export function useExcelImport(navigation: Pick<ScreenHistory, 'screen' | 'open'>): ExcelImportFlow {
+export function useExcelImport(navigation: Pick<ScreenHistory, 'screen' | 'replace'>): ExcelImportFlow {
   const [fileInput, setFileInput] = useState<HTMLInputElement | null>(null)
   const [pick, setPick] = useState<ExcelPick | undefined>()
 
@@ -29,8 +29,9 @@ export function useExcelImport(navigation: Pick<ScreenHistory, 'screen' | 'open'
       event.target.value = ''
       if (!file) return
       setPick({ id: (pick?.id ?? 0) + 1, file })
-      // 확인 화면에서 [파일 다시 고르기] 로 골랐으면 화면은 그대로 두고 새 파일을 읽는다
-      if (navigation.screen.name !== 'excel-import') navigation.open({ name: 'excel-import' })
+      // 확인 화면에서 [파일 다시 고르기] 로 골랐으면 화면은 그대로 두고 새 파일을 읽는다.
+      // replace(#163): 장부(장부 고르기 창)에서는 창 칸을 화면 칸으로, 설정에서는 설정 칸을 바꿔 끼워 뒤로 버튼 한 번에 장부로
+      if (navigation.screen.name !== 'excel-import') navigation.replace({ name: 'excel-import' })
     },
     pick,
   }

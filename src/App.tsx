@@ -33,6 +33,8 @@ import type { PracticeView } from './features/practice/practiceSteps'
 import { MonthSummaryScreen } from './features/report/MonthSummaryScreen'
 import { pictureSaver, type PictureSaver } from './features/report/savePicture'
 import { YearSummaryScreen } from './features/report/YearSummaryScreen'
+import { DuesScreen } from './features/dues/DuesScreen'
+import { useBehindCount } from './features/dues/useBehindCount'
 import type { DuesSettings } from './features/settings/RosterPages'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
@@ -112,7 +114,7 @@ function duesSettings(state: LedgerState, today: Date, notify: (message: string)
     onUpdateMember: (id, changes) => notifyIfSaved(state.updateMember(id, changes), '바꿨어요'),
     onDeleteMember: (id) => notifyIfSaved(state.deleteMember(id), '지웠어요'),
     onChangeStartMonth: (month) => notifyIfSaved(state.changeDuesStart(month), '바꿨어요'),
-    onChangeMonthlyFee: (fee) => notifyIfSaved(state.changeMonthlyFee(fee), '바꿨어요'),
+    onChangeMonthlyFee: (fee, year) => notifyIfSaved(state.changeMonthlyFee(fee, year), '바꿨어요'),
   }
 }
 
@@ -190,6 +192,8 @@ export default function App({
 
   const month = viewedMonth ?? ledger.firstMonth
   const today = now()
+  // 장부 [회비 표] 의 지난달까지 덜 낸 분 수 (동아리·모임 장부만, 장부·이번 달이 바뀔 때만 다시 센다)
+  const duesBehind = useBehindCount(ledger.book, today)
   // 이번 달·오늘 (달 선택 창 테두리·[오늘 7일] 칩). 지난 연도 장부에는 없다
   const isThisYear = ledger.year === today.getFullYear()
   const currentMonth = isThisYear ? today.getMonth() + 1 : undefined
@@ -521,8 +525,32 @@ export default function App({
             saver={saver}
             practice={practice !== undefined}
             onPictureResult={practice?.onPictureResult}
+            // 수입 항목별 회비 줄 → 회비 표 (SPEC-010 4절, 동아리만). 결산 칸을 바꿔 끼워 [‹ 장부로]·뒤로 버튼은 장부로
+            onOpenDues={ledger.book?.kind === 'club' ? () => navigation.replace({ name: 'dues', year: ledger.year }) : undefined}
           />
         )
+      case 'dues': {
+        // 회비 표 (SPEC-010 4·5절): 동아리·모임 장부의 장부 [회비 표]·결산 회비 줄에서만 열린다
+        const settings = duesSettings(ledger, today, setToast)
+        if (!ledger.book || !settings) return null
+        return (
+          <DuesScreen
+            book={ledger.book}
+            today={today}
+            initialYear={screen.year}
+            ledgerYears={ledger.years}
+            settings={settings}
+            onRest={(id, from, until) => {
+              if (ledger.restMember(id, from, until)) setToast('바꿨어요')
+            }}
+            onResume={(id, from) => {
+              if (ledger.resumeMember(id, from)) setToast('바꿨어요')
+            }}
+            sheets={navigation}
+            onBack={navigation.backToLedger}
+          />
+        )
+      }
       case 'add-entry':
         return (
           <AddEntryForm
@@ -644,6 +672,7 @@ export default function App({
           onEditEntry={(id) => navigation.open({ name: 'edit-entry', id })}
           unsavedEntryIds={ledger.unsavedEntryIds}
           settingsRef={guide.settings}
+          dues={duesBehind === undefined ? undefined : { behind: duesBehind, onOpen: () => navigation.open({ name: 'dues' }) }}
         />
       </>
     )

@@ -32,12 +32,14 @@ type YearShareSummaryProps = {
   targetRef: Ref<HTMLDivElement>
   // 연습 장부 결산: 맨 위에 "연습" 띠 (SPEC-008, 사진에도 찍힌다)
   practice?: boolean
+  // 수입 항목별 회비 줄 → 회비 표 (SPEC-010 4절)
+  onOpenDues?: () => void
 }
 
 // 올해 결산 [단톡방용 요약] (SPEC-003 v2.6, ADR 007): 단톡방에서 폰 폭으로 읽히는 큰 글씨 카드 셋.
 // 1 요약(제목 "N년 <장부> 결산", 수입 +·지출 −·잔액, 이월금 보조 줄) 2·3 수입·지출 항목별 합계.
 // 이 영역이 그대로 사진 한 장이 된다 (계산은 결산표와 같은 yearReport)
-export function YearShareSummary({ report, bookName, carryoverWords, targetRef, practice = false }: YearShareSummaryProps) {
+export function YearShareSummary({ report, bookName, carryoverWords, targetRef, practice = false, onOpenDues }: YearShareSummaryProps) {
   const titleId = useId()
   const note = carryoverNote(report.carryover, carryoverWords)
   return (
@@ -56,7 +58,7 @@ export function YearShareSummary({ report, bookName, carryoverWords, targetRef, 
           </p>
         )}
       </section>
-      <ItemTotalsCards report={report} />
+      <ItemTotalsCards report={report} onOpenDues={onOpenDues} />
     </div>
   )
 }

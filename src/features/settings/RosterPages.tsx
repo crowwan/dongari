@@ -49,16 +49,17 @@ export interface DuesSettings {
   onUpdateMember: (id: string, changes: MemberChanges) => void
   onDeleteMember: (id: string) => void
   onChangeStartMonth: (month: YearMonth) => void
-  onChangeMonthlyFee: (fee: number) => void
+  onChangeMonthlyFee: (fee: number, year?: number) => void // year: 그 해 (없으면 지금 장부 연도). 회비 표는 보고 있는 해 (#163)
 }
 
 type RosterPagesProps = {
   dues: DuesSettings
   sheets: SheetHistory
+  backLabel?: string // 회원 명단 맨 위 [‹ …]: 설정에서 열면 "설정", 회비 표에서 열면 "회비 표" (#163)
 }
 
 // 회원 명단 → 회원 넣기 / 회원 정보. 회원 넣기·회원 정보는 회원 명단의 칸을 바꿔 끼우고, 뒤로 버튼으로 닫히면 회원 명단을 다시 연다
-export function RosterPages({ dues, sheets }: RosterPagesProps) {
+export function RosterPages({ dues, sheets, backLabel = '설정' }: RosterPagesProps) {
   const [memberId, setMemberId] = useState<string>()
   const backToRoster = () => sheets.openSheet(ROSTER_PAGE)
   const editing = dues.members.find((member) => member.id === memberId)
@@ -104,6 +105,7 @@ export function RosterPages({ dues, sheets }: RosterPagesProps) {
     <RosterScreen
       dues={dues}
       sheets={sheets}
+      backLabel={backLabel}
       onAdd={() => sheets.openSheet(MEMBER_ADD_PAGE, backToRoster)}
       onOpen={(id) => {
         setMemberId(id)
@@ -116,6 +118,7 @@ export function RosterPages({ dues, sheets }: RosterPagesProps) {
 type RosterScreenProps = {
   dues: DuesSettings
   sheets: SheetHistory
+  backLabel: string
   onAdd: () => void
   onOpen: (memberId: string) => void
 }
@@ -127,7 +130,7 @@ function emptyCurrentNote(memberCount: number): string {
 
 // 회원 명단 (SPEC-010 6절, 시안 D): [‹ 설정] → 제목 → 지금 회원 → [+ 회원 넣기] → 그만둔 분 → 회비 표 시작 달 + [시작 달 바꾸기].
 // 시작 달 안내는 명단에 한 분이라도(그만둔 분 포함) 있을 때만 — 마지막 회원을 지워도 시작 달 값은 남지만 보여 줄 표가 없다
-function RosterScreen({ dues, sheets, onAdd, onOpen }: RosterScreenProps) {
+function RosterScreen({ dues, sheets, backLabel, onAdd, onOpen }: RosterScreenProps) {
   const leftTitleId = useId()
   const { members, startMonth, thisMonth } = dues
   const { current, left } = rosterGroups(members)
@@ -149,7 +152,7 @@ function RosterScreen({ dues, sheets, onAdd, onOpen }: RosterScreenProps) {
   return (
     <div className="screen roster" data-testid="roster-screen">
       <div className="settings__edit-head">
-        <BackButton label="설정" onBack={sheets.closeSheet} />
+        <BackButton label={backLabel} onBack={sheets.closeSheet} />
         <h1 className="screen__title">회원 명단</h1>
       </div>
       {current.length > 0 ? rows(current, '지금 회원') : <p className="screen__note">{emptyCurrentNote(members.length)}</p>}
@@ -281,11 +284,13 @@ type MemberEditPageProps = {
   onSave: (changes: MemberChanges) => void
   onDelete: () => void
   onBack: () => void
+  backLabel?: string // 맨 위 [‹ …]: 회원 명단에서 열면 "회원 명단", 회비 표 한 분 보기에서 열면 그분 이름 (#163)
 }
 
 // 회원 정보 (SPEC-010 5·6절): 이름, 들어온 달, 그만둔 달([그만뒀어요] → 마지막 회원 달 / [다시 회원으로]),
-// 시작할 때 남은 돈(덜 낸 돈·미리 낸 돈 + 금액) → [저장] → [이 회원 지우기](어느 기록에도 없을 때만). 쉬는 달은 한 분 보기(#163)
-function MemberEditPage({
+// 시작할 때 남은 돈(덜 낸 돈·미리 낸 돈 + 금액) → [저장] → [이 회원 지우기](어느 기록에도 없을 때만). 쉬는 달은 한 분 보기(#163).
+// 회비 표 한 분 보기의 이름 [›] 도 이 화면을 연다
+export function MemberEditPage({
   member,
   members,
   startMonth,
@@ -295,6 +300,7 @@ function MemberEditPage({
   onSave,
   onDelete,
   onBack,
+  backLabel = '회원 명단',
 }: MemberEditPageProps) {
   const [name, setName] = useState(member.name)
   const [joined, setJoined] = useState(member.joined)
@@ -319,7 +325,7 @@ function MemberEditPage({
   return (
     <EditPage
       title="회원 정보 바꾸기"
-      backLabel="회원 명단"
+      backLabel={backLabel}
       canSave={named && changed}
       onSave={() => onSave({ name, joined, left, opening })}
       onBack={onBack}

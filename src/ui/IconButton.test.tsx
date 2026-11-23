@@ -58,4 +58,15 @@ describe('IconButton', () => {
     expect(button).toHaveAttribute('data-dot', 'true')
     expect(screen.getByTestId('icon-button-dot')).toHaveAttribute('aria-hidden', 'true')
   })
+
+  it('보조 글(note)은 글자 뒤에 "· 보조 글"로 붙어 버튼 이름에 함께 읽힌다 (장부 [회비 표], SPEC-010 #163)', () => {
+    render(
+      <IconButton icon="users" variant="surface" note="지난달까지 덜 낸 분 2명" onClick={() => {}}>
+        회비 표
+      </IconButton>,
+    )
+
+    const button = screen.getByRole('button', { name: '회비 표 · 지난달까지 덜 낸 분 2명' })
+    expect(button).toHaveAttribute('data-note', 'true')
+  })
 })

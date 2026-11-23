@@ -125,6 +125,18 @@ describe('SPEC-010 엑셀로 새 장부 — 여는 곳 (8절 "여는 곳", #166)
     expect(opened()).toBe(screen.getByLabelText('엑셀 파일 고르기'))
   })
 
+  it('설정 [엑셀 파일 불러오기]로 읽은 내용을 열면 설정 칸을 바꿔 끼워 방문 기록이 늘지 않는다 (뒤로 버튼 한 번에 장부)', async () => {
+    renderApp(new MemoryRepository(ONE_BOOK))
+    await userEvent.click(screen.getByRole('button', { name: '설정' }))
+    const length = window.history.length
+
+    await userEvent.upload(screen.getByLabelText('엑셀 파일 고르기'), await xlsxFile('지어낸모임.xlsx', clubSheets()))
+
+    expect(await readExcelScreen()).toBeInTheDocument()
+    expect(window.history.length).toBe(length)
+    expect(window.history.state).toEqual({ screen: 'excel-import' })
+  })
+
   it('장부 고르기 창이 떠 있어 뒤 화면이 잠겨(inert) 있어도 엑셀 파일 고르기 칸은 잠긴 곳 밖에 있다 (#178 리뷰)', async () => {
     renderApp(new MemoryRepository(ONE_BOOK))
 

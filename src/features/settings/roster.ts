@@ -37,11 +37,11 @@ export function fullMonthText(value: YearMonth): string {
   return `${year}년 ${month}월`
 }
 
-// 이번 달을 포함해 이어진 쉬는 달의 첫 달. 이번 달이 쉬는 달이 아니면 undefined
-function restingSince(off: readonly YearMonth[], thisMonth: YearMonth): YearMonth | undefined {
+// 그 달을 포함해 이어진 쉬는 달의 첫 달. 그 달이 쉬는 달이 아니면 undefined (회원 명단 보조 줄·회비 표 "2월부터 쉬어요")
+export function restingSince(off: readonly YearMonth[], month: YearMonth): YearMonth | undefined {
   const months = new Set(off)
-  if (!months.has(thisMonth)) return undefined
-  let first = thisMonth
+  if (!months.has(month)) return undefined
+  let first = month
   while (months.has(previousMonth(first))) first = previousMonth(first)
   return first
 }
