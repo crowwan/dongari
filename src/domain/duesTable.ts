@@ -24,13 +24,15 @@ function monthOf(index: number): number {
   return (index % 12) + 1
 }
 
-// 오지 않는 달: 회비 표 시작 달이 없는 장부(어느 달도 시작 달 전), 월 회비가 어느 해에도 없는 장부(칸을 채울 수 없음)
+// 오지 않는 달: 회비 표 시작 달이 없는 장부(어느 달도 시작 달 전), 그만둔 달이 없는 분(칸이 끝나지 않음)
 const NEVER = Number.POSITIVE_INFINITY
-// 그만둔 달이 없는 분의 칸은 저장 형식이 받는 마지막 해(9999년)까지. 미리 낸 돈이 아무리 많아도 여기서 멈춘다
-const NO_END = monthIndex(10_000, 1)
+// 미리 낸 돈으로 칸을 채우는 범위: 기준 해(보는 해와 올해 중 늦은 해) + 이만큼 해의 12월까지. 넘는 돈은 남은 돈(remaining).
+// 금액 오타(월 회비 1,000원에 999,999,000원)에도 장부 화면을 그릴 때마다 수십만 칸을 돌지 않게 한다
+const PREPAID_YEARS = 10
 
-// 칸 한 개의 상태: 채움 ○ / 일부 / 빈칸 / 쉬는 달 "/" / 회원 아님 "-" / 시작 달 전
-export type DuesCellState = 'full' | 'partial' | 'empty' | 'off' | 'notMember' | 'beforeStart'
+// 칸 한 개의 상태: 채움 ○ / 일부 / 빈칸(안 냄) / 월 회비를 몰라 못 채우는 칸 / 쉬는 달 "/" / 회원 아님 "-" / 시작 달 전.
+// noFee 는 덜 낸 돈에도 넣지 않으니 빈칸(안 냄)과 다르게 그린다 (2절 3)
+export type DuesCellState = 'full' | 'partial' | 'empty' | 'noFee' | 'off' | 'notMember' | 'beforeStart'
 
 // 칸을 채운 돈 한 덩이: 입금(회비 기록) 또는 시작할 때 미리 낸 돈
 export type DuesFill =
@@ -40,7 +42,7 @@ export type DuesFill =
 export interface DuesCell {
   month: number // 1~12
   state: DuesCellState
-  fee?: number // 칸(채움·일부·빈칸)이면 그 칸이 있는 해의 월 회비. 어느 해에도 없으면 없음
+  fee?: number // 채움·일부·빈칸이면 그 칸이 있는 해의 월 회비 (noFee·칸 아님은 없음)
   paid: number // 이 칸에 채운 돈 (칸이 아니면 0)
   fills: DuesFill[] // 이 칸을 채운 돈, 채운 순서 (여러 입금이 한 칸을 나눠 채울 수 있다)
 }
@@ -62,7 +64,7 @@ export interface DuesPayment {
   beforeStart: boolean // 회비 표 시작 달 전 날짜라 칸에 넣지 않은 입금 (그 해 낸 돈에는 들어간다, 2절 2)
   toDebt: number // 시작할 때 덜 낸 돈을 먼저 메운 금액
   slots: DuesSlotFill[] // 채운 칸, 오래된 달부터
-  remaining: number // 칸을 다 채우고 남은 금액 (그만둔 뒤 낸 돈, 월 회비를 몰라 못 채운 돈)
+  remaining: number // 칸을 다 채우고 남은 금액 (그만둔 뒤 낸 돈, 월 회비를 몰라 못 채운 돈, 채우는 범위를 넘는 미리 낸 돈)
 }
 
 // 시작할 때 남은 돈과 그 반영 결과
@@ -157,14 +159,6 @@ function startIndexOf(book: Book): number {
   return startMonth === undefined ? NEVER : parseYearMonth(startMonth)
 }
 
-// 월 회비가 처음 있는 해의 1월. 월 회비는 그 전 해 값을 이어 쓰니 월 회비를 모르는 해는 이보다 앞쪽 해들뿐이다
-function firstFeeIndexOf(book: Book): number {
-  const years = Object.values(book.ledgers)
-    .filter((ledger) => ledger.monthlyFee !== undefined)
-    .map((ledger) => ledger.year)
-  return years.length === 0 ? NEVER : monthIndex(Math.min(...years), 1)
-}
-
 function shareOf(entry: Entry, memberId: string): number {
   return entry.payers?.find((payer) => payer.memberId === memberId)?.amount ?? 0
 }
@@ -179,7 +173,7 @@ interface MemberMonths {
 function monthsOf(member: Member): MemberMonths {
   return {
     joined: parseYearMonth(member.joined),
-    left: member.left === undefined ? NO_END : parseYearMonth(member.left),
+    left: member.left === undefined ? NEVER : parseYearMonth(member.left),
     off: new Set(member.off.map(parseYearMonth)),
   }
 }
@@ -204,7 +198,8 @@ interface FilledSlot {
 
 interface MemberFill {
   slots: Map<number, FilledSlot> // 달 번호 → 채운 칸 (채운 순 = 오래된 달부터)
-  deposits: Map<string, Deposit> // 기록 id → 입금 (칸 계산에 넣은 입금만)
+  // 기록 → 입금 (칸 계산에 넣은 입금만). 기록 id 는 해끼리 겹칠 수 있어 날짜 붙은 기록 자체로 찾는다
+  deposits: Map<DatedEntry, Deposit>
   debtCovered: number
   remaining: number
 }
@@ -212,9 +207,7 @@ interface MemberFill {
 interface TableContext {
   year: number // 보는 해
   startIndex: number // 회비 표 시작 달
-  // 칸을 셀 수 있는 첫 달: 시작 달과 월 회비가 처음 있는 해 1월 중 늦은 달. 그 앞 칸은 월 회비를 몰라 채우지도, 덜 낸 돈으로 세지도 않는다.
-  // 월 회비가 어느 해에도 없을 때 9999년까지 빈 달을 하나씩 넘기지 않게 한다
-  slotsFrom: number
+  fillUntil: number // 칸을 채우는 마지막 달 (PREPAID_YEARS)
   referenceIndex: number | undefined // 기준 달
   feeOf: (year: number) => number | undefined
   duesEntries: readonly DatedEntry[] // 장부의 회비 기록, 날짜순
@@ -227,12 +220,12 @@ function fillOf(deposit: Deposit, amount: number): DuesFill {
 }
 
 // 2절 2~4: 시작할 때 미리 낸 돈 + 시작 달 이후 입금(날짜순)을 앞에서부터 꺼내, 시작할 때 덜 낸 돈 → 칸(오래된 달부터) 순으로 채운다.
-// 칸 하나에 드는 돈은 그 칸이 있는 해의 월 회비. 월 회비를 모르는 해의 칸은 건너뛴다(slotsFrom)
+// 칸 하나에 드는 돈은 그 칸이 있는 해의 월 회비. 월 회비를 모르는 해의 칸은 건너뛴다. 채우는 범위(fillUntil)를 넘는 돈은 남은 돈
 function fillMember(
   member: Member,
   months: MemberMonths,
   payments: readonly DatedEntry[],
-  { startIndex, slotsFrom, feeOf }: TableContext,
+  { startIndex, fillUntil, feeOf }: TableContext,
 ): MemberFill {
   const opening = member.opening ?? 0
   const counted = payments.filter(({ year, entry }) => monthIndex(year, entry.month) >= startIndex)
@@ -262,10 +255,11 @@ function fillMember(
 
   // 덜 낸 돈을 다 못 메웠으면 남은 입금이 없어 칸은 하나도 차지 않는다
   const slots = new Map<number, FilledSlot>()
-  for (let index = Math.max(slotsFrom, months.joined); index < months.left && cursor < deposits.length; index += 1) {
+  const end = Math.min(months.left, fillUntil + 1)
+  for (let index = Math.max(startIndex, months.joined); index < end && cursor < deposits.length; index += 1) {
     if (months.off.has(index)) continue
     const fee = feeOf(yearOf(index))
-    if (fee === undefined) continue // 월 회비를 모르는 칸은 건너뛴다 (그런 해는 slotsFrom 으로 미리 넘겨 둔다)
+    if (fee === undefined) continue // 월 회비를 모르는 칸은 건너뛴다
     const taken = take(fee)
     for (const { deposit, amount } of taken) deposit.slots.push({ year: yearOf(index), month: monthOf(index), amount })
     slots.set(index, {
@@ -278,32 +272,33 @@ function fillMember(
   return {
     slots,
     deposits: new Map(
-      deposits.flatMap((deposit): [string, Deposit][] => (deposit.payment ? [[deposit.payment.entry.id, deposit]] : [])),
+      deposits.flatMap((deposit): [DatedEntry, Deposit][] => (deposit.payment ? [[deposit.payment, deposit]] : [])),
     ),
     debtCovered: debtTaken.reduce((sum, item) => sum + item.amount, 0),
     remaining: deposits.reduce((sum, deposit) => sum + deposit.unused, 0),
   }
 }
 
-// 2절 1: 회원 아님 → 시작 달 전 → 쉬는 달 → 칸(채운 돈에 따라 채움·일부·빈칸)
+// 2절 1: 회원 아님 → 시작 달 전 → 쉬는 달 → 월 회비 모름 → 칸(채운 돈에 따라 채움·일부·빈칸)
 function cellOf(months: MemberMonths, index: number, startIndex: number, fill: MemberFill, fee: number | undefined): DuesCell {
   const month = monthOf(index)
   if (!isMemberAt(months, index)) return { month, state: 'notMember', paid: 0, fills: [] }
   if (index < startIndex) return { month, state: 'beforeStart', paid: 0, fills: [] }
   if (months.off.has(index)) return { month, state: 'off', paid: 0, fills: [] }
+  if (fee === undefined) return { month, state: 'noFee', paid: 0, fills: [] }
   const slot = fill.slots.get(index)
   if (slot === undefined) return { month, state: 'empty', fee, paid: 0, fills: [] }
   return { month, state: slot.paid === slot.fee ? 'full' : 'partial', fee, paid: slot.paid, fills: slot.fills }
 }
 
-// 2절 5: 기준 달까지 칸에 들어갈 돈 − 채운 돈 (시작 달부터 쌓인 것, 지난해 빈칸 포함).
-// 못 메운 시작할 때 덜 낸 돈도 넣는다(시작 달 앞의 셈이라 늘 기준 달 전). 월 회비를 모르는 해의 칸은 들어갈 돈을 몰라 세지 않는다
+// 2절 5: 기준 달까지 칸에 들어갈 돈 − 채운 돈 (시작 달부터 쌓인 것, 지난해 빈칸 포함). 월 회비를 모르는 해의 칸은 들어갈 돈을 몰라 세지 않는다.
+// 못 메운 시작할 때 덜 낸 돈도 넣되(시작 달 앞의 셈이라 늘 기준 달 전), 기준 달까지 들어온 분만 (아직 안 들어온 분은 덜 냄이 아니다)
 function shortfallOf(months: MemberMonths, fill: MemberFill, debt: number, context: TableContext): number {
-  const { slotsFrom, referenceIndex, feeOf } = context
+  const { startIndex, referenceIndex, feeOf } = context
   if (referenceIndex === undefined) return 0
-  let shortfall = debt - fill.debtCovered
+  let shortfall = months.joined <= referenceIndex ? debt - fill.debtCovered : 0
   const last = Math.min(referenceIndex, months.left - 1)
-  for (let index = Math.max(slotsFrom, months.joined); index <= last; index += 1) {
+  for (let index = Math.max(startIndex, months.joined); index <= last; index += 1) {
     if (months.off.has(index)) continue
     shortfall += (feeOf(yearOf(index)) ?? 0) - (fill.slots.get(index)?.paid ?? 0)
   }
@@ -365,7 +360,7 @@ function memberRow(member: Member, context: TableContext): DuesRow | undefined {
     },
     opening: { amount: opening, debtCovered: fill.debtCovered },
     remaining: fill.remaining,
-    payments: ofYear.map((payment) => paymentOf(payment, member.id, fill.deposits.get(payment.entry.id))),
+    payments: ofYear.map((payment) => paymentOf(payment, member.id, fill.deposits.get(payment))),
   }
 }
 
@@ -383,7 +378,7 @@ export function duesTable(book: Book, year: number, today: Date): DuesTable {
   const context: TableContext = {
     year,
     startIndex,
-    slotsFrom: Math.max(startIndex, firstFeeIndexOf(book)),
+    fillUntil: monthIndex(Math.max(year, today.getFullYear()) + PREPAID_YEARS, 12),
     referenceIndex,
     feeOf,
     duesEntries: duesEntriesByDate(book),
@@ -391,7 +386,7 @@ export function duesTable(book: Book, year: number, today: Date): DuesTable {
   const rows = (book.members ?? [])
     .flatMap((member) => memberRow(member, context) ?? [])
     .sort(byBehindThenName)
-  // 월 회비를 모르는 해는 앞쪽 해들뿐이라(firstFeeIndexOf) 시작 해만 보면 된다
+  // 월 회비는 그 전 해 값을 이어 쓰니 모르는 해는 앞쪽 해들뿐이다. 그래서 시작 해만 보면 된다
   const startYear = yearOf(startIndex)
   return {
     year,
@@ -408,12 +403,14 @@ export function duesTable(book: Book, year: number, today: Date): DuesTable {
   }
 }
 
-// 회비 표 해 넘기기 범위: 회비 표 시작 해부터 올해까지 (4절). 시작 달이 없으면 올해만
+// 회비 표 해 넘기기 범위: 시작 해와 올해 중 이른 해부터 늦은 해까지 (4절). 화면은 올해를 열고 장부 버튼도 올해로 세니 올해는 늘 든다.
+// 보통은 시작 해 ~ 올해, 시작 달을 내년으로 정했으면 올해 ~ 내년. 시작 달이 없으면 올해만
 export function duesYears(book: Book, today: Date): number[] {
   const thisYear = today.getFullYear()
   const startMonth = book.dues?.startMonth
-  const first = startMonth === undefined ? thisYear : yearOf(parseYearMonth(startMonth))
-  const last = Math.max(first, thisYear)
+  const startYear = startMonth === undefined ? thisYear : yearOf(parseYearMonth(startMonth))
+  const first = Math.min(startYear, thisYear)
+  const last = Math.max(startYear, thisYear)
   return Array.from({ length: last - first + 1 }, (_, index) => first + index)
 }
 

@@ -5,6 +5,7 @@ import {
   duesYears,
   monthlyFeeOf,
   unassignedDues,
+  type DatedEntry,
   type DuesCellState,
   type DuesRow,
   type DuesTable,
@@ -12,11 +13,12 @@ import {
 import type { Book, Entry, Member, YearMonth } from './types'
 import { book } from '../test/ledgerFixtures'
 
-// 12칸 띠를 한 줄 글자로: ○ 채움, ◐ 일부, · 빈칸, / 쉬는 달, - 회원 아님, _ 시작 달 전
+// 12칸 띠를 한 줄 글자로: ○ 채움, ◐ 일부, · 빈칸, ? 월 회비를 몰라 못 채우는 칸, / 쉬는 달, - 회원 아님, _ 시작 달 전
 const SYMBOL: Readonly<Record<DuesCellState, string>> = {
   full: '○',
   partial: '◐',
   empty: '·',
+  noFee: '?',
   off: '/',
   notMember: '-',
   beforeStart: '_',
@@ -34,11 +36,6 @@ function rowOf(table: DuesTable, name: string): DuesRow {
 
 function member(id: string, name: string, overrides: Partial<Omit<Member, 'id' | 'name'>> = {}): Member {
   return { id, name, joined: '2026-01', off: [], ...overrides }
-}
-
-interface DatedEntry {
-  year: number
-  entry: Entry
 }
 
 // 회비 입금 한 건. date 는 'YYYY-MM-DD', 날짜 없는 예전 기록은 'YYYY-MM'. payers 는 { 회원 번호: 그분 몫 }
@@ -341,6 +338,23 @@ describe('SPEC-010 회비 표 계산 (2절)', () => {
 
       expect(rowOf(table, '강민지').shortfall).toBe(0)
     })
+
+    it('못 메운 시작할 때 덜 낸 돈은 기준 달까지 들어온 분만 덜 낸 돈에 넣는다', () => {
+      const club = clubBook({
+        members: [
+          member('m1', '강민지', { joined: '2026-12', opening: -30_000 }),
+          member('m2', '이서준', { joined: '2026-10', opening: -30_000 }),
+        ],
+      })
+      const table = duesTable(club, 2026, NOV_23)
+
+      // 12월에 들어온 분: 기준 10월까지 칸도 회원이었던 달도 없다
+      expect(rowOf(table, '강민지').shortfall).toBe(0)
+      expect(rowOf(table, '강민지').group).toBe('paid')
+      // 10월에 들어온 분(들어온 달 = 기준 달): 못 메운 3만 원 + 10월 칸 2만 원
+      expect(rowOf(table, '이서준').shortfall).toBe(50_000)
+      expect(behindMemberCount(club, NOV_23)).toBe(1)
+    })
   })
 
   describe('AC-9 입금을 날짜순으로 칸에 짝짓는다', () => {
@@ -402,6 +416,28 @@ describe('SPEC-010 회비 표 계산 (2절)', () => {
       expect(row.cells[1].fills.map((fill) => (fill.kind === 'payment' ? fill.entryId : 'opening'))).toEqual(['later'])
     })
 
+    it('다른 해 장부에 같은 기록 id 가 있어도 입금마다 채운 칸이 섞이지 않는다', () => {
+      const club = clubBook({
+        members: [member('m1', '김도윤', { joined: '2025-01' })],
+        startMonth: '2025-01',
+        fees: { 2025: 10_000, 2026: 20_000 },
+        entries: [paid('p1', '2025-01-05', { m1: 30_000 }), paid('p1', '2026-01-05', { m1: 20_000 })],
+      })
+
+      const lastYear = rowOf(duesTable(club, 2025, NOV_23), '김도윤')
+      const thisYear = rowOf(duesTable(club, 2026, NOV_23), '김도윤')
+
+      expect(lastYear.payments[0].slots).toEqual([
+        { year: 2025, month: 1, amount: 10_000 },
+        { year: 2025, month: 2, amount: 10_000 },
+        { year: 2025, month: 3, amount: 10_000 },
+      ])
+      expect(thisYear.payments[0].slots).toEqual([
+        { year: 2025, month: 4, amount: 10_000 },
+        { year: 2025, month: 5, amount: 10_000 },
+      ])
+    })
+
     it('날짜 없는 예전 기록은 장부 날짜순처럼 그 달 맨 뒤에 놓는다', () => {
       const table = duesTable(
         clubBook({
@@ -450,8 +486,9 @@ describe('SPEC-010 회비 표 계산 (2절)', () => {
 
       expect(table.monthlyFee).toBeUndefined()
       expect(table.missingFeeYear).toBe(2026)
-      expect(strip(row)).toBe('············')
-      expect(row.cells[0].fee).toBeUndefined()
+      // 안 낸 빈칸(empty)과 다른 상태라 화면이 "안 냄"으로 그리지 않는다
+      expect(strip(row)).toBe('????????????')
+      expect(row.cells[0]).toEqual({ month: 1, state: 'noFee', paid: 0, fills: [] })
       expect(row.remaining).toBe(20_000)
       expect(row.shortfall).toBe(0)
     })
@@ -469,7 +506,7 @@ describe('SPEC-010 회비 표 계산 (2절)', () => {
       expect(monthlyFeeOf(club, 2025)).toBeUndefined()
       expect(lastYear.monthlyFee).toBeUndefined()
       expect(lastYear.missingFeeYear).toBe(2025)
-      expect(strip(rowOf(lastYear, '김도윤'))).toBe('············')
+      expect(strip(rowOf(lastYear, '김도윤'))).toBe('????????????')
       expect(rowOf(lastYear, '김도윤').shortfall).toBe(0)
       expect(thisYear.monthlyFee).toBe(20_000)
       expect(thisYear.missingFeeYear).toBe(2025)
@@ -477,6 +514,26 @@ describe('SPEC-010 회비 표 계산 (2절)', () => {
       // 2026년 1~10월 20만 원 − 채운 4만 원 (2025년 칸은 세지 않음)
       expect(rowOf(thisYear, '김도윤').shortfall).toBe(160_000)
       expect(rowOf(thisYear, '김도윤').remaining).toBe(0)
+    })
+
+    it('미리 낸 돈은 기준 해(보는 해와 올해 중 늦은 해) + 10년 12월까지만 칸을 채우고 나머지는 남은 돈이다', () => {
+      // 월 회비 1,000원에 999,999,000원을 잘못 적은 경우
+      const table = duesTable(
+        clubBook({
+          members: [member('m1', '김도윤')],
+          fees: { 2026: 1_000 },
+          entries: [paid('p1', '2026-01-05', { m1: 999_999_000 })],
+        }),
+        2026,
+        NOV_23,
+      )
+      const row = rowOf(table, '김도윤')
+
+      // 2026년 1월 ~ 2036년 12월 = 132칸 × 1,000원
+      expect(row.paidThrough).toEqual({ year: 2036, month: 12, paid: 1_000, fee: 1_000 })
+      expect(row.remaining).toBe(999_999_000 - 132_000)
+      expect(row.payments[0].slots).toHaveLength(132)
+      expect(row.payments[0].remaining).toBe(999_999_000 - 132_000)
     })
 
     it('그 해 월 회비가 없으면 가장 가까운 그 전 해 값을 쓴다', () => {
@@ -554,6 +611,12 @@ describe('SPEC-010 회비 표 계산 (2절)', () => {
       const club = clubBook({ members: [member('m1', '김도윤')], startMonth: '2024-03' })
 
       expect(duesYears(club, NOV_23)).toEqual([2024, 2025, 2026])
+    })
+
+    it('시작 해가 올해보다 뒤면 올해부터 시작 해까지다 (올해 12월에 시작 달을 내년 1월로 정함)', () => {
+      const club = clubBook({ members: [member('m1', '김도윤')], startMonth: '2027-01' })
+
+      expect(duesYears(club, new Date(2026, 11, 5))).toEqual([2026, 2027])
     })
 
     it('회비 표 시작 달이 없으면 올해만이다', () => {
