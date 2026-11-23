@@ -21,8 +21,12 @@ type YearMonthPickerProps = {
 // 해·달 고르기 (선택 창 BottomSheet 안): 해 넘기기 [‹] 2026년 [›] + 열두 달. 달을 누르면 보고 있는 해의 그 달.
 // 들어온 달·그만둔 달·회비 표 시작 달 (SPEC-010 6절), 쉬는 끝 달 (5절). 해 넘기기는 YearStepper(창 안이라 화살표는 회색 면)
 export function YearMonthPicker({ value, onChange, firstYear, lastYear, current, min }: YearMonthPickerProps) {
+  // 넘겨 볼 수 있는 첫 해: min 이 있으면 그 해 전으로는 가지 않는다 (리뷰 #177)
+  const lowestYear = Math.max(firstYear, min?.year ?? firstYear)
   const startYear = value?.year ?? min?.year ?? current?.year ?? lastYear
-  const [shownYear, setShownYear] = useState(Math.min(Math.max(startYear, firstYear), lastYear))
+  const [shownYear, setShownYear] = useState(Math.min(Math.max(startYear, lowestYear), lastYear))
+  // 보고 있는 해의 고를 수 있는 첫 달: min 의 해면 그 달, 그 전 해(마지막 해가 min 보다 이를 때)면 모두 막는다(13)
+  const firstMonth = min === undefined || shownYear > min.year ? undefined : shownYear === min.year ? min.month : 13
 
   return (
     <div className="ui-year-month" data-testid="year-month-picker">
@@ -30,13 +34,13 @@ export function YearMonthPicker({ value, onChange, firstYear, lastYear, current,
         label={`${shownYear}년`}
         onPrevious={() => setShownYear(shownYear - 1)}
         onNext={() => setShownYear(shownYear + 1)}
-        previousDisabled={shownYear <= firstYear}
+        previousDisabled={shownYear <= lowestYear}
         nextDisabled={shownYear >= lastYear}
       />
       <MonthPicker
         value={value?.year === shownYear ? value.month : null}
         currentMonth={current?.year === shownYear ? current.month : undefined}
-        firstMonth={min?.year === shownYear ? min.month : undefined}
+        firstMonth={firstMonth}
         onChange={(month) => onChange(shownYear, month)}
       />
     </div>

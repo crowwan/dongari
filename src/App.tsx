@@ -31,13 +31,13 @@ import { MonthSummaryScreen } from './features/report/MonthSummaryScreen'
 import { pictureSaver, type PictureSaver } from './features/report/savePicture'
 import { YearSummaryScreen } from './features/report/YearSummaryScreen'
 import { DuesScreen } from './features/dues/DuesScreen'
+import { useBehindCount } from './features/dues/useBehindCount'
 import type { DuesSettings } from './features/settings/RosterPages'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
 import { useScreenHeading } from './features/useScreenHeading'
 import { useScreenHistory } from './features/useScreenHistory'
 import { totalEntryCount } from './domain/book'
-import { behindMemberCount } from './domain/duesTable'
 import type { BookSetup, EntryInput } from './domain/ledger'
 import { memberHasRecords, thisMonthOf } from './domain/members'
 import type { BookKind, StoredData } from './domain/types'
@@ -185,6 +185,8 @@ export default function App({
 
   const month = viewedMonth ?? ledger.firstMonth
   const today = now()
+  // 장부 [회비 표] 의 지난달까지 덜 낸 분 수 (동아리·모임 장부만, 장부·이번 달이 바뀔 때만 다시 센다)
+  const duesBehind = useBehindCount(ledger.book, today)
   // 이번 달·오늘 (달 선택 창 테두리·[오늘 7일] 칩). 지난 연도 장부에는 없다
   const isThisYear = ledger.year === today.getFullYear()
   const currentMonth = isThisYear ? today.getMonth() + 1 : undefined
@@ -621,11 +623,7 @@ export default function App({
           onEditEntry={(id) => navigation.open({ name: 'edit-entry', id })}
           unsavedEntryIds={ledger.unsavedEntryIds}
           settingsRef={guide.settings}
-          dues={
-            ledger.book?.kind === 'club'
-              ? { behind: behindMemberCount(ledger.book, today), onOpen: () => navigation.open({ name: 'dues' }) }
-              : undefined
-          }
+          dues={duesBehind === undefined ? undefined : { behind: duesBehind, onOpen: () => navigation.open({ name: 'dues' }) }}
         />
       </>
     )

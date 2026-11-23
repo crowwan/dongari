@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { duesTable, duesYears, monthlyFeeSource, type DuesGroup, type DuesTable } from '../../domain/duesTable'
-import { splitYearMonth } from '../../domain/members'
+import { splitYearMonth, thisMonthOf } from '../../domain/members'
 import type { Book, YearMonth } from '../../domain/types'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
@@ -151,6 +151,7 @@ export function DuesScreen({ book, today, initialYear, ledgerYears, settings, on
           {/* 7절 "낸 분을 안 적은 회비 N건" 카드 자리 (#164) */}
           <DuesRows
             table={table}
+            thisMonth={thisMonthOf(today)}
             filter={filter}
             onOpen={(id) => {
               setMemberId(id)
@@ -238,13 +239,14 @@ function DuesSummary({ table, filter, onFilter, canSetFee, onSetFee }: DuesSumma
 
 type DuesRowsProps = {
   table: DuesTable
+  thisMonth: YearMonth // 이번 달 (그만둔 문구를 과거형으로 쓸지)
   filter: DuesGroup | null
   onOpen: (memberId: string) => void
 }
 
 // 사람별 줄 (4절): 이름 + 그 해 낸 돈 / 상태 한 줄(덜 냄은 --info-ink) / 12칸 띠. 덜 낸 분 먼저(계산 순서 그대로), 줄 사이 선 없음.
 // 줄 전체가 한 분 보기 버튼 — "김도윤 190,000원 10월 반까지 · 1만 원 덜 냄" 으로 읽힌다
-function DuesRows({ table, filter, onOpen }: DuesRowsProps) {
+function DuesRows({ table, thisMonth, filter, onOpen }: DuesRowsProps) {
   const shown = activeFilter(table, filter)
   const rows = shown === null ? table.rows : table.rows.filter((row) => row.group === shown)
   const beforeStart = isBeforeStart(table)
@@ -252,7 +254,7 @@ function DuesRows({ table, filter, onOpen }: DuesRowsProps) {
   return (
     <ul className="dues-rows" aria-label={`${table.year}년 회원`}>
       {rows.map((row) => {
-        const status = rowStatus(row, table)
+        const status = rowStatus(row, table, thisMonth)
         return (
           <li key={row.member.id}>
             <button type="button" className="dues-row" data-testid="dues-row" data-group={row.group} onClick={() => onOpen(row.member.id)}>

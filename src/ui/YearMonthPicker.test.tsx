@@ -80,4 +80,27 @@ describe('YearMonthPicker (해·달 고르기, SPEC-010 6절)', () => {
     await user.click(screen.getByRole('button', { name: '다음 해' }))
     expect(screen.getByRole('button', { name: '1월' })).toBeEnabled()
   })
+
+  it('고른 값이 min 보다 이른 해여도 min 의 해부터 보이고, 그 전 해로는 넘길 수 없다 (리뷰 #177)', () => {
+    render(
+      <YearMonthPicker
+        value={{ year: 2024, month: 3 }}
+        min={{ year: 2025, month: 11 }}
+        firstYear={2020}
+        lastYear={2027}
+        onChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('2025년')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '이전 해' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '10월' })).toBeDisabled()
+  })
+
+  it('넘겨 볼 수 있는 마지막 해가 min 보다 이르면 그 해의 달은 모두 누를 수 없다 (리뷰 #177)', () => {
+    render(<YearMonthPicker value={null} min={{ year: 2026, month: 3 }} firstYear={2020} lastYear={2025} onChange={vi.fn()} />)
+
+    expect(screen.getByText('2025년')).toBeInTheDocument()
+    for (const month of [1, 6, 12]) expect(screen.getByRole('button', { name: `${month}월` })).toBeDisabled()
+  })
 })

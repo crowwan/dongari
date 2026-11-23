@@ -29,9 +29,14 @@ export function paidThroughText({ year, month, paid, fee }: DuesPaidThrough, vie
   return paid < fee ? `${label} ${partText(paid, fee)}까지` : `${label}까지`
 }
 
-// 사람별 줄 상태 한 줄 (4절). 덜 냄 → 쉬는 분 → 그 해에 그만둔 분 → 시작 달 뒤 그 해에 들어온 분 → 채운 달 → 칸에 못 넣은 남은 돈 순으로 하나.
-// 회비 표 시작 해보다 이른 해는 칸이 없어 상태 줄도 없다 (이름과 낸 돈만)
-export function rowStatus(row: DuesRow, table: DuesTable): string | undefined {
+// 그 해 안에 이미 그만둔 분: 그만둔 달이 그 해 안이고(다음 해 1월이면 12월까지 회원) 이번 달까지 와 있다(이번 달 뒤에 그만둘 분은 아직 회원)
+function leftWithin(member: DuesRow['member'], year: number, thisMonth: YearMonth): boolean {
+  return member.left !== undefined && member.left < yearMonth(year + 1, 1) && member.left <= thisMonth
+}
+
+// 사람별 줄 상태 한 줄 (4절). 덜 냄 → 쉬는 분 → 그 해에 이미 그만둔 분 → 시작 달 뒤 그 해에 들어온 분 → 채운 달 → 칸에 못 넣은 남은 돈 순으로 하나.
+// 회비 표 시작 해보다 이른 해는 칸이 없어 상태 줄도 없다 (이름과 낸 돈만). thisMonth: 이번 달 (그만둔 문구를 과거형으로 쓸지)
+export function rowStatus(row: DuesRow, table: DuesTable, thisMonth: YearMonth): string | undefined {
   const { year, startMonth, referenceMonth } = table
   if (startMonth === undefined || splitYearMonth(startMonth).year > year) return undefined
   const { member, paidThrough } = row
@@ -41,7 +46,7 @@ export function rowStatus(row: DuesRow, table: DuesTable): string | undefined {
     const since = restingSince(member.off, yearMonth(year, referenceMonth))
     if (since !== undefined) return `${yearMonthLabel(since, year)}부터 쉬어요`
   }
-  if (member.left !== undefined && member.left <= yearMonth(year + 1, 1)) {
+  if (member.left !== undefined && leftWithin(member, year, thisMonth)) {
     return `${yearMonthLabel(previousMonth(member.left), year)}까지 회원이었어요`
   }
   if (splitYearMonth(member.joined).year === year && member.joined > startMonth) {

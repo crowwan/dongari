@@ -7,7 +7,7 @@ type MonthPickerProps = {
   value: number | null
   // 이번 달 (테두리로 표시). 올해 장부가 아니면 주지 않는다
   currentMonth?: number
-  // 고를 수 있는 첫 달: 그 전 달은 누를 수 없다 (면 없이 점선, YearMonthPicker min)
+  // 고를 수 있는 첫 달: 그 전 달은 누를 수 없다 (면 없이 점선, YearMonthPicker min). 13 이면 모두 막는다
   firstMonth?: number
   onChange: (month: number) => void
 }

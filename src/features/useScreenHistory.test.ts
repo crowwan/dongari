@@ -430,6 +430,39 @@ describe('SPEC-010 회비 표 화면 칸 (#163)', () => {
     expect(result.current.screen).toEqual({ name: 'ledger' })
   })
 
+  it('선택 창이 떠 있는 채로 바꿔 끼우면 창 칸을 먼저 되돌리고 그 아래 화면 칸을 바꿔, 뒤로 버튼 한 번에 장부로 온다 (리뷰 #177)', () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    const result = renderOpened({ name: 'year-summary' })
+    act(() => result.current.openSheet('year-picture'))
+
+    act(() => result.current.replace({ name: 'dues', year: 2025 }))
+
+    expect(result.current.screen).toEqual({ name: 'dues', year: 2025 })
+    expect(result.current.sheet).toBeNull()
+    expect(back).toHaveBeenCalledOnce()
+    expect(replaceState).not.toHaveBeenCalled()
+    // 창 칸이 빠진 popstate 에서 그 아래 결산 칸을 회비 표 칸으로 바꾼다 (화면은 그대로)
+    pressBackButton()
+    expect(replaceState).toHaveBeenCalledWith({ screen: 'dues' }, '')
+    expect(result.current.screen).toEqual({ name: 'dues', year: 2025 })
+    pressBackButton()
+    expect(result.current.screen).toEqual({ name: 'ledger' })
+  })
+
+  it('선택 창보다 먼저 열린 확인 창은 선택 창을 닫아도 그대로 남는다 (리뷰 #177)', () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
+    const result = renderOpened({ name: 'settings' })
+    act(() => result.current.openDialog('guide-4'))
+    act(() => result.current.openSheet('settings-year'))
+
+    act(() => result.current.closeSheet())
+
+    expect(result.current.sheet).toBeNull()
+    expect(result.current.dialog).toBe('guide-4')
+    expect(back).toHaveBeenCalledOnce()
+    expect(go).not.toHaveBeenCalled()
+  })
+
   it('장부 화면에서 부르면 바꿔 끼우지 않고 칸을 쌓는다 (장부 칸을 바꾸면 뒤로 버튼에 앱이 닫힌다)', () => {
     const { result } = renderHook(() => useScreenHistory())
 

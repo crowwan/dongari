@@ -13,6 +13,7 @@ import {
 } from './duesWords'
 
 const TODAY = new Date('2026-11-23T09:00:00.000+09:00')
+const THIS_MONTH = '2026-11'
 
 // 회비 기록 하나 (낸 분 한 분)
 function paid(id: string, month: number, day: number | undefined, memberId: string, amount: number): Entry {
@@ -69,39 +70,39 @@ describe('SPEC-010 회비 표 화면 문구 (4·5절)', () => {
         [paid('e1', 1, 9, 'm1', 190_000), paid('e2', 1, 9, 'm2', 220_000)],
       )
 
-      expect(rowStatus(rowOf(table, 'm1'), table)).toBe('10월 반까지 · 1만 원 덜 냄')
-      expect(rowStatus(rowOf(table, 'm2'), table)).toBe('11월까지 냈어요')
+      expect(rowStatus(rowOf(table, 'm1'), table, THIS_MONTH)).toBe('10월 반까지 · 1만 원 덜 냄')
+      expect(rowStatus(rowOf(table, 'm2'), table, THIS_MONTH)).toBe('11월까지 냈어요')
     })
 
     it('한 칸도 못 채웠으면 "아직 안 냈어요"(덜 냈으면 덜 낸 돈을 붙인다)', () => {
       const table = tableOf([member('m1', '김도윤')], [])
 
-      expect(rowStatus(rowOf(table, 'm1'), table)).toBe('아직 안 냈어요 · 20만 원 덜 냄')
+      expect(rowStatus(rowOf(table, 'm1'), table, THIS_MONTH)).toBe('아직 안 냈어요 · 20만 원 덜 냄')
       const january = duesTable(
         book([{ year: 2026, carryover: 0, monthlyFee: 20_000, entries: [] }], { members: [member('m1', '김도윤')], dues: { startMonth: '2026-01' } }),
         2026,
         new Date('2026-01-10T09:00:00.000+09:00'),
       )
-      expect(rowStatus(rowOf(january, 'm1'), january)).toBe('아직 안 냈어요')
+      expect(rowStatus(rowOf(january, 'm1'), january, '2026-01')).toBe('아직 안 냈어요')
     })
 
     it('기준 달이 쉬는 달이면 이어진 쉬는 달의 첫 달 "2월부터 쉬어요"', () => {
       const off = ['2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12']
       const table = tableOf([member('m1', '한예린', { off })], [paid('e1', 1, 9, 'm1', 20_000)])
 
-      expect(rowStatus(rowOf(table, 'm1'), table)).toBe('2월부터 쉬어요')
+      expect(rowStatus(rowOf(table, 'm1'), table, THIS_MONTH)).toBe('2월부터 쉬어요')
     })
 
     it('시작 달 뒤 그 해에 들어와 다 냈으면 "7월에 들어왔어요"', () => {
       const table = tableOf([member('m1', '박서연', { joined: '2026-07' })], [paid('e1', 7, 1, 'm1', 100_000)])
 
-      expect(rowStatus(rowOf(table, 'm1'), table)).toBe('7월에 들어왔어요')
+      expect(rowStatus(rowOf(table, 'm1'), table, THIS_MONTH)).toBe('7월에 들어왔어요')
     })
 
     it('그 해가 끝나기 전에 그만둔 분은 회원이었던 마지막 달 "9월까지 회원이었어요"', () => {
       const table = tableOf([member('m1', '오세훈', { left: '2026-10' })], [paid('e1', 1, 9, 'm1', 180_000)])
 
-      expect(rowStatus(rowOf(table, 'm1'), table)).toBe('9월까지 회원이었어요')
+      expect(rowStatus(rowOf(table, 'm1'), table, THIS_MONTH)).toBe('9월까지 회원이었어요')
     })
 
     it('월 회비를 몰라 한 칸도 못 채운 돈은 "아직 안 냈어요" 가 아니라 "남은 돈 22만 원"', () => {
@@ -114,7 +115,22 @@ describe('SPEC-010 회비 표 화면 문구 (4·5절)', () => {
         TODAY,
       )
 
-      expect(rowStatus(rowOf(noFee, 'm1'), noFee)).toBe('남은 돈 22만 원')
+      expect(rowStatus(rowOf(noFee, 'm1'), noFee, THIS_MONTH)).toBe('남은 돈 22만 원')
+    })
+
+    it('12월까지 회원인 분(그만둔 달 = 다음 해 1월)은 그만둔 문구 없이 "11월까지 냈어요" (리뷰 #177)', () => {
+      const table = tableOf([member('m1', '최수아', { left: '2027-01' })], [paid('e1', 1, 9, 'm1', 220_000)])
+
+      expect(rowStatus(rowOf(table, 'm1'), table, THIS_MONTH)).toBe('11월까지 냈어요')
+    })
+
+    it('올해 이번 달 뒤에 그만둘 분은 아직 회원이라 과거형 "…까지 회원이었어요" 가 아니다 (리뷰 #177)', () => {
+      const leaving = tableOf([member('m1', '윤채원', { left: '2026-12' })], [paid('e1', 1, 9, 'm1', 220_000)])
+      expect(rowStatus(rowOf(leaving, 'm1'), leaving, THIS_MONTH)).toBe('11월까지 냈어요')
+
+      // 이번 달에 그만뒀으면(이번 달부터 회원 아님) 이미 지난 일
+      const leftNow = tableOf([member('m1', '윤채원', { left: '2026-11' })], [paid('e1', 1, 9, 'm1', 200_000)])
+      expect(rowStatus(rowOf(leftNow, 'm1'), leftNow, THIS_MONTH)).toBe('10월까지 회원이었어요')
     })
 
     it('회비 표 시작 해보다 이른 해는 상태 줄이 없다 (이름과 낸 돈만)', () => {
@@ -129,7 +145,7 @@ describe('SPEC-010 회비 표 화면 문구 (4·5절)', () => {
         TODAY,
       )
 
-      expect(rowStatus(rowOf(early, 'm1'), early)).toBeUndefined()
+      expect(rowStatus(rowOf(early, 'm1'), early, THIS_MONTH)).toBeUndefined()
     })
   })
 

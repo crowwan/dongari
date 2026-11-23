@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
+import type * as DuesTableModule from './domain/duesTable'
 import type { Book, Entry, Ledger, Member, StoredData } from './domain/types'
 import type { LedgerRepository } from './storage/LedgerRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
@@ -10,6 +11,19 @@ import { book, savedLedger, storedWith } from './test/ledgerFixtures'
 
 // 기준 달(지난달)은 10월
 const TODAY = new Date('2026-11-23T09:00:00.000+09:00')
+
+// 장부 [회비 표] 덜 낸 분 수를 몇 번 셌는지 (회비 표 전체를 계산하는 일이라 장부 화면을 다시 그릴 때마다 세지 않는지, 리뷰 #177)
+const counter = vi.hoisted(() => ({ behind: 0 }))
+vi.mock('./domain/duesTable', async (importOriginal) => {
+  const actual = await importOriginal<typeof DuesTableModule>()
+  return {
+    ...actual,
+    behindMemberCount: (...args: Parameters<typeof actual.behindMemberCount>) => {
+      counter.behind += 1
+      return actual.behindMemberCount(...args)
+    },
+  }
+})
 
 function dues(id: string, month: number, day: number, payers: [string, number][], year = 2026): Entry {
   return {
@@ -86,6 +100,17 @@ describe('SPEC-010 회비 표·한 분 보기 (4·5절, #163)', () => {
       renderApp(clubData({}))
 
       expect(screen.getByRole('button', { name: '회비 표' })).toBeInTheDocument()
+    })
+
+    it('장부 화면을 다시 그려도(달 넘기기) 장부·이번 달이 같으면 덜 낸 분 수를 다시 세지 않는다 (리뷰 #177)', async () => {
+      renderApp(clubData())
+      const counted = counter.behind
+
+      await userEvent.click(screen.getByRole('button', { name: '이전 달' }))
+      await userEvent.click(screen.getByRole('button', { name: '이전 달' }))
+
+      expect(counter.behind).toBe(counted)
+      expect(screen.getByRole('button', { name: '회비 표 · 지난달까지 덜 낸 분 1명' })).toBeInTheDocument()
     })
 
     it('AC-16 개인 가계부에는 [회비 표]가 없다', () => {
