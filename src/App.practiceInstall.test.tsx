@@ -12,7 +12,17 @@ import { createBackup } from './storage/backup'
 import { LocalStorageRepository } from './storage/LocalStorageRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
 import { fakeBrowser, KAKAO_UA, memoryOfferStore } from './test/installFakes'
-import { button, click, fakeSaver, pressBack, PRACTICE_TODAY, reachYear, settleHistory, startPracticeFromQuestion } from './test/practiceFlow'
+import {
+  button,
+  click,
+  fakeSaver,
+  finishAfterYear,
+  pressBack,
+  PRACTICE_TODAY,
+  reachYear,
+  settleHistory,
+  startPracticeFromQuestion,
+} from './test/practiceFlow'
 
 const ASK_TITLE = '홈 화면에 추가하시겠어요?'
 const ASK_LEAD = '연습으로 적은 내역은 지웠어요. 진짜 장부를 만들기 전에 하나만 물어볼게요.'
@@ -49,12 +59,13 @@ const heading = (name: string) => screen.findByRole('heading', { level: 1, name 
 const guideSheet = () => screen.queryByRole('dialog', { name: GUIDE_SHEET })
 const offerCard = () => screen.queryByTestId('install-offer')
 
-// 첫 실행 물음 → 연습 ①~④ → 결산 사진 보내기 → 끝 화면 "잘 보냈어요!"
+// 첫 실행 물음 → 연습 ①~④ → 결산 사진 보내기 → ⑤ 회비 표 → ⑥ 연습용 엑셀 → 끝 화면 "연습 끝!" (SPEC-010 10절)
 async function finishPractice() {
   await startPracticeFromQuestion()
   await reachYear()
   await click('사진 보내기')
-  await heading('잘 보냈어요!')
+  await finishAfterYear()
+  await heading('연습 끝!')
   await settleHistory()
 }
 
@@ -169,7 +180,7 @@ describe('SPEC-009 B 홈 화면에 추가하시겠어요?', () => {
     expect(screen.queryByTestId('practice-band')).not.toBeInTheDocument()
 
     await pressBack()
-    expect(await heading('잘 보냈어요!')).toBeInTheDocument()
+    expect(await heading('연습 끝!')).toBeInTheDocument()
     expect(screen.getByText(ASK_LEAD)).toBeInTheDocument()
   })
 

@@ -12,4 +12,6 @@ export type PracticeSlot = {
   render: (view: PracticeView, dialogs: SheetHistory) => ReactNode
   // 결산 [사진 보내기]·[사진으로 저장] 이 끝난 결과 (④ 단계 갈래)
   onPictureResult: (action: PictureAction, result: PictureResult) => void
+  // 연습용 엑셀 읽은 내용 [새 장부 만들기]: 진짜 장부를 만들지 않고 연습 끝 (SPEC-010 10절 ⑥)
+  onExcelCreate: () => void
 }

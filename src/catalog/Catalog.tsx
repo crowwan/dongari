@@ -1668,7 +1668,7 @@ export function Catalog() {
         </Section>
 
         <Section title="CoachMark (안내 말풍선, SPEC-008)">
-          <State label="연습 말풍선이 아래 버튼을 가리킬 때 ([+ 내역 적기]: 말풍선 위, 꼬리 아래, [✕]·[알겠어요] 없이 연습 1 / 4)">
+          <State label="연습 말풍선이 아래 버튼을 가리킬 때 ([+ 내역 적기]: 말풍선 위, 꼬리 아래, [✕]·[알겠어요] 없이 연습 1 / 6)">
             <CoachMarkSample place="bottom" />
           </State>
           <State label="복구 코드 안내가 위쪽 버튼을 가리킬 때 (4번 [설정]: 말풍선 아래, 꼬리 위)">
@@ -1735,7 +1735,7 @@ function CoachMarkSample({ place }: { place: 'top' | 'bottom' }) {
       {place === 'top' ? (
         <CoachMark inline open name="4" target={targetRef} message="폰을 바꿔도 기록이 돌아오게 복구 코드를 보내 두세요" onDismiss={noop} />
       ) : (
-        <CoachMark inline open name="open-add" target={targetRef} message="회비 10,000원을 적어 볼게요. 여기를 눌러요" progress="연습 1 / 4" />
+        <CoachMark inline open name="open-add" target={targetRef} message="회비 10,000원을 적어 볼게요. 여기를 눌러요" progress="연습 1 / 6" />
       )}
     </div>
   )

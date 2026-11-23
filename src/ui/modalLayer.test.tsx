@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -211,5 +211,122 @@ describe('SPEC-008 말풍선: 창 밖에 열어 둘 요소 (keepOpen)', () => {
 
     expect(document.querySelector('[inert]')).toBeNull()
     expect(screen.getByRole('button', { name: '설정' })).toHaveFocus()
+  })
+})
+
+type CoachLayerProps = {
+  open: boolean
+  layerRef: RefObject<HTMLDivElement | null>
+  targetRef: RefObject<HTMLButtonElement | null>
+  keepOpen: readonly RefObject<HTMLElement | null>[]
+}
+
+// 말풍선 층 (CoachMark 와 같이 가리키는 버튼·연습 띠를 열어 둔다)
+function CoachLayer({ open, layerRef, targetRef, keepOpen }: CoachLayerProps) {
+  useModalLayer(open, layerRef, targetRef, true, keepOpen)
+  return open ? createPortal(<div ref={layerRef}>말풍선</div>, document.body) : null
+}
+
+describe('SPEC-010 10절 말풍선이 선택 창 안을 가리킬 때 (연습 ⑥ 장부 고르기 창)', () => {
+  // 앱 뿌리 안 연습 띠([그만하기]) + 선택 창 안 가리키는 버튼. order: 말풍선과 선택 창 중 어느 쪽 잠금이 먼저 걸리는지
+  function CoachOnSheet({ open, order }: { open: boolean; order: 'coach-first' | 'sheet-first' }) {
+    const coachRef = useRef<HTMLDivElement>(null)
+    const targetRef = useRef<HTMLButtonElement>(null)
+    const bandRef = useRef<HTMLButtonElement>(null)
+    const [keepOpen] = useState(() => [targetRef, bandRef])
+    const coach = <CoachLayer open={open} layerRef={coachRef} targetRef={targetRef} keepOpen={keepOpen} />
+    return (
+      <>
+        {order === 'coach-first' && coach}
+        <div>
+          <button type="button" ref={bandRef}>
+            그만하기
+          </button>
+          <main>
+            <button type="button">결산</button>
+          </main>
+          <BottomSheet open={open} title="어느 장부를 볼까요?" onClose={() => {}}>
+            <button type="button">새 장부 만들기</button>
+            <button type="button" ref={targetRef}>
+              엑셀 파일로 새 장부
+            </button>
+          </BottomSheet>
+        </div>
+        {order === 'sheet-first' && coach}
+      </>
+    )
+  }
+
+  it.each(['coach-first', 'sheet-first'] as const)(
+    '말풍선이 열어 둔 연습 띠와 창 안 가리키는 버튼은 누를 수 있고, 창 안 다른 버튼·뒤 화면은 잠긴다 (%s)',
+    (order) => {
+      render(<CoachOnSheet open order={order} />)
+
+      expect(isLocked(screen.getByRole('button', { name: '그만하기' }))).toBe(false)
+      expect(isLocked(screen.getByRole('button', { name: '엑셀 파일로 새 장부' }))).toBe(false)
+      expect(isLocked(screen.getByRole('button', { name: '새 장부 만들기' }))).toBe(true)
+      expect(isLocked(screen.getByRole('button', { name: '결산' }))).toBe(true)
+      expect(screen.getByRole('button', { name: '엑셀 파일로 새 장부' })).toHaveFocus()
+    },
+  )
+
+  it.each(['coach-first', 'sheet-first'] as const)(
+    '창을 연 버튼으로 포커스가 돌아온다 — 말풍선이 먼저 창 안으로 포커스를 옮겨 놓았어도 (%s)',
+    (order) => {
+      function WithOpener({ open }: { open: boolean }) {
+        return (
+          <>
+            <button type="button">장부 바꾸기</button>
+            <CoachOnSheet open={open} order={order} />
+          </>
+        )
+      }
+      const { rerender } = render(<WithOpener open={false} />)
+      const opener = screen.getByRole('button', { name: '장부 바꾸기' })
+      opener.focus()
+      rerender(<WithOpener open />)
+
+      rerender(<WithOpener open={false} />)
+
+      expect(opener).toHaveFocus()
+    },
+  )
+
+  it.each(['coach-first', 'sheet-first'] as const)('둘 다 닫히면 잠금이 하나도 남지 않는다 (%s)', (order) => {
+    const { rerender } = render(<CoachOnSheet open order={order} />)
+
+    rerender(<CoachOnSheet open={false} order={order} />)
+
+    expect(document.querySelector('[inert]')).toBeNull()
+  })
+
+  it('말풍선만 먼저 닫히면 선택 창의 잠금(뒤 화면·연습 띠)은 그대로다', () => {
+    function SheetThenCoach({ coach }: { coach: boolean }) {
+      const coachRef = useRef<HTMLDivElement>(null)
+      const targetRef = useRef<HTMLButtonElement>(null)
+      const bandRef = useRef<HTMLButtonElement>(null)
+      const [keepOpen] = useState(() => [targetRef, bandRef])
+      return (
+        <>
+          <div>
+            <button type="button" ref={bandRef}>
+              그만하기
+            </button>
+            <BottomSheet open title="어느 장부를 볼까요?" onClose={() => {}}>
+              <button type="button" ref={targetRef}>
+                엑셀 파일로 새 장부
+              </button>
+            </BottomSheet>
+          </div>
+          <CoachLayer open={coach} layerRef={coachRef} targetRef={targetRef} keepOpen={keepOpen} />
+        </>
+      )
+    }
+    const { rerender } = render(<SheetThenCoach coach />)
+
+    rerender(<SheetThenCoach coach={false} />)
+
+    expect(isLocked(screen.getByRole('button', { name: '그만하기' }))).toBe(true)
+    expect(isLocked(screen.getByRole('button', { name: '엑셀 파일로 새 장부' }))).toBe(false)
   })
 })

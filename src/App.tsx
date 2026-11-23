@@ -27,7 +27,7 @@ import type { Keep } from './features/keep/startKeep'
 import { AddEntryForm } from './features/ledger/AddEntryForm'
 import { EditEntryForm } from './features/ledger/EditEntryForm'
 import { entryDues } from './features/ledger/entryDues'
-import { LedgerScreen } from './features/ledger/LedgerScreen'
+import { LEDGER_BOOK_SHEET, LedgerScreen } from './features/ledger/LedgerScreen'
 import type { StepState } from './features/ledger/entrySteps'
 import { StartLedgerScreen } from './features/ledger/StartLedgerScreen'
 import { useLedger, type LedgerState, type UseLedgerOptions } from './features/ledger/useLedger'
@@ -174,8 +174,8 @@ export default function App({
     onSent: setToast,
     dialogs: navigation,
   })
-  // 엑셀 불러오기 (SPEC-010 8절): 장부 고르기 창·설정·첫 실행이 같은 파일 고르기를 쓴다
-  const excelImport = useExcelImport(navigation)
+  // 엑셀 불러오기 (SPEC-010 8절): 장부 고르기 창·설정·첫 실행이 같은 파일 고르기를 쓴다. 연습 장부는 파일 고르기 대신 연습용 엑셀 (10절)
+  const excelImport = useExcelImport(navigation, practice && ledger.book?.kind)
   // 엑셀 내보내기 (SPEC-010 9절): 설정 [엑셀 파일로 내보내기] → 지금 장부의 모든 해를 한 파일로
   const excelExport = useExcelExport({ book: ledger.book, now, sheets: navigation, onSent: setToast })
   const createId = options?.createId ?? (() => crypto.randomUUID())
@@ -265,6 +265,11 @@ export default function App({
   // 엑셀 읽은 내용 [새 장부 만들기] (SPEC-010 8절): 동아리·모임 장부를 만들어 지금 장부로, 장부 연도는 엑셀 마지막 해.
   // 기기에 저장했으면 알리고 읽은 내용 화면 칸을 되돌려 장부로. 저장하지 못했으면 장부를 만들지 않고 그 화면에 남는다(화면이 이유대로 알린다)
   function importExcelBook(name: string, imported: ImportedBook): SaveResult {
+    // 연습 ⑥: 진짜 장부를 만들지 않고(저장할 것이 없다) 연습을 끝낸다 (SPEC-010 10절)
+    if (practice) {
+      practice.onExcelCreate()
+      return { ok: true }
+    }
     const isFirstBook = ledger.isFirstRun
     const result = ledger.importBook(name, imported)
     if (!result.ok) return result
@@ -376,16 +381,24 @@ export default function App({
     dialogs: navigation,
   })
 
-  // 연습 말풍선이 보는 지금 화면 (SPEC-008)
+  // 연습 말풍선이 보는 지금 화면 (SPEC-008). 장부 고르기 창은 ⑥ 에서 말풍선이 그 안을 가리킨다 (SPEC-010 10절)
+  const bookSheet = navigation.sheet === LEDGER_BOOK_SHEET
   const practiceView: PracticeView = {
     screen: screen.name,
-    covered: navigation.dialog !== null || navigation.sheet !== null || navigation.confirmingLeave,
+    covered: navigation.dialog !== null || (navigation.sheet !== null && !bookSheet) || navigation.confirmingLeave,
+    bookSheet,
     entries: ledger.ledger?.entries ?? [],
     entry:
       screen.name === 'add-entry' && entryStep?.form === chainSaved.length
-        ? { step: entryStep.state.step, amount: entryStep.state.draft.amount, saved: chainSaved.length }
+        ? {
+            step: entryStep.state.step,
+            amount: entryStep.state.draft.amount,
+            saved: chainSaved.length,
+            payers: entryStep.state.payers.memberIds,
+          }
         : undefined,
     canSend: saver.send !== undefined,
+    excel: excelImport.pick?.status ?? 'reading',
   }
 
   // 엑셀 파일 읽기 → 읽은 내용 확인 (SPEC-010 8절). 파일을 고를 때마다 처음부터 다시 읽는다(key)
@@ -395,7 +408,8 @@ export default function App({
     return (
       <ExcelImportSlot
         key={pick.id}
-        file={pick.file}
+        source={pick.source}
+        onSettled={(status) => excelImport.settle(pick.id, status)}
         deps={{ createId, now }}
         bookNames={ledger.bookChoices.map((choice) => choice.name)}
         data={ledger.data}
