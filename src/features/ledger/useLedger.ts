@@ -111,8 +111,8 @@ export interface LedgerState {
   // 새 장부를 만들어 지금 장부로 정하고 올해 장부를 연다. 저장에 성공했는지 (성공일 때만 "새 장부를 만들었어요")
   createBook: (setup: BookSetup) => boolean
   // 엑셀에서 읽은 내용으로 동아리·모임 장부를 만들어 지금 장부로 정하고 마지막 해 장부를 연다 (SPEC-010 8절 #166).
-  // 저장에 성공했는지. 저장하지 못하면 아무것도 바꾸지 않는다 (화면 데이터에도 넣지 않음, 성공일 때만 "엑셀 장부를 만들었어요")
-  importBook: (name: string, imported: ImportedBook) => boolean
+  // 저장 결과(실패면 이유, 화면 안내가 가른다 #172). 저장하지 못하면 아무것도 바꾸지 않는다 (화면 데이터에도 넣지 않음, 성공일 때만 "엑셀 장부를 만들었어요")
+  importBook: (name: string, imported: ImportedBook) => SaveResult
   // 장부를 지우고 남은 첫 장부의 올해 장부를 연다. 저장하지 못하면 아무것도 지우지 않고 false. 하나뿐인 장부는 지우지 않는다
   deleteBook: (id: string) => boolean
   // 백업 파일 데이터로 통째로 바꾼다 (SPEC-002). 저장에 성공했을 때만 화면을 바꾸고 올해 장부로 연다
@@ -168,6 +168,8 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
   }
 
   // 모든 변경은 즉시 저장한다. 실패해도 화면 데이터는 바뀐 대로 두고 이유를 알린다. 저장 성공 여부를 돌려준다.
+  // 다만 저장 형식 가드에 어긋나 쓰지 않은 변경(invalid-data)은 화면에도 들이지 않는다: 틀린 값이 남으면 그 뒤 저장이 모두 막혀,
+  // 그 한 번의 변경만 잃게 한다 (#172 리뷰).
   // 기록을 바꾼 것이면 변경 시각을 남긴다(백업 안내용). 장부를 고른 것처럼 기록이 그대로면 남기지 않는다.
   // entryId: 이번 변경으로 추가하거나 고친 기록 (저장 안 됨 표시용)
   function commit(
@@ -178,9 +180,13 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
     const next: StoredData = recordChange
       ? { ...changed, settings: { ...changed.settings, lastChangedAt: now().toISOString() } }
       : changed
+    const result = repository.save(next)
+    if (!result.ok && result.reason === 'invalid-data') {
+      noteSaveResult(result)
+      return false
+    }
     latest.current = next
     setData(next)
-    const result = repository.save(next)
     noteSaveResult(result, entryId)
     return result.ok
   }
@@ -347,10 +353,10 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
       // 저장했을 때만 화면에 들인다 (deleteBook·restoreBackup 과 같이, #178 리뷰): 큰 장부를 저장하지 못했는데(용량 초과 등)
       // 화면 데이터에 남기면 그 뒤 저장마다 그 장부까지 쓰려다 모두 실패한다. 못 했으면 지금 데이터·저장 상태 그대로
       const result = replace(next, (changed) => repository.save(changed))
-      if (!result.ok) return false
+      if (!result.ok) return result
       // 장부 연도는 엑셀의 마지막 해
       setYear(Math.max(...Object.values(imported.ledgers).map((item) => item.year)))
-      return true
+      return result
     },
     deleteBook: (id) => {
       // 저장하지 못하면 지운 것처럼 보였다가 새로고침 때 되살아나지 않게 화면도 그대로 둔다 (SPEC-005 예외)

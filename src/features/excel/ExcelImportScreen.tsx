@@ -4,6 +4,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { EntryDeps } from '../../domain/ledger'
 import type { StoredData } from '../../domain/types'
+import type { SaveFailureReason, SaveResult } from '../../storage/LedgerRepository'
 import { BottomActionBar } from '../../ui/BottomActionBar'
 import { BottomSheet } from '../../ui/BottomSheet'
 import { Button } from '../../ui/Button'
@@ -15,7 +16,7 @@ import { BackToLedger } from '../BackToLedger'
 import { EditPage } from '../settings/EditPage'
 import type { SheetHistory } from '../useScreenHistory'
 import { readExcelFile, type ExcelFileProblem, type PickedFile } from './excelFile'
-import { EXCEL_CREATE_FAILED, type BackupFileRoute } from './excelMessages'
+import { excelCreateFailedMessage, type BackupFileRoute } from './excelMessages'
 import { ExcelFact, ExcelFactValue, ExcelFacts, ExcelNote } from './ExcelParts'
 import { ExcelProblem, ExcelReading } from './ExcelStatus'
 import {
@@ -47,7 +48,7 @@ export type ExcelImportScreenProps = {
   onBack: () => void
   onPickAgain: () => void // 파일 고르기 창을 다시 연다
   onReload: () => void // [앱 다시 열기] (엑셀 기능을 받지 못했을 때)
-  onCreate: (name: string, book: ImportedBook) => boolean // [새 장부 만들기]. 기기에 저장했으면 true
+  onCreate: (name: string, book: ImportedBook) => SaveResult // [새 장부 만들기]. 기기에 저장하지 못했으면 그 이유 (#172)
 }
 
 type Read = { book: ImportedBook; summary: ExcelImportSummary; workbook: ExcelWorkbook }
@@ -76,8 +77,8 @@ export function ExcelImportScreen({
   const [name, setName] = useState<string>()
   // 월 회비 고치기에서 사람이 바꾼 해만 (여러 번 고치면 쌓인다). 안 바꾼 해는 읽는 규칙대로 앞 해 값을 이어 쓴다 (#178 리뷰)
   const [fixedFees, setFixedFees] = useState<ReadonlyMap<number, number>>(() => new Map())
-  // [새 장부 만들기]를 기기에 저장하지 못했다 (#178 리뷰)
-  const [createFailed, setCreateFailed] = useState(false)
+  // [새 장부 만들기]를 기기에 저장하지 못한 이유 (#178 리뷰, 이유별 문구 #172)
+  const [createFailure, setCreateFailure] = useState<SaveFailureReason>()
   // [새 장부 만들기] 를 두 번 눌러 장부가 둘 생기지 않게
   const created = useRef(false)
 
@@ -133,7 +134,7 @@ export function ExcelImportScreen({
   return (
     <div className="screen screen--stack excel excel-import" data-testid="excel-import-screen">
       {/* 저장 실패 안내는 다른 화면의 저장 실패 안내 띠와 같은 자리(맨 위)에 */}
-      {createFailed && <NoticeBar message={EXCEL_CREATE_FAILED} />}
+      {createFailure && <NoticeBar message={excelCreateFailedMessage(createFailure)} />}
       <div className="excel__head">
         <BackToLedger onBack={onBack} />
         <h1 className="screen__title">엑셀 파일을 읽었어요</h1>
@@ -210,10 +211,11 @@ export function ExcelImportScreen({
         onClick={() => {
           if (missingName || created.current) return
           created.current = true
-          if (onCreate(bookName.trim(), read.book)) return
+          const result = onCreate(bookName.trim(), read.book)
+          if (result.ok) return
           // 저장하지 못했으면 장부는 생기지 않았다: 이 화면에 남아 맨 위에 알리고 다시 누를 수 있게 (#178 리뷰)
           created.current = false
-          setCreateFailed(true)
+          setCreateFailure(result.reason)
           window.scrollTo(0, 0)
         }}
       />

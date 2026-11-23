@@ -47,7 +47,7 @@ import { totalEntryCount } from './domain/book'
 import type { BookSetup, EntryInput } from './domain/ledger'
 import { memberHasRecords, thisMonthOf } from './domain/members'
 import type { BookKind, StoredData } from './domain/types'
-import type { LedgerRepository, LoadResult } from './storage/LedgerRepository'
+import type { LedgerRepository, LoadResult, SaveResult } from './storage/LedgerRepository'
 import { requestPersistentStorage } from './storage/persist'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import type { IconName } from './ui/Icon'
@@ -261,16 +261,17 @@ export default function App({
   }
 
   // 엑셀 읽은 내용 [새 장부 만들기] (SPEC-010 8절): 동아리·모임 장부를 만들어 지금 장부로, 장부 연도는 엑셀 마지막 해.
-  // 기기에 저장했으면 알리고 읽은 내용 화면 칸을 되돌려 장부로. 저장하지 못했으면 장부를 만들지 않고 그 화면에 남는다(화면이 알린다)
-  function importExcelBook(name: string, imported: ImportedBook): boolean {
+  // 기기에 저장했으면 알리고 읽은 내용 화면 칸을 되돌려 장부로. 저장하지 못했으면 장부를 만들지 않고 그 화면에 남는다(화면이 이유대로 알린다)
+  function importExcelBook(name: string, imported: ImportedBook): SaveResult {
     const isFirstBook = ledger.isFirstRun
-    if (!ledger.importBook(name, imported)) return false
+    const result = ledger.importBook(name, imported)
+    if (!result.ok) return result
     const entryCount = Object.values(imported.ledgers).reduce((sum, item) => sum + item.entries.length, 0)
     setToast(`엑셀 장부를 만들었어요 · 기록 ${formatAmount(entryCount)}건`)
     if (isFirstBook) startFirstBook()
     setViewedMonth(undefined)
     navigation.backToLedger()
-    return true
+    return result
   }
 
   // 복구 코드로 받아 온 데이터로 전체 바꾸기 (SPEC-006 AC-5). 백업 불러오기와 같이 올해 장부의 처음 달로 돌아가 알린다
@@ -339,7 +340,6 @@ export default function App({
   const noticeActions: Record<StorageNoticeAction, { label: string; icon: IconName; onClick: () => void }> = {
     'import-backup': { label: '기록 파일 불러오기', icon: 'folder', onClick: backup.startImport },
     'send-backup': { label: '기록 파일 보내기', icon: 'share', onClick: backup.send },
-    'reload-app': { label: '앱 다시 열기', icon: 'refresh', onClick: () => window.location.reload() },
   }
   const storageNoticeList = storageNotices(ledger.startup, ledger.saveFailure)
   const notices = storageNoticeList.map(({ message, action }) => (

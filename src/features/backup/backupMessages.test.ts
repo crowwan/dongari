@@ -27,6 +27,14 @@ describe('SPEC-002 백업 불러오기 문구', () => {
     })
   })
 
+  // 저장 공간 탓이 아니라 공간을 비우고 다시 해도 같다 (#172 리뷰). 기록 파일·복구 코드 불러오기가 같이 쓴다
+  it('가드에 어긋나 저장하지 않았으면 앱 문제라고 알리고 지금 기록은 그대로라고 알린다', () => {
+    expect(restoreFailureMessage('invalid-data')).toEqual({
+      title: '불러오지 못했어요',
+      description: '앱에 문제가 있어 불러온 기록을 저장하지 않았어요. 지금 기록은 그대로예요',
+    })
+  })
+
   it('그 밖의 저장 실패는 지금 기록이 그대로라고 알린다', () => {
     expect(restoreFailureMessage('quota-exceeded')).toEqual({
       title: '불러오지 못했어요',

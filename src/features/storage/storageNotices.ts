@@ -9,12 +9,12 @@ export const STORAGE_NOTICE = {
   oldVersionUnpreserved: '기록을 새 버전으로 옮기지 못했어요. 지금 적는 내용은 저장되지 않아요',
   // v2.6 문구 ①: 목록에 보이는 내역이 앱을 닫으면 사라진다는 것까지 알린다 (#121)
   saveFailed: '저장하지 못했어요. 방금 적은 내역은 앱을 닫으면 사라져요. 기록 파일을 보내 두세요',
-  // 가드에 어긋나 쓰지 않음(#172): 사용자가 잘못한 것이 아니고, 다시 열면 마지막으로 저장한 기록이 열린다
-  invalidData: '앱에 문제가 있어 방금 바꾼 것을 저장하지 않았어요. 그 전 기록은 그대로예요. 앱을 다시 열어 주세요',
+  // 가드에 어긋나 쓰지 않음(#172): 사용자가 잘못한 것이 아니고, 화면은 그 변경 전으로 돌아가 있다(useLedger)
+  invalidData: '앱에 문제가 있어 방금 바꾼 것을 저장하지 않았어요. 그 전 기록은 그대로예요',
 }
 
-// 안내 띠에 붙는 버튼: [기록 파일 불러오기] / [기록 파일 보내기] / [앱 다시 열기]
-export type StorageNoticeAction = 'import-backup' | 'send-backup' | 'reload-app'
+// 안내 띠에 붙는 버튼: [기록 파일 불러오기] / [기록 파일 보내기]
+export type StorageNoticeAction = 'import-backup' | 'send-backup'
 
 export interface StorageNotice {
   message: string
@@ -38,10 +38,10 @@ function startupNotice(startup: StartupStatus): StorageNotice | undefined {
   return undefined
 }
 
-// 가드에 어긋난 저장(invalid-data)은 화면의 기록에 앱이 만든 틀린 값이 들어 있어, 지금 기록 파일을 보내면 열 수 없는 파일이 된다.
-// 보내기 대신 앱을 다시 열어 마지막으로 저장한 기록으로 돌아가게 한다 (#172)
+// 가드에 어긋난 저장(invalid-data)은 그 변경만 화면에 들이지 않아(useLedger) 다음 저장은 된다. 할 일이 없으니 버튼 없이 알리기만 한다.
+// 기록 파일 보내기를 권하지 않는다: 앱 문제라 사용자가 챙길 것이 없고, 저장 실패 띠의 "앱을 닫으면 사라져요"와 다르다 (#172)
 function saveFailureNotice(reason: SaveFailureReason): StorageNotice {
-  if (reason === 'invalid-data') return { message: STORAGE_NOTICE.invalidData, action: 'reload-app' }
+  if (reason === 'invalid-data') return { message: STORAGE_NOTICE.invalidData }
   return { message: STORAGE_NOTICE.saveFailed, action: 'send-backup' }
 }
 
