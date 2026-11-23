@@ -59,7 +59,9 @@ export function pwaOptions(tokensCss: string, base: string): Partial<VitePWAOpti
       ],
     },
     // 미리 저장: 화면 파일·글꼴(Pretendard woff2)은 아래 glob, 아이콘은 includeAssets 와 manifest 아이콘,
-    // manifest 는 플러그인이 넣는다 (겹치지 않게 나눔). 글꼴이 빠지면 오프라인에서 기기 글꼴로 바뀌어 글자 폭이 달라진다
+    // manifest 는 플러그인이 넣는다 (겹치지 않게 나눔). 글꼴이 빠지면 오프라인에서 기기 글꼴로 바뀌어 글자 폭이 달라진다.
+    // 누를 때 받는 엑셀 라이브러리(SheetJS) 조각도 js 라 같이 미리 저장한다 — 약 500 kB 로 workbox 기본 상한(2 MiB) 안.
+    // 첫 화면 밖에 있고 미리 저장되는지는 빌드 끝의 scripts/check-excel-bundle.mjs 가 본다 (SPEC-010 AC-35, ADR 009)
     workbox: {
       globPatterns: ['**/*.{js,css,html,woff2}'],
       cleanupOutdatedCaches: true,
