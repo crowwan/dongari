@@ -301,6 +301,21 @@ describe('SPEC-001 화면 이동과 뒤로가기', () => {
       pressBackButton()
       expect(result.current.screen).toEqual({ name: 'ledger' })
     })
+
+    it('SPEC-010 장부가 아닌 화면에서 다른 화면을 열면(설정 → 엑셀 읽은 내용) 그 화면 칸을 바꿔, 뒤로 버튼 한 번에 장부로 온다', () => {
+      const replace = vi.spyOn(window.history, 'replaceState')
+      const { result } = renderHook(() => useScreenHistory())
+      act(() => result.current.open({ name: 'settings' }))
+      push.mockClear()
+
+      act(() => result.current.open({ name: 'excel-import' }))
+
+      expect(push).not.toHaveBeenCalled()
+      expect(replace).toHaveBeenCalledWith({ screen: 'excel-import' }, '')
+      expect(result.current.screen).toEqual({ name: 'excel-import' })
+      act(() => result.current.backToLedger())
+      expect(back).toHaveBeenCalledTimes(1)
+    })
   })
 })
 

@@ -10,6 +10,8 @@ type BookPickerProps = {
   currentId: string // 지금 보고 있는 장부
   onPick: (id: string) => void
   onNew: () => void
+  // [엑셀 파일로 새 장부] (SPEC-010 8절): 폰 파일 고르기를 연다. 없으면 버튼이 없다
+  onImportExcel?: () => void
 }
 
 // 줄 아래 작은 글자: "동아리 · 잔액 537,142원". 잔액을 모르면(연도별 장부 없음) 종류만
@@ -19,8 +21,8 @@ function choiceNote({ kind, balance }: BookChoice): string {
 }
 
 // 장부 고르기 창 "어느 장부를 볼까요?" 안 (SPEC-005 A): 장부마다 한 줄(종류 아이콘 + 이름 + 종류·잔액), 지금 장부는 청록 둘레 + ✓,
-// 맨 아래 점선 [+ 새 장부 만들기]. 창은 장부 화면이 연다 (BottomSheet, 뒤로 버튼은 창만 닫는다)
-export function BookPicker({ books, currentId, onPick, onNew }: BookPickerProps) {
+// 맨 아래 점선 [+ 새 장부 만들기], 그 아래 같은 모양 [엑셀 파일로 새 장부](SPEC-010). 창은 장부 화면이 연다 (BottomSheet, 뒤로 버튼은 창만 닫는다)
+export function BookPicker({ books, currentId, onPick, onNew, onImportExcel }: BookPickerProps) {
   return (
     <>
       <div className="books__list" role="group" aria-label="장부" data-testid="book-picker">
@@ -50,6 +52,12 @@ export function BookPicker({ books, currentId, onPick, onNew }: BookPickerProps)
         <Icon name="plus" />
         새 장부 만들기
       </button>
+      {onImportExcel && (
+        <button type="button" className="books__new" onClick={onImportExcel}>
+          <Icon name="excel" />
+          엑셀 파일로 새 장부
+        </button>
+      )}
     </>
   )
 }

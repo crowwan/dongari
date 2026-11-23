@@ -32,6 +32,7 @@ export type Screen =
   | { name: 'edit-entry'; id: string } // 내역 고치기. id: 고칠 기록
   | { name: 'new-book' } // 새 장부 만들기 (SPEC-005, 장부 고르기 창에서)
   | { name: 'keep-restore' } // 복구 코드로 불러오기 (SPEC-006, 첫 실행 화면에서. 설정에서는 설정 위 편집 화면으로)
+  | { name: 'excel-import' } // 엑셀 파일 읽기 → 읽은 내용 확인 (SPEC-010 8절, 장부 고르기 창·설정·첫 실행에서 파일을 고르면)
 
 const LEDGER: Screen = { name: 'ledger' }
 
@@ -133,11 +134,14 @@ export function useScreenHistory({ backOpensDialog }: ScreenHistoryOptions = {})
 
   // 화면 칸 쌓기. 선택 창이 열려 있으면 창의 칸을 화면 칸으로 바꿔 끼운다: 창을 닫는 back() 은 늦게 오는 popstate 라
   // 바로 이어 쌓으면 순서가 꼬이고, 바꿔 끼우면 그 화면에서 뒤로 버튼 한 번에 장부로 온다.
-  // 확인 창 칸도 같다: 안내 말풍선(SPEC-008)이 가리키는 버튼을 누르면 말풍선 칸을 그 화면 칸으로 바꿔 끼운다
+  // 확인 창 칸도 같다: 안내 말풍선(SPEC-008)이 가리키는 버튼을 누르면 말풍선 칸을 그 화면 칸으로 바꿔 끼운다.
+  // 장부가 아닌 화면에서 다른 화면을 열 때(설정 [엑셀 파일 불러오기] → 엑셀 읽은 내용, SPEC-010 #166)도 그 화면 칸을 바꿔 끼운다:
+  // 새 화면도 [‹ 장부로] 라 뒤로 버튼 한 번에 장부로 와야 하고, 쌓으면 장부로 돌아온 뒤에도 앞 화면 칸이 남는다
   function enterScreen(name: Screen['name']) {
     const top: unknown = window.history.state
     const onLayer = (sheetRef.current !== null && isSheetEntry(top)) || (dialogRef.current !== null && isDialogEntry(top))
-    if (onLayer) {
+    const onScreen = screen.name !== 'ledger' && isOwnEntry(top) && !isSheetEntry(top) && !isDialogEntry(top)
+    if (onLayer || onScreen) {
       const state: HistoryState = { screen: name }
       window.history.replaceState(state, '')
     } else {

@@ -4,6 +4,10 @@ import { itemIcon } from '../domain/itemIcon'
 import { yearReport } from '../domain/report'
 import type { EntryType } from '../domain/types'
 import { BookPicker } from '../features/books/BookPicker'
+import { ImportFacts, ImportNote } from '../features/excel/ExcelImportScreen'
+import { EXCEL_PROBLEM_MESSAGES } from '../features/excel/excelMessages'
+import { ExcelProblem, ExcelReading } from '../features/excel/ExcelStatus'
+import type { ExcelImportSummary } from '../features/excel/readExcelBook'
 import { BrowserBar, BrowserMenu, BrowserPage, BrowserPicture } from '../features/install/BrowserPicture'
 import { HomeScreenPreview } from '../features/install/HomeScreenPreview'
 import { InAppBrowserScreen, InAppImportCard } from '../features/install/InAppBrowserScreen'
@@ -134,7 +138,30 @@ const ACTION_ICONS: { icon: IconName; label: string }[] = [
   { icon: 'key', label: '복구 코드로 불러오기' },
   { icon: 'alert', label: '저장 안 됨' },
   { icon: 'coin', label: '월 회비' },
+  { icon: 'excel', label: '엑셀 파일로 새 장부' },
+  { icon: 'file-in', label: '엑셀 파일 불러오기' },
+  { icon: 'ok', label: '잔액이 맞아요' },
 ]
+
+// 엑셀 읽은 내용 확인 화면 사실 카드 견본 (SPEC-010 8절 #166, 지어낸 숫자)
+const CATALOG_EXCEL_YEARS = Array.from({ length: 14 }, (_, index) => 2013 + index)
+const CATALOG_EXCEL_SUMMARY: ExcelImportSummary = {
+  sheetCount: 37,
+  readSheets: [],
+  unreadSheets: [],
+  years: CATALOG_EXCEL_YEARS,
+  incomeCount: 1_014,
+  expenseCount: 80,
+  memberCount: 31,
+  lastYearMemberCount: 19,
+  monthlyFees: CATALOG_EXCEL_YEARS.map((year) => ({ year, fee: year < 2017 ? 10_000 : 20_000 })),
+  startMonth: '2026-01',
+  balanceChecks: [],
+  balanceMismatches: [],
+  unassignedDuesCount: 118,
+  changedDates: [],
+  unreadLines: [],
+}
 
 // 복구 코드로 불러오기 미리보기용 서버: 어떤 코드든 보관본이 없다고 답한다
 const NO_KEEP_SERVER: KeepServer = {
@@ -563,12 +590,56 @@ export function Catalog() {
         </Section>
 
         <Section title="BookPicker (장부 고르기 창, SPEC-005)">
-          <State label="지금 장부 청록 둘레 + ✓, 맨 아래 점선 [+ 새 장부 만들기] (눌러 보기)">
+          <State label="지금 장부 청록 둘레 + ✓, 맨 아래 점선 [+ 새 장부 만들기], 그 아래 같은 모양 [엑셀 파일로 새 장부](SPEC-010) (눌러 보기)">
             <div className="catalog__frame catalog__frame--sheet">
               <BottomSheet inline open title="어느 장부를 볼까요?" onClose={noop}>
-                <BookPicker books={BOOK_CHOICES} currentId={pickedBook} onPick={setPickedBook} onNew={noop} />
+                <BookPicker books={BOOK_CHOICES} currentId={pickedBook} onPick={setPickedBook} onNew={noop} onImportExcel={noop} />
               </BottomSheet>
             </div>
+          </State>
+        </Section>
+
+        <Section title="엑셀 불러오기 (SPEC-010 8절 #166)">
+          <State label="읽는 중 (엑셀 기능을 처음 받는 시간 포함, [‹ 장부로] 로 떠나면 버림)">
+            <div className="catalog__frame catalog__frame--short-screen">
+              <div className="app__main">
+                <ExcelReading fileName="지어낸모임.xlsx" onBack={noop} />
+              </div>
+            </div>
+          </State>
+          <State label="읽지 못함: 제목 + 다음에 할 일 + 아래 고정 [파일 다시 고르기] (기록 파일을 고른 경우)">
+            <div className="catalog__frame catalog__frame--short-screen">
+              <div className="app__main">
+                <ExcelProblem message={EXCEL_PROBLEM_MESSAGES['backup-file']} onBack={noop} onPickAgain={noop} />
+              </div>
+            </div>
+          </State>
+          <State label="사실 카드: 해 · 기록 · 회원 · 월 회비(이어진 해 묶음) · 회비 표 (흰 카드, 줄 사이 선 없음)">
+            <ImportFacts summary={CATALOG_EXCEL_SUMMARY} />
+          </State>
+          <State label="알림 줄 ok: 흰 면 + 동그라미 체크 (검산이 맞음)">
+            <ImportNote tone="ok" title="해마다 잔액이 맞아요">
+              엑셀 잔액과 앱 계산을 해마다 맞춰 봤어요. 이월금은 엑셀에 적힌 값을 그대로 써요.
+            </ImportNote>
+          </State>
+          <State label="알림 줄 info: --info-bg (낸 분을 다 못 나눈 회비)">
+            <ImportNote tone="info" title="낸 분을 다 못 나눈 회비 118건">
+              회원 이름이 섞인 입금은 회비로 넣고, 낸 분은 나중에 회비 표에서 붙여요.
+            </ImportNote>
+          </State>
+          <State label="알림 줄 warn: --warn-bg + 목록 (검산이 다름)">
+            <ImportNote tone="warn" title="잔액을 맞춰 보니 2곳이 달라요">
+              <ul className="excel-note__items">
+                <li>2019년 마지막 잔액 4원 차이</li>
+                <li>2020년 이월금 4원 차이</li>
+              </ul>
+              이월금은 엑셀에 적힌 값을 그대로 써요.
+            </ImportNote>
+          </State>
+          <State label="알림 줄 warn 버튼: 줄 전체를 누르면 목록 (끝에 흰 면 [보기 ›], 눌러 보기)">
+            <ImportNote tone="warn" title="날짜를 바꾼 줄 3건" onOpen={noop}>
+              그 달에 없는 날은 그 달 마지막 날로, 날을 읽을 수 없는 줄은 날짜 없이 넣었어요.
+            </ImportNote>
           </State>
         </Section>
 

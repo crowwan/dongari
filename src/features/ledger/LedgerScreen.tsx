@@ -42,6 +42,7 @@ type LedgerScreenProps = {
   carryoverWords: CarryoverWords // 잔액 카드 보조 줄의 이월금 이름 (장부 종류별)
   onPickBook: (id: string) => void // 창에서 장부를 골랐다 (창은 이 화면이 닫는다)
   onNewBook: () => void // 창의 [+ 새 장부 만들기] (창의 방문 기록 칸은 새 장부 만들기 화면이 이어 쓴다)
+  onImportExcel?: () => void // 창의 [엑셀 파일로 새 장부] (SPEC-010 8절): 파일 고르기. 고르면 창의 칸을 읽은 내용 화면이 이어 쓴다
   year: number
   ledger: Ledger
   totals: LedgerTotals
@@ -77,6 +78,7 @@ export function LedgerScreen({
   carryoverWords,
   onPickBook,
   onNewBook,
+  onImportExcel,
   year,
   ledger,
   totals,
@@ -177,6 +179,7 @@ export function LedgerScreen({
             sheets.closeSheet()
           }}
           onNew={onNewBook}
+          onImportExcel={onImportExcel}
         />
       </BottomSheet>
     </div>

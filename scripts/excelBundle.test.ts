@@ -72,9 +72,14 @@ describe('SPEC-010 AC-35 엑셀 라이브러리는 첫 화면 번들에 없고 �
     expect(missingBuiltFiles(() => true)).toEqual([])
   })
 
-  it('아직 화면이 엑셀 기능을 부르지 않아 SheetJS 조각이 없으면 문제는 아니고 조각 목록만 빈다', () => {
+  it('SheetJS 조각을 하나도 찾지 못하면 검사가 헛돌지 않게 문제로 알린다 (#166 부터 엑셀 화면이 늘 부른다)', () => {
     const scripts = app().scripts.filter((script) => script.file !== 'assets/xlsx-Q1w2E3.js')
 
-    expect(checkExcelBundle(app({ scripts }))).toMatchObject({ excelChunks: [], problems: [] })
+    expect(checkExcelBundle(app({ scripts }))).toMatchObject({
+      excelChunks: [],
+      problems: [
+        "SheetJS 조각을 찾지 못했어요 — 엑셀 기능이 빠졌거나 검사 표시('SheetJS')가 바뀌었어요. 표시가 바뀌었으면 첫 화면에 섞여도 검사가 못 잡아요",
+      ],
+    })
   })
 })

@@ -1,0 +1,381 @@
+// 엑셀 파일 읽기 → 읽은 내용 확인 (SPEC-010 8절 "흐름"·"읽은 내용 확인", #166). 이 파일은 엑셀 조각이다:
+// 화면을 열 때 ExcelImportSlot 이 동적 import 로 받는다 (엑셀 읽기 규칙이 첫 화면 파일에 들어가지 않게).
+// [새 장부 만들기]를 누르기 전에는 아무것도 저장하지 않는다. 읽는 중에 화면을 떠나면 읽기를 버린다
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
+import type { EntryDeps } from '../../domain/ledger'
+import type { StoredData } from '../../domain/types'
+import { BottomActionBar } from '../../ui/BottomActionBar'
+import { BottomSheet } from '../../ui/BottomSheet'
+import { Button } from '../../ui/Button'
+import { Icon, type IconName } from '../../ui/Icon'
+import { formatAmount } from '../../ui/money'
+import { MoneyInput } from '../../ui/MoneyInput'
+import { TextField } from '../../ui/TextField'
+import { BackToLedger } from '../BackToLedger'
+import { EditPage } from '../settings/EditPage'
+import type { SheetHistory } from '../useScreenHistory'
+import { readExcelFile, type ExcelFileProblem, type PickedFile } from './excelFile'
+import { EXCEL_PROBLEM_MESSAGES } from './excelMessages'
+import { ExcelProblem, ExcelReading } from './ExcelStatus'
+import {
+  balanceCheckText,
+  feeLines,
+  importedBookName,
+  isNearKeepLimit,
+  lineNoteLabel,
+  unreadSheetsText,
+  yearsText,
+} from './importFacts'
+import type { LineNote } from './ledgerSheet'
+import { readExcelBook, type ExcelImportSummary, type ImportedBook } from './readExcelBook'
+import type { ExcelWorkbook } from './sheet'
+import './excelImport.css'
+
+// 확인 화면 위에 뜨는 것 (방문 기록 한 칸 — 뒤로 버튼은 이것만 닫는다)
+const FEE_PAGE = 'excel-fees'
+const CHANGED_DATES_SHEET = 'excel-changed-dates'
+const UNREAD_LINES_SHEET = 'excel-unread-lines'
+
+export type ExcelImportScreenProps = {
+  file: PickedFile // 고른 파일
+  deps: EntryDeps // 기록·회원 번호와 적은 시각
+  bookNames: readonly string[] // 지금 있는 장부 이름 (같은 이름이면 " (엑셀)")
+  data: StoredData // 지금 저장 데이터 (자동으로 지키기 크기 경고)
+  sheets: SheetHistory
+  onBack: () => void
+  onPickAgain: () => void // 파일 고르기 창을 다시 연다
+  onCreate: (name: string, book: ImportedBook) => void // [새 장부 만들기]
+}
+
+type Read = { book: ImportedBook; summary: ExcelImportSummary; workbook: ExcelWorkbook }
+
+type Phase = { name: 'reading' } | { name: 'failed'; problem: ExcelFileProblem } | { name: 'read'; read: Read }
+
+export function ExcelImportScreen({ file, deps, bookNames, data, sheets, onBack, onPickAgain, onCreate }: ExcelImportScreenProps) {
+  const [phase, setPhase] = useState<Phase>({ name: 'reading' })
+  // 장부 이름 칸. 손대기 전에는 파일 이름에서 정한 값
+  const [name, setName] = useState<string>()
+  // [새 장부 만들기] 를 두 번 눌러 장부가 둘 생기지 않게
+  const created = useRef(false)
+
+  const readFile = useEffectEvent(() => readExcelFile(file, deps))
+  useEffect(() => {
+    // 화면을 떠나면(읽는 중 [‹ 장부로]·뒤로 버튼) 읽은 결과를 버린다
+    let alive = true
+    readFile()
+      .catch((): { ok: false; problem: ExcelFileProblem } => ({ ok: false, problem: 'not-excel' }))
+      .then((result) => {
+        if (!alive) return
+        setPhase(result.ok ? { name: 'read', read: result } : { name: 'failed', problem: result.problem })
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  if (phase.name === 'reading') return <ExcelReading fileName={file.name} onBack={onBack} />
+  if (phase.name === 'failed') {
+    return <ExcelProblem message={EXCEL_PROBLEM_MESSAGES[phase.problem]} onBack={onBack} onPickAgain={onPickAgain} />
+  }
+
+  const { read } = phase
+  const { summary } = read
+
+  if (sheets.sheet === FEE_PAGE) {
+    return (
+      <FeeEdit
+        fees={summary.monthlyFees}
+        onBack={sheets.closeSheet}
+        onSave={(fixed) => {
+          // 고친 월 회비로 낸 분 배수 판정을 다시 해 처음부터 다시 읽는다 (8절 "월 회비", 스펙 "구현에서 정한 것")
+          const again = readExcelBook(read.workbook, deps, { monthlyFees: fixed })
+          if (again.ok) setPhase({ name: 'read', read: { ...again, workbook: read.workbook } })
+          sheets.closeSheet()
+        }}
+      />
+    )
+  }
+
+  const bookName = name ?? importedBookName(file.name, bookNames)
+  const missingName = bookName.trim() === ''
+
+  return (
+    <div className="screen screen--stack excel excel-import" data-testid="excel-import-screen">
+      <div className="excel__head">
+        <BackToLedger onBack={onBack} />
+        <h1 className="screen__title">엑셀 파일을 읽었어요</h1>
+      </div>
+      <p className="excel-import__file">
+        {file.name} · 시트 {summary.sheetCount}개 중 {summary.readSheets.length}개를 읽었어요
+      </p>
+
+      <div className="excel-import__group">
+        <TextField label="장부 이름" value={bookName} onChange={setName} />
+      </div>
+
+      <div className="excel-import__group excel-import__facts-block">
+        <ImportFacts summary={summary} />
+        <Button variant="secondary" icon="pen" onClick={() => sheets.openSheet(FEE_PAGE)}>
+          월 회비 고치기
+        </Button>
+      </div>
+
+      <div className="excel-import__group excel-import__notes">
+        <BalanceNote summary={summary} />
+        {summary.unassignedDuesCount > 0 && (
+          <ImportNote tone="info" title={`낸 분을 다 못 나눈 회비 ${formatAmount(summary.unassignedDuesCount)}건`}>
+            회원 이름이 섞인 입금은 회비로 넣고, 낸 분은 나중에 회비 표에서 붙여요. 회원 이름이 없는 입금(이자·찬조)은 엑셀 글이 항목
+            이름이 돼요.
+          </ImportNote>
+        )}
+        {summary.changedDates.length > 0 && (
+          <ImportNote
+            tone="warn"
+            title={`날짜를 바꾼 줄 ${formatAmount(summary.changedDates.length)}건`}
+            onOpen={() => sheets.openSheet(CHANGED_DATES_SHEET)}
+          >
+            그 달에 없는 날은 그 달 마지막 날로, 날을 읽을 수 없는 줄은 날짜 없이 넣었어요.
+          </ImportNote>
+        )}
+        {summary.unreadLines.length > 0 && (
+          <ImportNote
+            tone="warn"
+            title={`읽지 못한 줄 ${formatAmount(summary.unreadLines.length)}건`}
+            onOpen={() => sheets.openSheet(UNREAD_LINES_SHEET)}
+          >
+            금액이나 날짜를 읽지 못해 넣지 않았어요. 필요하면 만든 뒤 직접 적어 주세요.
+          </ImportNote>
+        )}
+        {isNearKeepLimit(data, read.book) && (
+          <ImportNote tone="warn" title="기록이 많아 자동으로 지키기를 못 할 수 있어요">
+            장부는 만들 수 있어요. 가끔 기록 파일을 보내 두세요.
+          </ImportNote>
+        )}
+      </div>
+
+      {unreadSheetsText(summary.unreadSheets) && <p className="screen__note">{unreadSheetsText(summary.unreadSheets)}</p>}
+
+      <LineNotesSheet
+        open={sheets.sheet === CHANGED_DATES_SHEET}
+        title={`날짜를 바꾼 줄 ${formatAmount(summary.changedDates.length)}건`}
+        notes={summary.changedDates}
+        onClose={sheets.closeSheet}
+      />
+      <LineNotesSheet
+        open={sheets.sheet === UNREAD_LINES_SHEET}
+        title={`읽지 못한 줄 ${formatAmount(summary.unreadLines.length)}건`}
+        notes={summary.unreadLines}
+        onClose={sheets.closeSheet}
+      />
+
+      {/* 다른 장부에 넣기(F4)는 #169 에서 보조 버튼으로 붙인다 */}
+      <BottomActionBar
+        label="새 장부 만들기"
+        icon="check"
+        disabled={missingName}
+        note={missingName ? '장부 이름을 적어 주세요' : undefined}
+        onClick={() => {
+          if (missingName || created.current) return
+          created.current = true
+          onCreate(bookName.trim(), read.book)
+        }}
+      />
+    </div>
+  )
+}
+
+type FactProps = {
+  label: string
+  children: ReactNode
+}
+
+// 사실 카드 한 줄: 왼쪽 이름(보조 글자) + 오른쪽 값(굵게, 아래 작은 글자). 큰 글씨에서 한 줄에 안 들어가면 값이 아래 줄로
+function Fact({ label, children }: FactProps) {
+  return (
+    <div className="excel-facts__row">
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  )
+}
+
+function FactValue({ main, sub }: { main: string; sub?: string }) {
+  return (
+    <>
+      <span className="excel-facts__main">{main}</span>
+      {sub && <span className="excel-facts__sub">{sub}</span>}
+    </>
+  )
+}
+
+// 사실 카드 (8절): 해 → 기록 → 회원 → 월 회비 → 회비 표. 흰 카드, 줄 사이 선 없음
+export function ImportFacts({ summary }: { summary: ExcelImportSummary }) {
+  const years = yearsText(summary.years)
+  const lastYear = summary.years[summary.years.length - 1]
+  const [startYear, startMonth] = summary.startMonth.split('-').map(Number)
+  const total = summary.incomeCount + summary.expenseCount
+  return (
+    <dl className="excel-facts" aria-label="읽은 내용" data-testid="excel-facts">
+      <Fact label="해">
+        <FactValue main={years.main} sub={years.sub} />
+      </Fact>
+      <Fact label="기록">
+        <FactValue
+          main={`${formatAmount(total)}건`}
+          sub={`수입 ${formatAmount(summary.incomeCount)} · 지출 ${formatAmount(summary.expenseCount)}`}
+        />
+      </Fact>
+      <Fact label="회원">
+        <FactValue
+          main={`${formatAmount(summary.memberCount)}명`}
+          sub={summary.memberCount > 0 ? `${lastYear}년 회원 ${formatAmount(summary.lastYearMemberCount)}명` : undefined}
+        />
+      </Fact>
+      <Fact label="월 회비">
+        {feeLines(summary.monthlyFees).map((line) => (
+          <span key={line} className="excel-facts__main">
+            {line}
+          </span>
+        ))}
+      </Fact>
+      <Fact label="회비 표">
+        <FactValue main={`${startYear}년 ${startMonth}월부터`} />
+      </Fact>
+    </dl>
+  )
+}
+
+// 검산 줄: 맞음 ✓ / N곳이 달라요 + 해·차이 / 맞춰 볼 엑셀 잔액 없음. 이월금은 엑셀 값을 쓴다고 함께 말한다
+function BalanceNote({ summary }: { summary: ExcelImportSummary }) {
+  const check = balanceCheckText(summary.balanceChecks)
+  const carryover = '이월금은 엑셀에 적힌 값을 그대로 써요.'
+  if (check.kind === 'ok') {
+    return (
+      <ImportNote tone="ok" title="해마다 잔액이 맞아요">
+        엑셀 잔액과 앱 계산을 해마다 맞춰 봤어요. {carryover}
+      </ImportNote>
+    )
+  }
+  if (check.kind === 'none') {
+    return (
+      <ImportNote tone="info" title="엑셀에 잔액이 없어 맞춰 보지 못했어요">
+        {carryover}
+      </ImportNote>
+    )
+  }
+  return (
+    <ImportNote tone="warn" title={check.title}>
+      <ul className="excel-note__items">
+        {check.items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+      {carryover} 다른 곳은 만든 뒤 고칠 수 있어요.
+    </ImportNote>
+  )
+}
+
+const NOTE_ICONS: Readonly<Record<ImportNoteProps['tone'], IconName>> = { ok: 'ok', info: 'info', warn: 'alert' }
+
+type ImportNoteProps = {
+  // ok: 흰 면 + 체크(맞음) / info: 알아 둘 것(--info-bg) / warn: 확인할 것(--warn-bg)
+  tone: 'ok' | 'info' | 'warn'
+  title: string
+  children: ReactNode
+  // 있으면 줄 전체가 버튼이고 끝에 [보기 ›] (목록을 연다)
+  onOpen?: () => void
+}
+
+// 확인 화면의 알림 줄 한 개: 아이콘 + 굵은 제목 + 설명. 색만이 아니라 아이콘 모양으로도 갈린다
+export function ImportNote({ tone, title, children, onOpen }: ImportNoteProps) {
+  // 버튼 안에는 글자 덩어리(span)만 둘 수 있다. 버튼이 아니면 설명에 목록(검산 차이)을 넣을 수 있게 div
+  const Text = onOpen ? 'span' : 'div'
+  const content = (
+    <>
+      <Icon name={NOTE_ICONS[tone]} />
+      <Text className="excel-note__text">
+        <Text className="excel-note__title">{title}</Text>
+        <Text className="excel-note__body">{children}</Text>
+      </Text>
+    </>
+  )
+  if (!onOpen) {
+    return (
+      <div className="excel-note" data-tone={tone} data-testid="excel-note">
+        {content}
+      </div>
+    )
+  }
+  return (
+    <button type="button" className="excel-note" data-tone={tone} data-testid="excel-note" onClick={onOpen}>
+      {content}
+      <span className="excel-note__open">
+        보기
+        <Icon name="right" />
+      </span>
+    </button>
+  )
+}
+
+type LineNotesSheetProps = {
+  open: boolean
+  title: string
+  notes: readonly LineNote[]
+  onClose: () => void
+}
+
+// [보기] 목록: 해·달 + 엑셀 원래 글 (8절 경고 줄)
+function LineNotesSheet({ open, title, notes, onClose }: LineNotesSheetProps) {
+  return (
+    <BottomSheet open={open} title={title} onClose={onClose}>
+      <ul className="excel-lines" aria-label={title}>
+        {notes.map((note, index) => (
+          <li key={index} className="excel-lines__line">
+            <span className="excel-lines__where">{lineNoteLabel(note)}</span>
+            <span className="excel-lines__text">{note.text}</span>
+          </li>
+        ))}
+      </ul>
+      <Button variant="secondary" onClick={onClose}>
+        닫기
+      </Button>
+    </BottomSheet>
+  )
+}
+
+type FeeEditProps = {
+  fees: ExcelImportSummary['monthlyFees']
+  onSave: (fixed: Map<number, number>) => void
+  onBack: () => void
+}
+
+// 월 회비 고치기: 해마다 금액 칸 하나. 고치면 그 금액으로 낸 분을 다시 나눈다 (월 회비의 배수 판정이 달라지므로).
+// 읽은 값이 있던 해는 비울 수 없다 (설정 월 회비처럼 "정하지 않음"으로 되돌리는 길은 두지 않는다)
+function FeeEdit({ fees, onSave, onBack }: FeeEditProps) {
+  const [amounts, setAmounts] = useState(() => new Map(fees.map(({ year, fee }) => [year, fee ?? 0])))
+  const amountOf = (year: number) => amounts.get(year) ?? 0
+  const changed = fees.some(({ year, fee }) => amountOf(year) !== (fee ?? 0))
+  const emptied = fees.some(({ year, fee }) => fee !== undefined && amountOf(year) === 0)
+
+  return (
+    <EditPage
+      title="월 회비 고치기"
+      backLabel="읽은 내용"
+      canSave={changed && !emptied}
+      onBack={onBack}
+      onSave={() => onSave(new Map([...amounts].filter(([, amount]) => amount > 0)))}
+    >
+      <p className="screen__note">해마다 한 분이 한 달에 내는 돈이에요. 고치면 그 금액으로 낸 분을 다시 나눠요.</p>
+      {fees.map(({ year, fee }) => (
+        <MoneyInput
+          key={year}
+          label={`${year}년 월 회비`}
+          labelRole="label"
+          value={amountOf(year)}
+          error={fee !== undefined && amountOf(year) === 0 ? '금액을 적어 주세요' : undefined}
+          onChange={(amount) => setAmounts((current) => new Map(current).set(year, amount))}
+        />
+      ))}
+    </EditPage>
+  )
+}
