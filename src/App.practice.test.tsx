@@ -759,6 +759,8 @@ describe('SPEC-010 10절 연습 장부의 회비 이름 고르기·회비 표·�
     expect(screen.getByText('해마다 잔액이 맞아요')).toBeInTheDocument()
     expect(band()).toBeInTheDocument()
     expect(isLocked(screen.getByLabelText('장부 이름'))).toBe(true)
+    // 연습 장부도 동아리 장부지만 연습은 [새 장부 만들기]만 따라 한다 (SPEC-010 8절 "다른 장부에 넣기", #169)
+    expect(screen.queryByRole('button', { name: '다른 장부에 넣기' })).not.toBeInTheDocument()
 
     await userEvent.click(create)
 

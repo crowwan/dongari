@@ -13,9 +13,11 @@ import type { PayerAssign } from '../features/dues/payerAssign'
 import { UnassignedDuesCard } from '../features/dues/UnassignedDuesCard'
 import { ImportFacts } from '../features/excel/ExcelImportScreen'
 import { ExcelExportSheet } from '../features/excel/ExcelExportSheet'
+import { ExcelMergePage, MergeConfirmDialog } from '../features/excel/ExcelMergePage'
 import { ExcelNote } from '../features/excel/ExcelParts'
 import { ExcelProblem, ExcelReading } from '../features/excel/ExcelStatus'
-import type { ExcelImportSummary } from '../features/excel/readExcelBook'
+import { mergePlan } from '../features/excel/mergeBook'
+import type { ExcelImportSummary, ImportedBook } from '../features/excel/readExcelBook'
 import { BrowserBar, BrowserMenu, BrowserPage, BrowserPicture } from '../features/install/BrowserPicture'
 import { HomeScreenPreview } from '../features/install/HomeScreenPreview'
 import { InAppBrowserScreen, InAppImportCard } from '../features/install/InAppBrowserScreen'
@@ -287,6 +289,30 @@ const ASSIGN_PREVIEW: PayerAssign = {
 
 // 붙이기 화면 미리보기용 칸: 선택 창·확인 창이 뜨지 않는다
 const NO_SHEETS: SheetHistory = { sheet: null, openSheet: noop, closeSheet: noop, ...NO_DIALOGS }
+
+// 다른 장부에 넣기 견본 (지어낸 엑셀, SPEC-010 8절 #169): 2024·2025년은 다솜회에 없는 해, 2026년은 앱 기록이 있는 해.
+// 회원 강민지·김도윤은 다솜회와 같은 이름, 정하늘은 새 이름
+function catalogExcelLedger(year: number, count: number) {
+  const entries = Array.from({ length: count }, (_, index) => ({
+    id: `e${year}-${index}`,
+    month: index + 1,
+    day: 5,
+    type: 'income' as const,
+    name: '회비',
+    amount: 20_000,
+    createdAt: '2026-11-23T00:00:00.000Z',
+  }))
+  return { year, carryover: 0, monthlyFee: 20_000, entries }
+}
+const CATALOG_MERGE_IMPORTED: ImportedBook = {
+  ledgers: { '2024': catalogExcelLedger(2024, 2), '2025': catalogExcelLedger(2025, 4), '2026': catalogExcelLedger(2026, 5) },
+  members: [
+    { id: 'x-kang', name: '강민지', joined: '2024-01', off: [] },
+    { id: 'x-kim', name: '김도윤', joined: '2024-01', off: [] },
+    { id: 'x-jung', name: '정하늘', joined: '2025-03', off: [] },
+  ],
+  dues: { startMonth: '2026-01' },
+}
 
 // 회비 "누가 냈어요?" 견본 (지어낸 이름, SPEC-010 3절)
 const CHECK_NAMES: CheckOption[] = [
@@ -637,6 +663,17 @@ export function Catalog() {
               />
             </div>
           </State>
+          <State label="줄 둘째 줄 detail (엑셀 넣을 해, SPEC-010 8절 #169): 이름 아래 Caption, 고른 줄에서도 굵게 하지 않음">
+            <CheckList
+              label="넣을 해"
+              options={[
+                { value: '2025', label: '2025년', detail: '엑셀 61건 · 새로 넣어요' },
+                { value: '2026', label: '2026년', detail: '엑셀 58건 · 지금 앱 기록 12건 · 고르면 바꿔요' },
+              ]}
+              checked={['2025']}
+              onToggle={noop}
+            />
+          </State>
         </Section>
 
         <Section title="한 분씩 금액 (PayerSharesPage, SPEC-010)">
@@ -835,6 +872,34 @@ export function Catalog() {
             <ExcelNote tone="warn" title="날짜를 바꾼 줄 3건" onOpen={noop}>
               그 달에 없는 날은 그 달 마지막 날로, 날을 읽을 수 없는 줄은 날짜 없이 넣었어요.
             </ExcelNote>
+          </State>
+          <State label="다른 장부에 넣기 (#169): 넣을 장부(동아리, 하나면 고른 채) → 넣을 해(앱 기록 없는 해만 체크) → 경고 + [기록 파일 먼저 보내기] → [고른 해 넣기]">
+            <div className="catalog__frame catalog__frame--screen">
+              <div className="app__main">
+                <ExcelMergePage
+                  books={[ASSIGN_BOOK]}
+                  imported={CATALOG_MERGE_IMPORTED}
+                  deps={{ createId: () => 'catalog-new' }}
+                  sheets={NO_SHEETS}
+                  onBack={noop}
+                  onSendBackup={noop}
+                  onMerge={() => ({ ok: true })}
+                />
+              </div>
+            </div>
+          </State>
+          <State label="다른 장부에 넣기 확인 창: 바꾸는 해가 있으면 지워질 앱 기록 + 위험 [바꾸기] (없으면 [넣기]), 합칠 회원·새 회원(5명 넘으면 &quot;외 N명&quot;)">
+            <div className="catalog__frame catalog__frame--screen">
+              <MergeConfirmDialog
+                inline
+                open
+                bookName={ASSIGN_BOOK.name}
+                yearCount={3}
+                plan={mergePlan(ASSIGN_BOOK, CATALOG_MERGE_IMPORTED, [2024, 2025, 2026])}
+                onConfirm={noop}
+                onCancel={noop}
+              />
+            </div>
           </State>
         </Section>
 
