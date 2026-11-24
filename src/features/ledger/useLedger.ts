@@ -118,6 +118,9 @@ export interface LedgerState {
   // 엑셀에서 읽은 내용으로 동아리·모임 장부를 만들어 지금 장부로 정하고 마지막 해 장부를 연다 (SPEC-010 8절 #166).
   // 저장 결과(실패면 이유, 화면 안내가 가른다 #172). 저장하지 못하면 아무것도 바꾸지 않는다 (화면 데이터에도 넣지 않음, 성공일 때만 "엑셀 장부를 만들었어요")
   importBook: (name: string, imported: ImportedBook) => SaveResult
+  // 엑셀 해를 있는 장부에 넣는다 (SPEC-010 8절 "다른 장부에 넣기" #169): 지금 데이터의 그 장부에 merge 를 적용해 저장하고,
+  // 그 장부를 지금 장부로 정해 openYear 를 연다. importBook 처럼 저장하지 못하면 아무것도 바꾸지 않고 이유를 돌려준다
+  importIntoBook: (bookId: string, merge: (book: Book) => Book, openYear: number) => SaveResult
   // 장부를 지우고 남은 첫 장부의 올해 장부를 연다. 저장하지 못하면 아무것도 지우지 않고 false. 하나뿐인 장부는 지우지 않는다
   deleteBook: (id: string) => boolean
   // 백업 파일 데이터로 통째로 바꾼다 (SPEC-002). 저장에 성공했을 때만 화면을 바꾸고 올해 장부로 연다
@@ -364,6 +367,19 @@ export function useLedger(repository: LedgerRepository, loaded: LoadResult, opti
       if (!result.ok) return result
       // 장부 연도는 엑셀의 마지막 해
       setYear(Math.max(...Object.values(imported.ledgers).map((item) => item.year)))
+      return result
+    },
+    importIntoBook: (bookId, merge, openYear) => {
+      const current = latest.current
+      const target = current.books.find((item) => item.id === bookId)
+      if (!target) throw new Error(`넣을 장부가 없다: ${bookId}`)
+      const next: StoredData = {
+        ...replaceBook(current, merge(target)),
+        settings: { ...current.settings, lastBookId: bookId, lastChangedAt: now().toISOString() },
+      }
+      // importBook 과 같이 저장했을 때만 화면에 들인다 (못 했으면 지금 데이터·저장 상태 그대로)
+      const result = replace(next, (changed) => repository.save(changed))
+      if (result.ok) setYear(openYear)
       return result
     },
     deleteBook: (id) => {

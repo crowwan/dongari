@@ -28,6 +28,21 @@
   gap: var(--space-3);
 }
 
+/* 다른 장부에 넣기 "어느 해를 넣을까요?" (#169) 묶음 제목 "넣을 장부"·"넣을 해": 질문 제목과 같은 Heading */
+.excel-merge__heading {
+  margin: 0;
+  color: var(--strong);
+  font-size: var(--text-heading-size);
+  font-weight: var(--text-heading-weight);
+  line-height: var(--line-tight);
+  word-break: keep-all;
+}
+
+/* 큰 글씨에서 [기록 파일 먼저 보내기]·[고른 해 넣기] 가 "보내/기"처럼 낱말 가운데서 끊기지 않게 (PATTERNS A4) */
+.excel-merge .ui-button {
+  word-break: keep-all;
+}
+
 /* 날짜를 바꾼 줄·읽지 못한 줄 목록 (선택 창 안): 해·달 + 엑셀 원래 글, 줄 사이 선 없음 */
 .excel-lines {
   margin: 0;

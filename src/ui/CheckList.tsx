@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type Ref } from 'react'
 import { Icon, type IconName } from './Icon'
 import './ui.css'
 
-export type CheckOption = { value: string; label: string }
+// detail: 이름 아래 작은 글자 한 줄 (엑셀 넣을 해 "엑셀 12건 · 새로 넣어요", SPEC-010 8절 #169)
+export type CheckOption = { value: string; label: string; detail?: string }
 
 // 맨 아래 따로 묶는 줄들과 그 묶음 이름 (회비 "누가 냈어요?" 의 "쉬는 분", SPEC-010 3절)
 export type CheckListTail = { title: string; options: readonly CheckOption[] }
@@ -98,7 +99,7 @@ type CheckRowProps = {
   buttonRef?: Ref<HTMLButtonElement>
 }
 
-// 고르는 줄 하나: 체크 동그라미 + 이름. 화면 읽기는 "김도윤, 체크박스, 선택됨"
+// 고르는 줄 하나: 체크 동그라미 + 이름 (+ 아래 작은 글자). 화면 읽기는 "김도윤, 체크박스, 선택됨"
 function CheckRow({ option, checked, onToggle, buttonRef }: CheckRowProps) {
   return (
     <button
@@ -113,7 +114,15 @@ function CheckRow({ option, checked, onToggle, buttonRef }: CheckRowProps) {
       <span className="ui-checks__box" aria-hidden="true">
         {checked && <Icon name="check" />}
       </span>
-      <span className="ui-checks__label">{option.label}</span>
+      <span className="ui-checks__label">
+        {option.label}
+        {option.detail && (
+          <>
+            {/* 이름과 띄어 읽히게 ("2025년 엑셀 12건 · 새로 넣어요") */}{' '}
+            <span className="ui-checks__detail">{option.detail}</span>
+          </>
+        )}
+      </span>
     </button>
   )
 }

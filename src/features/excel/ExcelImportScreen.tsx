@@ -17,6 +17,7 @@ import { EditPage } from '../settings/EditPage'
 import type { SheetHistory } from '../useScreenHistory'
 import { readExcelSource, type ExcelFileProblem } from './excelFile'
 import { excelCreateFailedMessage, type BackupFileRoute } from './excelMessages'
+import { ExcelMergePage } from './ExcelMergePage'
 import { ExcelFact, ExcelFactValue, ExcelFacts, ExcelNote } from './ExcelParts'
 import { ExcelProblem, ExcelReading } from './ExcelStatus'
 import {
@@ -29,6 +30,7 @@ import {
   yearsText,
 } from './importFacts'
 import type { LineNote } from './ledgerSheet'
+import type { ExcelMerge } from './mergeBook'
 import { readExcelBook, type ExcelImportSummary, type ImportedBook } from './readExcelBook'
 import type { ExcelWorkbook } from './sheet'
 import { excelSourceName, type ExcelSource } from './useExcelImport'
@@ -36,6 +38,7 @@ import './excelImport.css'
 
 // 확인 화면 위에 뜨는 것 (방문 기록 한 칸 — 뒤로 버튼은 이것만 닫는다)
 const FEE_PAGE = 'excel-fees'
+const MERGE_PAGE = 'excel-merge'
 const CHANGED_DATES_SHEET = 'excel-changed-dates'
 const UNREAD_LINES_SHEET = 'excel-unread-lines'
 
@@ -50,6 +53,9 @@ export type ExcelImportScreenProps = {
   onPickAgain: () => void // 파일 고르기 창을 다시 연다
   onReload: () => void // [앱 다시 열기] (엑셀 기능을 받지 못했을 때)
   onCreate: (name: string, book: ImportedBook) => SaveResult // [새 장부 만들기]. 기기에 저장하지 못했으면 그 이유 (#172)
+  // [다른 장부에 넣기](#169) 의 넣기. 없으면(연습 장부 — 연습은 [새 장부 만들기]만 따라 한다) 버튼이 없다
+  onMerge?: (merge: ExcelMerge) => SaveResult
+  onSendBackup: () => void // 해 고르기 [기록 파일 먼저 보내기]
   onSettled?: (status: 'read' | 'failed') => void // 다 읽어 확인 화면이 떴다 / 못 읽어 안내가 떴다 (연습 말풍선이 본다)
 }
 
@@ -73,6 +79,8 @@ export function ExcelImportScreen({
   onPickAgain,
   onReload,
   onCreate,
+  onMerge,
+  onSendBackup,
   onSettled,
 }: ExcelImportScreenProps) {
   const [phase, setPhase] = useState<Phase>({ name: 'reading' })
@@ -129,6 +137,22 @@ export function ExcelImportScreen({
           }
           sheets.closeSheet()
         }}
+      />
+    )
+  }
+
+  // 다른 장부에 넣기 (8절 F4): 넣을 수 있는 장부는 동아리·모임 장부 (회원 명단·월 회비가 있는 장부)
+  const mergeBooks = data.books.filter((item) => item.kind === 'club')
+  if (onMerge && sheets.sheet === MERGE_PAGE) {
+    return (
+      <ExcelMergePage
+        books={mergeBooks}
+        imported={read.book}
+        deps={deps}
+        sheets={sheets}
+        onBack={sheets.closeSheet}
+        onSendBackup={onSendBackup}
+        onMerge={onMerge}
       />
     )
   }
@@ -208,12 +232,17 @@ export function ExcelImportScreen({
         onClose={sheets.closeSheet}
       />
 
-      {/* 다른 장부에 넣기(F4)는 #169 에서 보조 버튼으로 붙인다 */}
       <BottomActionBar
         label="새 장부 만들기"
         icon="check"
         disabled={missingName}
         note={missingName ? '장부 이름을 적어 주세요' : undefined}
+        // 보조 [다른 장부에 넣기] (F4, #169): 동아리·모임 장부가 하나 이상 있을 때만
+        secondary={
+          onMerge && mergeBooks.length > 0
+            ? { label: '다른 장부에 넣기', icon: 'file-in', onClick: () => sheets.openSheet(MERGE_PAGE) }
+            : undefined
+        }
         onClick={() => {
           if (missingName || created.current) return
           created.current = true
