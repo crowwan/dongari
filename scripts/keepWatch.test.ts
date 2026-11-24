@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { annotations, formatKst, judgeReport, NO_SIGNAL, renderSummary, SERVER_DOWN, TOKEN_REJECTED } from './keepWatch.ts'
-import type { DeviceReport, ReportResponse } from './keepWatch.ts'
+import {
+  annotations,
+  formatKst,
+  judgeReport,
+  NO_EXPORT,
+  NO_SIGNAL,
+  parseReport,
+  renderSummary,
+  SERVER_DOWN,
+  TOKEN_REJECTED,
+} from './keepWatch.ts'
+import type { DeviceReport, ExportReport, ReportResponse } from './keepWatch.ts'
 
 const NOW = '2026-10-15T00:00:00.000Z'
+// 어제 아침(월요일 08:00 KST 무렵) 서버 밖 사본을 내보냄 — 문제 없는 상태
+const RECENT_EXPORT: ExportReport = { lastAt: '2026-10-14T23:00:00.000Z', count: 2 }
 
 // 문제 없는 기기 하나 (어제 앱을 열었고 다 보관됨)
 function device(overrides: Partial<DeviceReport> = {}): DeviceReport {
@@ -17,8 +29,8 @@ function device(overrides: Partial<DeviceReport> = {}): DeviceReport {
   }
 }
 
-function ok(devices: unknown[], now: string = NOW): ReportResponse {
-  return { kind: 'http', status: 200, body: { now, devices } }
+function ok(devices: unknown[], now: string = NOW, lastExport: ExportReport | null = RECENT_EXPORT): ReportResponse {
+  return { kind: 'http', status: 200, body: { now, devices, export: lastExport } }
 }
 
 describe('SPEC-007 AC-6 보관 지켜보기 판정', () => {
@@ -117,6 +129,60 @@ describe('SPEC-007 AC-6 보관 지켜보기 판정', () => {
       '기기 `ab12cd34` 가 자동 보관을 껐어요',
       '기기 `ef56ab78` 가 30일 넘게 앱을 열지 않았어요',
     ])
+  })
+})
+
+describe('SPEC-011 AC-6 보관 지켜보기 서버 밖 사본 판정', () => {
+  it('마지막 내보내기가 8일 넘었으면 "서버 밖 사본이 N일째 없어요" 로 마지막 때와 함께 실패한다', () => {
+    const stale = { lastAt: '2026-10-06T23:59:59.000Z', count: 2 }
+    const verdict = judgeReport(ok([device()], NOW, stale))
+    expect(verdict.failures).toEqual(['서버 밖 사본이 8일째 없어요 (마지막 내보내기 2026-10-07 08:59 KST)'])
+    expect(verdict.warnings).toEqual([])
+  })
+
+  it('마지막 내보내기가 정확히 8일이면 아직 실패가 아니다', () => {
+    const edge = { lastAt: '2026-10-07T00:00:00.000Z', count: 2 }
+    expect(judgeReport(ok([device()], NOW, edge))).toMatchObject({ failures: [], warnings: [] })
+  })
+
+  it('한 번도 내보내지 않았으면(export 가 null) "아직 서버 밖 사본이 없어요" 경고만 한다', () => {
+    const verdict = judgeReport(ok([device()], NOW, null))
+    expect(verdict.failures).toEqual([])
+    expect(verdict.warnings).toEqual([NO_EXPORT])
+    expect(NO_EXPORT).toBe('아직 서버 밖 사본이 없어요')
+  })
+
+  it('export 칸이 없는 예전 서버 답도 받아 내보낸 적 없음으로 보고 경고한다', () => {
+    const verdict = judgeReport({ kind: 'http', status: 200, body: { now: NOW, devices: [device()] } })
+    expect(verdict.report?.export).toBeNull()
+    expect(verdict.failures).toEqual([])
+    expect(verdict.warnings).toEqual([NO_EXPORT])
+  })
+
+  it('상태 신호가 하나도 없어도 서버 밖 사본은 따로 판정한다', () => {
+    const stale = { lastAt: '2026-10-01T00:00:00.000Z', count: 0 }
+    expect(judgeReport(ok([], NOW, stale))).toMatchObject({
+      failures: ['서버 밖 사본이 14일째 없어요 (마지막 내보내기 2026-10-01 09:00 KST)'],
+      warnings: [NO_SIGNAL],
+    })
+    expect(judgeReport(ok([], NOW, null)).warnings).toEqual([NO_SIGNAL, NO_EXPORT])
+  })
+
+  it.each([
+    ['lastAt 이 시각이 아님', { lastAt: '지난주', count: 1 }],
+    ['count 가 없음', { lastAt: NOW }],
+    ['count 가 음수', { lastAt: NOW, count: -1 }],
+    ['count 가 정수가 아님', { lastAt: NOW, count: 1.5 }],
+    ['객체가 아님', '2026-10-14'],
+  ])('export 칸 모양이 틀리면(%s) 요약 형식이 틀림으로 실패한다', (_case, lastExport) => {
+    const body = { now: NOW, devices: [], export: lastExport }
+    expect(parseReport(body)).toBeNull()
+    expect(judgeReport({ kind: 'http', status: 200, body }).failures).toEqual([`${SERVER_DOWN} (요약 형식이 틀림)`])
+  })
+
+  it('실행 요약에 마지막 내보내기 때(KST)와 보관본 개수를 쓴다', () => {
+    expect(renderSummary(judgeReport(ok([device()])))).toContain('마지막 내보내기: 2026-10-15 08:00 KST · 보관본 2개')
+    expect(renderSummary(judgeReport(ok([device()], NOW, null)))).toContain(`마지막 내보내기: ${NO_EXPORT}`)
   })
 })
 
