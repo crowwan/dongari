@@ -118,7 +118,7 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
   curl -i "$KEEP_URL/v1/report"                                     # 401
   ```
 - 내보내기 토큰(SPEC-011 2절, #186, ADR 010): 비공개 백업 레포의 주간 워크플로(아래 "서버 밖 주간 사본")가 `GET /v1/export` 를 부를 때 쓴다. 요약 토큰과 별개(요약 토큰으로는 안 열림). 넣지 않으면 내보내기는 늘 401.
-  - `GET /v1/export` → `{ exportedAt, items: [{ id, savedAt, envelope }] }`: 본 자리 최신본만(미리보기·날짜별·달별 사본 제외), id 순, `savedAt` 은 서버 시각(옛 최신본은 겉봉투), `envelope` 은 겉봉투 객체. 출처 검사·CORS 없음, GET 만(그 밖 405). 주고 나서 KV `export:last` 에 `{ at, count }`(못 쓰면 503), 요약 `/v1/report` 의 `export: { lastAt, count } | null` 이 이것.
+  - `GET /v1/export` → `{ exportedAt, items: [{ id, savedAt, envelope }] }`: 본 자리 최신본만(미리보기·날짜별·달별 사본 제외), id 순, `savedAt` 은 서버 시각(옛 최신본은 겉봉투), `envelope` 은 겉봉투 객체. 출처 검사·CORS 없음, GET 만(그 밖 405). 주고 나서 KV `export:last` 에 `{ at, count }`(못 쓰면 503), 요약 `/v1/report` 의 `export: { lastAt, count } | null` 이 이것. 최신본 목록은 KV list 한 장(1,000개)만 읽고, 잘리면(`list_complete` false) 잘린 목록 대신 503(#194 리뷰).
   - 값은 `openssl rand -hex 32` 로 만들어 **레포 Secrets `KEEP_EXPORT_TOKEN`** 과 **백업 레포 Secrets `EXPORT_TOKEN`** 에 같게 넣는다. Worker 비밀값 `EXPORT_TOKEN` 은 `worker.yml` 이 배포 뒤 "내보내기 토큰 넣기" 단계에서 `KEEP_EXPORT_TOKEN` 을 표준 입력으로 넣는다(배포마다, 값은 로그에 안 찍힘). 레포 비밀값을 바꿨으면 Actions → "보관 서버" → Run workflow. 레포 비밀값이 없으면 그 단계는 경고만 하고 건너뛴다(이미 넣은 Worker 비밀값은 남음).
   - 확인: `curl -s -o /dev/null -w '%{http_code}\n' "$KEEP_URL/v1/export"` → 401(토큰 없음). 토큰을 넣은 확인은 백업 레포 워크플로를 손으로 돌려 본다(토큰을 셸에 꺼내지 않게).
 - 로컬: `cd worker && npm install && npm test`, 실제 런타임으로 보려면 `npx wrangler dev --local --port 8787`(로컬 KV, 실제 KV 안 건드림). 날 바뀜을 흉내 내려면 로컬 KV 의 최신본을 어제 보관한 것으로 넣고 PUT 한다: `npx wrangler kv key put "keep:<id>" "$(cat 겉봉투.json)" --binding KEEP --local --metadata '{"savedAt":"<어제 ISO 시각>"}'` (`--local` 을 빼면 실제 KV 에 쓰니 주의. `wrangler dev` 에 `--persist-to` 를 줬으면 여기도 같은 값).
@@ -171,11 +171,12 @@ node scripts/keep-rescue.mjs --file ../dongari-keep-backup/keep/<id>.json       
 
 | 언제 | 하는 일 |
 |---|---|
-| 매주 일요일 23:00 UTC(월요일 08:00 KST), 또는 백업 레포 Actions → "주간 보관본" → Run workflow | `GET $KEEP_URL/v1/export` → `keep/<id>.json`(겉봉투 그대로)·`index.json`(id·savedAt·bytes), 목록에 없는 id 파일은 지움, 바뀐 게 있으면 "주간 보관본 YYYY-MM-DD" 커밋(그 레포 `GITHUB_TOKEN`) |
+| 매주 일요일 23:00 UTC(월요일 08:00 KST), 또는 백업 레포 Actions → "주간 보관본" → Run workflow | `GET $KEEP_URL/v1/export` → `keep/<id>.json`(겉봉투 그대로)·`index.json`(id·savedAt·bytes), 목록에 없는 id 파일은 지움(한 번에 1개까지), 바뀐 게 있으면 "주간 보관본 YYYY-MM-DD" 커밋(그 레포 `GITHUB_TOKEN`) |
 
 - **파일 원본은 이 레포 `ops/keep-backup/`**(`.github/workflows/backup.yml`·`README.md`·`scripts/backup.mjs`·`scripts/backupPlan.ts`). 고칠 때는 여기서 PR 로 리뷰·테스트(`scripts/keepBackupPlan.test.ts`, 루트 `npm test`)하고, 머지 뒤 백업 레포에 손으로 옮긴다(같은 경로로 복사해 커밋·push).
 - 백업 레포 값: Secrets `EXPORT_TOKEN`(이 레포 `KEEP_EXPORT_TOKEN` 과 같은 값, 위 "내보내기 토큰"), Variables `KEEP_URL`(이 레포와 같은 값).
-- 실패하면(토큰 401·예전 서버 404·서버 오류·응답 모양 틀림·id 모양 틀림) 아무것도 쓰지 않고 GitHub 실패 메일. **서버가 0개를 줬는데 레포에 파일이 있으면 지우지 않고 실패**한다(서버가 비었을 수 있음) — 정말 다 지울 일이면 백업 레포 README "0개라서 멈췄을 때". 실행이 8일 넘게 없으면 보관 지켜보기도 실패로 알린다.
+- 실패하면(토큰 401·예전 서버 404·서버 오류·응답 모양 틀림·id 모양 틀림) 아무것도 쓰지 않고 GitHub 실패 메일. **서버가 0개를 줬는데 레포에 파일이 있거나, 지울 파일이 2개 이상이면 지우지 않고 실패**한다(서버 KV 를 잃은 뒤 폰 몇 대만 다시 보관했을 수 있음, #194 리뷰) — 정말 지울 일이면 백업 레포 README "지우지 않고 멈췄을 때"(문구에 나온 id 파일을 손으로 `git rm`·push 뒤 다시 실행).
+- 알림의 나눔: 서버가 답을 줄 때 `export:last` 를 쓰므로, 워크플로가 **서버를 부르지 못하면**(예약 실행 멈춤·꺼짐, 토큰 401, 서버 오류) 보관 지켜보기가 8일 뒤 실패로 알리고, **답을 받은 뒤 실패하면**(모양 거절·지우기 멈춤·커밋·push 실패) 백업 레포 실패 메일만 온다.
 - 되살리기: 위 "보관본 꺼내기" `--file`. 지워 달라는 요청(커밋 이력까지)은 백업 레포 README "지워 달라는 요청을 받았을 때"(`git filter-repo` 로 그 id 파일을 이력에서 지우고 force push).
 - 로컬에서 변환만 확인: `wrangler dev --local`(가짜 `--var EXPORT_TOKEN:…`) 에 보관본을 올리고, 스크래치 폴더에 `ops/keep-backup` 을 복사해 `KEEP_URL=http://localhost:8787 EXPORT_TOKEN=… node scripts/backup.mjs`. 실제 서버·토큰은 쓰지 않는다.
 

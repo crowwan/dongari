@@ -57,13 +57,15 @@ updated: 2026-11-24
   - `/v1/export` 는 `/v1/report` 처럼 라우팅에서 출처 검사보다 먼저 처리하고 CORS 헤더가 없다. GET 말고는 405, 401·405 는 본문 없음. 비교는 요약과 같은 시간 일정 비교(`isAuthorized`). `REPORT_TOKEN` 으로는 열리지 않는다.
   - `items` 는 KV list 이름순(= id 순). `savedAt` 은 최신본 metadata 의 서버 시각, 없으면(옛 최신본) 겉봉투 `savedAt`(1절 `keptAtOf` 와 같음). `envelope` 은 저장된 JSON 을 파싱한 객체. 이름이 64자 16진수가 아니거나 본문이 JSON 객체가 아니거나 그사이 지워진 키는 뺀다(서버가 쓴 값이라 생길 일은 없다).
   - `export:last` 를 쓰지 못하면 503(본문 없음): 요약(보관 지켜보기)이 모르는 내보내기가 성공으로 끝나면 백업은 됐는데 지켜보기가 8일 뒤 틀린 실패를 낸다. 503 이면 백업 레포 워크플로가 그날 바로 실패 메일을 보낸다.
+  - 최신본 목록은 KV list 한 장(최대 1,000개)만 읽는다. `list_complete` 가 false(잘림)면 잘린 목록을 주지 않고 503, `export:last` 도 쓰지 않는다(#194 리뷰): 잘린 목록이 나가면 백업 레포가 빠진 id 의 파일을 지운다. 이어 받기(cursor)는 하지 않는다(가족 몇 명이라 1,000개에 닿을 일이 없고, 닿으면 그때 나눠 받기를 만든다). `KeepStore.list` 결과에 `list_complete` 를 더했다(Cloudflare KV 그대로).
   - `/v1/report` 의 `export` 는 `export:last` 가 없거나 모양이 틀리면 null.
+  - **알림의 나눔** (#194 리뷰): `export:last` 는 서버가 답을 줄 때 쓰인다. 그래서 보관 지켜보기의 8일 규칙은 **워크플로가 서버를 부르지 못한 경우**(예약 실행이 멈춤·꺼짐, 토큰 틀림 401, 서버 오류)를 잡고, **답을 받은 뒤의 실패**(응답 모양 거절·지우기 상한·0개 멈춤·커밋·push 실패)는 지켜보기가 모르고 백업 레포 워크플로의 실패 메일만 알린다.
   - 보관 지켜보기: `export` 칸이 **없는** 예전 서버 답도 받아 null(경고 "아직 서버 밖 사본이 없어요")로 본다. 그 서버는 내보내기 경로도 없어 백업 레포 워크플로가 404 로 실패 메일을 보내므로 지켜보기에서 따로 실패로 만들지 않는다(배포 사이 잠깐뿐). `export` 칸 모양이 틀리면(시각이 아님, 개수가 음수·소수) "요약 형식이 틀림" 실패. 8일은 경계를 넣지 않는다(정확히 8일은 아직 문제 아님). N 은 지난 날수의 내림. 문구 뒤에 "(마지막 내보내기 YYYY-MM-DD HH:MM KST)". 신호가 하나도 없어도 내보내기는 따로 판정한다. 실행 요약에 "서버 밖 사본 — 마지막 내보내기: … KST · 보관본 N개" 한 줄.
   - `worker.yml`: `wrangler deploy` 뒤 "내보내기 토큰 넣기" 단계가 `printf %s "$KEEP_EXPORT_TOKEN" | npx wrangler secret put EXPORT_TOKEN`(표준 입력). 배포마다 넣는다(레포 비밀값을 바꾸면 다음 배포에 따라감). 레포 비밀값이 없으면 **경고 후 건너뛴다**(배포는 성공): Cloudflare 비밀값은 배포 자체에 필요해 없으면 실패지만, 내보내기 토큰은 폰의 자동 보관과 상관없어 그 때문에 보관 서버 배포를 막지 않는다. 이미 넣은 Worker 비밀값은 배포해도 남고, 토큰이 없으면 백업 레포 워크플로가 401 로 실패 메일을 보낸다.
   - 백업 레포 파일의 원본은 dongari `ops/keep-backup/`(`.github/workflows/backup.yml`·`README.md`·`scripts/backup.mjs`·`scripts/backupPlan.ts`). 리뷰·테스트(`scripts/keepBackupPlan.test.ts`)는 dongari PR 에서 하고, 머지 뒤 개발자가 백업 레포에 옮긴다. 변환 규칙은 순수 함수 `planBackup`(Node 24 타입 지우기로 실행, `keepWatch.ts` 와 같은 제약).
   - `keep/<id>.json` 은 겉봉투 JSON 한 줄 + 줄바꿈(서버가 받은 바이트와 같다). `index.json` 은 id 순 `[{ id, savedAt, bytes }]`(줄 맞춤). 내보낸 때(`exportedAt`)는 넣지 않는다 — 넣으면 매주 바뀌어 아무도 고치지 않은 주에도 커밋이 생긴다. 커밋 날짜는 한국 날짜.
   - 안전장치: 보관본 하나라도 id 가 `^[0-9a-f]{64}$` 가 아니거나(경로 조작 막기), 응답·겉봉투 모양이 틀리거나(`{ v: 1, savedAt, iv, data }`), 같은 id 가 두 번이면 **아무것도 쓰지 않고** 실패. 실패 문구에 받은 값은 넣지 않는다(몇 번째인지만).
-  - **items 가 0개인데 레포에 `keep/<id>.json` 이 있으면 지우지 않고 실패**한다: 서버(KV)가 비었거나 잘못 답한 것일 수 있고(이 레포가 막으려는 바로 그 사고), 한꺼번에 지운 커밋이 생기면 되살리기가 이력 뒤지기가 된다. 정말 모두 [지우기]를 했으면 README 대로 손으로 지운다. 레포에 파일이 없으면(처음) 0개라도 빈 `index.json` 을 쓴다. 0개가 아니면 목록에 없는 id 파일은 지운다(앱 [지우기]). `keep/` 의 id 모양이 아닌 파일은 건드리지 않는다.
+  - **지우기 안전장치 — 아무것도 지우지 않고 실패**하는 두 경우: (1) items 가 0개인데 레포에 `keep/<id>.json` 이 있음(1개라도), (2) 이번 목록에 없어 지울 파일이 **2개 이상**(한 번에 1개까지, `MAX_REMOVALS_PER_RUN`, #194 리뷰). 서버(KV)를 잃은 뒤 폰 한 대만 다시 보관하면 다음 내보내기가 1개라 (1)만으로는 나머지가 HEAD 에서 모두 지워진다 — 이 레포가 막으려는 바로 그 사고다. 보관본이 사라지는 길은 앱 [지우기]뿐이고 가족 몇 명이 한 주에 둘 이상 지우는 일은 드물어서 비율 대신 개수 상한을 골랐다(작은 가족에서도 같게 동작하고 문구로 설명하기 쉽다). (2)의 실패 문구에 지울 id 앞 8자를 적는다(이 레포의 파일 이름이라 찍어도 된다). 정말 지울 일이면 README "지우지 않고 멈췄을 때" 대로 그 파일을 손으로 `git rm` 하고 push 한 뒤 다시 실행한다(`index.json` 은 워크플로가 맞춘다). 레포에 파일이 없으면(처음) 0개라도 빈 `index.json` 을 쓴다. `keep/` 의 id 모양이 아닌 파일은 건드리지 않는다.
   - 손 실행과 예약 실행이 겹치지 않게 `concurrency`(끊지 않음). 서버 실패는 401(토큰 — 고칠 곳 안내)·404(예전 서버)·그 밖 HTTP·연결 실패로 나눠 `::error` 를 찍는다. 토큰·서버 주소·오류 내용은 스크립트가 찍지 않는다. 다만 `KEEP_URL` 은 변수라 GitHub 가 단계 머리(env)에 보여 준다 — 앱 화면 파일에도 들어 있는 공개 주소라 그대로 둔다(dongari 보관 지켜보기와 같음).
 
 ### 3. 개발자 꺼내기 (`scripts/keep-rescue.mjs`)
@@ -97,7 +99,7 @@ updated: 2026-11-24
 - 미리보기 출처의 보관은 `preview:snap:`·`preview:month:` 로 나뉘어 본 사본과 섞이지 않는다. 내보내기는 본 자리만.
 - 보관본이 1MB 를 넘으면 지금처럼 받지 않는다(사본도 안 생김).
 - `/v1/export` 응답 크기: 가족 몇 명 × 수백 KB. 10MB 를 넘기 전에 나눠 받기를 생각한다(지금은 범위 밖, 기술 메모).
-- 백업 레포 워크플로가 실패해도 Worker·앱은 영향 없음. 보관 지켜보기가 8일 뒤 알림.
+- 백업 레포 워크플로가 실패해도 Worker·앱은 영향 없음. 서버를 부르지 못하면 보관 지켜보기가 8일 뒤 알리고, 답을 받은 뒤 실패하면 백업 레포 실패 메일만 알린다(2절 "알림의 나눔").
 
 ## 수용 기준
 
@@ -123,12 +125,13 @@ updated: 2026-11-24
 - KST 날: `new Date(ms + 9h).toISOString().slice(0, 10)`. 시각 주입(테스트).
 - 사본 키 모양 `snap:<id>:<YYYY-MM-DD>`·`month:<id>:<YYYY-MM>`, 자리 접두사는 `ORIGIN_KEY_PREFIXES` 그대로.
 - 백업 레포는 공개 dongari 레포와 따로. 그 레포에는 암호문만 들어간다.
+- 내보내기 CPU (#194 리뷰): 최신본마다 `JSON.parse` 하고 응답에서 다시 `JSON.stringify` 한다. 겉봉투는 큰 base64 문자열 하나라 빠르다 — Node 24(같은 V8)에서 잰 값: 5개 × 350KB 약 1.4ms, 10개 × 500KB 약 4ms, 20개 × 1MB 약 17ms(KV 를 기다리는 시간은 CPU 시간에 들지 않는다). 가족 몇 명 × 수백 KB 면 Workers 무료 요금제 CPU 10ms 안이다. 10ms 에 가까워지면(대략 10명 × 500KB 넘음) 저장된 글을 파싱하지 않고 그대로 이어 붙여 응답을 만들거나 나눠 받기를 만든다.
 - 운영 문서: CLAUDE.md "자동 보관 서버 배포"·"보관 지켜보기"·"보관본 꺼내기" 절에 새 비밀값·워크플로·옵션을 적는다.
 - 자리(#185):
   - `worker/src/keep.ts`: `KeepStore`(Cloudflare KV 의 `put(key, value, { metadata, expirationTtl })`·`getWithMetadata`·`list` 의 `metadata` 와 같은 모양 — `@cloudflare/workers-types` 의 `KVNamespace` 가 `KeepStore` 자리에 들어가는지 레포 밖에서 타입 검사로 확인), 사본 남기기 `copyBeforeOverwrite`, 목록 `getHistory`, 지우기 `deleteKeep`, 키 모양 `keepKeysOf`. 서버 시각은 `handleKeepRequest(request, env, clock)` 의 `clock`(기본 `new Date()`, 상태 신호 `seenAt`·요약 `now` 도 같은 시계). 테스트 `worker/src/index.test.ts` "SPEC-011"(가짜 KV 가 metadata·TTL·쓰기 실패를 흉내).
   - `scripts/keepRescue.ts`: 명령줄 `parseRescueArgs`, 목록 `listKeep`·`describeList`, 사본 받기 `rescueKeep(code, keepUrl, fetchFn, target)`. 테스트 `scripts/keepRescue.test.ts` "SPEC-011"(가짜 서버, 앱의 `sealKeep` 으로 잠근 사본).
 - 자리(#186):
-  - `worker/src/keep.ts`: 내보내기 `handleExport`(`exportItemOf`, `export:last`), 요약의 `lastExportOf`, `Env.EXPORT_TOKEN`. 테스트 `worker/src/index.test.ts` "SPEC-011 서버 밖 사본 내보내기".
+  - `worker/src/keep.ts`: 내보내기 `handleExport`(`exportItemOf`, `export:last`, 목록이 잘리면 503), 요약의 `lastExportOf`, `Env.EXPORT_TOKEN`, `KeepStore.list` 의 `list_complete`(`@cloudflare/workers-types` 5.20261123 의 `KVNamespace` 가 여전히 `KeepStore` 자리에 들어가는지 레포 밖 타입 검사로 확인). 테스트 `worker/src/index.test.ts` "SPEC-011 서버 밖 사본 내보내기"(가짜 KV 가 list 한 장 크기를 흉내).
   - `scripts/keepWatch.ts`: `parseReport` 의 `export`, `judgeExport`(`EXPORT_LIMIT_MS` 8일, `NO_EXPORT`). 테스트 `scripts/keepWatch.test.ts` "SPEC-011 AC-6".
   - `scripts/keepRescue.ts` `rescueFile`·`RescueSource`(파일 이름·요약의 출처). 테스트 `scripts/keepRescue.test.ts` "AC-7 --file".
   - 백업 레포 파일 원본 `ops/keep-backup/`, 변환 규칙 `ops/keep-backup/scripts/backupPlan.ts` `planBackup`. 테스트 `scripts/keepBackupPlan.test.ts`(앱 `sealKeep` 으로 잠근 겉봉투 → 레포 파일 → `rescueFile` → `readBackup` 까지).
@@ -146,3 +149,4 @@ updated: 2026-11-24
 | 2026-11-24 | 이슈 분해: 상위 #184, 하위 #185 보관 서버 날짜별 사본·꺼내기 날짜 고르기, #186 서버 밖 주간 사본·보관 지켜보기 |
 | 2026-11-24 | 서버 날짜별 사본·꺼내기 날짜 고르기 구현(#185): 1절·3절 "구현에서 정한 것"(달 사본 metadata, 날 가르기는 서버 시각, 복사 실패 503, 쿼리 형식 400, 목록은 KV list metadata, 옵션 하나만·쓰는 법, 목록 줄 모양·못 푼 줄, 달 파일 이름, 없는 날·달 안내), 예외에 [지우기]와 KV list 지연, 기술 메모에 코드 자리 |
 | 2026-11-24 | 서버 밖 주간 사본·보관 지켜보기·`--file` 구현(#186): 2절 "구현에서 정한 것"(내보내기 라우팅·순서·`export:last` 못 쓰면 503, 예전 서버 답의 `export` 없음 = null 경고, 8일 경계·문구, `worker.yml` 토큰 없으면 경고 후 건너뛰기, 백업 레포 파일 원본 `ops/keep-backup/`·파일 모양·`index.json` 에 내보낸 때 없음, id·모양·같은 id 실패, **0개인데 레포에 파일이 있으면 지우지 않고 실패**), 3절 `--file`(파일 이름으로 코드 맞추기·id 앞 8자 안내·KEEP_URL 필요 없음). #190 리뷰 반영: 1절 보관일이 오늘보다 앞일 때만 복사·최신본 쓰기 실패도 503, 3절 최신본 파일 이름 `-최신`·목록 중 사라진 사본 문구·달력에 없는 날 쓰는 법. 열린 질문 Cloudflare API 토큰: 기존 토큰을 그대로 쓴다(사용자) |
+| 2026-11-24 | #194 리뷰 반영: 2절 백업 레포가 한 번에 지우는 파일 1개까지(2개 이상이면 지우지 않고 실패, 0개 멈춤은 그대로), 내보내기 목록이 KV list 한 장을 넘어 잘리면 503(`list_complete`), "알림의 나눔"(8일 규칙 = 서버를 부르지 못함, 받은 뒤 실패 = 백업 레포 실패 메일), 예외 줄 맞춤, 기술 메모에 내보내기 CPU |
