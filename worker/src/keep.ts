@@ -34,8 +34,9 @@ export interface KeepStore {
   getWithMetadata(key: string): Promise<{ value: string | null; metadata: unknown }>
   put(key: string, value: string, options?: KeepPutOptions): Promise<void>
   delete(key: string): Promise<void>
-  // 기기는 가족 몇 대, 사본은 이름당 최대 31 + 13개라 한 번(최대 1,000개)으로 충분하다. 다음 장(cursor)은 읽지 않는다
-  list(options: { prefix: string }): Promise<{ keys: { name: string; metadata?: unknown }[] }>
+  // 기기는 가족 몇 대, 사본은 이름당 최대 31 + 13개라 한 번(최대 1,000개)으로 충분하다. 다음 장(cursor)은 읽지 않는다.
+  // list_complete 가 false 면 그 장 뒤에 더 있다 (내보내기는 잘린 목록을 주지 않는다)
+  list(options: { prefix: string }): Promise<{ keys: { name: string; metadata?: unknown }[]; list_complete: boolean }>
 }
 
 export interface Env {
@@ -421,12 +422,14 @@ async function exportItemOf(store: KeepStore, name: string): Promise<ExportItem 
 
 // 비공개 백업 레포의 GitHub Actions 가 부르는 내보내기 (SPEC-011 2절): 요약처럼 출처 검사·CORS 헤더 없이 내보내기 토큰으로만 연다.
 // 본 자리 최신본만 준다(KV list 는 앞부분 일치라 미리보기·날짜별·달별 사본은 잡히지 않는다). 순서는 KV list 의 이름순(= id 순).
-// 내보낸 때를 export:last 에 남기지 못하면 503: 요약(보관 지켜보기)이 모르는 내보내기가 성공으로 끝나지 않게
+// 목록이 한 장(1,000개)을 넘어 잘리면 503: 잘린 목록을 주면 백업 레포가 빠진 id 의 파일을 지운다. 이어 받기(cursor)는 하지 않는다 (#194 리뷰).
+// 내보낸 때를 export:last 에 남기지 못해도 503: 요약(보관 지켜보기)이 모르는 내보내기가 성공으로 끝나지 않게
 async function handleExport(request: Request, env: Env, clock: Clock): Promise<Response> {
   if (request.method !== 'GET') return new Response(null, { status: 405 })
   if (!isAuthorized(request, env.EXPORT_TOKEN)) return new Response(null, { status: 401 })
 
-  const { keys } = await env.KEEP.list({ prefix: LATEST_PREFIX })
+  const { keys, list_complete: complete } = await env.KEEP.list({ prefix: LATEST_PREFIX })
+  if (!complete) return new Response(null, { status: 503 })
   const found = await Promise.all(keys.map(({ name }) => exportItemOf(env.KEEP, name)))
   const items = found.filter((item) => item !== null)
   const exportedAt = clock().toISOString()

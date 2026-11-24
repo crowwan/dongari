@@ -9,6 +9,9 @@
 
 export const KEEP_DIR = 'keep'
 export const INDEX_FILE = 'index.json'
+// 한 번 실행에서 지울 수 있는 보관본 파일 수. 보관본이 사라지는 길은 앱 [지우기]뿐이고 가족 몇 명이 한 주에 둘 이상 지우는 일은 드물다.
+// 넘으면 서버(KV)를 잃었거나 목록이 잘린 것일 수 있어 지우지 않고 멈춘다 (#194 리뷰)
+export const MAX_REMOVALS_PER_RUN = 1
 
 // 서버 이름(복구 코드에서 만든 SHA-256)과 같은 모양만 파일 이름으로 쓴다 (경로 조작 막기)
 const KEEP_ID = /^[0-9a-f]{64}$/
@@ -71,8 +74,9 @@ function toItems(items: unknown[]): ExportItem[] | string {
 }
 
 // 내보내기 답(body)과 지금 keep/ 폴더의 파일 이름들 → 쓸 파일·지울 파일·index.json.
-// 답이 0개인데 레포에 보관본 파일이 있으면 지우지 않고 실패한다: 서버(KV)가 비었거나 잘못 답한 것일 수 있고,
-// 한꺼번에 지운 커밋이 생기면 되살리기가 이력 뒤지기가 된다. 정말 다 지울 일이면 손으로 지운다(README "0개라서 멈췄을 때")
+// 답이 0개인데 레포에 보관본 파일이 있거나, 지울 파일이 MAX_REMOVALS_PER_RUN 을 넘으면 지우지 않고 실패한다:
+// 서버(KV)를 잃은 뒤 폰 몇 대만 다시 보관했거나 잘못 답한 것일 수 있고(이 레포가 막으려는 바로 그 사고),
+// 한꺼번에 지운 커밋이 생기면 되살리기가 이력 뒤지기가 된다. 정말 지울 일이면 손으로 지운다(README "지우지 않고 멈췄을 때")
 export function planBackup(body: unknown, existingFileNames: readonly string[]): BackupPlan {
   if (!isRecord(body)) return fail('내보내기 답이 { exportedAt, items } 모양이 아니에요')
   const { exportedAt, items } = body
@@ -86,21 +90,27 @@ export function planBackup(body: unknown, existingFileNames: readonly string[]):
     const match = ID_FILE.exec(name)
     return match ? [match[1]] : []
   })
+  const manualHelp = '보관 서버를 먼저 확인하고, 정말 지울 일이면 README "지우지 않고 멈췄을 때" 대로 손으로 지우세요'
   if (checked.length === 0 && existingIds.length > 0) {
+    return fail(`서버가 보관본 0개를 줬는데 레포에는 ${existingIds.length}개가 있어요. 한꺼번에 지우지 않고 멈춰요 — ${manualHelp}`)
+  }
+  const keptIds = new Set(checked.map(({ id }) => id))
+  const removeIds = existingIds.filter((id) => !keptIds.has(id))
+  if (removeIds.length > MAX_REMOVALS_PER_RUN) {
+    // 지울 것은 이 레포의 파일 이름이라 앞 8자를 알려 준다 (손으로 지울 때 찾게)
+    const names = removeIds.map((id) => id.slice(0, 8)).join(', ')
     return fail(
-      `서버가 보관본 0개를 줬는데 레포에는 ${existingIds.length}개가 있어요. 한꺼번에 지우지 않고 멈춰요 — ` +
-        '보관 서버를 먼저 확인하고, 정말 다 지울 일이면 README "0개라서 멈췄을 때" 대로 손으로 지우세요',
+      `서버 목록에 없는 보관본이 ${removeIds.length}개(${names})라 지우지 않고 멈춰요 — 한 번에 ${MAX_REMOVALS_PER_RUN}개까지만 지워요. ${manualHelp}`,
     )
   }
 
   const written = checked.map(({ id, savedAt, envelope }) => ({ id, savedAt, text: `${JSON.stringify(envelope)}\n` }))
   const index = written.map(({ id, savedAt, text }) => ({ id, savedAt, bytes: new TextEncoder().encode(text).byteLength }))
-  const keptIds = new Set(written.map(({ id }) => id))
   return {
     ok: true,
     exportedAt,
     files: written.map(({ id, text }) => ({ path: `${KEEP_DIR}/${id}.json`, text })),
-    removePaths: existingIds.filter((id) => !keptIds.has(id)).map((id) => `${KEEP_DIR}/${id}.json`),
+    removePaths: removeIds.map((id) => `${KEEP_DIR}/${id}.json`),
     indexText: `${JSON.stringify(index, null, 2)}\n`,
   }
 }

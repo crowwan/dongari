@@ -15,6 +15,8 @@ class FakeKeepStore implements KeepStore {
   readonly ttls = new Map<string, number>()
   // 이 키에 쓰면 실패하게 한다 (KV 쓰기 실패 흉내)
   failPut: (key: string) => boolean = () => false
+  // list 한 장의 크기 (Cloudflare KV 는 1,000). 넘으면 그 장까지만 주고 list_complete 가 false
+  listPageSize = 1000
 
   async get(key: string): Promise<string | null> {
     return this.values.get(key) ?? null
@@ -39,10 +41,12 @@ class FakeKeepStore implements KeepStore {
     this.ttls.delete(key)
   }
 
-  async list(options: { prefix: string }): Promise<{ keys: { name: string; metadata?: unknown }[] }> {
+  async list(options: { prefix: string }): Promise<{ keys: { name: string; metadata?: unknown }[]; list_complete: boolean }> {
     const names = [...this.values.keys()].filter((name) => name.startsWith(options.prefix)).sort()
+    const page = names.slice(0, this.listPageSize)
     return {
-      keys: names.map((name) => (this.metadata.has(name) ? { name, metadata: this.metadata.get(name) } : { name })),
+      keys: page.map((name) => (this.metadata.has(name) ? { name, metadata: this.metadata.get(name) } : { name })),
+      list_complete: page.length === names.length,
     }
   }
 }
@@ -1093,6 +1097,18 @@ describe('SPEC-011 서버 밖 사본 내보내기 (Worker)', () => {
         )
         expect(res.status).toBe(405)
       }
+      expect(store.values.has('export:last')).toBe(false)
+    })
+
+    it('최신본 목록이 한 장(1,000개)을 넘어 잘리면 잘린 목록을 주지 않고 503 이며 export:last 도 남기지 않는다 (#194 리뷰)', async () => {
+      await putAt('2026-11-21T03:00:00.000Z', keepBody())
+      await putAt('2026-11-21T03:00:00.000Z', keepBody(), { url: `https://keep.example.workers.dev/v1/keep/${OTHER_ID}` })
+      store.listPageSize = 1
+
+      const res = await getExport()
+
+      expect(res.status).toBe(503)
+      expect(await res.text()).toBe('')
       expect(store.values.has('export:last')).toBe(false)
     })
 

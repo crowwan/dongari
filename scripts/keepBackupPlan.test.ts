@@ -41,7 +41,7 @@ describe('SPEC-011 서버 밖 주간 사본 (백업 레포 워크플로)', () =>
       expect(plan.removePaths).toEqual([])
     })
 
-    it('이번 목록에 없는 id 파일은 지우고, id 모양이 아닌 파일은 건드리지 않는다', () => {
+    it('이번 목록에 없는 id 파일이 1개면(앱 [지우기] 한 사람) 지우고, id 모양이 아닌 파일은 건드리지 않는다', () => {
       const existing = [`${ID_A}.json`, `${ID_C}.json`, '.gitkeep', 'README.md']
 
       const plan = planBackup(exported([itemA]), existing)
@@ -100,10 +100,25 @@ describe('SPEC-011 서버 밖 주간 사본 (백업 레포 워크플로)', () =>
       expect(planBackup(body, [`${ID_A}.json`])).toMatchObject({ ok: false })
     })
 
-    it('보관본이 0개인데 레포에 파일이 있으면 한꺼번에 지우지 않고 실패한다', () => {
-      const plan = planBackup(exported([]), [`${ID_A}.json`, `${ID_B}.json`])
+    it('보관본이 0개인데 레포에 파일이 있으면(1개라도) 지우지 않고 실패한다', () => {
+      const plan = planBackup(exported([]), [`${ID_A}.json`])
 
       expect(plan).toEqual({ ok: false, message: expect.stringContaining('0개') })
+    })
+
+    it('한 번에 지울 파일이 2개 이상이면 아무것도 지우지 않고 실패하며, 지울 id 앞 8자를 알려 준다 (#194 리뷰)', () => {
+      const plan = planBackup(exported([itemA]), [`${ID_A}.json`, `${ID_B}.json`, `${ID_C}.json`])
+
+      expect(plan).toEqual({ ok: false, message: expect.stringContaining('2개') })
+      expect(plan).toEqual({ ok: false, message: expect.stringContaining('bbbbbbbb') })
+      expect(plan).toEqual({ ok: false, message: expect.stringContaining('cccccccc') })
+    })
+
+    it('서버(KV)를 잃은 뒤 폰 한 대만 다시 보관한 모양(새 id 1개, 레포에 여러 개)이면 지우지 않고 실패한다 (#194 리뷰)', () => {
+      const existing = ['1', '2', '3', '4'].map((digit) => `${digit.repeat(64)}.json`)
+      const reKept = { ...itemA, id: '5'.repeat(64) }
+
+      expect(planBackup(exported([reKept]), existing)).toMatchObject({ ok: false })
     })
 
     it('레포에 파일이 없으면 0개라도 빈 목록을 쓴다 (처음 실행)', () => {
