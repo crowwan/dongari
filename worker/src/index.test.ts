@@ -1,26 +1,49 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import worker from './index'
-import { type KeepStore, MAX_BODY_BYTES, MAX_STATUS_BYTES } from './keep'
+import {
+  handleKeepRequest,
+  type KeepPutOptions,
+  type KeepStore,
+  MAX_BODY_BYTES,
+  MAX_STATUS_BYTES,
+} from './keep'
 
-// KV 가짜: 키·값을 메모리에 둔다
+// KV 가짜: 키·값과 metadata·TTL 을 메모리에 둔다 (Cloudflare KV 처럼 다시 쓰면 metadata·TTL 도 새로, list 는 이름순)
 class FakeKeepStore implements KeepStore {
   readonly values = new Map<string, string>()
+  readonly metadata = new Map<string, unknown>()
+  readonly ttls = new Map<string, number>()
+  // 이 키에 쓰면 실패하게 한다 (KV 쓰기 실패 흉내)
+  failPut: (key: string) => boolean = () => false
 
   async get(key: string): Promise<string | null> {
     return this.values.get(key) ?? null
   }
 
-  async put(key: string, value: string): Promise<void> {
+  async getWithMetadata(key: string): Promise<{ value: string | null; metadata: unknown }> {
+    return { value: this.values.get(key) ?? null, metadata: this.metadata.get(key) ?? null }
+  }
+
+  async put(key: string, value: string, options: KeepPutOptions = {}): Promise<void> {
+    if (this.failPut(key)) throw new Error('KV 쓰기 실패')
     this.values.set(key, value)
+    this.metadata.delete(key)
+    this.ttls.delete(key)
+    if (options.metadata !== undefined) this.metadata.set(key, options.metadata)
+    if (options.expirationTtl !== undefined) this.ttls.set(key, options.expirationTtl)
   }
 
   async delete(key: string): Promise<void> {
     this.values.delete(key)
+    this.metadata.delete(key)
+    this.ttls.delete(key)
   }
 
-  async list(options: { prefix: string }): Promise<{ keys: { name: string }[] }> {
-    const names = [...this.values.keys()].filter((name) => name.startsWith(options.prefix))
-    return { keys: names.map((name) => ({ name })) }
+  async list(options: { prefix: string }): Promise<{ keys: { name: string; metadata?: unknown }[] }> {
+    const names = [...this.values.keys()].filter((name) => name.startsWith(options.prefix)).sort()
+    return {
+      keys: names.map((name) => (this.metadata.has(name) ? { name, metadata: this.metadata.get(name) } : { name })),
+    }
   }
 }
 
@@ -616,5 +639,307 @@ describe('SPEC-006·SPEC-007 미리보기 주소는 저장 자리를 나눈다 (
       expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
     }
     expect(store.values.size).toBe(0)
+  })
+})
+
+const DAY_TTL = 2_678_400 // 31일
+const MONTH_TTL = 34_560_000 // 400일
+const HISTORY_URL = `${URL_FOR_ID}/history`
+
+describe('SPEC-011 보관본 날짜별 사본 (Worker)', () => {
+  let store: FakeKeepStore
+
+  // 서버 시각을 정해 두고 보낸다 (날짜는 한국 시간으로 가르므로 UTC 와 날이 다른 시각을 일부러 쓴다)
+  const sendAt = (now: string, req: Request) => handleKeepRequest(req, { KEEP: store }, () => new Date(now))
+  const putAt = (now: string, body: string, origin?: string) => sendAt(now, request('PUT', { body, origin }))
+  const getFrom = (url: string, origin?: string) => sendAt('2026-11-24T00:00:00.000Z', request('GET', { url, origin }))
+  const keysStartingWith = (prefix: string) => [...store.values.keys()].filter((key) => key.startsWith(prefix)).sort()
+
+  beforeEach(() => {
+    store = new FakeKeepStore()
+  })
+
+  describe('AC-1 날·달이 바뀐 뒤 첫 보관에 사본을 남긴다', () => {
+    it('날(KST)이 바뀐 뒤 첫 PUT 은 기존 최신본을 그 보관일 사본으로 31일 TTL·보관 시각과 함께 남긴다', async () => {
+      const first = keepBody({ data: 'Zmlyc3Q=' })
+      const second = keepBody({ data: 'c2Vjb25k' })
+      // 한국 시간 11월 20일 23:00 → 11월 21일 00:30 (UTC 로는 둘 다 11월 20일)
+      await putAt('2026-11-20T14:00:00.000Z', first)
+
+      const res = await putAt('2026-11-20T15:30:00.000Z', second)
+
+      expect(res.status).toBe(204)
+      expect(store.values.get(`snap:${ID}:2026-11-20`)).toBe(first)
+      expect(store.ttls.get(`snap:${ID}:2026-11-20`)).toBe(DAY_TTL)
+      expect(store.metadata.get(`snap:${ID}:2026-11-20`)).toEqual({ savedAt: '2026-11-20T14:00:00.000Z' })
+      expect(store.values.get(`keep:${ID}`)).toBe(second)
+      expect(store.metadata.get(`keep:${ID}`)).toEqual({ savedAt: '2026-11-20T15:30:00.000Z' })
+      expect(store.ttls.has(`keep:${ID}`)).toBe(false)
+      // 같은 달이라 달 사본은 없다
+      expect(keysStartingWith('month:')).toEqual([])
+    })
+
+    it('같은 날(KST) 두 번째 PUT 은 사본을 만들지 않는다', async () => {
+      // 한국 시간 11월 21일 00:30 → 23:30 (UTC 로는 11월 20일 → 21일)
+      await putAt('2026-11-20T15:30:00.000Z', keepBody({ data: 'Zmlyc3Q=' }))
+
+      await putAt('2026-11-21T14:30:00.000Z', keepBody({ data: 'c2Vjb25k' }))
+
+      expect(keysStartingWith('snap:')).toEqual([])
+      expect(keysStartingWith('month:')).toEqual([])
+      expect(store.metadata.get(`keep:${ID}`)).toEqual({ savedAt: '2026-11-21T14:30:00.000Z' })
+    })
+
+    it('사본은 그날 마지막으로 보관된 모습이고, 그 날 사본이 이미 있으면 덮어쓴다', async () => {
+      store.values.set(`snap:${ID}:2026-11-20`, keepBody({ data: 'b3RoZXI=' }))
+      await putAt('2026-11-20T01:00:00.000Z', keepBody({ data: 'bW9ybmluZw==' }))
+      const last = keepBody({ data: 'bmlnaHQ=' })
+      await putAt('2026-11-20T14:00:00.000Z', last)
+
+      await putAt('2026-11-21T01:00:00.000Z', keepBody({ data: 'bmV4dA==' }))
+
+      expect(keysStartingWith('snap:')).toEqual([`snap:${ID}:2026-11-20`])
+      expect(store.values.get(`snap:${ID}:2026-11-20`)).toBe(last)
+    })
+
+    it('달(KST)이 바뀐 첫 PUT 은 지난 보관 달 사본도 400일 TTL·보관 시각과 함께 남긴다', async () => {
+      const october = keepBody({ data: 'b2N0' })
+      // 한국 시간 10월 31일 23:00 → 11월 1일 00:10
+      await putAt('2026-10-31T14:00:00.000Z', october)
+
+      await putAt('2026-10-31T15:10:00.000Z', keepBody({ data: 'bm92' }))
+
+      expect(store.values.get(`month:${ID}:2026-10`)).toBe(october)
+      expect(store.ttls.get(`month:${ID}:2026-10`)).toBe(MONTH_TTL)
+      expect(store.metadata.get(`month:${ID}:2026-10`)).toEqual({ savedAt: '2026-10-31T14:00:00.000Z' })
+      expect(store.values.get(`snap:${ID}:2026-10-31`)).toBe(october)
+      expect(store.ttls.get(`snap:${ID}:2026-10-31`)).toBe(DAY_TTL)
+    })
+
+    it('최신본이 없던 첫 PUT 은 사본 없이 최신본만 쓴다', async () => {
+      await putAt('2026-11-20T14:00:00.000Z', keepBody())
+
+      expect([...store.values.keys()]).toEqual([`keep:${ID}`])
+    })
+
+    it('형식이 틀려 받지 않은 PUT 은 사본도 만들지 않는다', async () => {
+      await putAt('2026-11-20T14:00:00.000Z', keepBody())
+
+      const res = await putAt('2026-11-21T14:00:00.000Z', keepBody({ v: 2 }))
+
+      expect(res.status).toBe(400)
+      expect([...store.values.keys()]).toEqual([`keep:${ID}`])
+    })
+  })
+
+  describe('AC-2 옛 최신본과 복사 실패', () => {
+    it('metadata 없는 옛 최신본은 겉봉투 savedAt(한국 시간)으로 보관일을 정한다', async () => {
+      // 이 기능 전에 저장된 최신본: metadata 없음. 겉봉투 savedAt 은 한국 시간 11월 20일 01:00 (UTC 19일)
+      const old = keepBody({ savedAt: '2026-11-19T16:00:00.000Z' })
+      store.values.set(`keep:${ID}`, old)
+
+      const res = await putAt('2026-11-21T01:00:00.000Z', keepBody({ data: 'bmV3' }))
+
+      expect(res.status).toBe(204)
+      expect(store.values.get(`snap:${ID}:2026-11-20`)).toBe(old)
+      expect(store.metadata.get(`snap:${ID}:2026-11-20`)).toEqual({ savedAt: '2026-11-19T16:00:00.000Z' })
+      expect(keysStartingWith('month:')).toEqual([])
+    })
+
+    it('metadata 없는 옛 최신본이 오늘(KST) 보관된 것이면 사본을 만들지 않는다', async () => {
+      store.values.set(`keep:${ID}`, keepBody({ savedAt: '2026-11-20T16:00:00.000Z' }))
+
+      await putAt('2026-11-21T01:00:00.000Z', keepBody({ data: 'bmV3' }))
+
+      expect(keysStartingWith('snap:')).toEqual([])
+    })
+
+    it('날짜 사본 복사가 실패하면 최신본을 바꾸지 않고 5xx 로 답한다', async () => {
+      const first = keepBody({ data: 'Zmlyc3Q=' })
+      await putAt('2026-11-20T14:00:00.000Z', first)
+      store.failPut = (key) => key.startsWith('snap:')
+
+      const res = await putAt('2026-11-21T14:00:00.000Z', keepBody({ data: 'c2Vjb25k' }))
+
+      expect(res.status).toBeGreaterThanOrEqual(500)
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ORIGIN)
+      expect(store.values.get(`keep:${ID}`)).toBe(first)
+      expect(store.metadata.get(`keep:${ID}`)).toEqual({ savedAt: '2026-11-20T14:00:00.000Z' })
+    })
+
+    it('달 사본 복사가 실패해도 최신본을 바꾸지 않고 5xx 로 답한다', async () => {
+      const october = keepBody({ data: 'b2N0' })
+      await putAt('2026-10-31T14:00:00.000Z', october)
+      store.failPut = (key) => key.startsWith('month:')
+
+      const res = await putAt('2026-10-31T15:10:00.000Z', keepBody({ data: 'bm92' }))
+
+      expect(res.status).toBeGreaterThanOrEqual(500)
+      expect(store.values.get(`keep:${ID}`)).toBe(october)
+    })
+
+    it('복사가 실패한 뒤 다시 보내면 사본과 최신본이 모두 생긴다', async () => {
+      const first = keepBody({ data: 'Zmlyc3Q=' })
+      await putAt('2026-11-20T14:00:00.000Z', first)
+      store.failPut = (key) => key.startsWith('snap:')
+      await putAt('2026-11-21T14:00:00.000Z', keepBody({ data: 'c2Vjb25k' }))
+      store.failPut = () => false
+
+      const second = keepBody({ data: 'c2Vjb25k' })
+      const res = await putAt('2026-11-21T14:01:00.000Z', second)
+
+      expect(res.status).toBe(204)
+      expect(store.values.get(`snap:${ID}:2026-11-20`)).toBe(first)
+      expect(store.values.get(`keep:${ID}`)).toBe(second)
+    })
+  })
+
+  describe('AC-3 사본 목록과 고른 사본 받기', () => {
+    // 10월 31일·11월 20일·11월 21일(KST)에 보관하고 11월 22일에 마지막으로 보관한 모습
+    async function keepFourDays(origin?: string) {
+      await putAt('2026-10-31T14:00:00.000Z', keepBody({ data: 'b2N0' }), origin)
+      await putAt('2026-11-20T03:00:00.000Z', keepBody({ data: 'MjA=' }), origin)
+      await putAt('2026-11-21T03:00:00.000Z', keepBody({ data: 'MjE=' }), origin)
+      await putAt('2026-11-22T03:00:00.000Z', keepBody({ data: 'MjI=' }), origin)
+    }
+
+    it('GET …/history 가 최신본·날짜별·달별 목록을 최신 것부터 준다', async () => {
+      await keepFourDays()
+
+      const res = await getFrom(HISTORY_URL)
+
+      expect(res.status).toBe(200)
+      expect(res.headers.get('Content-Type')).toContain('application/json')
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ORIGIN)
+      expect(await res.json()).toEqual({
+        latest: { savedAt: '2026-11-22T03:00:00.000Z' },
+        days: [
+          { date: '2026-11-21', savedAt: '2026-11-21T03:00:00.000Z' },
+          { date: '2026-11-20', savedAt: '2026-11-20T03:00:00.000Z' },
+          { date: '2026-10-31', savedAt: '2026-10-31T14:00:00.000Z' },
+        ],
+        months: [{ month: '2026-10', savedAt: '2026-10-31T14:00:00.000Z' }],
+      })
+    })
+
+    it('보관본이 없으면 최신본 없이 빈 목록을 준다', async () => {
+      const res = await getFrom(HISTORY_URL)
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ days: [], months: [] })
+    })
+
+    it('metadata 없는 옛 최신본의 보관 시각은 겉봉투 savedAt 으로 준다', async () => {
+      store.values.set(`keep:${ID}`, keepBody({ savedAt: '2026-11-19T16:00:00.000Z' }))
+
+      const res = await getFrom(HISTORY_URL)
+
+      expect(await res.json()).toEqual({ latest: { savedAt: '2026-11-19T16:00:00.000Z' }, days: [], months: [] })
+    })
+
+    it('다른 이름의 사본은 목록에 넣지 않는다', async () => {
+      const OTHER_ID = 'b'.repeat(64)
+      store.values.set(`snap:${OTHER_ID}:2026-11-20`, keepBody())
+      store.metadata.set(`snap:${OTHER_ID}:2026-11-20`, { savedAt: '2026-11-20T03:00:00.000Z' })
+
+      const res = await getFrom(HISTORY_URL)
+
+      expect(await res.json()).toEqual({ days: [], months: [] })
+    })
+
+    it('?day= 는 그 날 사본을, ?month= 는 그 달 사본을, 쿼리가 없으면 최신본을 준다', async () => {
+      await keepFourDays()
+
+      const day = await getFrom(`${URL_FOR_ID}?day=2026-11-20`)
+      const month = await getFrom(`${URL_FOR_ID}?month=2026-10`)
+      const latest = await getFrom(URL_FOR_ID)
+
+      expect(day.status).toBe(200)
+      expect(day.headers.get('Content-Type')).toContain('application/json')
+      expect(await day.text()).toBe(keepBody({ data: 'MjA=' }))
+      expect(await month.text()).toBe(keepBody({ data: 'b2N0' }))
+      expect(await latest.text()).toBe(keepBody({ data: 'MjI=' }))
+    })
+
+    it('없는 날·달 사본은 404 다', async () => {
+      await keepFourDays()
+
+      expect((await getFrom(`${URL_FOR_ID}?day=2026-11-19`)).status).toBe(404)
+      expect((await getFrom(`${URL_FOR_ID}?month=2026-09`)).status).toBe(404)
+    })
+
+    it('날·달 형식이 틀리거나 둘을 함께 주면 400 이다', async () => {
+      const queries = ['day=2026-11', 'day=20261120', 'day=', 'month=2026-10-31', 'month=2026', 'day=2026-11-20&month=2026-11']
+      for (const query of queries) {
+        expect((await getFrom(`${URL_FOR_ID}?${query}`)).status).toBe(400)
+      }
+    })
+
+    it('미리보기 출처의 보관은 미리보기 자리에 사본을 두고, 목록·사본 받기도 미리보기 자리만 본다', async () => {
+      await keepFourDays()
+      await putAt('2026-11-23T03:00:00.000Z', keepBody({ data: 'cDE=' }), PREVIEW_ORIGIN)
+      await putAt('2026-11-24T03:00:00.000Z', keepBody({ data: 'cDI=' }), PREVIEW_ORIGIN)
+
+      expect(keysStartingWith('preview:snap:')).toEqual([`preview:snap:${ID}:2026-11-23`])
+      expect(keysStartingWith('preview:month:')).toEqual([])
+      const previewHistory = await getFrom(HISTORY_URL, PREVIEW_ORIGIN)
+      expect(await previewHistory.json()).toEqual({
+        latest: { savedAt: '2026-11-24T03:00:00.000Z' },
+        days: [{ date: '2026-11-23', savedAt: '2026-11-23T03:00:00.000Z' }],
+        months: [],
+      })
+      expect((await getFrom(`${URL_FOR_ID}?day=2026-11-20`, PREVIEW_ORIGIN)).status).toBe(404)
+      expect(await (await getFrom(`${URL_FOR_ID}?day=2026-11-23`, PREVIEW_ORIGIN)).text()).toBe(keepBody({ data: 'cDE=' }))
+      // 본 자리 목록에는 미리보기 사본이 섞이지 않는다
+      const mainHistory: unknown = await (await getFrom(HISTORY_URL)).json()
+      expect(mainHistory).toHaveProperty('days.length', 3)
+      expect(mainHistory).toHaveProperty('latest.savedAt', '2026-11-22T03:00:00.000Z')
+    })
+
+    it('목록은 허용한 출처만, GET 만 받고 이름 형식이 틀리면 400 이다', async () => {
+      expect((await getFrom(HISTORY_URL, 'https://evil.example')).status).toBe(403)
+      expect((await sendAt('2026-11-24T00:00:00.000Z', request('GET', { url: HISTORY_URL, origin: null }))).status).toBe(403)
+      expect((await sendAt('2026-11-24T00:00:00.000Z', request('DELETE', { url: HISTORY_URL }))).status).toBe(405)
+      expect((await sendAt('2026-11-24T00:00:00.000Z', request('OPTIONS', { url: HISTORY_URL }))).status).toBe(204)
+      expect((await getFrom(`https://keep.example.workers.dev/v1/keep/${'A'.repeat(64)}/history`)).status).toBe(400)
+      expect((await getFrom(`${HISTORY_URL}/more`)).status).toBe(404)
+    })
+  })
+
+  describe('AC-4 지우면 사본까지', () => {
+    it('DELETE 가 그 이름의 최신본·상태 신호·날짜별·달별 사본을 지우고 다른 이름과 미리보기 자리는 남긴다', async () => {
+      const OTHER_ID = 'b'.repeat(64)
+      await putAt('2026-10-31T14:00:00.000Z', keepBody())
+      await putAt('2026-11-20T03:00:00.000Z', keepBody())
+      await putAt('2026-11-21T03:00:00.000Z', keepBody())
+      store.values.set(`status:${ID}`, statusBody())
+      store.values.set(`snap:${OTHER_ID}:2026-11-20`, keepBody())
+      store.values.set(`month:${OTHER_ID}:2026-10`, keepBody())
+      store.values.set(`preview:snap:${ID}:2026-11-20`, keepBody())
+      store.values.set(`preview:month:${ID}:2026-10`, keepBody())
+      expect(keysStartingWith('snap:')).toHaveLength(3)
+
+      const res = await sendAt('2026-11-24T00:00:00.000Z', request('DELETE'))
+
+      expect(res.status).toBe(204)
+      expect([...store.values.keys()].sort()).toEqual([
+        `month:${OTHER_ID}:2026-10`,
+        `preview:month:${ID}:2026-10`,
+        `preview:snap:${ID}:2026-11-20`,
+        `snap:${OTHER_ID}:2026-11-20`,
+      ])
+    })
+
+    it('미리보기에서 지우면 미리보기 자리의 사본만 지운다', async () => {
+      store.values.set(`snap:${ID}:2026-11-20`, keepBody())
+      store.values.set(`preview:keep:${ID}`, keepBody())
+      store.values.set(`preview:snap:${ID}:2026-11-20`, keepBody())
+      store.values.set(`preview:month:${ID}:2026-10`, keepBody())
+
+      const res = await sendAt('2026-11-24T00:00:00.000Z', request('DELETE', { origin: PREVIEW_ORIGIN }))
+
+      expect(res.status).toBe(204)
+      expect([...store.values.keys()]).toEqual([`snap:${ID}:2026-11-20`])
+    })
   })
 })
