@@ -22,7 +22,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "scripts/**/*.ts"],
+  // ops/keep-backup 은 비공개 백업 레포에 올리는 파일 원본 (SPEC-011 #186). 그 스크립트도 Node 24 가 타입만 지우고 돌린다
+  "include": ["vite.config.ts", "scripts/**/*.ts", "ops/keep-backup/scripts/**/*.ts"],
   // scripts 테스트는 vitest(jsdom)에서 돌고 앱 코드(src)를 불러오기도 해서 tsconfig.app 이 검사한다 (#154)
   "exclude": ["scripts/**/*.test.ts"]
 }
