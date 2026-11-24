@@ -2,15 +2,22 @@ import { describe, expect, it } from 'vitest'
 import { keepIdOf as appKeepIdOf, sealKeep } from '../src/features/keep/keepCrypto'
 import { normalizeRecoveryCode as appNormalize } from '../src/features/keep/recoveryCode'
 import { createBackup, readBackup } from '../src/storage/backup'
-import { book, duesBook, ledger, storedWith } from '../src/test/ledgerFixtures'
+import type { Book } from '../src/domain/types'
+import { book, duesBook, ledger, storedWith, type EntrySpec } from '../src/test/ledgerFixtures'
 import {
   APP_ORIGIN,
   BROKEN_ENVELOPE,
+  BROKEN_HISTORY,
+  describeList,
   describeRescue,
   INVALID_CODE,
   keepIdOf,
+  listKeep,
+  NO_HISTORY_ROUTE,
   normalizeRecoveryCode,
   NOT_FOUND,
+  parseRescueArgs,
+  RESCUE_USAGE,
   rescueDir,
   rescueFileName,
   rescueKeep,
@@ -29,12 +36,12 @@ interface SentRequest {
   headers: Record<string, string>
 }
 
-// 받은 요청을 적어 두고 정해 둔 답을 주는 가짜 서버
-function fakeServer(answer: () => Promise<Response>): { fetchFn: FetchFn; sent: SentRequest[] } {
+// 받은 요청을 적어 두고 정해 둔 답을 주는 가짜 서버 (주소에 따라 답을 고를 수 있다)
+function fakeServer(answer: (url: string) => Promise<Response>): { fetchFn: FetchFn; sent: SentRequest[] } {
   const sent: SentRequest[] = []
   const fetchFn: FetchFn = (url, init) => {
     sent.push({ url, method: init.method, headers: init.headers })
-    return answer()
+    return answer(url)
   }
   return { fetchFn, sent }
 }
@@ -175,6 +182,190 @@ describe('#154 보관본 꺼내기 스크립트', () => {
       expect(text).toContain('3건')
       expect(text).toContain('다 보냈으면 이 파일을 지우세요')
       expect(text).not.toMatch(/HK7M|29QF|MX4P|8R2D/)
+    })
+  })
+})
+
+// 장부들을 기록 파일 글자로 만들어 앱의 sealKeep 으로 잠근 보관본
+async function sealedBooks(books: Book[], savedAt: string, code: string = CODE) {
+  const plain = createBackup({ ...storedWith(), books, settings: { recoveryCode: code } }, new Date(savedAt)).text
+  return { plain, envelope: await sealKeep(code, plain, savedAt) }
+}
+
+const flowerClub = (specs: EntrySpec[]) => book([ledger(specs, { year: 2026 })], { id: 'a', name: '꽃동아리' })
+
+describe('SPEC-011 꺼내기 스크립트 날짜 고르기', () => {
+  // 서버의 사본 목록 (GET /v1/keep/<id>/history): 최신본 11월 24일, 날짜별 21일·20일, 달별 10월
+  const HISTORY = {
+    latest: { savedAt: '2026-11-24T00:30:00.000Z' }, // 한국 시간 09:30
+    days: [
+      { date: '2026-11-21', savedAt: '2026-11-21T13:10:00.000Z' }, // 22:10
+      { date: '2026-11-20', savedAt: '2026-11-20T03:00:00.000Z' }, // 12:00
+    ],
+    months: [{ month: '2026-10', savedAt: '2026-10-31T12:00:00.000Z' }], // 21:00
+  }
+
+  // 주소에 따라 목록·최신본·날짜별·달별 사본을 주는 가짜 서버. 11월 20일 사본은 다른 코드로 잠겨 있다
+  async function historyServer(history: unknown = HISTORY) {
+    const base = `https://keep.example.workers.dev/v1/keep/${await appKeepIdOf(CODE)}`
+    const latest = await appEnvelope()
+    const day21 = await sealedBooks([flowerClub([[11, 'income', '회비', 10_000]])], HISTORY.days[0].savedAt)
+    const day20 = await sealedBooks([flowerClub([])], HISTORY.days[1].savedAt, 'ABCD-EFGH-JKMN-PQRS')
+    const october = await sealedBooks(
+      [flowerClub([[10, 'income', '회비', 10_000], [10, 'expense', '꽃', 3_000]])],
+      HISTORY.months[0].savedAt,
+    )
+    const answers = new Map<string, unknown>([
+      [`${base}/history`, history],
+      [base, latest.envelope],
+      [`${base}?day=2026-11-21`, day21.envelope],
+      [`${base}?day=2026-11-20`, day20.envelope],
+      [`${base}?month=2026-10`, october.envelope],
+    ])
+    const server = fakeServer((url) => {
+      const answer = answers.get(url)
+      return answer === undefined ? Promise.resolve(new Response(null, { status: 404 })) : jsonResponse(answer)
+    })
+    return { ...server, base, plains: { day21: day21.plain, october: october.plain } }
+  }
+
+  describe('AC-7 명령줄', () => {
+    it('옵션이 없으면 최신본, --list 는 목록, --day·--month 는 그 날·달 사본을 고르고 남은 인자 하나는 복구 코드다', () => {
+      expect(parseRescueArgs([])).toEqual({ ok: true, command: { action: 'rescue', target: { kind: 'latest' } } })
+      expect(parseRescueArgs([CODE])).toEqual({
+        ok: true,
+        command: { action: 'rescue', target: { kind: 'latest' }, code: CODE },
+      })
+      expect(parseRescueArgs(['--list'])).toEqual({ ok: true, command: { action: 'list' } })
+      expect(parseRescueArgs(['--day', '2026-11-21'])).toEqual({
+        ok: true,
+        command: { action: 'rescue', target: { kind: 'day', date: '2026-11-21' } },
+      })
+      expect(parseRescueArgs(['--month', '2026-10', CODE])).toEqual({
+        ok: true,
+        command: { action: 'rescue', target: { kind: 'month', month: '2026-10' }, code: CODE },
+      })
+    })
+
+    it('날·달 형식이 틀리거나, 옵션을 함께 주거나, 모르는 옵션·남는 인자가 있으면 쓰는 법을 안내한다', () => {
+      const badArgs = [
+        ['--day'],
+        ['--day', '2026-11'],
+        ['--day', '2026-13-01'],
+        ['--day', CODE],
+        ['--month', '2026-10-31'],
+        ['--month', '2026-13'],
+        ['--list', '--day', '2026-11-21'],
+        ['--day', '2026-11-21', '--month', '2026-10'],
+        ['--all'],
+        [CODE, 'extra'],
+      ]
+      for (const args of badArgs) {
+        expect(parseRescueArgs(args)).toEqual({ ok: false, message: expect.stringContaining(RESCUE_USAGE) })
+      }
+    })
+  })
+
+  describe('AC-7 --day·--month 로 사본 꺼내기', () => {
+    it('--day 는 그 날 사본을 ?day= 로 받아 풀고, 기록 파일 이름에 그 날을 넣는다', async () => {
+      const server = await historyServer()
+      const target = { kind: 'day', date: '2026-11-21' } as const
+
+      const result = await rescueKeep(CODE, KEEP_URL, server.fetchFn, target)
+
+      expect(server.sent).toEqual([{ url: `${server.base}?day=2026-11-21`, method: 'GET', headers: { Origin: APP_ORIGIN } }])
+      if (!result.ok) throw new Error(result.message)
+      expect(result.plain).toBe(server.plains.day21)
+      expect(readBackup(result.plain)).toMatchObject({ ok: true, summary: { bookCount: 1, entryCount: 1 } })
+      expect(rescueFileName(result.savedAt, target)).toBe('우리장부-기록-2026-11-21.txt')
+    })
+
+    it('--month 는 그 달 사본을 ?month= 로 받아 풀고, 기록 파일 이름에 그 달을 넣는다', async () => {
+      const server = await historyServer()
+      const target = { kind: 'month', month: '2026-10' } as const
+
+      const result = await rescueKeep(CODE, KEEP_URL, server.fetchFn, target)
+
+      expect(server.sent.map(({ url }) => url)).toEqual([`${server.base}?month=2026-10`])
+      if (!result.ok) throw new Error(result.message)
+      expect(result.plain).toBe(server.plains.october)
+      expect(result.summary).toEqual({ bookNames: ['꽃동아리'], entryCount: 2 })
+      expect(rescueFileName(result.savedAt, target)).toBe('우리장부-기록-2026-10.txt')
+    })
+
+    it('고른 날·달 사본이 없으면(404) 그 날·달을 넣어 --list 로 있는 것을 보라고 안내한다', async () => {
+      const server = await historyServer()
+
+      const day = await rescueKeep(CODE, KEEP_URL, server.fetchFn, { kind: 'day', date: '2026-11-19' })
+      const month = await rescueKeep(CODE, KEEP_URL, server.fetchFn, { kind: 'month', month: '2026-09' })
+
+      expect(day).toEqual({ ok: false, message: expect.stringMatching(/2026-11-19.*--list/) })
+      expect(month).toEqual({ ok: false, message: expect.stringMatching(/2026-09.*--list/) })
+    })
+
+    it('꺼낸 요약에 어떤 사본인지 적고 복구 코드는 넣지 않는다', async () => {
+      const server = await historyServer()
+      const target = { kind: 'day', date: '2026-11-21' } as const
+      const result = await rescueKeep(CODE, KEEP_URL, server.fetchFn, target)
+      if (!result.ok) throw new Error(result.message)
+
+      const text = describeRescue(result, rescueFileName(result.savedAt, target), target).join('\n')
+
+      expect(text).toContain('꺼낸 사본: 2026-11-21 날짜별 사본')
+      expect(text).toContain('2026-11-21 22:10')
+      expect(text).toContain('우리장부-기록-2026-11-21.txt')
+      expect(text).not.toMatch(/HK7M|29QF|MX4P|8R2D/)
+    })
+  })
+
+  describe('AC-7 --list 사본 목록', () => {
+    it('최신본·날짜별·달별 사본을 최신 것부터 한국 시각과 함께, 풀어 본 장부 이름·기록 건수로 보인다', async () => {
+      const server = await historyServer()
+
+      const result = await listKeep('hk7m 29qf mx4p 8r2d', KEEP_URL, server.fetchFn)
+
+      if (!result.ok) throw new Error(result.message)
+      const lines = describeList(result.rows)
+      expect(lines).toContain('최신본: 2026-11-24 09:30 보관 · 꽃동아리, 우리집 가계부 · 기록 3건')
+      expect(lines).toContain('  2026-11-21: 2026-11-21 22:10 보관 · 꽃동아리 · 기록 1건')
+      expect(lines).toContain('  2026-10: 2026-10-31 21:00 보관 · 꽃동아리 · 기록 2건')
+      expect(lines.findIndex((line) => line.includes('2026-11-21:'))).toBeLessThan(
+        lines.findIndex((line) => line.includes('2026-11-20:')),
+      )
+      expect(lines.join('\n')).not.toMatch(/HK7M|29QF|MX4P|8R2D/)
+      // 목록 하나 + 사본마다 하나씩, 모두 본 주소 출처의 GET
+      expect(server.sent.map(({ url }) => url).sort()).toEqual(
+        [server.base, `${server.base}/history`, `${server.base}?day=2026-11-20`, `${server.base}?day=2026-11-21`, `${server.base}?month=2026-10`].sort(),
+      )
+      expect(server.sent.every(({ method, headers }) => method === 'GET' && headers.Origin === APP_ORIGIN)).toBe(true)
+    })
+
+    it('풀지 못한 사본은 그 줄에 이유를 적고 나머지 줄은 그대로 보인다', async () => {
+      const server = await historyServer()
+
+      const result = await listKeep(CODE, KEEP_URL, server.fetchFn)
+
+      if (!result.ok) throw new Error(result.message)
+      expect(describeList(result.rows)).toContain(`  2026-11-20: 2026-11-20 12:00 보관 · 풀지 못했어요 (${WRONG_CODE})`)
+    })
+
+    it('사본이 하나도 없으면 없음 안내를 한다', async () => {
+      const server = await historyServer({ days: [], months: [] })
+
+      expect(await listKeep(CODE, KEEP_URL, server.fetchFn)).toEqual({ ok: false, message: NOT_FOUND })
+    })
+
+    it('목록 답이 모양이 아니거나 목록 경로가 없는 예전 서버·서버 오류·연결 실패·코드 형식 틀림이면 각각 안내한다', async () => {
+      const broken = await historyServer({ days: 'x' })
+      const oldServer = fakeServer(() => Promise.resolve(new Response(null, { status: 404 })))
+      const down = fakeServer(() => Promise.reject(new TypeError('fetch failed')))
+      const failing = fakeServer(() => Promise.resolve(new Response(null, { status: 503 })))
+
+      expect(await listKeep(CODE, KEEP_URL, broken.fetchFn)).toEqual({ ok: false, message: BROKEN_HISTORY })
+      expect(await listKeep(CODE, KEEP_URL, oldServer.fetchFn)).toEqual({ ok: false, message: NO_HISTORY_ROUTE })
+      expect(await listKeep(CODE, KEEP_URL, down.fetchFn)).toEqual({ ok: false, message: SERVER_DOWN })
+      expect(await listKeep(CODE, KEEP_URL, failing.fetchFn)).toEqual({ ok: false, message: expect.stringContaining('HTTP 503') })
+      expect(await listKeep('HK7M', KEEP_URL, down.fetchFn)).toEqual({ ok: false, message: INVALID_CODE })
     })
   })
 })
