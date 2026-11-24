@@ -43,6 +43,23 @@
   word-break: keep-all;
 }
 
+/* 다른 장부에 넣기 확인 창 안 (#193): 사실 카드 + 바로 밑 고칠 곳 Caption 을 한 덩어리로 (창의 덩어리 사이 20 보다 가깝게 8) */
+.excel-merge__facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* "넣은 뒤 2026년 장부의 설정 › 작년 이월금에서 고칠 수 있어요": Caption, 낱말 단위 줄바꿈 */
+.excel-merge__fix {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  line-height: var(--line-body);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
 /* 날짜를 바꾼 줄·읽지 못한 줄 목록 (선택 창 안): 해·달 + 엑셀 원래 글, 줄 사이 선 없음 */
 .excel-lines {
   margin: 0;

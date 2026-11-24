@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
-import type { Book, Entry, StoredData } from './domain/types'
+import type { Book, Entry, Ledger, StoredData } from './domain/types'
 import type { SheetData } from './features/excel/sheet'
 import { writeWorkbook, XLSX_MIME } from './features/excel/sheetjs'
 import type { LedgerRepository } from './storage/LedgerRepository'
@@ -26,20 +26,26 @@ function income(id: string, month: number, amount: number, payers?: [string, num
   return made
 }
 
-// 앱에 있는 동아리 장부 "한랑드림": 2025년 기록 둘(김도윤 회비·간식비), 2026년 기록 하나. 회원 김도윤, 회비 표 2025년 1월부터
-function clubBook(overrides: Partial<Book> = {}): Book {
-  return book(
-    [
-      {
-        year: 2025,
-        carryover: 0,
-        monthlyFee: 10_000,
-        entries: [income('a1', 1, 10_000, [['m1', 10_000]]), { ...income('a2', 2, 5_000), type: 'expense', name: '간식비' }],
-      },
-      { year: 2026, carryover: 5_000, entries: [income('a3', 3, 10_000, [['m1', 10_000]])] },
-    ],
-    { members: [{ id: 'm1', name: '김도윤', joined: '2025-01', off: [] }], dues: { startMonth: '2025-01' }, ...overrides },
-  )
+// 앱 장부의 해들: 2025년 기록 둘(김도윤 회비·간식비, 끝 잔액 = 이월금 + 5,000), 2026년 기록 하나(이월금 5,000)
+function clubLedgers(carryover2025 = 0): Ledger[] {
+  return [
+    {
+      year: 2025,
+      carryover: carryover2025,
+      monthlyFee: 10_000,
+      entries: [income('a1', 1, 10_000, [['m1', 10_000]]), { ...income('a2', 2, 5_000), type: 'expense', name: '간식비' }],
+    },
+    { year: 2026, carryover: 5_000, entries: [income('a3', 3, 10_000, [['m1', 10_000]])] },
+  ]
+}
+
+// 앱에 있는 동아리 장부 "한랑드림": 2025년 기록 둘, 2026년 기록 하나. 회원 김도윤, 회비 표 2025년 1월부터
+function clubBook(overrides: Partial<Book> = {}, ledgers: readonly Ledger[] = clubLedgers()): Book {
+  return book(ledgers, {
+    members: [{ id: 'm1', name: '김도윤', joined: '2025-01', off: [] }],
+    dues: { startMonth: '2025-01' },
+    ...overrides,
+  })
 }
 
 const HOUSEHOLD = book([{ year: 2026, carryover: 0, entries: [] }], { id: 'home', name: '우리집', kind: 'household' })
@@ -53,7 +59,8 @@ function phoneWith(...books: Book[]): StoredData {
   }
 }
 
-// 지어낸 엑셀: 2024년(강민지·김도윤 회비, 대관료) + 2025년(강민지·김도윤·이서준 회비). 이서준은 2025년에 들어왔다
+// 지어낸 엑셀: 2024년(강민지·김도윤 회비, 대관료) + 2025년(강민지·김도윤·이서준 회비). 이서준은 2025년에 들어왔다.
+// 끝 잔액: 2024년 0 + 20,000 − 5,000 = 15,000, 2025년 15,000 + 30,000 = 45,000
 function clubSheets(): SheetData[] {
   return [
     ledgerSheet(2024, 0, [
@@ -126,11 +133,26 @@ describe('SPEC-010 엑셀로 기존 장부에 넣기 — 해 고르기 (8절 "�
     ])
     expect(yearBox(/^2024년/)).toBeChecked()
     expect(yearBox(/^2025년/)).not.toBeChecked()
+    expect(placeButton()).toBeEnabled()
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('경고·[기록 파일 먼저 보내기]는 고른 해 중에 앱 기록이 있는 해가 있을 때만 보인다 — 처음에는 없고, 그 해를 고르면 나타나고 빼면 사라진다 (#191 리뷰)', async () => {
+    renderApp(new MemoryRepository(phoneWith(clubBook())))
+    await openMerge()
+
+    // 앱 기록이 있는 2025년은 빠진 채 시작해 지워질 기록이 없다
+    expect(screen.queryByText('고른 해의 앱 기록은 지워지고 엑셀 기록으로 바뀌어요')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '기록 파일 먼저 보내기' })).not.toBeInTheDocument()
+
+    await userEvent.click(yearBox(/^2025년/))
     expect(screen.getByText('고른 해의 앱 기록은 지워지고 엑셀 기록으로 바뀌어요')).toBeInTheDocument()
     expect(screen.getByText('되돌릴 수 없으니 먼저 기록 파일을 보내 두세요')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '기록 파일 먼저 보내기' })).toBeInTheDocument()
-    expect(placeButton()).toBeEnabled()
-    expect(save).not.toHaveBeenCalled()
+
+    await userEvent.click(yearBox(/^2025년/))
+    expect(screen.queryByText('고른 해의 앱 기록은 지워지고 엑셀 기록으로 바뀌어요')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '기록 파일 먼저 보내기' })).not.toBeInTheDocument()
   })
 
   it('동아리 장부가 둘 이상이면 고르기 전에는 해 목록이 없고 [고른 해 넣기]를 누를 수 없으며, 고르면 그 장부 기준으로 체크가 정해진다', async () => {
@@ -168,13 +190,15 @@ describe('SPEC-010 엑셀로 기존 장부에 넣기 — 해 고르기 (8절 "�
     })
     renderApp(new MemoryRepository(phoneWith(clubBook())))
     await openMerge()
+    await userEvent.click(yearBox(/^2025년/))
 
     await userEvent.click(screen.getByRole('button', { name: '기록 파일 먼저 보내기' }))
 
     expect(await screen.findByText('기록 파일을 보냈어요')).toBeInTheDocument()
     expect(shared.map((file) => file.name)).toEqual(['우리장부-기록-2026-11-23.txt'])
-    // 해 고르기 화면에 그대로 있다
+    // 해 고르기 화면에 그대로 있고 고른 해도 그대로다
     expect(screen.getByRole('heading', { level: 1, name: '어느 해를 넣을까요?' })).toBeInTheDocument()
+    expect(yearBox(/^2025년/)).toBeChecked()
   })
 
   it('[‹ 읽은 내용]·뒤로 버튼은 해 고르기만 닫고 읽은 내용 확인 화면으로 돌아온다', async () => {
@@ -295,5 +319,89 @@ describe('SPEC-010 엑셀로 기존 장부에 넣기 — 확인 창과 넣기 (8
     expect(await screen.findByTestId('ledger-screen')).toBeInTheDocument()
     expect(save).toHaveBeenCalledTimes(2)
     expect(Object.keys(repository.load().data.books[0]?.ledgers ?? {}).sort()).toEqual(['2024', '2025', '2026'])
+  })
+})
+
+describe('SPEC-010 엑셀로 기존 장부에 넣기 — 확인 창의 이월금·기록 없는 해 (8절 "다른 장부에 넣기", #193)', () => {
+  const FIX_ROUTE = /작년 이월금에서 고칠 수 있어요$/
+
+  it('AC-42 지난 해만 넣어 넣지 않는 다음 해 이월금이 엑셀 끝 잔액과 다르면 사실 카드에 엑셀·앱 값 한 줄과 고칠 곳이 보이고, 넣어도 이월금은 그대로다', async () => {
+    const repository = new MemoryRepository(phoneWith(clubBook()))
+    renderApp(repository)
+    await openMerge()
+    // 2024·2025년을 넣고 2026년(앱 이월금 5,000원)은 넣지 않는다 — 엑셀 2025년 끝 잔액은 45,000원
+    await userEvent.click(yearBox(/^2025년/))
+    await userEvent.click(placeButton())
+
+    const dialog = within(screen.getByRole('alertdialog', { name: '2개 해를 넣을까요?' }))
+    expect(dialog.getByText('2026년 이월금').parentElement).toHaveTextContent('2026년 이월금앱 5,000원엑셀 2025년 끝 잔액 45,000원과 달라요')
+    expect(dialog.getByText('넣은 뒤 2026년 장부의 설정 › 작년 이월금에서 고칠 수 있어요')).toBeInTheDocument()
+    // 2024·2025년은 둘 다 넣어 맞닿은 곳이 아니다
+    expect(dialog.queryByText('2025년 이월금')).not.toBeInTheDocument()
+
+    await userEvent.click(dialog.getByRole('button', { name: '바꾸기' }))
+
+    expect(await screen.findByText('엑셀 기록을 넣었어요 · 2개 해')).toBeInTheDocument()
+    expect(repository.load().data.books[0]?.ledgers['2026']).toEqual(clubBook().ledgers['2026'])
+  })
+
+  it('AC-42 넣는 해의 앞 해를 넣지 않으면 앱 앞 해 끝 잔액과 엑셀 이월금을 비교하고, 다른 곳이 여럿이면 해마다 한 줄과 고칠 곳 한 줄에 해를 모두 적는다', async () => {
+    // 앱 2024년(기록 하나, 끝 잔액 3,000원)·2025년·2026년 사이에 엑셀 2025년만 넣는다
+    const app2024: Ledger = { year: 2024, carryover: 0, entries: [{ ...income('a0', 4, 3_000), createdAt: '2024-04-05T00:00:00.000Z' }] }
+    renderApp(new MemoryRepository(phoneWith(clubBook({}, [app2024, ...clubLedgers()]))))
+    await openMerge()
+    await userEvent.click(yearBox(/^2025년/))
+    await userEvent.click(placeButton())
+
+    const dialog = within(screen.getByRole('alertdialog', { name: '1개 해를 넣을까요?' }))
+    // 앞 해(2024년)는 앱, 넣는 2025년 이월금은 엑셀 값 / 넣는 2025년 끝 잔액은 엑셀, 다음 해(2026년) 이월금은 앱 값
+    expect(dialog.getByText('2025년 이월금').parentElement).toHaveTextContent('2025년 이월금엑셀 15,000원앱 2024년 끝 잔액 3,000원과 달라요')
+    expect(dialog.getByText('2026년 이월금').parentElement).toHaveTextContent('2026년 이월금앱 5,000원엑셀 2025년 끝 잔액 45,000원과 달라요')
+    expect(dialog.getByText('넣은 뒤 2025·2026년 장부의 설정 › 작년 이월금에서 고칠 수 있어요')).toBeInTheDocument()
+  })
+
+  it('AC-42 앞 해 끝 잔액과 뒤 해 이월금이 같으면 이월금 줄도 고칠 곳도 없다', async () => {
+    // 앱 2025년 이월금 15,000원 = 엑셀 2024년 끝 잔액
+    renderApp(new MemoryRepository(phoneWith(clubBook({}, clubLedgers(15_000)))))
+    await openMerge()
+    await userEvent.click(placeButton())
+
+    const dialog = within(screen.getByRole('alertdialog', { name: '1개 해를 넣을까요?' }))
+    expect(dialog.queryByText(/년 이월금$/)).not.toBeInTheDocument()
+    expect(dialog.queryByText(FIX_ROUTE)).not.toBeInTheDocument()
+    // 회원 줄은 그대로 있다
+    expect(dialog.getByText('합칠 회원')).toBeInTheDocument()
+  })
+
+  it('AC-42 기록 0건인 해(장부만 있는 해)를 고르면 설명에 그 해 이월금·월 회비·쉬는 달도 엑셀 값이 된다고 한 문장이 붙는다', async () => {
+    // 2024년은 앱에 장부만 있고(이월금 7,000원) 기록이 없다. 앱 2025년 이월금은 엑셀 2024년 끝 잔액과 같게 둔다
+    const repository = new MemoryRepository(phoneWith(clubBook({}, [{ year: 2024, carryover: 7_000, entries: [] }, ...clubLedgers(15_000)])))
+    renderApp(repository)
+    await openMerge()
+    expect(yearBox(/^2024년 엑셀 2건 · 새로 넣어요$/)).toBeChecked()
+    await userEvent.click(placeButton())
+
+    const dialog = within(screen.getByRole('alertdialog', { name: '1개 해를 넣을까요?' }))
+    expect(dialog.getByText('한랑드림 장부에 엑셀 기록 2건을 넣어요. 2024년은 이월금·월 회비·쉬는 달도 엑셀 값이 돼요')).toBeInTheDocument()
+    expect(dialog.getByRole('button', { name: '넣기' })).toBeInTheDocument()
+
+    await userEvent.click(dialog.getByRole('button', { name: '넣기' }))
+
+    expect(await screen.findByText('엑셀 기록을 넣었어요 · 1개 해')).toBeInTheDocument()
+    expect(repository.load().data.books[0]?.ledgers['2024']?.carryover).toBe(0)
+  })
+
+  it('바꾸는 해와 기록 0건인 해를 함께 고르면 기록 0건인 해 문장은 "되돌릴 수 없어요" 앞에 온다', async () => {
+    renderApp(new MemoryRepository(phoneWith(clubBook({}, [{ year: 2024, carryover: 7_000, entries: [] }, ...clubLedgers(15_000)]))))
+    await openMerge()
+    await userEvent.click(yearBox(/^2025년/))
+    await userEvent.click(placeButton())
+
+    const dialog = within(screen.getByRole('alertdialog', { name: '2개 해를 넣을까요?' }))
+    expect(
+      dialog.getByText(
+        '한랑드림 장부의 2025년 앱 기록 2건은 지워지고 엑셀 기록으로 바뀌어요. 2024년은 이월금·월 회비·쉬는 달도 엑셀 값이 돼요. 되돌릴 수 없어요',
+      ),
+    ).toBeInTheDocument()
   })
 })

@@ -1,7 +1,8 @@
 // 엑셀로 기존 장부에 넣기 — "어느 해를 넣을까요?" (SPEC-010 8절 "다른 장부에 넣기", F4, #169). 엑셀 조각(확인 화면 위 칸)이다.
-// 넣을 장부(동아리·모임만) → 해 목록(앱 기록이 없는 해만 처음부터 체크, 시안 결정 E-4) → 경고 + [기록 파일 먼저 보내기] →
-// [고른 해 넣기] → 확인 창 → 넣기. 확인 창 [넣기]·[바꾸기]를 누르기 전에는 아무것도 저장하지 않는다
+// 넣을 장부(동아리·모임만) → 해 목록(앱 기록이 없는 해만 처음부터 체크, 시안 결정 E-4) → (앱 기록이 있는 해를 고르면) 경고 +
+// [기록 파일 먼저 보내기] → [고른 해 넣기] → 확인 창 → 넣기. 확인 창 [넣기]·[바꾸기]를 누르기 전에는 아무것도 저장하지 않는다
 import { useState } from 'react'
+import { carryoverWords } from '../../domain/book'
 import type { EntryDeps } from '../../domain/ledger'
 import type { Book } from '../../domain/types'
 import type { SaveFailureReason, SaveResult } from '../../storage/LedgerRepository'
@@ -17,7 +18,16 @@ import { bookKindIcon } from '../books/bookKindIcon'
 import type { SheetHistory } from '../useScreenHistory'
 import { excelMergeFailedMessage } from './excelMessages'
 import { ExcelFact, ExcelFactValue, ExcelFacts, ExcelNote } from './ExcelParts'
-import { defaultMergeYears, mergeImportedYears, mergePlan, mergeYearRows, type ExcelMerge, type MergePlan, type MergeYearRow } from './mergeBook'
+import {
+  defaultMergeYears,
+  mergeImportedYears,
+  mergePlan,
+  mergeYearRows,
+  type CarryoverGap,
+  type ExcelMerge,
+  type MergePlan,
+  type MergeYearRow,
+} from './mergeBook'
 import type { ImportedBook } from './readExcelBook'
 
 // 확인 창 (해 고르기 위 한 칸 — 뒤로 버튼은 창만 닫는다)
@@ -25,6 +35,11 @@ const MERGE_DIALOG = 'excel-merge-confirm'
 
 // 확인 창의 이름 목록은 앞 몇 분만: 큰 글씨에서도 창이 한 화면에 들게 (합친 명단은 넣은 뒤 회원 명단에서 본다)
 const SHOWN_NAMES = 5
+
+// 이월금을 고치는 설정 줄 이름 (넣는 곳은 동아리·모임 장부만이라 그 종류의 말, SPEC-005)
+const CARRYOVER_ROW = carryoverWords('club', false).label
+
+const SOURCE_NAMES: Readonly<Record<CarryoverGap['carryoverFrom'], string>> = { app: '앱', excel: '엑셀' }
 
 export type ExcelMergePageProps = {
   books: readonly Book[] // 넣을 수 있는 장부 (동아리·모임, 만든 순)
@@ -55,12 +70,19 @@ function namesText(names: readonly string[]): string {
   return names.length > SHOWN_NAMES ? `${shown} 외 ${formatAmount(names.length - SHOWN_NAMES)}명` : shown
 }
 
-// 확인 창 설명: 바꾸는 해가 있으면 지워질 앱 기록, 없으면 넣는 엑셀 기록
+// "2026년" / 여럿이면 "2026·2027년"
+function yearsText(years: readonly number[]): string {
+  return `${years.join('·')}년`
+}
+
+// 확인 창 설명: 바꾸는 해가 있으면 지워질 앱 기록, 없으면 넣는 엑셀 기록.
+// 기록 0건인 해를 넣으면 [넣기]·"넣어요"여도 그 해 앱 값이 바뀌므로 한 문장을 더한다 (바꾸는 해 설명에서는 "되돌릴 수 없어요" 앞, #193)
 function planDescription(bookName: string, plan: MergePlan): string {
-  if (plan.replaced.length === 0) return `${bookName} 장부에 엑셀 기록 ${formatAmount(plan.entryCount)}건을 넣어요`
-  const years = plan.replaced.map((row) => row.year).join('·')
+  const emptyNote = plan.emptyYears.length > 0 ? [`${yearsText(plan.emptyYears)}은 이월금·월 회비·쉬는 달도 엑셀 값이 돼요`] : []
+  if (plan.replaced.length === 0) return [`${bookName} 장부에 엑셀 기록 ${formatAmount(plan.entryCount)}건을 넣어요`, ...emptyNote].join('. ')
+  const years = yearsText(plan.replaced.map((row) => row.year))
   const appCount = plan.replaced.reduce((sum, row) => sum + row.appCount, 0)
-  return `${bookName} 장부의 ${years}년 앱 기록 ${formatAmount(appCount)}건은 지워지고 엑셀 기록으로 바뀌어요. 되돌릴 수 없어요`
+  return [`${bookName} 장부의 ${years} 앱 기록 ${formatAmount(appCount)}건은 지워지고 엑셀 기록으로 바뀌어요`, ...emptyNote, '되돌릴 수 없어요'].join('. ')
 }
 
 export function ExcelMergePage({ books, imported, deps, sheets, onBack, onSendBackup, onMerge }: ExcelMergePageProps) {
@@ -72,9 +94,9 @@ export function ExcelMergePage({ books, imported, deps, sheets, onBack, onSendBa
   const [failure, setFailure] = useState<SaveFailureReason>()
 
   const rows = book ? mergeYearRows(book, imported) : []
-  // 지워질 수 있는 앱 기록(앱 기록이 있는 엑셀 해)이 있을 때만 경고한다
-  const overlaps = rows.some((row) => row.appCount > 0)
   const plan = book && years.length > 0 ? mergePlan(book, imported, years) : undefined
+  // 고른 해 중에 지워질 앱 기록(앱 기록이 있는 해)이 있을 때만 경고한다 — 그런 해는 빠진 채 시작해 처음 화면에는 없다 (#191 리뷰)
+  const replacing = plan !== undefined && plan.replaced.length > 0
   const reason = !book ? '넣을 장부를 골라 주세요' : years.length === 0 ? '넣을 해를 골라 주세요' : undefined
 
   function chooseBook(id: string) {
@@ -125,7 +147,7 @@ export function ExcelMergePage({ books, imported, deps, sheets, onBack, onSendBa
         </div>
       )}
 
-      {book && overlaps && (
+      {replacing && (
         <div className="excel-import__group">
           <ExcelNote tone="warn" title="고른 해의 앱 기록은 지워지고 엑셀 기록으로 바뀌어요">
             되돌릴 수 없으니 먼저 기록 파일을 보내 두세요
@@ -170,7 +192,8 @@ type MergeConfirmDialogProps = {
   inline?: boolean // 카탈로그 견본
 }
 
-// 확인 창 "N개 해를 넣을까요?": 바꾸는 해가 있으면 지워질 앱 기록을 말하고 위험 [바꾸기], 없으면 [넣기]. 아래 합칠 회원·새 회원
+// 확인 창 "N개 해를 넣을까요?": 바꾸는 해가 있으면 지워질 앱 기록을 말하고 위험 [바꾸기], 없으면 [넣기].
+// 아래 사실 카드에 합칠 회원·새 회원·이어지지 않는 이월금, 카드 밑에 이월금을 고칠 곳
 export function MergeConfirmDialog({ open, bookName, yearCount, plan, onConfirm, onCancel, inline }: MergeConfirmDialogProps) {
   const replacing = plan.replaced.length > 0
   return (
@@ -184,27 +207,49 @@ export function MergeConfirmDialog({ open, bookName, yearCount, plan, onConfirm,
       onCancel={onCancel}
       inline={inline}
     >
-      <MergeMembers plan={plan} />
+      <MergeFacts plan={plan} />
     </ConfirmDialog>
   )
 }
 
-// 확인 창 안 회원: 이름이 같아 합칠 분 / 새로 넣을 분 (8절 "합칠 이름 목록을 확인 창에")
-function MergeMembers({ plan }: { plan: MergePlan }) {
-  const { mergedNames, addedNames } = plan
-  if (mergedNames.length === 0 && addedNames.length === 0) return null
+// 확인 창 안 회색 사실 카드: 이름이 같아 합칠 분 / 새로 넣을 분(8절 "합칠 이름 목록을 확인 창에") / 이어지지 않는 이월금(#193).
+// 이월금 줄이 있으면 카드 바로 밑에 고칠 곳 한 줄. 줄이 하나도 없으면 카드가 없다
+function MergeFacts({ plan }: { plan: MergePlan }) {
+  const { mergedNames, addedNames, carryoverGaps } = plan
+  if (mergedNames.length === 0 && addedNames.length === 0 && carryoverGaps.length === 0) return null
   return (
-    <ExcelFacts label="넣을 회원" variant="sheet">
-      {mergedNames.length > 0 && (
-        <ExcelFact label="합칠 회원">
-          <ExcelFactValue main={namesText(mergedNames)} sub={`${formatAmount(mergedNames.length)}명 · 앱 명단과 이름이 같아요`} />
-        </ExcelFact>
+    <div className="excel-merge__facts">
+      <ExcelFacts label="넣을 내용" variant="sheet">
+        {mergedNames.length > 0 && (
+          <ExcelFact label="합칠 회원">
+            <ExcelFactValue main={namesText(mergedNames)} sub={`${formatAmount(mergedNames.length)}명 · 앱 명단과 이름이 같아요`} />
+          </ExcelFact>
+        )}
+        {addedNames.length > 0 && (
+          <ExcelFact label="새 회원">
+            <ExcelFactValue main={namesText(addedNames)} sub={`${formatAmount(addedNames.length)}명`} />
+          </ExcelFact>
+        )}
+        {carryoverGaps.map((gap) => (
+          <CarryoverGapFact key={gap.year} gap={gap} />
+        ))}
+      </ExcelFacts>
+      {carryoverGaps.length > 0 && (
+        <p className="excel-merge__fix">{`넣은 뒤 ${yearsText(carryoverGaps.map((gap) => gap.year))} 장부의 설정 › ${CARRYOVER_ROW}에서 고칠 수 있어요`}</p>
       )}
-      {addedNames.length > 0 && (
-        <ExcelFact label="새 회원">
-          <ExcelFactValue main={namesText(addedNames)} sub={`${formatAmount(addedNames.length)}명`} />
-        </ExcelFact>
-      )}
-    </ExcelFacts>
+    </div>
+  )
+}
+
+// 이월금 한 줄: 이름 = 고칠 값(뒤 해 이월금), 값 = 그 이월금과 어느 쪽 값인지, 작은 글자 = 비교한 앞 해 끝 잔액과 어느 쪽 값인지
+function CarryoverGapFact({ gap }: { gap: CarryoverGap }) {
+  const balanceFrom: CarryoverGap['carryoverFrom'] = gap.carryoverFrom === 'app' ? 'excel' : 'app'
+  return (
+    <ExcelFact label={`${gap.year}년 이월금`}>
+      <ExcelFactValue
+        main={`${SOURCE_NAMES[gap.carryoverFrom]} ${formatAmount(gap.carryover)}원`}
+        sub={`${SOURCE_NAMES[balanceFrom]} ${gap.year - 1}년 끝 잔액 ${formatAmount(gap.previousBalance)}원과 달라요`}
+      />
+    </ExcelFact>
   )
 }

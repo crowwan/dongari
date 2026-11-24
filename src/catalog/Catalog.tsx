@@ -314,6 +314,13 @@ const CATALOG_MERGE_IMPORTED: ImportedBook = {
   dues: { startMonth: '2026-01' },
 }
 
+// 확인 창 이월금 줄 견본 (#193): 다솜회에 2025년 장부만 시작해 둔(기록 0건) 모습. 2024·2025년을 넣으면
+// 엑셀 2025년 끝 잔액 80,000원과 앱 2026년 이월금 0원이 이어지지 않는다
+const CATALOG_MERGE_EMPTY_YEAR_BOOK: Book = {
+  ...ASSIGN_BOOK,
+  ledgers: { ...ASSIGN_BOOK.ledgers, '2025': { year: 2025, carryover: 50_000, entries: [] } },
+}
+
 // 회비 "누가 냈어요?" 견본 (지어낸 이름, SPEC-010 3절)
 const CHECK_NAMES: CheckOption[] = [
   { value: 'm-kang', label: '강민지' },
@@ -873,7 +880,7 @@ export function Catalog() {
               그 달에 없는 날은 그 달 마지막 날로, 날을 읽을 수 없는 줄은 날짜 없이 넣었어요.
             </ExcelNote>
           </State>
-          <State label="다른 장부에 넣기 (#169): 넣을 장부(동아리, 하나면 고른 채) → 넣을 해(앱 기록 없는 해만 체크) → 경고 + [기록 파일 먼저 보내기] → [고른 해 넣기]">
+          <State label="다른 장부에 넣기 (#169): 넣을 장부(동아리, 하나면 고른 채) → 넣을 해(앱 기록 없는 해만 체크) → [고른 해 넣기]. 경고 + [기록 파일 먼저 보내기]는 앱 기록이 있는 2026년을 고르면 (눌러 보기, #193)">
             <div className="catalog__frame catalog__frame--screen">
               <div className="app__main">
                 <ExcelMergePage
@@ -896,6 +903,19 @@ export function Catalog() {
                 bookName={ASSIGN_BOOK.name}
                 yearCount={3}
                 plan={mergePlan(ASSIGN_BOOK, CATALOG_MERGE_IMPORTED, [2024, 2025, 2026])}
+                onConfirm={noop}
+                onCancel={noop}
+              />
+            </div>
+          </State>
+          <State label="다른 장부에 넣기 확인 창 (#193): 기록 0건인 2025년을 넣으면 설명에 한 문장, 넣지 않는 2026년 이월금이 엑셀 2025년 끝 잔액과 다르면 사실 카드에 한 줄 + 밑에 고칠 곳">
+            <div className="catalog__frame catalog__frame--screen">
+              <MergeConfirmDialog
+                inline
+                open
+                bookName={CATALOG_MERGE_EMPTY_YEAR_BOOK.name}
+                yearCount={2}
+                plan={mergePlan(CATALOG_MERGE_EMPTY_YEAR_BOOK, CATALOG_MERGE_IMPORTED, [2024, 2025])}
                 onConfirm={noop}
                 onCancel={noop}
               />
