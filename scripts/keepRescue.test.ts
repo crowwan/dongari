@@ -7,18 +7,22 @@ import { book, duesBook, ledger, storedWith, type EntrySpec } from '../src/test/
 import {
   APP_ORIGIN,
   BROKEN_ENVELOPE,
+  BROKEN_FILE,
   BROKEN_HISTORY,
   describeList,
   describeRescue,
+  GONE_COPY,
   INVALID_CODE,
   keepIdOf,
   listKeep,
   NO_HISTORY_ROUTE,
   normalizeRecoveryCode,
   NOT_FOUND,
+  NOT_THIS_CODE_FILE,
   parseRescueArgs,
   RESCUE_USAGE,
   rescueDir,
+  rescueFile,
   rescueFileName,
   rescueKeep,
   SERVER_DOWN,
@@ -157,8 +161,9 @@ describe('#154 보관본 꺼내기 스크립트', () => {
   })
 
   describe('파일 이름과 요약', () => {
-    it('파일 이름 날짜는 보관한 날의 한국 날짜다', () => {
-      expect(rescueFileName(SAVED_AT)).toBe('우리장부-기록-2026-10-19.txt')
+    it('최신본 파일 이름은 보관한 날의 한국 날짜에 "-최신" 을 붙여 같은 날 날짜별 사본 파일과 겹치지 않는다 (#190 리뷰)', () => {
+      expect(rescueFileName(SAVED_AT)).toBe('우리장부-기록-2026-10-19-최신.txt')
+      expect(rescueFileName(SAVED_AT, { kind: 'day', date: '2026-10-19' })).toBe('우리장부-기록-2026-10-19.txt')
     })
 
     it('기록 파일은 기본으로 레포 밖 ~/Downloads 에, 없으면 홈에 둔다 (지금 폴더가 아니다)', () => {
@@ -247,6 +252,14 @@ describe('SPEC-011 꺼내기 스크립트 날짜 고르기', () => {
       })
     })
 
+    it('--file 은 뒤의 경로로 백업 레포 파일을 고른다', () => {
+      expect(parseRescueArgs(['--file', 'keep/abc.json'])).toEqual({ ok: true, command: { action: 'file', path: 'keep/abc.json' } })
+      expect(parseRescueArgs([CODE, '--file', '../backup/keep/abc.json'])).toEqual({
+        ok: true,
+        command: { action: 'file', path: '../backup/keep/abc.json', code: CODE },
+      })
+    })
+
     it('날·달 형식이 틀리거나, 옵션을 함께 주거나, 모르는 옵션·남는 인자가 있으면 쓰는 법을 안내한다', () => {
       const badArgs = [
         ['--day'],
@@ -259,10 +272,21 @@ describe('SPEC-011 꺼내기 스크립트 날짜 고르기', () => {
         ['--day', '2026-11-21', '--month', '2026-10'],
         ['--all'],
         [CODE, 'extra'],
+        ['--file'],
+        ['--file', '--list'],
+        ['--file', 'keep/abc.json', '--list'],
+        ['--day', '2026-11-21', '--file', 'keep/abc.json'],
       ]
       for (const args of badArgs) {
         expect(parseRescueArgs(args)).toEqual({ ok: false, message: expect.stringContaining(RESCUE_USAGE) })
       }
+    })
+
+    it('달력에 없는 날(2월 30일 등)은 서버에 묻지 않고 쓰는 법을 안내하고, 윤년 2월 29일은 받는다 (#190 리뷰)', () => {
+      for (const day of ['2026-02-29', '2026-02-30', '2026-04-31']) {
+        expect(parseRescueArgs(['--day', day])).toEqual({ ok: false, message: expect.stringContaining(RESCUE_USAGE) })
+      }
+      expect(parseRescueArgs(['--day', '2028-02-29'])).toMatchObject({ ok: true })
     })
   })
 
@@ -349,6 +373,18 @@ describe('SPEC-011 꺼내기 스크립트 날짜 고르기', () => {
       expect(describeList(result.rows)).toContain(`  2026-11-20: 2026-11-20 12:00 보관 · 풀지 못했어요 (${WRONG_CODE})`)
     })
 
+    it('목록을 받은 뒤 사라진 사본(404)은 그 줄에 목록용 문구를 적는다 (#190 리뷰)', async () => {
+      const gone = { date: '2026-11-19', savedAt: '2026-11-19T03:00:00.000Z' }
+      const server = await historyServer({ ...HISTORY, days: [...HISTORY.days, gone] })
+
+      const result = await listKeep(CODE, KEEP_URL, server.fetchFn)
+
+      if (!result.ok) throw new Error(result.message)
+      const line = describeList(result.rows).find((text) => text.startsWith('  2026-11-19:'))
+      expect(line).toBe(`  2026-11-19: 2026-11-19 12:00 보관 · 풀지 못했어요 (${GONE_COPY})`)
+      expect(line).not.toContain('--list')
+    })
+
     it('사본이 하나도 없으면 없음 안내를 한다', async () => {
       const server = await historyServer({ days: [], months: [] })
 
@@ -366,6 +402,58 @@ describe('SPEC-011 꺼내기 스크립트 날짜 고르기', () => {
       expect(await listKeep(CODE, KEEP_URL, down.fetchFn)).toEqual({ ok: false, message: SERVER_DOWN })
       expect(await listKeep(CODE, KEEP_URL, failing.fetchFn)).toEqual({ ok: false, message: expect.stringContaining('HTTP 503') })
       expect(await listKeep('HK7M', KEEP_URL, down.fetchFn)).toEqual({ ok: false, message: INVALID_CODE })
+    })
+  })
+
+  // 백업 레포 파일 keep/<id>.json: 서버 내보내기의 겉봉투를 그대로 쓴 JSON (ops/keep-backup)
+  async function backupFile(code: string = CODE) {
+    const { plain, envelope } = await appEnvelope(code)
+    return { plain, fileName: `${await appKeepIdOf(code)}.json`, text: `${JSON.stringify(envelope)}\n` }
+  }
+
+  describe('AC-7 --file 로 백업 레포 파일 꺼내기', () => {
+    it('서버 없이 백업 레포의 keep/<id>.json 을 풀어 앱의 [기록 파일 불러오기]로 읽히는 기록 파일을 만든다', async () => {
+      const file = await backupFile()
+
+      const result = await rescueFile('hk7m 29qf mx4p 8r2d', file.fileName, file.text)
+
+      if (!result.ok) throw new Error(result.message)
+      expect(result.plain).toBe(file.plain)
+      expect(readBackup(result.plain)).toMatchObject({ ok: true, summary: { bookCount: 2, entryCount: 3 } })
+      expect(result.savedAt).toBe(SAVED_AT)
+      expect(rescueFileName(result.savedAt, { kind: 'file' })).toBe('우리장부-기록-2026-10-19-주간사본.txt')
+    })
+
+    it('파일 이름의 id 가 이 코드에서 만든 id 와 다르면 "이 코드의 파일이 아니에요" 로 멈추고 이 코드의 파일 이름(id 앞 8자)을 알려 준다', async () => {
+      const other = await backupFile('ABCD-EFGH-JKMN-PQRS')
+      const ownId = await appKeepIdOf(CODE)
+
+      for (const fileName of [other.fileName, 'backup.json', `${ownId}.json.bak`]) {
+        const result = await rescueFile(CODE, fileName, other.text)
+        expect(result).toEqual({ ok: false, message: expect.stringContaining(NOT_THIS_CODE_FILE) })
+        expect(result).toEqual({ ok: false, message: expect.stringContaining(`keep/${ownId.slice(0, 8)}`) })
+      }
+    })
+
+    it('파일이 보관본 모양이 아니면 그렇게 안내하고, 코드 형식이 틀리면 형식 안내를 한다', async () => {
+      const { fileName } = await backupFile()
+
+      for (const text of ['not json', '{"hello":"world"}', '[]']) {
+        expect(await rescueFile(CODE, fileName, text)).toEqual({ ok: false, message: BROKEN_FILE })
+      }
+      expect(await rescueFile('HK7M', fileName, '{}')).toEqual({ ok: false, message: INVALID_CODE })
+    })
+
+    it('꺼낸 요약에 서버 밖 주간 사본이라고 적고 복구 코드는 넣지 않는다', async () => {
+      const file = await backupFile()
+      const result = await rescueFile(CODE, file.fileName, file.text)
+      if (!result.ok) throw new Error(result.message)
+
+      const text = describeRescue(result, rescueFileName(result.savedAt, { kind: 'file' }), { kind: 'file' }).join('\n')
+
+      expect(text).toContain('꺼낸 사본: 서버 밖 주간 사본 (백업 레포 파일)')
+      expect(text).toContain('우리장부-기록-2026-10-19-주간사본.txt')
+      expect(text).not.toMatch(/HK7M|29QF|MX4P|8R2D/)
     })
   })
 })
