@@ -172,8 +172,8 @@ describe('SPEC-010 엑셀로 새 장부 — 읽은 내용 확인 (8절 "읽은 �
     expect(screen.getByRole('button', { name: /^읽지 못한 줄 1건/ })).toBeInTheDocument()
     expect(screen.getByText('읽지 않은 것: 연락처')).toBeInTheDocument()
     expect(screen.queryByText('기록이 많아 자동으로 지키기를 못 할 수 있어요')).not.toBeInTheDocument()
-    // 다른 장부에 넣기(F4)는 #169
-    expect(screen.queryByRole('button', { name: '다른 장부에 넣기' })).not.toBeInTheDocument()
+    // 동아리 장부가 있어 보조 [다른 장부에 넣기](F4, #169 — App.excelMerge.test)
+    expect(screen.getByRole('button', { name: '다른 장부에 넣기' })).toBeInTheDocument()
     expect(save).not.toHaveBeenCalled()
     expect(repository.load().data).toEqual(ONE_BOOK)
   })

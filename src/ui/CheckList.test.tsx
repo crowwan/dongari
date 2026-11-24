@@ -112,4 +112,18 @@ describe('CheckList 세로 체크 목록 (SPEC-010 3절, PATTERNS N12)', () => {
     expect(onAdd).toHaveBeenCalledOnce()
     expect(boxes()).toEqual(['김도윤'])
   })
+
+  it('줄에 둘째 줄 글(detail)이 있으면 이름 아래 작은 글자로 보이고 화면 읽기 이름에도 띄어 들어간다 (엑셀 넣을 해, #169)', () => {
+    render(
+      <CheckList
+        label="넣을 해"
+        options={[{ value: '2025', label: '2025년', detail: '엑셀 12건 · 새로 넣어요' }]}
+        checked={['2025']}
+        onToggle={vi.fn()}
+      />,
+    )
+
+    const row = screen.getByRole('checkbox', { name: '2025년 엑셀 12건 · 새로 넣어요' })
+    expect(within(row).getByText('엑셀 12건 · 새로 넣어요')).toHaveClass('ui-checks__detail')
+  })
 })

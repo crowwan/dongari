@@ -5,6 +5,7 @@ import { useBackup } from './features/backup/useBackup'
 import { NewBookScreen } from './features/books/NewBookScreen'
 import { ExcelExportSheet } from './features/excel/ExcelExportSheet'
 import { ExcelFileInput, ExcelImportSlot } from './features/excel/ExcelImportSlot'
+import type { ExcelMerge } from './features/excel/mergeBook'
 import type { ImportedBook } from './features/excel/readExcelBook'
 import { useExcelExport } from './features/excel/useExcelExport'
 import { useExcelImport } from './features/excel/useExcelImport'
@@ -281,6 +282,17 @@ export default function App({
     return result
   }
 
+  // 엑셀 읽은 내용 [다른 장부에 넣기] → 확인 창 [넣기] (SPEC-010 8절 F4, #169): 고른 장부에 고른 해를 넣어 그 장부의 넣은 마지막 해를 연다.
+  // 저장하지 못했으면 아무것도 바꾸지 않고 해 고르기 화면에 남는다(화면이 이유대로 알린다)
+  function mergeExcelBook({ bookId, years, apply }: ExcelMerge): SaveResult {
+    const result = ledger.importIntoBook(bookId, apply, Math.max(...years))
+    if (!result.ok) return result
+    setToast(`엑셀 기록을 넣었어요 · ${formatAmount(years.length)}개 해`)
+    setViewedMonth(undefined)
+    navigation.backToLedger()
+    return result
+  }
+
   // 복구 코드로 받아 온 데이터로 전체 바꾸기 (SPEC-006 AC-5). 백업 불러오기와 같이 올해 장부의 처음 달로 돌아가 알린다
   function restoreKept(data: StoredData) {
     const wasFirstRun = ledger.isFirstRun
@@ -420,6 +432,9 @@ export default function App({
         onPickAgain={excelImport.start}
         onReload={() => window.location.reload()}
         onCreate={importExcelBook}
+        // 연습은 [새 장부 만들기]만 따라 한다 (SPEC-010 10절)
+        onMerge={practice ? undefined : mergeExcelBook}
+        onSendBackup={() => void backup.send()}
       />
     )
   }

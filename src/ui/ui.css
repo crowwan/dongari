@@ -646,6 +646,11 @@
   box-sizing: border-box;
   width: 100%;
   max-width: var(--dialog-max);
+  /* 큰 글씨에서 창이 화면보다 길어지면(엑셀 넣기 확인 창의 회원 이름 등, #169) 위아래가 잘리지 않고 창 안에서 내려 본다.
+     화면에 들어가는 창은 그대로다 */
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-6) var(--card-pad-inline) var(--card-pad-inline);
   border-radius: var(--corner-lg);
   background: var(--surface);
@@ -1224,6 +1229,17 @@ button.ui-row {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* 이름 아래 작은 글자 한 줄 (엑셀 넣을 해 "엑셀 12건 · 새로 넣어요"): Caption, 고른 줄에서도 굵게 하지 않는다 */
+.ui-checks__detail {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--line-tight);
+  word-break: keep-all;
 }
 
 .ui-checks__divider {

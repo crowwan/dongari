@@ -62,6 +62,13 @@ export function excelCreateFailedMessage(reason: SaveFailureReason): string {
   return reason === 'invalid-data' ? EXCEL_CREATE_INVALID : EXCEL_CREATE_FAILED
 }
 
+// 다른 장부에 넣기(#169)를 저장하지 못함: 만들기와 같은 두 갈래 (저장 공간 / 저장 전 가드)
+export function excelMergeFailedMessage(reason: SaveFailureReason): string {
+  return reason === 'invalid-data'
+    ? '앱에 문제가 있어 엑셀 기록을 넣지 못했어요. 지금 기록은 그대로예요'
+    : '엑셀 기록을 넣지 못했어요. 이 폰에 저장하지 못해 지금 기록은 그대로예요'
+}
+
 export const EXCEL_READING_TITLE = '엑셀 파일을 읽는 중이에요'
 
 // 처음 한 번은 SheetJS 조각을 받는다 (읽는 중·만드는 중 같이)

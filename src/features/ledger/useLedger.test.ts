@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CURRENT_SCHEMA_VERSION, type Ledger, type StoredData } from '../../domain/types'
+import { CURRENT_SCHEMA_VERSION, type Book, type Ledger, type StoredData } from '../../domain/types'
 import type { LedgerRepository, LoadResult, SaveResult } from '../../storage/LedgerRepository'
 import { LocalStorageRepository, STORAGE_KEY } from '../../storage/LocalStorageRepository'
 import { MemoryRepository } from '../../storage/MemoryRepository'
@@ -1146,5 +1146,66 @@ describe('SPEC-010 useLedger 낸 분 붙이기 (7절)', () => {
     })
 
     expect(repository.load().data.books[0]?.dues).toEqual({ startMonth: '2025-01', hideUnassigned: true })
+  })
+})
+
+describe('SPEC-010 useLedger 엑셀로 기존 장부에 넣기 (8절 "다른 장부에 넣기", #169)', () => {
+  // 장부 둘: 지금 장부는 가계부, 넣을 곳은 두 번째 동아리 장부(2026년 기록)
+  function twoBooks(): StoredData {
+    const household = book([ledger2026()], { id: 'home', name: '우리집', kind: 'household' })
+    const club = book([ledger2026()], { id: 'club', name: '한랑드림', members: [{ id: 'm1', name: '김도윤', joined: '2026-01', off: [] }] })
+    return { schemaVersion: CURRENT_SCHEMA_VERSION, books: [household, club], settings: { lastBookId: 'home' } }
+  }
+
+  // 2025년 장부를 넣는다 (기록 하나, 낸 분 김도윤)
+  function add2025(target: Book): Book {
+    const entry = { id: 'x1', month: 4, type: 'income', name: '회비', amount: 20_000, createdAt: '2026-11-23T00:00:00.000Z' } as const
+    const ledger: Ledger = { year: 2025, carryover: 10_000, entries: [{ ...entry, payers: [{ memberId: 'm1', amount: 20_000 }] }] }
+    return { ...target, ledgers: { ...target.ledgers, '2025': ledger } }
+  }
+
+  it('AC-31 그 장부에 넣어 저장하고, 그 장부를 지금 장부로 정해 넣은 해를 연다', () => {
+    const repository = new MemoryRepository(twoBooks())
+    const { result } = renderLedger(repository)
+
+    let saved: SaveResult = { ok: false, reason: 'unknown' }
+    act(() => {
+      saved = result.current.importIntoBook('club', add2025, 2025)
+    })
+
+    expect(saved).toEqual({ ok: true })
+    expect(result.current.book?.id).toBe('club')
+    expect(result.current.year).toBe(2025)
+    expect(result.current.ledger?.entries.map((entry) => entry.id)).toEqual(['x1'])
+    const stored = repository.load().data
+    expect(stored.settings.lastBookId).toBe('club')
+    expect(stored.settings.lastChangedAt).toBe(TODAY.toISOString())
+    expect(Object.keys(stored.books[1]?.ledgers ?? {}).sort()).toEqual(['2025', '2026'])
+    expect(stored.books[0]).toEqual(twoBooks().books[0])
+  })
+
+  it('저장하지 못하면(저장 공간 부족·저장 전 가드) 아무것도 바꾸지 않고 그 이유를 돌려준다 (#172)', () => {
+    const repository = new MemoryRepository(twoBooks())
+    vi.spyOn(repository, 'save').mockReturnValueOnce({ ok: false, reason: 'quota-exceeded' })
+    const { result } = renderLedger(repository)
+    const before = result.current.data
+
+    let saved: SaveResult = { ok: true }
+    act(() => {
+      saved = result.current.importIntoBook('club', add2025, 2025)
+    })
+    expect(saved).toEqual({ ok: false, reason: 'quota-exceeded' })
+
+    // 명단에 없는 낸 분: 저장 전 가드가 막는다
+    act(() => {
+      saved = result.current.importIntoBook('club', (target) => ({ ...add2025(target), members: [] }), 2025)
+    })
+
+    expect(saved).toEqual({ ok: false, reason: 'invalid-data' })
+    expect(result.current.data).toEqual(before)
+    expect(result.current.book?.id).toBe('home')
+    expect(result.current.year).toBe(2026)
+    expect(result.current.saveFailure).toBeUndefined()
+    expect(repository.load().data).toEqual(twoBooks())
   })
 })
