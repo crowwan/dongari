@@ -269,7 +269,7 @@ updated: 2026-11-24
   - CORS: `Origin` 이 허용한 출처일 때만 받고 `Access-Control-Allow-Origin` 을 요청 출처 그대로(`Vary: Origin`, 메서드 GET·PUT·DELETE·OPTIONS, 헤더 Content-Type). OPTIONS 미리 요청 204. 다른 출처·출처 없음은 403
   - 출처와 KV 자리 (#128, ADR 008): 허용한 출처는 정확한 주소 둘 — 본 주소 `https://crowwan.github.io` → KV `keep:<id>`, 미리보기(Cloudflare Pages) `https://uri-jangbu-preview.pages.dev` → KV `preview:keep:<id>`. 같은 이름(같은 복구 코드)이라도 미리보기의 올리기·받기·지우기는 `preview:` 자리만 건드려, 미리보기에서 어머니 복구 코드로 불러오거나 기록 파일로 같은 코드를 갖게 돼도 본 사본을 읽거나 덮어쓰지 않는다. 미리보기 배포별 주소(`<hash>.uri-jangbu-preview.pages.dev`)·http·비슷한 주소는 403. 출처→자리 표는 `worker/src/keep.ts` `ORIGIN_KEY_PREFIXES`
   - 그 밖의 경로 404(출처와 상관없이), `/v1/keep/:id` 에 다른 메서드는 405
-  - (v2.8 SPEC-011 #185, ADR 010) PUT 은 날·달(한국 시간)이 바뀐 뒤 첫 보관이면 있던 최신본을 `snap:<id>:<YYYY-MM-DD>`(31일)·`month:<id>:<YYYY-MM>`(400일)로 남기고 최신본에 KV metadata `savedAt` 을 둔다(복사 실패면 최신본을 바꾸지 않고 503). DELETE 는 그 사본까지 지운다. 개발자용 `GET /v1/keep/:id/history`·`GET /v1/keep/:id?day=`·`?month=` 가 더해졌다 — SPEC-011 1절
+  - (v2.8 SPEC-011 #185, ADR 010) PUT 은 날·달(한국 시간)이 바뀐 뒤 첫 보관이면 있던 최신본을 `snap:<id>:<YYYY-MM-DD>`(31일)·`month:<id>:<YYYY-MM>`(400일)로 남기고 최신본에 KV metadata `savedAt` 을 둔다(복사 실패면 최신본을 바꾸지 않고 503). DELETE 는 그 사본까지 지운다. 개발자용 `GET /v1/keep/:id/history`·`GET /v1/keep/:id?day=`·`?month=` 가 더해졌다 — SPEC-011 1절. (#186) 최신본 쓰기 실패도 CORS 있는 503, 보관일이 오늘보다 앞일 때만 사본. 서버 밖 주간 사본용 `GET /v1/export`(내보내기 토큰, 본 자리 최신본 전부) — SPEC-011 2절
 - KV 무료 한도: 쓰기 하루 1,000회. 10초 묶음으로 사용자 몇 명이면 한참 남는다.
 - 앱 쪽 보관기는 `LedgerRepository` 저장 뒤 알림을 받아 동작(저장 계층과 분리, 테스트는 가짜 서버).
 - 앱 쪽 구현 (#98, `src/features/keep/`)
@@ -305,3 +305,4 @@ updated: 2026-11-24
 | 2026-10-16 | v2.6.0 릴리스 (#137) |
 | 2026-11-24 | 저장 전 v4 가드(SPEC-002 #172): 복구 코드로 불러오기가 저장 형식 검사에 막히면 기록 파일 불러오기와 같은 "앱에 문제가 있어…" 문구 |
 | 2026-11-24 | 서버 날짜별·달별 사본(SPEC-011 #185, ADR 010): [지우기]가 사본까지 지운다, 서버 API 에 사본 경로·PUT 때 사본 남기기 한 줄, 범위 밖 "보관본 여러 개"에 SPEC-011 표시 |
+| 2026-11-24 | 서버 API 줄에 최신본 쓰기 실패 503·오늘보다 앞일 때만 사본·`GET /v1/export`(SPEC-011 #186) |

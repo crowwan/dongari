@@ -1,0 +1,69 @@
+name: 주간 보관본
+
+# 우리 장부 보관 서버의 최신본(암호문)을 일주일에 한 번 이 레포에 커밋한다 (dongari SPEC-011 2절, ADR 010)
+# - 매주 일요일 23:00 UTC(= 월요일 08:00 KST, dongari 보관 지켜보기 09:00 앞) + 손으로 실행(Run workflow)
+# - GET $KEEP_URL/v1/export → keep/<id>.json(겉봉투 그대로)·index.json (scripts/backup.mjs)
+#   바뀐 게 있으면 "주간 보관본 YYYY-MM-DD" 커밋을 이 레포 GITHUB_TOKEN 으로 push 한다(개인 접근 토큰 없음)
+# - 실패하면 GitHub 가 실패 메일을 보낸다. 내보내기가 8일 넘게 없으면 dongari 보관 지켜보기도 실패로 알린다
+# 원본은 dongari 레포 ops/keep-backup/ — 고칠 때는 거기서 PR 로 리뷰하고 이 레포에 옮긴다
+on:
+  schedule:
+    - cron: "0 23 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 손 실행과 예약 실행이 겹쳐 push 가 엇갈리지 않게 한 줄로 (진행 중인 것은 끊지 않음)
+concurrency:
+  group: keep-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # 커밋을 push 해야 해서 checkout 이 GITHUB_TOKEN 을 남겨 두게 한다(기본값)
+      - uses: actions/checkout@v4
+
+      # 의존성이 없어 npm 은 쓰지 않는다. backupPlan.ts 를 타입 지우기로 바로 불러오려고 Node 24
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # 비밀값·변수가 아직 없으면 서버를 부르지 않고 넣는 방법을 알려 준다 (값은 출력하지 않는다)
+      - name: 비밀값 확인
+        env:
+          EXPORT_TOKEN: ${{ secrets.EXPORT_TOKEN }}
+          KEEP_URL: ${{ vars.KEEP_URL }}
+        run: |
+          ok=true
+          if [ -z "$EXPORT_TOKEN" ]; then
+            echo "::error title=주간 보관본 비밀값 없음::이 레포 Settings → Secrets and variables → Actions → Secrets 에 EXPORT_TOKEN(dongari 레포 비밀값 KEEP_EXPORT_TOKEN 과 같은 값)을 넣은 뒤 다시 실행(Run workflow)하세요"
+            ok=false
+          fi
+          if [ -z "$KEEP_URL" ]; then
+            echo "::error title=주간 보관본 변수 없음::이 레포 Settings → Secrets and variables → Actions → Variables 에 KEEP_URL(dongari 의 KEEP_URL 과 같은 보관 서버 주소)을 넣은 뒤 다시 실행(Run workflow)하세요"
+            ok=false
+          fi
+          [ "$ok" = true ] || exit 1
+
+      - name: 보관본 받기
+        env:
+          EXPORT_TOKEN: ${{ secrets.EXPORT_TOKEN }}
+          KEEP_URL: ${{ vars.KEEP_URL }}
+        run: node scripts/backup.mjs
+
+      # 바뀐 게 없으면(이번 주 아무도 기록을 고치지 않음) 커밋하지 않는다. 날짜는 한국 시간
+      - name: 커밋
+        run: |
+          git add -A -- keep index.json
+          if git diff --cached --quiet; then
+            echo "바뀐 보관본이 없어 커밋하지 않아요"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "주간 보관본 $(TZ=Asia/Seoul date +%F)"
+          git push

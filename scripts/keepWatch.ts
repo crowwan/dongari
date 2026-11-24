@@ -1,6 +1,7 @@
 // 보관 지켜보기 판정 (SPEC-007 "판정", #106)
 //
 // 서버 요약(`GET /v1/report`) 응답을 받아 실패·경고 문구와 실행 요약 표를 만든다. 입출력 없는 순수 함수만 둔다.
+// SPEC-011(#186): 요약에 실린 마지막 서버 밖 사본 내보내기(export)도 판정한다.
 // 워크플로는 scripts/keep-watch.mjs 가 이 파일을 그대로 불러 쓴다(Node 24 가 타입만 지우고 실행, 빌드 없음).
 // 그래서 타입 지우기로 없어지는 문법만 쓴다(enum·namespace 없음, tsconfig erasableSyntaxOnly).
 
@@ -9,12 +10,15 @@ const DAY_MS = 24 * HOUR_MS
 // 앱 안 띠(7일)보다 먼저 알기 위한 값
 export const PENDING_LIMIT_MS = 3 * DAY_MS
 export const SILENT_LIMIT_MS = 30 * DAY_MS
+// 백업 레포 워크플로는 주 1회. 한 번 건너뛰면 바로 알게 7일에 하루 여유
+export const EXPORT_LIMIT_MS = 8 * DAY_MS
 const KST_OFFSET_MS = 9 * HOUR_MS
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
 
 export const SERVER_DOWN = '보관 서버가 응답하지 않아요'
 export const TOKEN_REJECTED = '보관 서버가 요약 토큰을 받지 않아요 (401). 레포 Secrets `KEEP_REPORT_TOKEN` 과 Worker 비밀값 `REPORT_TOKEN` 이 같은 값인지 확인하세요'
 export const NO_SIGNAL = '아직 상태 신호가 없어요'
+export const NO_EXPORT = '아직 서버 밖 사본이 없어요'
 
 // 서버를 부른 결과: 연결 자체가 안 됐거나(시간 초과 포함), 상태 코드와 JSON 본문(못 읽었으면 undefined)
 export type ReportResponse =
@@ -31,9 +35,17 @@ export interface DeviceReport {
   appVersion: string
 }
 
+// 마지막 서버 밖 사본 내보내기 (SPEC-011 2절): 때와 내보낸 보관본 개수
+export interface ExportReport {
+  lastAt: string
+  count: number
+}
+
 export interface Report {
   now: string
   devices: DeviceReport[]
+  // 한 번도 내보내지 않았으면 null
+  export: ExportReport | null
 }
 
 export interface Verdict {
@@ -65,16 +77,27 @@ function toDevice(value: unknown): DeviceReport | null {
   return { id, seenAt, enabled, pendingSince, lastKeptAt, tooLarge, appVersion }
 }
 
-// 서버 요약 형식 `{ now, devices: [...] }` 이 맞으면 Report, 하나라도 틀리면 null
+// export 칸: null 이나 칸 없음(이 칸을 모르는 예전 서버, #186 배포 전)은 내보낸 적 없음(null), 모양이 틀리면 undefined
+function toExport(value: unknown): ExportReport | null | undefined {
+  if (value === undefined || value === null) return null
+  if (!isRecord(value) || !isIsoDate(value.lastAt)) return undefined
+  const { count } = value
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) return undefined
+  return { lastAt: value.lastAt, count }
+}
+
+// 서버 요약 형식 `{ now, devices: [...], export? }` 이 맞으면 Report, 하나라도 틀리면 null
 export function parseReport(body: unknown): Report | null {
   if (!isRecord(body) || !isIsoDate(body.now) || !Array.isArray(body.devices)) return null
+  const lastExport = toExport(body.export)
+  if (lastExport === undefined) return null
   const devices: DeviceReport[] = []
   for (const item of body.devices) {
     const device = toDevice(item)
     if (!device) return null
     devices.push(device)
   }
-  return { now: body.now, devices }
+  return { now: body.now, devices, export: lastExport }
 }
 
 // 사람이 읽는 시각: 한국 시간 `2026-10-12 09:30`
@@ -98,6 +121,18 @@ function judgeDevice(device: DeviceReport, now: number): { failures: string[]; w
   return { failures, warnings }
 }
 
+// 서버 밖 사본 (SPEC-011): 한 번도 없으면 경고(첫 주), 마지막 내보내기가 8일 넘었으면 실패
+function judgeExport(lastExport: ExportReport | null, now: number): { failures: string[]; warnings: string[] } {
+  if (lastExport === null) return { failures: [], warnings: [NO_EXPORT] }
+  const elapsed = now - Date.parse(lastExport.lastAt)
+  if (elapsed <= EXPORT_LIMIT_MS) return { failures: [], warnings: [] }
+  const days = Math.floor(elapsed / DAY_MS)
+  return {
+    failures: [`서버 밖 사본이 ${days}일째 없어요 (마지막 내보내기 ${formatKst(lastExport.lastAt)} KST)`],
+    warnings: [],
+  }
+}
+
 // 응답 하나를 판정한다. 시각 비교는 서버 요약의 now 로 한다 (실행기 시계와 무관)
 export function judgeReport(response: ReportResponse): Verdict {
   if (response.kind === 'unreachable') return { failures: [`${SERVER_DOWN} (연결 실패)`], warnings: [] }
@@ -106,14 +141,14 @@ export function judgeReport(response: ReportResponse): Verdict {
 
   const report = parseReport(response.body)
   if (!report) return { failures: [`${SERVER_DOWN} (요약 형식이 틀림)`], warnings: [] }
-  if (report.devices.length === 0) return { report, failures: [], warnings: [NO_SIGNAL] }
 
   const now = Date.parse(report.now)
-  const judged = report.devices.map((device) => judgeDevice(device, now))
+  const judged = [...report.devices.map((device) => judgeDevice(device, now)), judgeExport(report.export, now)]
+  const noSignal = report.devices.length === 0 ? [NO_SIGNAL] : []
   return {
     report,
     failures: judged.flatMap((result) => result.failures),
-    warnings: judged.flatMap((result) => result.warnings),
+    warnings: [...noSignal, ...judged.flatMap((result) => result.warnings)],
   }
 }
 
@@ -154,8 +189,14 @@ export function renderSummary(verdict: Verdict): string {
         '',
       )
     }
+    lines.push('### 서버 밖 사본', '', `마지막 내보내기: ${exportText(report.export)}`, '')
   }
   return lines.join('\n')
+}
+
+function exportText(lastExport: ExportReport | null): string {
+  if (lastExport === null) return NO_EXPORT
+  return `${formatKst(lastExport.lastAt)} KST · 보관본 ${lastExport.count}개`
 }
 
 // GitHub Actions 작업 명령의 메시지 칸 이스케이프 (줄바꿈·% 가 명령을 깨지 않게)

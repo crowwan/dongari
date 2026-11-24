@@ -15,6 +15,8 @@ class FakeKeepStore implements KeepStore {
   readonly ttls = new Map<string, number>()
   // 이 키에 쓰면 실패하게 한다 (KV 쓰기 실패 흉내)
   failPut: (key: string) => boolean = () => false
+  // list 한 장의 크기 (Cloudflare KV 는 1,000). 넘으면 그 장까지만 주고 list_complete 가 false
+  listPageSize = 1000
 
   async get(key: string): Promise<string | null> {
     return this.values.get(key) ?? null
@@ -39,10 +41,12 @@ class FakeKeepStore implements KeepStore {
     this.ttls.delete(key)
   }
 
-  async list(options: { prefix: string }): Promise<{ keys: { name: string; metadata?: unknown }[] }> {
+  async list(options: { prefix: string }): Promise<{ keys: { name: string; metadata?: unknown }[]; list_complete: boolean }> {
     const names = [...this.values.keys()].filter((name) => name.startsWith(options.prefix)).sort()
+    const page = names.slice(0, this.listPageSize)
     return {
-      keys: names.map((name) => (this.metadata.has(name) ? { name, metadata: this.metadata.get(name) } : { name })),
+      keys: page.map((name) => (this.metadata.has(name) ? { name, metadata: this.metadata.get(name) } : { name })),
+      list_complete: page.length === names.length,
     }
   }
 }
@@ -424,6 +428,7 @@ describe('SPEC-007 자동 보관 지켜보기 서버 (Worker)', () => {
       const report: unknown = await res.json()
       expect(report).toEqual({
         now: '2026-10-15T02:00:00.000Z',
+        export: null,
         devices: expect.arrayContaining([
           {
             id: 'aaaaaaaa',
@@ -450,7 +455,7 @@ describe('SPEC-007 자동 보관 지켜보기 서버 (Worker)', () => {
       const res = await getReport(`Bearer ${TOKEN}`)
 
       expect(res.status).toBe(200)
-      expect(await res.json()).toEqual({ now: NOW, devices: [] })
+      expect(await res.json()).toEqual({ now: NOW, devices: [], export: null })
     })
 
     it('토큰이 없거나 틀리면 401 을 준다', async () => {
@@ -778,6 +783,31 @@ describe('SPEC-011 보관본 날짜별 사본 (Worker)', () => {
       expect(store.values.get(`keep:${ID}`)).toBe(october)
     })
 
+    it('사본을 쓴 뒤 최신본 쓰기가 실패해도 CORS 헤더가 있는 503 으로 답한다 (#190 리뷰)', async () => {
+      const first = keepBody({ data: 'Zmlyc3Q=' })
+      await putAt('2026-11-20T14:00:00.000Z', first)
+      store.failPut = (key) => key === `keep:${ID}`
+
+      const res = await putAt('2026-11-21T14:00:00.000Z', keepBody({ data: 'c2Vjb25k' }))
+
+      expect(res.status).toBe(503)
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ORIGIN)
+      expect(store.values.get(`keep:${ID}`)).toBe(first)
+    })
+
+    it('metadata 없는 옛 최신본의 겉봉투 savedAt 이 미래(폰 시계)면 미래 날·달 사본을 만들지 않는다 (#190 리뷰)', async () => {
+      // 폰 시계가 앞서 있던 옛 최신본: 겉봉투 savedAt 이 한국 시간 12월 2일
+      store.values.set(`keep:${ID}`, keepBody({ savedAt: '2026-12-02T01:00:00.000Z' }))
+      const next = keepBody({ data: 'bmV3' })
+
+      const res = await putAt('2026-11-21T01:00:00.000Z', next)
+
+      expect(res.status).toBe(204)
+      expect(keysStartingWith('snap:')).toEqual([])
+      expect(keysStartingWith('month:')).toEqual([])
+      expect(store.values.get(`keep:${ID}`)).toBe(next)
+    })
+
     it('복사가 실패한 뒤 다시 보내면 사본과 최신본이 모두 생긴다', async () => {
       const first = keepBody({ data: 'Zmlyc3Q=' })
       await putAt('2026-11-20T14:00:00.000Z', first)
@@ -940,6 +970,189 @@ describe('SPEC-011 보관본 날짜별 사본 (Worker)', () => {
 
       expect(res.status).toBe(204)
       expect([...store.values.keys()]).toEqual([`snap:${ID}:2026-11-20`])
+    })
+  })
+})
+
+const EXPORT_URL = 'https://keep.example.workers.dev/v1/export'
+const EXPORT_TOKEN = 'e'.repeat(64)
+
+describe('SPEC-011 서버 밖 사본 내보내기 (Worker)', () => {
+  let store: FakeKeepStore
+  const OTHER_ID = '0123456789abcdef'.repeat(4)
+  const EXPORTED_AT = '2026-11-23T23:00:00.000Z'
+
+  // 토큰(EXPORT_TOKEN·REPORT_TOKEN)과 서버 시각을 정해 두고 보낸다
+  const sendAt = (now: string, req: Request, tokens: { exportToken?: string; reportToken?: string } = {}) =>
+    handleKeepRequest(
+      req,
+      { KEEP: store, EXPORT_TOKEN: tokens.exportToken ?? EXPORT_TOKEN, REPORT_TOKEN: tokens.reportToken ?? TOKEN },
+      () => new Date(now),
+    )
+  const putAt = (now: string, body: string, options: { origin?: string; url?: string } = {}) =>
+    sendAt(now, request('PUT', { body, ...options }))
+  // 아무것도 주지 않으면 맞는 토큰으로, authorization 을 빼고 주면 Authorization 헤더 없이 보낸다
+  const getExport = (
+    options: { authorization?: string; exportToken?: string } = { authorization: `Bearer ${EXPORT_TOKEN}` },
+  ) =>
+    sendAt(EXPORTED_AT, request('GET', { url: EXPORT_URL, origin: null, authorization: options.authorization }), {
+      exportToken: options.exportToken,
+    })
+  const getReport = () =>
+    sendAt(EXPORTED_AT, request('GET', { url: REPORT_URL, origin: null, authorization: `Bearer ${TOKEN}` }))
+
+  beforeEach(() => {
+    store = new FakeKeepStore()
+  })
+
+  describe('AC-5 토큰이 맞을 때만 본 자리 최신본 전부를 준다', () => {
+    it('본 자리 최신본만(미리보기·날짜별·달별 사본·상태 신호 빼고) id 순으로 보관 시각·겉봉투와 함께 준다', async () => {
+      // ID: 11월 20일·21일(KST)에 보관 → 날짜 사본이 생김. 미리보기 자리에도 같은 이름
+      await putAt('2026-11-20T03:00:00.000Z', keepBody({ data: 'MjA=' }))
+      await putAt('2026-11-21T03:00:00.000Z', keepBody({ data: 'MjE=' }))
+      await putAt('2026-11-21T04:00:00.000Z', keepBody({ data: 'cHJldmlldw==' }), { origin: PREVIEW_ORIGIN })
+      store.values.set(`status:${ID}`, statusBody())
+      // OTHER_ID: 이 기능 전에 저장된 metadata 없는 옛 최신본
+      store.values.set(`keep:${OTHER_ID}`, keepBody({ savedAt: '2026-11-19T16:00:00.000Z', data: 'b2xk' }))
+      expect(store.values.has(`snap:${ID}:2026-11-20`)).toBe(true)
+
+      const res = await getExport()
+
+      expect(res.status).toBe(200)
+      expect(res.headers.get('Content-Type')).toContain('application/json')
+      expect(await res.json()).toEqual({
+        exportedAt: EXPORTED_AT,
+        items: [
+          {
+            id: OTHER_ID,
+            savedAt: '2026-11-19T16:00:00.000Z',
+            envelope: JSON.parse(keepBody({ savedAt: '2026-11-19T16:00:00.000Z', data: 'b2xk' })),
+          },
+          { id: ID, savedAt: '2026-11-21T03:00:00.000Z', envelope: JSON.parse(keepBody({ data: 'MjE=' })) },
+        ],
+      })
+    })
+
+    it('주고 나서 export:last 에 내보낸 때와 개수를 남긴다', async () => {
+      await putAt('2026-11-21T03:00:00.000Z', keepBody())
+      await putAt('2026-11-21T03:00:00.000Z', keepBody(), { url: `https://keep.example.workers.dev/v1/keep/${OTHER_ID}` })
+
+      await getExport()
+
+      expect(JSON.parse(store.values.get('export:last') ?? 'null')).toEqual({ at: EXPORTED_AT, count: 2 })
+    })
+
+    it('보관본이 하나도 없으면 빈 목록을 주고 0개로 남긴다', async () => {
+      const res = await getExport()
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ exportedAt: EXPORTED_AT, items: [] })
+      expect(JSON.parse(store.values.get('export:last') ?? 'null')).toEqual({ at: EXPORTED_AT, count: 0 })
+    })
+
+    it('토큰이 없거나 틀리면(요약 토큰 포함) 401 을 주고 아무것도 남기지 않는다', async () => {
+      await putAt('2026-11-21T03:00:00.000Z', keepBody())
+      const badAuthorizations = [
+        undefined,
+        '',
+        EXPORT_TOKEN,
+        `Basic ${EXPORT_TOKEN}`,
+        `Bearer ${TOKEN}`,
+        `Bearer ${EXPORT_TOKEN.slice(1)}`,
+        `Bearer ${EXPORT_TOKEN}0`,
+        'Bearer ',
+      ]
+      for (const authorization of badAuthorizations) {
+        const res = await getExport({ authorization })
+        expect(res.status).toBe(401)
+        expect(await res.text()).toBe('')
+      }
+      expect(store.values.has('export:last')).toBe(false)
+    })
+
+    it('서버 비밀값 EXPORT_TOKEN 이 비어 있으면 늘 401 을 준다', async () => {
+      expect((await getExport({ authorization: 'Bearer ', exportToken: '' })).status).toBe(401)
+      expect((await getExport({ exportToken: '' })).status).toBe(401)
+    })
+
+    it('출처 검사를 하지 않고 CORS 헤더도 주지 않는다', async () => {
+      const fromApp = await sendAt(EXPORTED_AT, request('GET', { url: EXPORT_URL, authorization: `Bearer ${EXPORT_TOKEN}` }))
+      const fromElsewhere = await sendAt(
+        EXPORTED_AT,
+        request('GET', { url: EXPORT_URL, origin: 'https://evil.example', authorization: `Bearer ${EXPORT_TOKEN}` }),
+      )
+
+      for (const res of [fromApp, fromElsewhere, await getExport()]) {
+        expect(res.status).toBe(200)
+        expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+      }
+      expect((await getExport({})).headers.get('Access-Control-Allow-Origin')).toBeNull()
+    })
+
+    it('GET 말고는 405 를 준다', async () => {
+      for (const method of ['PUT', 'DELETE', 'POST']) {
+        const res = await sendAt(
+          EXPORTED_AT,
+          request(method, { url: EXPORT_URL, origin: null, authorization: `Bearer ${EXPORT_TOKEN}`, body: '{}' }),
+        )
+        expect(res.status).toBe(405)
+      }
+      expect(store.values.has('export:last')).toBe(false)
+    })
+
+    it('최신본 목록이 한 장(1,000개)을 넘어 잘리면 잘린 목록을 주지 않고 503 이며 export:last 도 남기지 않는다 (#194 리뷰)', async () => {
+      await putAt('2026-11-21T03:00:00.000Z', keepBody())
+      await putAt('2026-11-21T03:00:00.000Z', keepBody(), { url: `https://keep.example.workers.dev/v1/keep/${OTHER_ID}` })
+      store.listPageSize = 1
+
+      const res = await getExport()
+
+      expect(res.status).toBe(503)
+      expect(await res.text()).toBe('')
+      expect(store.values.has('export:last')).toBe(false)
+    })
+
+    it('export:last 를 쓰지 못하면 503 으로 답한다 (내보낸 기록 없이 성공하지 않게)', async () => {
+      await putAt('2026-11-21T03:00:00.000Z', keepBody())
+      store.failPut = (key) => key === 'export:last'
+
+      const res = await getExport()
+
+      expect(res.status).toBe(503)
+      expect(await res.text()).toBe('')
+    })
+
+    it('비슷하지만 다른 경로는 404 를 준다', async () => {
+      for (const path of ['/v1/export/', '/v1/exports', `/v1/export/${ID}`]) {
+        const url = `https://keep.example.workers.dev${path}`
+        const res = await sendAt(EXPORTED_AT, request('GET', { url, origin: null, authorization: `Bearer ${EXPORT_TOKEN}` }))
+        expect(res.status).toBe(404)
+      }
+    })
+  })
+
+  describe('AC-5 요약(/v1/report)에 마지막 내보내기가 실린다', () => {
+    it('아직 내보낸 적이 없으면 export 는 null 이다', async () => {
+      const res = await getReport()
+
+      expect(await res.json()).toHaveProperty('export', null)
+    })
+
+    it('내보낸 뒤에는 export 에 마지막 때와 개수가 실린다', async () => {
+      await putAt('2026-11-21T03:00:00.000Z', keepBody())
+      await getExport()
+
+      const res = await getReport()
+
+      expect(await res.json()).toHaveProperty('export', { lastAt: EXPORTED_AT, count: 1 })
+    })
+
+    it('export:last 모양이 틀리면 export 는 null 이다', async () => {
+      store.values.set('export:last', JSON.stringify({ at: '어제', count: -1 }))
+
+      const res = await getReport()
+
+      expect(await res.json()).toHaveProperty('export', null)
     })
   })
 })

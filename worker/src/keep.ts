@@ -4,6 +4,7 @@
 // SPEC-007(ADR 006): 같은 이름으로 폰의 보관 상태 신호를 받아 두고, 토큰을 가진 쪽(GitHub Actions)에 요약을 준다.
 // #128(ADR 008): 본 주소와 미리보기 주소를 받고, 미리보기 요청은 KV 의 다른 자리(preview:)에 둔다.
 // SPEC-011(ADR 010): 날(한국 시간)·달이 바뀐 뒤 첫 보관 때 있던 최신본을 날짜별·달별 사본으로 남기고, 개발자가 골라 받게 한다.
+// 서버 밖 주간 사본(비공개 백업 레포의 GitHub Actions)에는 내보내기 토큰으로 본 자리 최신본 전부를 준다.
 
 export const MAX_BODY_BYTES = 1_048_576
 export const MAX_STATUS_BYTES = 4096
@@ -33,14 +34,17 @@ export interface KeepStore {
   getWithMetadata(key: string): Promise<{ value: string | null; metadata: unknown }>
   put(key: string, value: string, options?: KeepPutOptions): Promise<void>
   delete(key: string): Promise<void>
-  // 기기는 가족 몇 대, 사본은 이름당 최대 31 + 13개라 한 번(최대 1,000개)으로 충분하다. 다음 장(cursor)은 읽지 않는다
-  list(options: { prefix: string }): Promise<{ keys: { name: string; metadata?: unknown }[] }>
+  // 기기는 가족 몇 대, 사본은 이름당 최대 31 + 13개라 한 번(최대 1,000개)으로 충분하다. 다음 장(cursor)은 읽지 않는다.
+  // list_complete 가 false 면 그 장 뒤에 더 있다 (내보내기는 잘린 목록을 주지 않는다)
+  list(options: { prefix: string }): Promise<{ keys: { name: string; metadata?: unknown }[]; list_complete: boolean }>
 }
 
 export interface Env {
   KEEP: KeepStore
   // 요약 토큰 (Worker 비밀값). 넣지 않았으면 비어 있고, 그때 요약은 늘 401
   REPORT_TOKEN?: string
+  // 내보내기 토큰 (Worker 비밀값, 요약 토큰과 별개, SPEC-011 2절). 넣지 않았으면 내보내기는 늘 401
+  EXPORT_TOKEN?: string
 }
 
 // 서버 시각 (테스트는 정한 시각을 넣는다)
@@ -49,7 +53,12 @@ export type Clock = () => Date
 const ID_PATH = /^\/v1\/(keep|status)\/([^/]+)$/
 const HISTORY_PATH = /^\/v1\/keep\/([^/]+)\/history$/
 const REPORT_PATH = '/v1/report'
+const EXPORT_PATH = '/v1/export'
 const STATUS_PREFIX = 'status:'
+// 본 자리 최신본 키의 앞부분. 미리보기(preview:keep:)·사본(snap:·month:)은 앞부분이 달라 잡히지 않는다
+const LATEST_PREFIX = 'keep:'
+// 마지막 내보내기 { at, count } (요약이 싣는다)
+const EXPORT_LAST_KEY = 'export:last'
 const MAX_APP_VERSION_LENGTH = 32
 const KEEP_ID = /^[0-9a-f]{64}$/
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
@@ -83,7 +92,7 @@ interface KeepKeys {
 function keepKeysOf(app: AppRequest, id: string): KeepKeys {
   const place = app.keyPrefix
   return {
-    latest: `${place}keep:${id}`,
+    latest: `${place}${LATEST_PREFIX}${id}`,
     status: `${place}${STATUS_PREFIX}${id}`,
     dayPrefix: `${place}snap:${id}:`,
     monthPrefix: `${place}month:${id}:`,
@@ -109,14 +118,18 @@ function isIsoDate(value: string): boolean {
   return ISO_DATE.test(value) && !Number.isNaN(Date.parse(value))
 }
 
+// JSON 이 아니면 undefined
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
+}
+
 // 보관본 형식: { v: 1, savedAt: ISO 시각, iv: base64, data: base64 }
 function isKeepBody(text: string): boolean {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch {
-    return false
-  }
+  const parsed = parseJson(text)
   if (!isRecord(parsed)) return false
   const { v, savedAt, iv, data } = parsed
   return v === 1 && typeof savedAt === 'string' && isIsoDate(savedAt) && isBase64(iv) && isBase64(data)
@@ -146,12 +159,7 @@ function toStatusSignal(record: Record<string, unknown>): StatusSignal | null {
 
 // 정한 칸 말고 다른 것이 섞여 있으면 받지 않는다 (서버에 평문으로 남는 것을 정한 만큼으로)
 function parseStatusBody(text: string): StatusSignal | null {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch {
-    return null
-  }
+  const parsed = parseJson(text)
   if (!isRecord(parsed)) return null
   if (Object.keys(parsed).some((key) => !STATUS_KEYS.has(key))) return null
   return toStatusSignal(parsed)
@@ -177,28 +185,19 @@ function kstDay(iso: string): string {
   return new Date(Date.parse(iso) + KST_OFFSET_MS).toISOString().slice(0, 10)
 }
 
-// 서버가 최신본·사본에 붙이는 metadata { savedAt } 의 보관 시각. 모양이 다르면 undefined
-function savedAtOfMetadata(metadata: unknown): string | undefined {
-  if (!isRecord(metadata)) return undefined
-  const { savedAt } = metadata
+// { savedAt: ISO 시각 } 의 보관 시각 (서버가 최신본·사본에 붙이는 metadata, 보관본 겉봉투). 모양이 다르면 undefined
+function savedAtOf(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined
+  const { savedAt } = value
   return typeof savedAt === 'string' && isIsoDate(savedAt) ? savedAt : undefined
-}
-
-function savedAtOfEnvelope(text: string): string | undefined {
-  try {
-    const parsed: unknown = JSON.parse(text)
-    return isRecord(parsed) && typeof parsed.savedAt === 'string' && isIsoDate(parsed.savedAt) ? parsed.savedAt : undefined
-  } catch {
-    return undefined
-  }
 }
 
 // 최신본의 보관 시각: metadata 의 서버 시각, 없으면(이 기능 전에 저장한 최신본) 보관본 겉봉투의 savedAt
 function keptAtOf(value: string, metadata: unknown): string | undefined {
-  return savedAtOfMetadata(metadata) ?? savedAtOfEnvelope(value)
+  return savedAtOf(metadata) ?? savedAtOf(parseJson(value))
 }
 
-// 새 값을 쓰기 전에: 지금 최신본의 보관일이 오늘이 아니면 그 날 사본으로, 보관 달이 이번 달이 아니면 달 사본으로도 복사한다.
+// 새 값을 쓰기 전에: 지금 최신본의 보관일이 오늘보다 앞이면 그 날 사본으로, 보관 달이 이번 달이 아니면 달 사본으로도 복사한다.
 // 그래서 사본은 "그날(그달) 마지막으로 보관된 모습"이다. 이미 있으면 덮어쓴다
 async function copyBeforeOverwrite(store: KeepStore, keys: KeepKeys, today: string): Promise<void> {
   const { value, metadata } = await store.getWithMetadata(keys.latest)
@@ -207,7 +206,8 @@ async function copyBeforeOverwrite(store: KeepStore, keys: KeepKeys, today: stri
   const keptAt = keptAtOf(value, metadata)
   if (keptAt === undefined) return
   const keptDay = kstDay(keptAt)
-  if (keptDay === today) return
+  // 오늘이거나, metadata 없는 옛 최신본의 폰 시계가 앞서 있어 미래 날이면 복사하지 않는다 (미래 날·달 사본이 생기지 않게, #190 리뷰)
+  if (keptDay >= today) return
 
   const copyMetadata = { savedAt: keptAt }
   const copies = [
@@ -230,12 +230,14 @@ async function putKeep(request: Request, env: Env, app: AppRequest, keys: KeepKe
   // 보관 시각은 폰 시계가 아니라 서버 시각 (날 가르기 기준)
   const savedAt = clock().toISOString()
   try {
+    // 복사가 실패하면 사본이 빠진 채 최신본만 바뀌지 않게 새 값을 쓰지 않는다
     await copyBeforeOverwrite(env.KEEP, keys, kstDay(savedAt))
+    await env.KEEP.put(keys.latest, text, { metadata: { savedAt } })
   } catch {
-    // 사본이 빠진 채 최신본만 바뀌지 않게 새 값을 쓰지 않는다. 폰은 실패로 보고 다시 보낸다
+    // 복사든 최신본 쓰기(예: KV 하루 쓰기 한도)든 CORS 헤더가 있는 503 으로 답한다.
+    // CORS 없는 500 이면 폰은 연결 실패로 본다. 503 이면 실패로 보고 다시 보낸다 (#190 리뷰)
     return respond(app, 503)
   }
-  await env.KEEP.put(keys.latest, text, { metadata: { savedAt } })
   return respond(app, 204)
 }
 
@@ -268,7 +270,7 @@ async function listCopies(store: KeepStore, prefix: string, stampPattern: RegExp
   return keys
     .flatMap(({ name, metadata }) => {
       const stamp = name.slice(prefix.length)
-      const savedAt = savedAtOfMetadata(metadata)
+      const savedAt = savedAtOf(metadata)
       return stampPattern.test(stamp) && savedAt !== undefined ? [{ stamp, savedAt }] : []
     })
     .sort((a, b) => b.stamp.localeCompare(a.stamp))
@@ -348,12 +350,7 @@ interface DeviceSummary extends Omit<StatusSignal, 'v'> {
 // 저장한 신호를 요약 한 줄로. 서버가 쓴 값이라 형식이 틀릴 일은 없지만, 틀리면 빼고 준다
 function toDeviceSummary(key: string, stored: string | null): DeviceSummary | null {
   if (stored === null) return null
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(stored)
-  } catch {
-    return null
-  }
+  const parsed = parseJson(stored)
   if (!isRecord(parsed) || typeof parsed.seenAt !== 'string') return null
   const signal = toStatusSignal(parsed)
   if (!signal) return null
@@ -370,6 +367,26 @@ function toDeviceSummary(key: string, stored: string | null): DeviceSummary | nu
   }
 }
 
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+}
+
+interface LastExport {
+  lastAt: string
+  count: number
+}
+
+// 마지막 내보내기 (SPEC-011 2절). 아직 없거나 모양이 틀리면 null
+async function lastExportOf(store: KeepStore): Promise<LastExport | null> {
+  const stored = await store.get(EXPORT_LAST_KEY)
+  const parsed = stored === null ? undefined : parseJson(stored)
+  if (!isRecord(parsed)) return null
+  const { at, count } = parsed
+  if (typeof at !== 'string' || !isIsoDate(at)) return null
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) return null
+  return { lastAt: at, count }
+}
+
 // GitHub Actions 가 부르는 요약: 출처 검사·CORS 헤더 없이 토큰으로만 연다
 async function handleReport(request: Request, env: Env, clock: Clock): Promise<Response> {
   if (request.method !== 'GET') return new Response(null, { status: 405 })
@@ -377,12 +394,51 @@ async function handleReport(request: Request, env: Env, clock: Clock): Promise<R
 
   // 본 자리만 본다: KV list 는 앞부분 일치라 미리보기 신호(preview:status:…)는 잡히지 않는다 (#128)
   const { keys } = await env.KEEP.list({ prefix: STATUS_PREFIX })
-  const summaries = await Promise.all(
-    keys.map(async ({ name }) => toDeviceSummary(name, await env.KEEP.get(name))),
-  )
+  const [summaries, lastExport] = await Promise.all([
+    Promise.all(keys.map(async ({ name }) => toDeviceSummary(name, await env.KEEP.get(name)))),
+    lastExportOf(env.KEEP),
+  ])
   const devices = summaries.filter((summary) => summary !== null)
-  const body = JSON.stringify({ now: clock().toISOString(), devices })
-  return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } })
+  return jsonResponse({ now: clock().toISOString(), devices, export: lastExport })
+}
+
+interface ExportItem {
+  id: string
+  savedAt: string
+  envelope: Record<string, unknown>
+}
+
+// 최신본 하나를 내보낼 줄로. 서버가 쓴 값이라 틀릴 일은 없지만, 이름·본문이 틀렸거나 그사이 지워졌으면 뺀다
+async function exportItemOf(store: KeepStore, name: string): Promise<ExportItem | null> {
+  const id = name.slice(LATEST_PREFIX.length)
+  if (!KEEP_ID.test(id)) return null
+  const { value, metadata } = await store.getWithMetadata(name)
+  if (value === null) return null
+  const savedAt = keptAtOf(value, metadata)
+  const envelope = parseJson(value)
+  if (savedAt === undefined || !isRecord(envelope)) return null
+  return { id, savedAt, envelope }
+}
+
+// 비공개 백업 레포의 GitHub Actions 가 부르는 내보내기 (SPEC-011 2절): 요약처럼 출처 검사·CORS 헤더 없이 내보내기 토큰으로만 연다.
+// 본 자리 최신본만 준다(KV list 는 앞부분 일치라 미리보기·날짜별·달별 사본은 잡히지 않는다). 순서는 KV list 의 이름순(= id 순).
+// 목록이 한 장(1,000개)을 넘어 잘리면 503: 잘린 목록을 주면 백업 레포가 빠진 id 의 파일을 지운다. 이어 받기(cursor)는 하지 않는다 (#194 리뷰).
+// 내보낸 때를 export:last 에 남기지 못해도 503: 요약(보관 지켜보기)이 모르는 내보내기가 성공으로 끝나지 않게
+async function handleExport(request: Request, env: Env, clock: Clock): Promise<Response> {
+  if (request.method !== 'GET') return new Response(null, { status: 405 })
+  if (!isAuthorized(request, env.EXPORT_TOKEN)) return new Response(null, { status: 401 })
+
+  const { keys, list_complete: complete } = await env.KEEP.list({ prefix: LATEST_PREFIX })
+  if (!complete) return new Response(null, { status: 503 })
+  const found = await Promise.all(keys.map(({ name }) => exportItemOf(env.KEEP, name)))
+  const items = found.filter((item) => item !== null)
+  const exportedAt = clock().toISOString()
+  try {
+    await env.KEEP.put(EXPORT_LAST_KEY, JSON.stringify({ at: exportedAt, count: items.length }))
+  } catch {
+    return new Response(null, { status: 503 })
+  }
+  return jsonResponse({ exportedAt, items })
 }
 
 // 이름(id)이 들어간 경로: 보관본 /v1/keep/<id>, 상태 신호 /v1/status/<id>, 사본 목록 /v1/keep/<id>/history
@@ -405,8 +461,9 @@ export async function handleKeepRequest(
   clock: Clock = () => new Date(),
 ): Promise<Response> {
   const { pathname } = new URL(request.url)
-  // 요약은 출처 검사보다 먼저 (앱이 아니라 GitHub Actions 에서 부른다)
+  // 요약·내보내기는 출처 검사보다 먼저 (앱이 아니라 GitHub Actions 에서 부른다)
   if (pathname === REPORT_PATH) return handleReport(request, env, clock)
+  if (pathname === EXPORT_PATH) return handleExport(request, env, clock)
 
   const route = idRouteOf(pathname)
   // 그 밖의 경로는 출처와 상관없이 404 (주소 확인용으로도 쓴다)

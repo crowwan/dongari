@@ -36,8 +36,11 @@ SPEC-006 자동 보관은 실패해도 조용히 기다린다(사용자를 귀�
 | 어떤 기기든 자동 보관 꺼짐 | 경고(성공) | 기기 `ab12cd34` 가 자동 보관을 껐어요 |
 | 마지막 신호가 요약의 `now` 기준 30일 넘음 | 경고(성공) | 기기 `ab12cd34` 가 30일 넘게 앱을 열지 않았어요 |
 | 신호가 하나도 없음 | 경고(성공) | 아직 상태 신호가 없어요 |
+| (SPEC-011 #186) 마지막 서버 밖 사본 내보내기(`export.lastAt`)가 요약의 `now` 기준 8일 넘음 | 실패 | 서버 밖 사본이 9일째 없어요 (마지막 내보내기 2026-11-16 08:00 KST) |
+| (SPEC-011 #186) 내보낸 적이 없음(`export` 가 null, 또는 `export` 칸이 없는 예전 서버) | 경고(성공) | 아직 서버 밖 사본이 없어요 |
 
 - 기기는 이름(64자 해시)의 앞 8자로만 보여 준다.
+- 서버 밖 사본 두 줄은 SPEC-011 2절(비공개 백업 레포의 주간 내보내기). 8일은 주 1회 실행에 하루 여유, 경계 값은 문제 아님. 신호가 없어도 따로 판정하고, `export` 칸 모양이 틀리면 "요약 형식이 틀림" 실패. 실행 요약에 "서버 밖 사본 — 마지막 내보내기" 한 줄.
 - 3일은 앱 안 띠(7일)보다 먼저 알기 위한 값이다.
 - "넘음"은 경계 값을 넣지 않는다(정확히 72시간·30일은 아직 문제 아님). 실패·경고는 기기마다 모두 모은다.
 - 밀린 시간을 요약의 `now` 가 아니라 `seenAt` 으로 재는 이유: 신호는 앱을 열 때만 오므로, 앱을 연 뒤 보관이 성공했어도 다음 앱 열기까지 서버는 모른다. `now` 로 재면 어머니가 사흘 앱을 안 열기만 해도 실패 메일이 온다. 정말 막힌 보관은 다음 앱 열기 때 `seenAt` 기준으로 걸린다.
@@ -74,7 +77,7 @@ SPEC-006 자동 보관은 실패해도 조용히 기다린다(사용자를 귀�
 
 - 서버 API 추가 (`worker/src/`)
   - `PUT /v1/status/:id` — 출처·이름 검사는 `/v1/keep/:id` 와 같다. 본문 `{ "v": 1, "enabled": boolean, "pendingSince"?: ISO, "lastKeptAt"?: ISO, "tooLarge": boolean, "appVersion": string(1~32자) }`. 선택 칸은 빼서 보낸다(`null` 은 400). 정한 칸 말고 다른 칸이 있어도 400(평문으로 남는 것을 정한 만큼으로). 서버가 `seenAt`(서버 시각)을 붙여 KV `status:<id>` 에 저장 204. 미리보기 출처(`https://uri-jangbu-preview.pages.dev`)에서 온 신호는 `preview:status:<id>` 에 두고, 미리보기에서 보관본을 지우면 `preview:` 자리의 보관본·신호만 지운다(#128, SPEC-006 기술 메모 "출처와 KV 자리"). CORS 메서드에 맞춰 PUT 은 이미 허용. `/v1/status/:id` 에 PUT 말고(GET·DELETE)는 405.
-  - `GET /v1/report` — `Authorization: Bearer <REPORT_TOKEN>`(Worker 비밀값, `wrangler secret put REPORT_TOKEN`). KV `list({ prefix: 'status:' })` 로 키를 모으고(앞부분 일치라 미리보기 신호 `preview:status:…` 는 잡히지 않는다 — 요약은 본 주소 기기만, #128) 값은 키마다 `get` 으로 읽어 `{ now, devices: [{ id: 앞 8자, seenAt, enabled, pendingSince?, lastKeptAt?, tooLarge, appVersion }] }` 200. `list` 는 한 장(최대 1,000개)만 읽는다(기기는 가족 몇 대). 비교는 시간 일정 비교(길이 같을 때 바이트 XOR). `Origin` 검사 없음(GitHub Actions 에서 부른다), CORS 헤더 없음 — 라우팅에서 출처 검사보다 먼저 처리. 401·405 는 본문 없음.
+  - `GET /v1/report` — `Authorization: Bearer <REPORT_TOKEN>`(Worker 비밀값, `wrangler secret put REPORT_TOKEN`). KV `list({ prefix: 'status:' })` 로 키를 모으고(앞부분 일치라 미리보기 신호 `preview:status:…` 는 잡히지 않는다 — 요약은 본 주소 기기만, #128) 값은 키마다 `get` 으로 읽어 `{ now, devices: [{ id: 앞 8자, seenAt, enabled, pendingSince?, lastKeptAt?, tooLarge, appVersion }] }` 200. `list` 는 한 장(최대 1,000개)만 읽는다(기기는 가족 몇 대). 비교는 시간 일정 비교(길이 같을 때 바이트 XOR). `Origin` 검사 없음(GitHub Actions 에서 부른다), CORS 헤더 없음 — 라우팅에서 출처 검사보다 먼저 처리. 401·405 는 본문 없음. (SPEC-011 #186) 응답에 마지막 서버 밖 사본 내보내기 `export: { lastAt, count } | null` 이 더해졌다(KV `export:last`).
   - 신호를 받는 것만으로 서버가 살아 있는지도 확인되므로 `/health` 는 따로 두지 않는다 — `/v1/report` 가 KV 를 읽으므로 그 응답이 곧 건강 확인이다.
 - 앱 (`src/features/keep/`)
   - `keepServer.ts` 에 `sendStatus(id, status)` (실패는 삼킨다).
@@ -103,3 +106,4 @@ SPEC-006 자동 보관은 실패해도 조용히 기다린다(사용자를 귀�
 | 2026-10-15 | 워크플로 구현(#106): 401 은 토큰 문구로 따로 실패, 서버 실패 문구에 까닭(연결 실패·HTTP 코드·형식) 덧붙임, 밀린 때는 KST, 판정은 `scripts/keepWatch.ts`(Node 24 타입 지우기로 실행), 경계 값은 문제 아님. 앱 메모를 `start` 의 올리기 시도 뒤로 맞춤(#105). deploy.yml 서버 주소 확인은 하지 않기로 |
 | 2026-10-16 | 기술 메모(#128): 미리보기 출처의 상태 신호는 `preview:status:<id>` 에, 요약은 본 자리(`status:`)만 |
 | 2026-10-16 | v2.6.0 릴리스 (#137) |
+| 2026-11-24 | 판정 표에 서버 밖 사본 두 줄(8일 넘음 실패, 없음 경고)·요약 `export` (SPEC-011 2절, #186) |
