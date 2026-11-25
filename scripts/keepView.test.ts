@@ -444,9 +444,12 @@ describe('SPEC-013 보관본 들여다보기', () => {
       expect(noNames.notices).toEqual([NO_DEVICE_NAMES])
       expect(deviceOf(noNames, idA).name).toBeUndefined()
 
-      const brokenNames = await listWith({ 'devices.json': '{ "엄마": "폰" }' })
-      expect(brokenNames.notices).toEqual([BROKEN_DEVICE_NAMES])
-      expect(deviceOf(brokenNames, idA).name).toBeUndefined()
+      // 모양 규칙은 보관 지켜보기와 같다: 키는 소문자 16진수 8자, 값은 빈칸 아닌 글자
+      for (const broken of ['{ "엄마": "폰" }', JSON.stringify({ [idA.slice(0, 8)]: '  ' }), '이름표 아님']) {
+        const brokenNames = await listWith({ 'devices.json': broken })
+        expect(brokenNames.notices).toEqual([BROKEN_DEVICE_NAMES])
+        expect(deviceOf(brokenNames, idA).name).toBeUndefined()
+      }
     })
   })
 

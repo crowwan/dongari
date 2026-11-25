@@ -155,14 +155,16 @@ export function parseBackupIndex(text: string): string[] | undefined {
   return raw.flatMap((item) => (isRecord(item) && typeof item.id === 'string' && isKeepId(item.id) ? [item.id] : []))
 }
 
-// devices.json { "aaa97843": "엄마 폰" } (SPEC-012 1절) → id 앞 8자별 이름. 모양이 틀리면 undefined
+// devices.json { "aaa97843": "엄마 폰" } (SPEC-012 1절) → id 앞 8자별 이름. 모양이 틀리면 undefined.
+// 모양 규칙은 보관 지켜보기(ops/keep-backup/scripts/keepWatch.ts parseDeviceNames)와 같다: 키는 소문자 16진수 8자, 값은 빈칸 아닌 글자.
+// 그 파일은 페이지로 보내지 않으므로 불러오지 않고 같은 규칙을 둔다
 export function parseDeviceNames(text: string): Map<string, string> | undefined {
   const raw = parseJson(text)
   if (!isRecord(raw)) return undefined
   const names = new Map<string, string>()
   for (const [key, name] of Object.entries(raw)) {
-    if (!NAME_KEY.test(key) || typeof name !== 'string') return undefined
-    names.set(key, name)
+    if (!NAME_KEY.test(key) || typeof name !== 'string' || name.trim() === '') return undefined
+    names.set(key, name.trim())
   }
   return names
 }

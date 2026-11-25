@@ -43,8 +43,9 @@ updated: 2026-11-26
 3. **겉 정보 (코드 없이).** 고른 사본의 다음 항목을 보인다.
    - 기기 이름과 보관 자리 id(64자)
    - 사본 종류, 있는 곳(KV 키 `snap:<id>:<날>` 또는 `<커밋>:keep/<id>.json`)
-   - 서버가 받은 때(KST), 크기와 1MB 한도의 몇 %인지
+   - 서버가 받은 때(KST, 주간 사본은 백업 레포에 넣은 커밋 시각), 크기와 1MB 한도의 몇 %인지
    - 남는 기간, 이 기기의 사본 개수
+     - 날짜별 사본은 그 날 다음 날 0시(KST) 이후의 첫 보관 때 만들어지므로 "그 날 다음 날 0시 + 31일"까지는 적어도 남는다고 적는다. 달별은 "다음 달 1일 0시 + 400일".
    - 겉봉투(`{ v, savedAt, iv, data }`, `data` 는 앞부분만)
 4. **풀기.**
    - 페이지 입력칸에 복구 코드를 넣으면 페이지가 코드에서 id 를 계산한다. 그 기기의 id 와 같으면 이 기기의 사본이 모두 풀린다.
@@ -127,15 +128,18 @@ updated: 2026-11-26
 - **풀기**
   - `keepRescue.ts` 의 `normalizeRecoveryCode`·`keepIdOf`·`openKeep` 을 그대로 쓴다. 이 함수들은 Web Crypto 라 브라우저에서도 같다.
   - 브라우저는 `127.0.0.1` 을 안전한 출처로 보므로 `crypto.subtle` 을 쓸 수 있다.
-- **페이지에 TS 보내기**: 로컬 서버가 `node:module` 의 `stripTypeScriptTypes` 로 `keepView.ts`·`keepRescue.ts` 의 타입을 지워 `text/javascript` 로 보낸다. 빌드는 없다. Node 24 에 있는 것은 확인했다. 실험 기능 경고가 나면 첫 이슈에서 처리 방법을 정한다.
+- **페이지에 TS 보내기**: 로컬 서버가 `node:module` 의 `stripTypeScriptTypes` 로 `keepView.ts`·`keepRescue.ts` 의 타입을 지워 `text/javascript` 로 보낸다(`GET /keepView.ts`·`/keepRescue.ts`). 빌드는 없다.
+  - #205 기술 확인: Node 24.14 에서 지운 두 파일이 브라우저(크롬)에서 ES 모듈로 불리고, 페이지가 `normalizeRecoveryCode`·`keepIdOf`·`openKeep` 으로 앱이 만든 보관본을 푼다.
+  - 이 함수는 Node 24 에서 실험 기능이라 처음 부를 때 `ExperimentalWarning` 이 한 번 찍힌다. **그대로 둔다**: 켤 때 두 파일을 한 번만 지워 두므로 켤 때 한 줄뿐이고, 숨기려면 프로세스 경고 처리를 건드려 다른 경고까지 가릴 수 있다. 함수가 바뀌면 켤 때 바로 멈춘다(요청 중이 아니라).
 - **로컬 서버 경로**
   - `GET /`: 페이지
   - `GET /api/devices`: 기기와 사본 목록
   - `GET /api/history?id=<64자>`: 코드로 열기
   - `GET /api/copy?id=<64자>&kind=latest|day|month|week&key=<날|달|커밋>`: 겉봉투
   - 모든 응답에 `Cache-Control: no-store` 를 붙이고, `Host` 를 검사한다(DNS rebinding 막기). id·날·달·커밋은 형식을 검사한 뒤에만 쓴다(git 인자에 아무 글자나 넘기지 않음).
-- **서버 부르기**: 꺼내기 스크립트처럼 `Origin: https://crowwan.github.io` 를 붙여 본 자리만 읽는다.
-- **주간 사본**: `git -C <클론> log --format=%H%x09%cI -- keep/<id>.json` 으로 목록을 만들고, `git -C <클론> show <커밋>:keep/<id>.json` 으로 본문을 읽는다.
+  - 페이지가 이 맥 밖으로 아무것도 보내지 못하게 CSP(`connect-src 'self'`, `form-action 'none'`)를 붙인다. 외부 글꼴·스크립트는 쓰지 않는다.
+- **서버 부르기**: 꺼내기 스크립트처럼 `Origin: https://crowwan.github.io` 를 붙여 본 자리만 읽는다. 서버 목록에는 크기가 없어서, 사본마다 GET 하나로 크기를 잰다(꺼내기 `--list` 와 같다). 그 GET 이 404 면 그 줄에 "목록을 받은 사이 서버에서 사라졌어요".
+- **주간 사본**: `git -C <클론> log --format=%H%x09%cI --diff-filter=AM -- keep/<id>.json` 으로 목록을 만들고(파일이 생기거나 바뀐 커밋만, [지우기]로 지운 커밋은 뺀다), 크기는 `git cat-file --batch-check` 한 번으로, `git -C <클론> show <커밋>:keep/<id>.json` 으로 본문을 읽는다. `index.json`·`devices.json` 도 커밋된 것(`git show HEAD:…`)을 읽고, 클론의 마지막 커밋 시각은 `git log -1 --format=%cI`. git 은 `GIT_CEILING_DIRECTORIES` 로 클론 자리 밖의 레포를 읽지 않는다.
 - **비교 기준**
   - 내역은 `Entry.id`, 회원은 장부 id + `Member.id` 로 맞춘다.
   - 바뀐 칸으로 보는 것은 `month`·`day`·`type`·`name`·`amount`·`payers`·`sourceText` 다.
@@ -148,7 +152,7 @@ updated: 2026-11-26
 ## 열린 질문
 
 - 표에 해별·월별 모아 보기(합계)를 더할지 — 결정: 써 본 뒤
-- `stripTypeScriptTypes` 실험 경고를 어떻게 다룰지 — 결정: 첫 이슈 기술 확인
+- ~~`stripTypeScriptTypes` 실험 경고를 어떻게 다룰지~~ — 결정(#205): 숨기지 않고 둔다. 켤 때 한 번 찍힌다 (기술 메모 "페이지에 TS 보내기")
 
 ## 변경 이력
 
@@ -158,3 +162,4 @@ updated: 2026-11-26
 | 2026-11-26 | 초안 (사용자: "이렇게 진행해줘" — 고를 것 4개 추천 그대로) |
 | 2026-11-26 | 승인 (사용자: "승인할게") |
 | 2026-11-26 | 이슈 분해: #204 (하위 #205 로컬 서버·목록·겉 정보·풀기, #206 구조·표·비교) |
+| 2026-11-26 | #205 기술 확인: `stripTypeScriptTypes` 로 지운 모듈을 브라우저가 ES 모듈로 불러 푼다. 실험 경고는 켤 때 한 번이라 그대로 둔다(열린 질문 닫음). 주간 사본 목록은 `--diff-filter=AM`(지운 커밋 빼기), 크기는 `git cat-file --batch-check`, 주간 사본의 받은 때는 커밋 시각, 남는 기간 계산 방식, 페이지 CSP 를 기술 메모에 더함 |
