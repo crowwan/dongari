@@ -1,10 +1,10 @@
 name: 주간 보관본
 
 # 우리 장부 보관 서버의 최신본(암호문)을 일주일에 한 번 이 레포에 커밋한다 (dongari SPEC-011 2절, ADR 010)
-# - 매주 일요일 23:00 UTC(= 월요일 08:00 KST, dongari 보관 지켜보기 09:00 앞) + 손으로 실행(Run workflow)
+# - 매주 일요일 23:00 UTC(= 월요일 08:00 KST) + 손으로 실행(Run workflow)
 # - GET $KEEP_URL/v1/export → keep/<id>.json(겉봉투 그대로)·index.json (scripts/backup.mjs)
 #   바뀐 게 있으면 "주간 보관본 YYYY-MM-DD" 커밋을 이 레포 GITHUB_TOKEN 으로 push 한다(개인 접근 토큰 없음)
-# - 실패하면 GitHub 가 실패 메일을 보낸다. 내보내기가 8일 넘게 없으면 dongari 보관 지켜보기도 실패로 알린다
+# - 실패하면 GitHub 가 실패 메일을 보낸다. 내보내기가 8일 넘게 없으면 이 레포의 보관 지켜보기(keep-watch.yml)도 실패로 알린다
 # 원본은 dongari 레포 ops/keep-backup/ — 고칠 때는 거기서 PR 로 리뷰하고 이 레포에 옮긴다
 on:
   schedule:

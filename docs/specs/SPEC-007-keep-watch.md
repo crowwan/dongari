@@ -54,7 +54,7 @@ SPEC-006 자동 보관은 실패해도 조용히 기다린다(사용자를 귀�
 - `VITE_KEEP_URL` 이 없는 빌드는 보내지 않는다.
 - 서버의 보관본을 지우면(`DELETE /v1/keep/:id`) 그 기기의 상태 신호도 지운다.
 - 신호는 앱을 열 때만 보내므로 앱을 안 열면 `pendingSince` 를 알 수 없다. 이때는 30일 경고로만 안다.
-- 레포에 60일 동안 활동이 없으면 GitHub 가 예약 워크플로를 멈춘다. 멈추면 GitHub 가 미리 메일로 알려 주고, Actions 화면에서 다시 켠다(CLAUDE.md 에 적는다).
+- 레포에 60일 동안 활동이 없으면 GitHub 가 예약 워크플로를 멈춘다. 멈추면 GitHub 가 미리 메일로 알려 주고, Actions 화면에서 다시 켠다(CLAUDE.md 에 적는다). — SPEC-012(#201)로 비공개 레포로 옮긴 뒤로는 해당 없다(문서상 공개 레포 규칙).
 - KV 쓰기 하루 1,000회 한도: 신호는 앱 열 때 한 번이라 하루 몇 회다.
 
 ## 수용 기준
@@ -83,6 +83,7 @@ SPEC-006 자동 보관은 실패해도 조용히 기다린다(사용자를 귀�
   - `keepServer.ts` 에 `sendStatus(id, status)` (실패는 삼킨다).
   - `AutoKeeper.start` 의 올리기 시도가 끝난 뒤 한 번 부른다(#105). 앱 버전은 빌드 때 `package.json` version 을 `define` 으로 넣는다(이미 있으면 그것).
 - 워크플로 `.github/workflows/keep-watch.yml`
+  - (SPEC-012 #201) 이 워크플로와 `keep-watch.mjs`·`keepWatch.ts` 는 비공개 백업 레포(`crowwan/dongari-keep-backup`)로 옮겼다(원본 dongari `ops/keep-backup/`, 시험은 그대로 `scripts/keepWatch.test.ts`). 예약은 `17 22 * * *`(KST 07:17), 비밀값은 그 레포 `REPORT_TOKEN`, 판정은 `judgeReport(응답, 이름표)` 로 기기 이름표(`devices.json`)를 붙인다. 아래는 옮기기 전 dongari 에서의 모양이다.
   - `schedule: cron '0 0 * * *'`(UTC 0시 = KST 9시) + `workflow_dispatch`.
   - 비밀값 `KEEP_REPORT_TOKEN`, 주소는 저장소 변수 `KEEP_URL`(앱 배포와 같은 값). `permissions: contents: read`, checkout 은 `persist-credentials: false`, Node 는 `.nvmrc`(24). 의존성이 없어 `npm ci` 를 하지 않는다.
   - 실행은 `scripts/keep-watch.mjs`(Node, 의존성 없음): `GET {KEEP_URL}/v1/report`(15초 시간 초과) → 판정 → 표준 출력과 `$GITHUB_STEP_SUMMARY` 에 요약(결과 줄, 실패·경고 목록, 기기별 표: 기기·마지막 신호·자동 보관·밀린 때·마지막 보관·크기·앱 버전, 시각은 KST). 실패가 있으면 `::error` 후 exit 1, 경고는 `::warning`. 토큰은 요청 헤더에만 쓰고 출력하지 않는다.
@@ -107,3 +108,4 @@ SPEC-006 자동 보관은 실패해도 조용히 기다린다(사용자를 귀�
 | 2026-10-16 | 기술 메모(#128): 미리보기 출처의 상태 신호는 `preview:status:<id>` 에, 요약은 본 자리(`status:`)만 |
 | 2026-10-16 | v2.6.0 릴리스 (#137) |
 | 2026-11-24 | 판정 표에 서버 밖 사본 두 줄(8일 넘음 실패, 없음 경고)·요약 `export` (SPEC-011 2절, #186) |
+| 2026-11-26 | 워크플로를 비공개 백업 레포로 옮기고 기기 이름표를 붙임(SPEC-012 1절, #201). 401 문구는 그 레포 `REPORT_TOKEN`·dongari `KEEP_REPORT_TOKEN` 을 가리킨다 |
