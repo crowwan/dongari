@@ -143,7 +143,9 @@ function gitRunner(dir: string): { git: GitFn; calls: GitCall[] } {
     calls.push({ args, input })
     return new Promise((done) => {
       const child = execFile('git', ['-C', dir, ...args], { encoding: 'utf8' }, (error, stdout) => done(error ? undefined : stdout))
-      child.stdin?.end(input ?? '')
+      // git 이 표준 입력을 읽기 전에 끝나면 쓰기가 EPIPE 로 실패한다 (keep-view.mjs 와 같게 삼킨다)
+      child.stdin?.on('error', () => {})
+      child.stdin?.end(input)
     })
   }
   return { git, calls }

@@ -58,7 +58,10 @@ function git(args, input) {
       },
       (error, stdout) => done(error ? undefined : stdout),
     )
-    child.stdin?.end(input ?? '')
+    // git 이 표준 입력을 읽기 전에 끝나면(클론 없음 등) 쓰기가 EPIPE 로 실패한다. 결과는 위 콜백의 오류로 이미 알므로
+    // 여기서는 삼킨다 — 처리하지 않으면 도구가 통째로 죽는다. 입력이 없으면 쓰지 않고 닫기만 한다
+    child.stdin?.on('error', () => {})
+    child.stdin?.end(input)
   })
 }
 
