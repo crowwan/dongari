@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>보관본 들여다보기</title>
+<!--
+  보관본 들여다보기 (SPEC-013, #205) — scripts/keep-view.mjs 가 127.0.0.1 에서 보내는 개발자용 페이지.
+  모양은 시안(SPEC-013 prototype)의 왼쪽 사본 목록 + 오른쪽 탭. 큰 글씨 규칙(docs/design.md)은 사용자 화면 기준이라 적용하지 않는다.
+  복구 코드는 이 탭 메모리(codes)에만 두고 페이지 안에서 푼다(keepRescue.ts 의 Web Crypto). 로컬 서버로 가는 주소에는 id 만 들어간다.
+  풀린 내용·코드는 localStorage·주소창·로그에 남기지 않는다. 구조·표·비교 탭은 #206.
+-->
+<style>
+:root{
+  --bg:#eef1f4;--panel:#ffffff;--sunk:#f5f7f9;--line:#d8dee6;--line-strong:#b9c3cf;
+  --ink:#17202b;--text:#2c3846;--muted:#5d6878;
+  --accent:#1f6b86;--accent-ink:#1a5a71;--accent-bg:#e1eff5;--on-accent:#ffffff;
+  --add:#17703f;--add-bg:#e0f3e7;--del:#ad2630;--del-bg:#fbe5e7;--chg:#8a5a00;--chg-bg:#fcefd2;
+  --lock:#5b4a9e;--lock-bg:#ece8f8;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141a;--panel:#161d26;--sunk:#1b2430;--line:#2a3543;--line-strong:#3b4858;
+  --ink:#e8edf3;--text:#cfd8e3;--muted:#93a0b1;
+  --accent:#4ea8cb;--accent-ink:#8ccbe3;--accent-bg:#14303c;--on-accent:#06141b;
+  --add:#74d6a0;--add-bg:#143020;--del:#f29299;--del-bg:#3a1a1e;--chg:#e8bb62;--chg-bg:#342811;
+  --lock:#b3a5f0;--lock-bg:#272044;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f141a;--panel:#161d26;--sunk:#1b2430;--line:#2a3543;--line-strong:#3b4858;
+  --ink:#e8edf3;--text:#cfd8e3;--muted:#93a0b1;
+  --accent:#4ea8cb;--accent-ink:#8ccbe3;--accent-bg:#14303c;--on-accent:#06141b;
+  --add:#74d6a0;--add-bg:#143020;--del:#f29299;--del-bg:#3a1a1e;--chg:#e8bb62;--chg-bg:#342811;
+  --lock:#b3a5f0;--lock-bg:#272044;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.55}
+h1,h2,h3{color:var(--ink);margin:0;line-height:1.3}
+h1{font-size:18px;font-weight:700}
+h2{font-size:16px;font-weight:600}
+h3{font-size:14px;font-weight:600}
+p{margin:0}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* 위: 제목·코드로 열기·출처 안내 */
+.top{display:grid;gap:10px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line-strong)}
+.toprow{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.addr{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+.bycode{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-left:auto}
+.bycode label{font-size:13px;font-weight:600;color:var(--ink)}
+.notices{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.notices:empty{display:none}
+.notices li{font-size:13px;color:var(--chg);background:var(--chg-bg);border-radius:6px;padding:4px 10px}
+.msg{font-size:12.5px;color:var(--muted)}
+.msg:empty{display:none}
+.msg.bad{color:var(--del)}
+.bycode .msg{flex-basis:100%;text-align:right}
+
+input.code{font-family:var(--mono);font-size:13px;padding:5px 10px;border:1px solid var(--line-strong);border-radius:6px;background:var(--panel);width:220px;max-width:100%;-webkit-text-security:disc}
+.btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:5px 12px;border-radius:6px;border:1px solid var(--line-strong);background:var(--panel);cursor:pointer}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+
+/* 도구: 왼쪽 사본 목록 + 오른쪽 탭 */
+.tool{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 64px)}
+@media (max-width:820px){.tool{grid-template-columns:minmax(0,1fr)}.side{border-right:0;border-bottom:1px solid var(--line);max-height:340px;overflow:auto}}
+.side{border-right:1px solid var(--line);background:var(--sunk);padding:8px 0;display:grid;align-content:start;gap:2px}
+.empty{padding:12px 16px;color:var(--muted);font-size:13px}
+.dev{display:grid;gap:1px;padding:6px 0 10px}
+.dev + .dev{border-top:1px solid var(--line)}
+.devhead{display:flex;align-items:center;gap:8px;padding:4px 14px}
+.devhead b{color:var(--ink);font-size:14px}
+.devhead .id{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.devhead .st{margin-left:auto}
+.devnote{font-size:12px;color:var(--chg);padding:2px 14px 2px 22px}
+.grp{font-size:11.5px;font-weight:600;letter-spacing:.04em;color:var(--muted);padding:8px 14px 2px}
+.cp{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;padding:3px 14px 3px 22px;cursor:pointer;font-size:13px}
+.cp:hover{background:var(--panel)}
+.cp[aria-pressed="true"]{background:var(--accent-bg);border-left-color:var(--accent);color:var(--ink)}
+.cp .t{font-family:var(--mono);font-size:12.5px}
+.cp .s{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.cp .s.gone{color:var(--del)}
+
+.chip{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.chip.lock{color:var(--lock);background:var(--lock-bg)}
+.chip.open{color:var(--add);background:var(--add-bg)}
+
+.main{display:grid;grid-template-rows:auto auto auto 1fr;min-width:0;background:var(--panel)}
+.head{padding:14px 18px 10px;display:grid;gap:6px;border-bottom:1px solid var(--line)}
+.head .meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.lockbar{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line)}
+.lockbar:empty{display:none}
+.lockbar label{font-size:13px;font-weight:600;color:var(--ink)}
+.lockbar .msg{flex-basis:100%}
+.lockform{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;flex:1}
+.tabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px 8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab:disabled{cursor:default;opacity:.55}
+.tab .k{font-weight:400;font-size:11.5px;margin-left:4px}
+.pane{padding:16px 18px 24px;min-width:0;display:grid;align-content:start;gap:16px}
+
+dl.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 18px;margin:0;font-size:13.5px}
+dl.kv dt{color:var(--muted)}
+dl.kv dd{margin:0;color:var(--ink);font-family:var(--mono);font-size:12.5px;word-break:break-all}
+pre{margin:0;font-family:var(--mono);font-size:12px;line-height:1.55;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow:auto;color:var(--text)}
+.block{display:grid;gap:8px}
+.cap{font-size:12.5px;color:var(--muted)}
+.bad{color:var(--del)}
+.locked{display:grid;gap:4px;justify-items:start;padding:16px 18px;border:1px dashed var(--line-strong);border-radius:10px;background:var(--sunk)}
+.locked b{color:var(--lock)}
+.opened{display:grid;gap:8px;padding:14px 16px;border:1px solid var(--line);border-left:3px solid var(--add);border-radius:10px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="toprow">
+    <h1>보관본 들여다보기</h1>
+    <span class="addr" id="addr">127.0.0.1 · 읽기만</span>
+    <form class="bycode" id="byCodeForm" autocomplete="off" data-testid="by-code">
+      <label for="byCode">코드로 열기</label>
+      <input class="code" id="byCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX">
+      <button class="btn" type="submit">열기</button>
+      <p class="msg" id="byCodeMsg" aria-live="polite"></p>
+    </form>
+  </div>
+  <ul class="notices" id="notices" aria-label="출처 안내" data-testid="notices"></ul>
+</header>
+<main class="tool">
+  <nav class="side" id="side" aria-label="사본 목록" data-testid="copy-list"></nav>
+  <section class="main" aria-labelledby="copyTitle">
+    <div class="head" id="head"></div>
+    <div class="lockbar" id="lockbar" data-testid="lockbar"></div>
+    <div class="tabs" role="tablist" aria-label="보기">
+      <button class="tab" type="button" role="tab" id="tab-outer" aria-selected="true" aria-controls="pane">겉 정보<span class="k">코드 없이</span></button>
+      <button class="tab" type="button" role="tab" aria-selected="false" disabled title="다음 단계(#206)">구조<span class="k">다음 단계</span></button>
+      <button class="tab" type="button" role="tab" aria-selected="false" disabled title="다음 단계(#206)">표<span class="k">다음 단계</span></button>
+      <button class="tab" type="button" role="tab" aria-selected="false" disabled title="다음 단계(#206)">비교<span class="k">다음 단계</span></button>
+    </div>
+    <div class="pane" id="pane" role="tabpanel" aria-labelledby="tab-outer" data-testid="outer"></div>
+  </section>
+</main>
+<script type="module">
+import * as view from './keepView.ts'
+import { formatKst } from './keepRescue.ts'
+
+const $ = (id) => document.getElementById(id)
+
+// el('p', { class: 'x', onclick }, '글', 자식…) — 글은 늘 글자로 넣는다(innerHTML 안 씀)
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag)
+  for (const [name, value] of Object.entries(attrs)) {
+    if (value === undefined || value === false) continue
+    if (name.startsWith('on')) node.addEventListener(name.slice(2), value)
+    else node.setAttribute(name, value === true ? '' : String(value))
+  }
+  node.append(...children.flat().filter((child) => child !== undefined && child !== null && child !== false))
+  return node
+}
+
+// 자리 하나를 새로 채운다 (없음·거짓 자식은 뺀다 — replaceChildren 은 글자로 바꿔 넣는다)
+function fill(id, ...children) {
+  $(id).replaceChildren(...children.flat().filter((child) => child !== undefined && child !== null && child !== false))
+}
+
+function infoList(rows, testid) {
+  return el('dl', { class: 'kv', 'data-testid': testid }, rows.flatMap(({ label, value }) => [el('dt', {}, label), el('dd', {}, value)]))
+}
+
+const SERVER_GONE = '로컬 서버가 답하지 않아요. 터미널에서 도구가 켜져 있는지 보세요'
+
+// 기기 id → 정규화한 복구 코드. 이 탭 메모리에만 있고, [잠그기]나 탭을 닫으면 잊는다
+const codes = new Map()
+const state = {
+  loading: true,
+  loadError: '',
+  devices: [],
+  notices: [],
+  pick: undefined, // { deviceId, index }
+  copy: undefined, // undefined | { loading: true } | /api/copy 답
+  opened: undefined, // 고른 사본을 푼 결과
+  lockMessage: '',
+}
+// 사본을 빨리 바꿔 고를 때 늦게 온 답이 덮지 않게
+let pickToken = 0
+
+// 로컬 서버 GET. 주소는 keepView 의 DEVICES_PATH·historyPath·copyPath 로만 만든다 (id 만, 코드 없음)
+async function getLocal(path) {
+  const response = await fetch(path, { cache: 'no-store' })
+  return response.json()
+}
+
+function currentDevice() {
+  return state.devices.find((device) => device.id === state.pick?.deviceId)
+}
+
+function currentCopy() {
+  const copy = currentDevice()?.copies[state.pick?.index ?? -1]
+  if (copy === undefined) return undefined
+  // 받아 온 크기가 있으면 그것 (목록 뒤에 바뀌었을 수 있다)
+  return state.copy?.ok ? { ...copy, bytes: state.copy.bytes } : copy
+}
+
+async function openPicked(token) {
+  const device = currentDevice()
+  const code = device && codes.get(device.id)
+  const opened = code && state.copy?.ok ? await view.openCopy(code, state.copy.envelope) : undefined
+  if (token === pickToken) state.opened = opened
+}
+
+async function pick(deviceId, index) {
+  const token = ++pickToken
+  state.pick = { deviceId, index }
+  state.copy = { loading: true }
+  state.opened = undefined
+  state.lockMessage = ''
+  render()
+  const device = currentDevice()
+  const copy = device?.copies[index]
+  let answer
+  if (copy === undefined) answer = undefined
+  else answer = await getLocal(view.copyPath(device.id, copy)).catch(() => ({ ok: false, message: SERVER_GONE }))
+  if (token !== pickToken) return
+  state.copy = answer
+  await openPicked(token)
+  render()
+}
+
+async function unlock(event) {
+  event.preventDefault()
+  const input = $('code')
+  const code = input.value
+  input.value = ''
+  const device = currentDevice()
+  const result = await view.unlockDevice(code, device.id)
+  if (!result.ok) {
+    state.lockMessage = result.message
+    render()
+    $('code')?.focus()
+    return
+  }
+  codes.set(device.id, result.normalized)
+  state.lockMessage = ''
+  await openPicked(pickToken)
+  render()
+}
+
+function relock() {
+  codes.delete(currentDevice().id)
+  state.opened = undefined
+  render()
+}
+
+async function openWithCode(event) {
+  event.preventDefault()
+  const input = $('byCode')
+  const code = input.value
+  input.value = ''
+  const message = $('byCodeMsg')
+  const result = await view.openByCode(code, state.devices, getLocal).catch(() => ({ ok: false, message: SERVER_GONE }))
+  if (!result.ok) {
+    message.className = 'msg bad'
+    message.textContent = result.message
+    return
+  }
+  const { device } = result
+  if (!state.devices.some(({ id }) => id === device.id)) state.devices.push(device)
+  codes.set(device.id, result.normalized)
+  message.className = 'msg'
+  message.textContent = `${view.deviceName(device)} (${device.id.slice(0, 8)}) 을 열었어요`
+  await pick(device.id, 0)
+}
+
+// ---------- 그리기 ----------
+
+function chip(open) {
+  return el('span', { class: open ? 'chip open' : 'chip lock' }, open ? '풀림' : '잠김')
+}
+
+function copyButton(device, copy, index) {
+  const on = state.pick?.deviceId === device.id && state.pick.index === index
+  const size = copy.bytes === undefined
+    ? el('span', { class: 's gone', title: copy.problem ?? '' }, '못 받음')
+    : el('span', { class: 's' }, view.sizeText(copy.bytes))
+  return el('button', { type: 'button', class: 'cp', 'aria-pressed': String(on), 'data-testid': `copy-${device.id.slice(0, 8)}-${index}`, onclick: () => pick(device.id, index) },
+    el('span', { class: 't' }, view.copyListText(copy)), size)
+}
+
+function deviceSection(device) {
+  const groups = view.COPY_GROUPS.flatMap(({ kind, title }) => {
+    const items = device.copies.flatMap((copy, index) => (copy.kind === kind ? [copyButton(device, copy, index)] : []))
+    return items.length === 0 ? [] : [el('p', { class: 'grp' }, title), ...items]
+  })
+  return el('section', { class: 'dev', 'aria-label': `${view.deviceName(device)} ${device.id.slice(0, 8)}` },
+    el('div', { class: 'devhead' }, el('b', {}, view.deviceName(device)), el('span', { class: 'id' }, device.id.slice(0, 8)), el('span', { class: 'st' }, chip(codes.has(device.id)))),
+    device.serverProblem && el('p', { class: 'devnote' }, `서버 사본: ${device.serverProblem}`),
+    groups,
+    device.copies.length === 0 && el('p', { class: 'devnote' }, '사본이 없어요'))
+}
+
+function renderSide() {
+  let content
+  if (state.loading) content = el('p', { class: 'empty' }, '사본 목록을 받는 중…')
+  else if (state.devices.length === 0) content = el('p', { class: 'empty' }, state.loadError || '기기가 없어요. 위 [코드로 열기]로 열어요')
+  else content = state.devices.map(deviceSection)
+  fill('side', content)
+}
+
+function renderHead() {
+  const device = currentDevice()
+  const copy = currentCopy()
+  if (device === undefined) {
+    fill('head', el('h2', { id: 'copyTitle' }, '사본을 고르세요'))
+    return
+  }
+  fill('head',
+    el('h2', { id: 'copyTitle' }, `${view.deviceName(device)} · ${copy ? view.copyLabel(copy) : '사본 없음'}`),
+    copy && el('div', { class: 'meta' },
+      el('span', {}, `${device.id.slice(0, 8)}…`),
+      el('span', {}, `${copy.kind === 'week' ? '백업 레포에 넣은 때' : '서버가 받은 때'} ${formatKst(copy.at)} KST`),
+      copy.bytes !== undefined && el('span', {}, view.sizeText(copy.bytes))))
+}
+
+function renderLockbar() {
+  const device = currentDevice()
+  if (device === undefined) {
+    fill('lockbar')
+    return
+  }
+  if (codes.has(device.id)) {
+    fill('lockbar',
+      chip(true),
+      el('span', {}, '이 기기의 사본은 모두 이 코드로 풀려요.'),
+      el('button', { type: 'button', class: 'btn', onclick: relock }, '잠그기'),
+      el('p', { class: 'msg' }, '코드는 이 탭 메모리에만 있어요. [잠그기]를 누르거나 탭을 닫으면 잊어요.'))
+    return
+  }
+  fill('lockbar', el('form', { class: 'lockform', autocomplete: 'off', onsubmit: unlock },
+    el('label', { for: 'code' }, '복구 코드'),
+    el('input', { class: 'code', id: 'code', type: 'text', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', placeholder: 'XXXX-XXXX-XXXX-XXXX' }),
+    el('button', { class: 'btn pri', type: 'submit' }, '풀기'),
+    el('p', { class: state.lockMessage ? 'msg bad' : 'msg', 'aria-live': 'polite', 'data-testid': 'lock-message' },
+      state.lockMessage || '코드가 없으면 겉 정보만 보여요. 코드는 이 탭 안에서만 쓰고 로컬 서버로도 보내지 않아요.')))
+}
+
+function openedBlock(device) {
+  if (!codes.has(device.id)) {
+    return el('div', { class: 'locked' },
+      el('b', {}, '잠겨 있어요'),
+      el('p', {}, '이 기기의 복구 코드를 넣으면 저장 형식·장부·기록 수가 보여요. 서버와 백업 레포에는 암호문만 있어요.'),
+      el('p', { class: 'cap' }, '구조·표·비교는 다음 단계(#206)예요.'))
+  }
+  if (!state.copy?.ok) return el('div', { class: 'locked' }, el('p', {}, '사본을 받지 못해 풀 수 없어요.'))
+  if (state.opened === undefined) return el('p', { class: 'cap' }, '푸는 중…')
+  return el('div', { class: 'opened', 'data-testid': 'opened' }, el('h3', {}, '풀린 내용'), infoList(view.openedInfo(state.opened), 'opened-info'))
+}
+
+function renderPane() {
+  const device = currentDevice()
+  const copy = currentCopy()
+  if (device === undefined || copy === undefined) {
+    fill('pane', el('p', { class: 'cap' }, state.loading ? '' : '왼쪽에서 사본을 고르세요.'))
+    return
+  }
+  const answer = state.copy
+  fill('pane',
+    infoList(view.outerInfo(device, copy, Date.now()), 'outer-info'),
+    answer?.loading && el('p', { class: 'cap' }, '겉봉투를 받는 중…'),
+    answer && !answer.loading && !answer.ok && el('p', { class: 'bad', 'data-testid': 'copy-problem' }, answer.message),
+    answer?.ok && el('div', { class: 'block' }, el('p', { class: 'cap' }, '겉봉투 (서버·백업 레포에 있는 그대로, data 는 앞부분만)'), el('pre', {}, view.envelopePreview(answer.envelope))),
+    openedBlock(device))
+}
+
+function render() {
+  fill('notices', state.notices.map((notice) => el('li', {}, notice)))
+  renderSide()
+  renderHead()
+  renderLockbar()
+  renderPane()
+}
+
+$('addr').textContent = `${location.host} · 읽기만`
+$('byCodeForm').addEventListener('submit', openWithCode)
+
+const loaded = await getLocal(view.DEVICES_PATH).catch(() => undefined)
+state.loading = false
+if (loaded === undefined) state.loadError = SERVER_GONE
+else {
+  state.devices = loaded.devices
+  state.notices = loaded.notices
+}
+const first = state.devices.find((device) => device.copies.length > 0)
+if (first) await pick(first.id, 0)
+else render()
+</script>
+</body>
+</html>
