@@ -9,8 +9,8 @@ import {
   renderSummary,
   SERVER_DOWN,
   TOKEN_REJECTED,
-} from './keepWatch.ts'
-import type { DeviceReport, ExportReport, ReportResponse } from './keepWatch.ts'
+} from '../ops/keep-backup/scripts/keepWatch.ts'
+import type { DeviceReport, ExportReport, ReportResponse } from '../ops/keep-backup/scripts/keepWatch.ts'
 
 const NOW = '2026-10-15T00:00:00.000Z'
 // 어제 아침(월요일 08:00 KST 무렵) 서버 밖 사본을 내보냄 — 문제 없는 상태
