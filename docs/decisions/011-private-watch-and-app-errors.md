@@ -1,6 +1,6 @@
 # ADR 011: 지켜보기 결과는 비공개 레포에서 보고, 앱 오류도 상태 신호에 싣는다
 
-- 상태: proposed
+- 상태: accepted
 - 날짜: 2026-11-25
 - 관련: [SPEC-012](../specs/SPEC-012-watch-and-app-errors.md), [ADR 006](006-keep-status-signal.md)(고침: 누가 보는가), [ADR 010](010-keep-history-offsite.md)(같은 비공개 레포), SPEC-007
 

@@ -1,7 +1,7 @@
 ---
 id: SPEC-013
 title: 보관본 들여다보기
-status: draft
+status: approved
 milestone: v2.9
 issue:
 prototype: https://claude.ai/artifact/WG8KFKKMwK57vfZQYhVVmC
@@ -156,3 +156,4 @@ updated: 2026-11-26
 |---|---|
 | 2026-11-25 | 시안 artifact (지어낸 데이터, 고를 것 4개). 어디서 열지는 "내 맥에서만"으로 정함(사용자: "A로 가는 게 좋을 것 같고") |
 | 2026-11-26 | 초안 (사용자: "이렇게 진행해줘" — 고를 것 4개 추천 그대로) |
+| 2026-11-26 | 승인 (사용자: "승인할게") |
