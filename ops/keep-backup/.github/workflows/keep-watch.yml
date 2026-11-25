@@ -1,13 +1,16 @@
 name: 보관 지켜보기
 
-# 자동 보관이 밀리거나 서버가 죽었는지 하루 한 번 본다 (SPEC-007, ADR 006, #106)
-# - 매일 UTC 0시(= KST 9시) + Actions 에서 수동 실행(Run workflow)
-# - 보관 서버 요약(GET /v1/report)을 받아 scripts/keep-watch.mjs 가 판정한다
-# - 문제가 있으면 실패로 끝나고 GitHub 가 실패 메일을 보낸다. 실행 요약(Job summary)에 기기별 표가 남는다
-# - 레포에 60일 동안 활동이 없으면 GitHub 가 예약 실행을 멈춘다 → Actions 화면에서 다시 켠다(CLAUDE.md)
+# 우리 장부 자동 보관이 밀리거나 서버가 죽었는지 하루 한 번 본다 (dongari SPEC-007·SPEC-012, ADR 006·011)
+# - 매일 22:17 UTC(= 다음 날 07:17 KST) + 손으로 실행(Run workflow).
+#   정각(0분)은 GitHub 예약 실행이 몰려 늦거나 빠질 수 있어 피한다
+# - 보관 서버 요약(GET /v1/report)을 받아 scripts/keep-watch.mjs 가 판정한다. 레포 맨 위 devices.json(기기 이름표)으로
+#   기기를 `엄마 폰 (aaa97843)` 처럼 보인다
+# - 문제가 있으면 실패로 끝나고 GitHub 가 실패 메일을 보낸다(예약 실행의 메일은 cron 을 마지막으로 고친 사람에게).
+#   실행 요약(Job summary)에 기기별 표가 남는다 — 기기마다 앱을 연 때·앱 버전이 들어 있어 비공개 레포에서만 돌린다
+# 원본은 dongari 레포 ops/keep-backup/ — 고칠 때는 거기서 PR 로 리뷰하고 이 레포에 옮긴다
 on:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "17 22 * * *"
   workflow_dispatch:
 
 permissions:
@@ -18,34 +21,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # devices.json 을 읽으려고 받는다. push 하지 않으니 토큰은 남기지 않는다
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      # 의존성이 없어 npm ci 는 하지 않는다
+      # 의존성이 없어 npm 은 쓰지 않는다. keepWatch.ts 를 타입 지우기로 바로 불러오려고 Node 24
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version: 24
 
       # 비밀값·변수가 아직 없으면 서버를 부르지 않고 넣는 방법을 알려 준다 (값은 출력하지 않는다)
       - name: 비밀값 확인
         env:
-          KEEP_REPORT_TOKEN: ${{ secrets.KEEP_REPORT_TOKEN }}
+          REPORT_TOKEN: ${{ secrets.REPORT_TOKEN }}
           KEEP_URL: ${{ vars.KEEP_URL }}
         run: |
           ok=true
-          if [ -z "$KEEP_REPORT_TOKEN" ]; then
-            echo "::error title=보관 지켜보기 비밀값 없음::레포 Settings → Secrets and variables → Actions → Secrets 에 KEEP_REPORT_TOKEN(Worker 비밀값 REPORT_TOKEN 과 같은 값, CLAUDE.md '요약 토큰')을 넣은 뒤 이 워크플로를 다시 실행(Run workflow)하세요"
+          if [ -z "$REPORT_TOKEN" ]; then
+            echo "::error title=보관 지켜보기 비밀값 없음::이 레포 Settings → Secrets and variables → Actions → Secrets 에 REPORT_TOKEN(dongari 레포 비밀값 KEEP_REPORT_TOKEN 과 같은 값, README '필요한 값')을 넣은 뒤 다시 실행(Run workflow)하세요"
             ok=false
           fi
           if [ -z "$KEEP_URL" ]; then
-            echo "::error title=보관 지켜보기 변수 없음::레포 Settings → Secrets and variables → Actions → Variables 에 KEEP_URL(보관 서버 주소, 앱 배포와 같은 값)을 넣은 뒤 이 워크플로를 다시 실행(Run workflow)하세요"
+            echo "::error title=보관 지켜보기 변수 없음::이 레포 Settings → Secrets and variables → Actions → Variables 에 KEEP_URL(dongari 의 KEEP_URL 과 같은 보관 서버 주소)을 넣은 뒤 다시 실행(Run workflow)하세요"
             ok=false
           fi
           [ "$ok" = true ] || exit 1
 
       - name: 판정
         env:
-          KEEP_REPORT_TOKEN: ${{ secrets.KEEP_REPORT_TOKEN }}
+          REPORT_TOKEN: ${{ secrets.REPORT_TOKEN }}
           KEEP_URL: ${{ vars.KEEP_URL }}
         run: node scripts/keep-watch.mjs

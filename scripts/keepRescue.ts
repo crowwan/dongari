@@ -3,6 +3,7 @@
 // 사용자가 앱에서 [복구 코드로 불러오기]를 못 할 때(카톡 안 브라우저, 앱 오류 등) 대신 꺼내 주는 도구.
 // SPEC-011(#185): 최신본 말고 서버의 날짜별·달별 사본도 목록(--list)으로 보고 골라(--day·--month) 꺼낸다.
 // SPEC-011(#186): 서버 대신 비공개 백업 레포의 주간 사본 파일(keep/<id>.json)도 푼다(--file, 파일 읽기는 .mjs 쪽).
+// SPEC-012(#201): 보관 지켜보기 기기 이름표(devices.json)의 키인 서버 이름 앞 8자를 보여 준다(--which, 서버를 부르지 않음).
 // 서버에는 GET 만 보낸다(쓰기·지우기 없음). 복구 코드는 결과·문구 어디에도 담지 않는다.
 //
 // scripts/keep-rescue.mjs 가 이 파일을 그대로 불러 쓴다(Node 24 가 타입만 지우고 실행, 빌드 없음).
@@ -25,7 +26,7 @@ export const BROKEN_FILE = '파일이 보관본 모양이 아니에요. 백업 �
 // --list 중 목록에는 있었는데 받으려니 없는 사본 (남는 기간이 막 지났거나 그사이 지워짐)
 export const GONE_COPY = '목록을 받은 사이 서버에서 사라졌어요 — 남는 기간이 막 지났을 수 있어요 (404)'
 export const RESCUE_USAGE =
-  '쓰는 법: node scripts/keep-rescue.mjs [--list | --day YYYY-MM-DD | --month YYYY-MM | --file 백업레포/keep/<id>.json] [복구 코드]'
+  '쓰는 법: node scripts/keep-rescue.mjs [--list | --day YYYY-MM-DD | --month YYYY-MM | --file 백업레포/keep/<id>.json | --which] [복구 코드]'
 
 // 앱과 같은 코드 글자 (recoveryCode.ts RECOVERY_CODE_ALPHABET)
 const RECOVERY_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
@@ -69,8 +70,12 @@ export type RescueCommand =
   | { action: 'list'; code?: string }
   | { action: 'rescue'; target: RescueTarget; code?: string }
   | { action: 'file'; path: string; code?: string }
+  | { action: 'which'; code?: string }
 
 export type ParsedArgs = { ok: true; command: RescueCommand } | { ok: false; message: string }
+
+// --which 결과: 서버 이름(64자) 앞 8자 = 보관 지켜보기 기기 이름표의 키 (SPEC-012)
+export type WhichResult = { ok: true; prefix: string } | { ok: false; message: string }
 
 // --list 의 한 줄: 어떤 사본인지, 서버가 적어 둔 보관 시각, 풀어 본 요약(못 풀면 이유)
 export interface CopyRow {
@@ -99,8 +104,8 @@ function isCalendarDay(value: string): boolean {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDate() === day
 }
 
-// 옵션 없음 = 최신본, --list = 사본 목록, --day YYYY-MM-DD / --month YYYY-MM = 그 사본, --file 경로 = 백업 레포 파일.
-// 옵션이 아닌 인자 하나는 복구 코드
+// 옵션 없음 = 최신본, --list = 사본 목록, --day YYYY-MM-DD / --month YYYY-MM = 그 사본, --file 경로 = 백업 레포 파일,
+// --which = 서버 이름 앞 8자만. 옵션이 아닌 인자 하나는 복구 코드
 export function parseRescueArgs(args: readonly string[]): ParsedArgs {
   const picks: RescueCommand[] = []
   const codes: string[] = []
@@ -108,6 +113,8 @@ export function parseRescueArgs(args: readonly string[]): ParsedArgs {
     const arg = args[index]
     if (arg === '--list') {
       picks.push({ action: 'list' })
+    } else if (arg === '--which') {
+      picks.push({ action: 'which' })
     } else if (arg === '--day' || arg === '--month') {
       const value = args[++index] ?? ''
       if (arg === '--day' && !isCalendarDay(value)) return usageError(`--day 뒤에는 달력에 있는 날짜(YYYY-MM-DD)를 적어요: "${value}"`)
@@ -124,7 +131,7 @@ export function parseRescueArgs(args: readonly string[]): ParsedArgs {
       codes.push(arg)
     }
   }
-  if (picks.length > 1) return usageError('--list·--day·--month·--file 은 하나만 써요')
+  if (picks.length > 1) return usageError('--list·--day·--month·--file·--which 은 하나만 써요')
   if (codes.length > 1) return usageError('복구 코드 말고 다른 인자가 있어요 (코드는 띄어 쓰지 말고 한 덩어리로, 또는 인자 없이 물을 때 넣어요)')
   const command = picks[0] ?? { action: 'rescue', target: LATEST }
   return { ok: true, command: { ...command, code: codes[0] } }
@@ -159,6 +166,14 @@ function hkdf(info: Uint8Array<ArrayBuffer>) {
 // 서버 주소에 쓰는 이름 (keepCrypto.ts keepIdOf 와 같은 값)
 export async function keepIdOf(normalized: string): Promise<string> {
   return toHex(await crypto.subtle.deriveBits(hkdf(ID_INFO), await codeMaterial(normalized), 256))
+}
+
+// --which: 이 코드로 보관하는 폰이 지켜보기 요약·기기 이름표(devices.json)에서 어느 기기인지(서버 이름 앞 8자, SPEC-012).
+// 서버를 부르지 않는다. 결과에 코드는 담지 않는다
+export async function whichKeep(code: string): Promise<WhichResult> {
+  const normalized = normalizeRecoveryCode(code)
+  if (normalized === undefined) return { ok: false, message: INVALID_CODE }
+  return { ok: true, prefix: (await keepIdOf(normalized)).slice(0, 8) }
 }
 
 // 보관본을 푼다. 코드가 틀렸거나 본문이 망가졌으면 undefined (keepCrypto.ts openKeep 과 같다)

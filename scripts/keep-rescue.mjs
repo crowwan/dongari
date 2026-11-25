@@ -5,6 +5,8 @@
 // 만든다. 파일에는 장부 전체와 복구 코드가 들어 있다 — 레포(공개)에 두지 말고, 다 보냈으면 지운다. 서버에는 쓰지 않는다.
 // 서버의 날짜별(31일)·달별(400일) 사본은 --list 로 보고 --day·--month 로 골라 꺼낸다(파일 이름에 그 날·달).
 // 서버 대신 비공개 백업 레포(crowwan/dongari-keep-backup)의 주간 사본 파일 keep/<id>.json 은 --file 로 푼다(KEEP_URL 필요 없음).
+// --which 는 그 폰이 보관 지켜보기 기기 이름표(백업 레포 devices.json)에서 어느 기기인지, 서버 이름 앞 8자 한 줄만 찍는다
+// (SPEC-012, 서버를 부르지 않고 파일도 만들지 않음, KEEP_URL 필요 없음).
 // 의존성 없음. Node 24 가 keepRescue.ts 의 타입만 지우고 바로 불러온다(빌드 없음).
 //
 //   KEEP_URL=$(gh variable get KEEP_URL) node scripts/keep-rescue.mjs        # 최신본. 코드를 물으면 붙여 넣기 (권장)
@@ -12,6 +14,7 @@
 //   KEEP_URL=… node scripts/keep-rescue.mjs --day 2026-11-21                # 그 날 사본 → 우리장부-기록-2026-11-21.txt
 //   KEEP_URL=… node scripts/keep-rescue.mjs --month 2026-10                 # 그 달 사본 → 우리장부-기록-2026-10.txt
 //   node scripts/keep-rescue.mjs --file ../dongari-keep-backup/keep/<id>.json  # 백업 레포 파일 → 우리장부-기록-YYYY-MM-DD-주간사본.txt
+//   node scripts/keep-rescue.mjs --which                                     # 이 코드의 기기 앞 8자 (devices.json 의 키)
 //   KEEP_URL=… node scripts/keep-rescue.mjs HK7M-29QF-MX4P-8R2D             # 코드를 인자로도 되지만 셸 기록에 남는다
 //   RESCUE_DIR=/tmp/rescue KEEP_URL=… node scripts/keep-rescue.mjs           # 다른 폴더에 쓰기
 //
@@ -29,6 +32,7 @@ import {
   rescueFile,
   rescueFileName,
   rescueKeep,
+  whichKeep,
 } from './keepRescue.ts'
 
 const TIMEOUT_MS = 15_000
@@ -63,12 +67,22 @@ const parsed = parseRescueArgs(process.argv.slice(2))
 if (!parsed.ok) fail(parsed.message)
 const { command } = parsed
 
-// 서버를 부르는 일에만 KEEP_URL 이 필요하다 (--file 은 서버를 부르지 않는다)
+// 서버를 부르는 일(최신본·사본 꺼내기, --list)에만 KEEP_URL 이 필요하다 (--file·--which 는 서버를 부르지 않는다)
 const keepUrl = process.env.KEEP_URL ?? ''
-if (command.action !== 'file' && !keepUrl) fail('환경변수 KEEP_URL 이 필요해요 (KEEP_URL=$(gh variable get KEEP_URL))')
+const callsServer = command.action === 'rescue' || command.action === 'list'
+if (callsServer && !keepUrl) fail('환경변수 KEEP_URL 이 필요해요 (KEEP_URL=$(gh variable get KEEP_URL))')
 const fileText = command.action === 'file' ? readBackupFile(command.path) : ''
 
 const code = await readCode(command.code)
+
+// --which: 앞 8자 한 줄만 표준 출력에 (복붙해 devices.json 키로 쓰게)
+if (command.action === 'which') {
+  const which = await whichKeep(code)
+  if (!which.ok) fail(which.message)
+  console.log(which.prefix)
+  process.exit(0)
+}
+
 const fetchFn = (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) })
 
 if (command.action === 'list') {
