@@ -87,10 +87,10 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
 | 언제 | 하는 일 |
 |---|---|
 | PR 에서 `worker/**` 가 바뀜 | `worker-test`(타입 검사·테스트)만. main 필수 체크 `test`(ci.yml)와 별개 |
-| main 에 `worker/**` 변경이 들어옴, 또는 Actions → "보관 서버" → Run workflow | 테스트 → `wrangler deploy` → 내보내기 토큰 넣기(SPEC-011 #186) |
+| main 에 `worker/**` 변경이 들어옴, 또는 Actions → "보관 서버" → Run workflow | 테스트 → `wrangler deploy` → 내보내기 토큰 넣기(SPEC-011 #186) → 요약 토큰 넣기(SPEC-012 #201) |
 
 - 이름 `uri-jangbu-keep`, KV 바인딩 `KEEP`(namespace id 는 `worker/wrangler.toml`). 계정 id 는 파일에 쓰지 않고 비밀값으로 넘긴다.
-- 레포 Secrets 두 개가 필요하다: `CLOUDFLARE_API_TOKEN`(Workers 편집·KV 쓰기 권한 토큰. 미리보기 배포도 같은 토큰을 써서 Cloudflare Pages 편집 권한도 필요, #128), `CLOUDFLARE_ACCOUNT_ID`. 없으면 배포 단계가 "보관 서버 배포 비밀값 없음" 오류로 끝난다 → 넣고 Run workflow 로 다시 돌린다. 서버 밖 사본용 `KEEP_EXPORT_TOKEN` 은 아래 "내보내기 토큰"(없으면 배포는 되고 "내보내기 토큰 없음" 경고만).
+- 레포 Secrets 두 개가 필요하다: `CLOUDFLARE_API_TOKEN`(Workers 편집·KV 쓰기 권한 토큰. 미리보기 배포도 같은 토큰을 써서 Cloudflare Pages 편집 권한도 필요, #128), `CLOUDFLARE_ACCOUNT_ID`. 없으면 배포 단계가 "보관 서버 배포 비밀값 없음" 오류로 끝난다 → 넣고 Run workflow 로 다시 돌린다. 서버 밖 사본용 `KEEP_EXPORT_TOKEN` 은 아래 "내보내기 토큰"(없으면 배포는 되고 "내보내기 토큰 없음" 경고만), 보관 지켜보기용 `KEEP_REPORT_TOKEN` 은 아래 "요약 토큰"(없으면 "요약 토큰 없음" 경고만).
 - 주소: `https://uri-jangbu-keep.<계정 서브도메인>.workers.dev`. 확인 방법은 둘 중 하나
   - Actions 배포 로그의 `wrangler deploy` 출력 마지막 주소
   - Cloudflare 대시보드 → Workers & Pages → `uri-jangbu-keep` → Domains
@@ -108,16 +108,9 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
   - 미리보기 출처는 `preview:snap:`·`preview:month:`. 오래된 사본은 KV 가 TTL 로 지운다(정리 작업 없음).
   - `DELETE /v1/keep/<id>`([지우기])는 최신본·상태 신호와 그 이름의 사본(KV list 로 찾음)을 모두 지운다. KV list 는 최대 60초 늦게 보여서, 사본이 생기고 1분 안에 지우면 그 사본은 TTL 까지 남을 수 있다.
   - 개발자용 읽기(꺼내기 스크립트가 부른다, 출처 검사 그대로): `GET /v1/keep/<id>/history` → `{ latest?: { savedAt }, days: [{ date, savedAt }], months: [{ month, savedAt }] }`(최신 것부터, KV list 의 metadata 로 만들고 본문은 읽지 않음), `GET /v1/keep/<id>?day=YYYY-MM-DD`·`?month=YYYY-MM` → 그 사본(없으면 404, 형식이 틀리거나 둘을 함께 주면 400). 배포 뒤 확인: `curl -s -H 'Origin: https://crowwan.github.io' "$KEEP_URL/v1/keep/$(printf x | shasum -a 256 | cut -c1-64)/history"` → `{"days":[],"months":[]}`
-- 요약 토큰(SPEC-007, #104): 보관 지켜보기 워크플로(#106)가 `GET /v1/report` 를 부를 때 쓴다. 넣지 않으면 요약은 늘 401.
-  ```bash
-  TOKEN=$(openssl rand -hex 32)
-  cd worker && printf %s "$TOKEN" | npx wrangler secret put REPORT_TOKEN   # Worker 비밀값
-  ```
-  같은 값을 레포 Secrets `KEEP_REPORT_TOKEN` 에도 넣는다. 확인:
-  ```bash
-  curl -i -H "Authorization: Bearer $TOKEN" "$KEEP_URL/v1/report"   # 200 + { now, devices: [...], export }
-  curl -i "$KEEP_URL/v1/report"                                     # 401
-  ```
+- 요약 토큰(SPEC-007 #104, SPEC-012 #201): 비공개 백업 레포의 보관 지켜보기(아래 "보관 지켜보기")가 `GET /v1/report` 를 부를 때 쓴다. 넣지 않으면 요약은 늘 401.
+  - 값은 `openssl rand -hex 32` 로 만들어 **레포 Secrets `KEEP_REPORT_TOKEN`** 과 **백업 레포 Secrets `REPORT_TOKEN`** 에 같게 넣는다. Worker 비밀값 `REPORT_TOKEN` 은 `worker.yml` 이 배포 뒤 "요약 토큰 넣기" 단계에서 `KEEP_REPORT_TOKEN` 을 표준 입력으로 넣는다(내보내기 토큰과 같은 모양, 배포마다, 값은 로그에 안 찍힘). 레포 비밀값을 바꿨으면 Actions → "보관 서버" → Run workflow. 레포 비밀값이 없으면 그 단계는 경고만 하고 건너뛴다(이미 넣은 Worker 비밀값은 남음).
+  - 확인: `curl -s -o /dev/null -w '%{http_code}\n' "$KEEP_URL/v1/report"` → 401(토큰 없음). 토큰을 넣은 확인은 백업 레포 "보관 지켜보기"를 손으로 돌려 본다(토큰을 셸에 꺼내지 않게).
 - 내보내기 토큰(SPEC-011 2절, #186, ADR 010): 비공개 백업 레포의 주간 워크플로(아래 "서버 밖 주간 사본")가 `GET /v1/export` 를 부를 때 쓴다. 요약 토큰과 별개(요약 토큰으로는 안 열림). 넣지 않으면 내보내기는 늘 401.
   - `GET /v1/export` → `{ exportedAt, items: [{ id, savedAt, envelope }] }`: 본 자리 최신본만(미리보기·날짜별·달별 사본 제외), id 순, `savedAt` 은 서버 시각(옛 최신본은 겉봉투), `envelope` 은 겉봉투 객체. 출처 검사·CORS 없음, GET 만(그 밖 405). 주고 나서 KV `export:last` 에 `{ at, count }`(못 쓰면 503), 요약 `/v1/report` 의 `export: { lastAt, count } | null` 이 이것. 최신본 목록은 KV list 한 장(1,000개)만 읽고, 잘리면(`list_complete` false) 잘린 목록 대신 503(#194 리뷰).
   - 값은 `openssl rand -hex 32` 로 만들어 **레포 Secrets `KEEP_EXPORT_TOKEN`** 과 **백업 레포 Secrets `EXPORT_TOKEN`** 에 같게 넣는다. Worker 비밀값 `EXPORT_TOKEN` 은 `worker.yml` 이 배포 뒤 "내보내기 토큰 넣기" 단계에서 `KEEP_EXPORT_TOKEN` 을 표준 입력으로 넣는다(배포마다, 값은 로그에 안 찍힘). 레포 비밀값을 바꿨으면 Actions → "보관 서버" → Run workflow. 레포 비밀값이 없으면 그 단계는 경고만 하고 건너뛴다(이미 넣은 Worker 비밀값은 남음).
@@ -126,22 +119,24 @@ npm run build:preview        # 미리보기 경로(/, Cloudflare Pages)로 빌�
 - 수동 배포(비상용): `cd worker && CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... npx wrangler deploy` (또는 `npx wrangler login` 뒤). 값은 셸에만, 파일에 쓰지 않는다.
 - API 는 SPEC-006 기술 메모 "서버 API", 상태 신호·요약은 SPEC-007 기술 메모 "서버 API 추가", 날짜별·달별 사본은 SPEC-011 1절, 내보내기는 SPEC-011 2절.
 
-### 보관 지켜보기 (`.github/workflows/keep-watch.yml`, SPEC-007, #106)
+### 보관 지켜보기 (비공개 레포 `crowwan/dongari-keep-backup`, SPEC-007·SPEC-012 1절, #106·#201, ADR 011)
 
-자동 보관이 밀리거나 서버가 죽었는지 개발자(나)가 메일로 알게 하는 일일 점검. 사용자 화면과는 상관없다.
+자동 보관이 밀리거나 서버가 죽었는지 개발자(나)가 메일로 알게 하는 일일 점검. 사용자 화면과는 상관없다. 결과(기기마다 앱을 연 때·마지막 보관·앱 버전)가 공개되지 않게 **비공개 백업 레포**(아래 "서버 밖 주간 사본"과 같은 곳)에서 돈다. 이 레포(공개)에는 워크플로가 없다.
 
 | 언제 | 하는 일 |
 |---|---|
-| 매일 UTC 0시(KST 9시, `schedule`), 또는 Actions → "보관 지켜보기" → Run workflow | `GET $KEEP_URL/v1/report` 를 받아 `scripts/keep-watch.mjs` 가 판정 |
+| 매일 22:17 UTC(다음 날 KST 07:17, 정각을 피함), 또는 백업 레포 Actions → "보관 지켜보기" → Run workflow | `GET $KEEP_URL/v1/report` 를 받아 `scripts/keep-watch.mjs` 가 백업 레포 맨 위 `devices.json`(기기 이름표)과 함께 판정 |
 
-- 판정(SPEC-007 "판정" 표): 서버 응답 없음·5xx·형식 틀림, 토큰 틀림(401), 3일 넘게 밀림, 1MB 넘음, 서버 밖 사본 내보내기가 8일 넘게 없음("서버 밖 사본이 N일째 없어요", SPEC-011 #186) → **실패**. 자동 보관 꺼짐, 30일 넘게 신호 없음, 신호 하나도 없음, 내보낸 적 없음("아직 서버 밖 사본이 없어요" — 요약에 `export` 칸이 없는 예전 서버도) → 경고(성공). 실행 요약 끝에 마지막 내보내기 때·보관본 개수 한 줄.
-- 실패하면 GitHub 가 실패 메일을 보낸다(내 계정 Settings → Notifications → Actions 에서 메일 알림이 켜져 있어야 한다. 예약 실행의 알림은 워크플로를 만든 사람, cron 을 다른 사람이 고쳤으면 그 사람에게 간다). 실행 화면 요약(Summary)에 결과·실패/경고 목록·기기별 표(시각은 KST)가 남는다.
-- 필요한 값: 레포 Secrets `KEEP_REPORT_TOKEN`(넣는 법은 위 "요약 토큰"), 저장소 변수 `KEEP_URL`(앱 배포와 같은 값). 없으면 "보관 지켜보기 비밀값 없음/변수 없음" 오류로 끝난다 → 넣고 Run workflow 로 다시 돌린다.
-- 판정은 `scripts/keepWatch.ts`(순수 함수, 테스트 `scripts/keepWatch.test.ts`, 루트 `npm test` 가 같이 돈다). `keep-watch.mjs` 는 Node 24 가 이 파일의 타입만 지우고 불러 쓴다 — 빌드·`npm ci` 없음. 그래서 `keepWatch.ts` 에는 타입 지우기로 없어지는 문법만 쓰고(enum 등 금지, `erasableSyntaxOnly`), 다른 패키지를 불러오지 않는다.
-- 로컬에서 돌리기: `KEEP_URL=… KEEP_REPORT_TOKEN=… node scripts/keep-watch.mjs` (토큰은 셸에만. 출력에 토큰은 찍히지 않는다)
-- 레포에 60일 동안 활동(커밋 등)이 없으면 GitHub 가 예약 실행을 멈춘다(멈추기 전에 메일로 알림). 멈췄으면 Actions → "보관 지켜보기" → 위쪽 안내의 [Enable workflow] 로 다시 켜고, Run workflow 로 한 번 돌려 본다.
+- **파일 원본은 이 레포 `ops/keep-backup/`**(`.github/workflows/keep-watch.yml`·`scripts/keep-watch.mjs`·`scripts/keepWatch.ts`). 고칠 때는 여기서 PR 로 리뷰·테스트(`scripts/keepWatch.test.ts`, 루트 `npm test`)하고, 머지 뒤 백업 레포에 같은 경로로 손으로 옮긴다. 워크플로를 올리는 커밋은 개발자 계정으로 한다(예약 실행의 실패 메일은 cron 을 마지막으로 고친 사람에게 간다).
+- 판정(SPEC-007 "판정" 표 + SPEC-012 "판정에 더하는 것"): 서버 응답 없음·5xx·형식 틀림, 토큰 틀림(401), 3일 넘게 밀림, 1MB 넘음, 서버 밖 사본 내보내기가 8일 넘게 없음("서버 밖 사본이 N일째 없어요", SPEC-011 #186), `devices.json` 모양이 틀림 → **실패**. 자동 보관 꺼짐, 30일 넘게 신호 없음, 신호 하나도 없음, 내보낸 적 없음("아직 서버 밖 사본이 없어요" — 요약에 `export` 칸이 없는 예전 서버도), 이름 없는 기기, 요약에 없는 이름표 기기 → 경고(성공). 실행 요약 끝에 마지막 내보내기 때·보관본 개수 한 줄.
+- 기기 이름표 `devices.json`(백업 레포에만, 이 레포에는 두지 않는다 — `.gitignore` 안전망): `{ "aaa97843": "엄마 폰" }`. 이름이 있으면 실패·경고 문구와 기기별 표에 `엄마 폰 (aaa97843)` 으로 보인다. 키(서버 이름 앞 8자)는 그 폰의 복구 코드로 `node scripts/keep-rescue.mjs --which`(아래 "보관본 꺼내기"). 파일이 없으면 모든 기기가 "이름 없는 기기" 경고. 키는 소문자 16진수 8자, 값은 빈칸 아닌 글자 — 하나라도 틀리면 실패. 넣는 법·실패 문구표는 백업 레포 README.
+- 실패하면 GitHub 가 실패 메일을 보낸다(내 계정 Settings → Notifications → Actions 에서 메일 알림이 켜져 있어야 한다). 실행 화면 요약(Summary)에 결과·실패/경고 목록·기기별 표(시각은 KST)가 남는다.
+- 필요한 값(백업 레포): Secrets `REPORT_TOKEN`(이 레포 `KEEP_REPORT_TOKEN` 과 같은 값, 위 "요약 토큰"), Variables `KEEP_URL`(주간 사본과 같은 값). 없으면 "보관 지켜보기 비밀값 없음/변수 없음" 오류로 끝난다 → 넣고 Run workflow 로 다시 돌린다.
+- 판정은 `ops/keep-backup/scripts/keepWatch.ts`(순수 함수, 이름표 읽기 `parseDeviceNames`·판정 `judgeReport(응답, 이름표)`). `keep-watch.mjs` 는 Node 24 가 이 파일의 타입만 지우고 불러 쓴다 — 빌드·`npm ci` 없음. 그래서 `keepWatch.ts` 에는 타입 지우기로 없어지는 문법만 쓰고(enum 등 금지, `erasableSyntaxOnly`), 다른 패키지를 불러오지 않는다.
+- 로컬에서 판정만 확인: 스크래치 폴더에 `ops/keep-backup` 을 복사해(지어낸 `devices.json` 과 함께) 가짜 요약 서버로 `KEEP_URL=http://localhost:… REPORT_TOKEN=… node scripts/keep-watch.mjs`. 실제 서버·토큰은 쓰지 않는다(출력에 토큰은 찍히지 않는다).
+- 비공개 레포라 Actions 시간이 든다(한 번 1분 안쪽, 한 달 30분쯤, 무료 2,000분).
 
-### 보관본 꺼내기 (개발자용, `scripts/keep-rescue.mjs`, #154, SPEC-011 #185·#186)
+### 보관본 꺼내기 (개발자용, `scripts/keep-rescue.mjs`, #154, SPEC-011 #185·#186, SPEC-012 #201)
 
 사용자가 앱에서 [복구 코드로 불러오기]를 못 할 때(카톡 안 브라우저, 앱 오류 등) 복구 코드를 받아 내가 대신 서버 보관본을 꺼내 기록 파일로 만들어 준다. 잘못 지우거나 망가진 상태가 보관됐으면 `--list` 로 서버의 날짜별·달별 사본을 보고 그 전 날·달 사본을 골라 꺼낸다(SPEC-011). 서버가 통째로 없어졌거나 31일·400일보다 옛 모습이 필요하면 비공개 백업 레포의 주간 사본 파일을 `--file` 로 푼다(아래 "서버 밖 주간 사본"). 서버에는 `GET` 만 보낸다(최신본 `/v1/keep/<id>`, 고른 사본 `?day=`·`?month=`, 목록 `/v1/keep/<id>/history`, 출처 `https://crowwan.github.io` 라 본 자리) — 쓰기·지우기 없음. `--file` 은 서버를 부르지 않는다.
 
@@ -151,11 +146,13 @@ KEEP_URL=$(gh variable get KEEP_URL) node scripts/keep-rescue.mjs --list        
 KEEP_URL=$(gh variable get KEEP_URL) node scripts/keep-rescue.mjs --day 2026-11-21   # 그 날 사본
 KEEP_URL=$(gh variable get KEEP_URL) node scripts/keep-rescue.mjs --month 2026-10    # 그 달 사본
 node scripts/keep-rescue.mjs --file ../dongari-keep-backup/keep/<id>.json            # 백업 레포 파일 (KEEP_URL 필요 없음)
+node scripts/keep-rescue.mjs --which                                                 # 이 코드의 기기 앞 8자만 (KEEP_URL 필요 없음)
 ```
 
 - `--list`: 최신본·날짜별(만든 날부터 31일 남음)·달별(400일 남음) 사본을 최신 것부터, 보관 시각(한국 시간)과 사본마다 풀어 본 장부 이름·기록 건수로 보인다(목록 하나 + 사본마다 GET 하나). 못 푼 사본은 그 줄에 이유를 적는다(목록을 받은 사이 사라진 사본은 "서버에서 사라졌어요"). 파일은 만들지 않는다.
 - `--day YYYY-MM-DD`·`--month YYYY-MM`: 그 사본으로 기록 파일을 만든다. 옵션은 하나만 쓰고, 날·달 형식이 틀리거나(달력에 없는 날 포함) 모르는 옵션이면 쓰는 법을 찍고 멈춘다(코드를 묻기 전에).
 - `--file <keep/<id>.json 경로>`: 백업 레포 파일(겉봉투 그대로)을 푼다. 다른 옵션과 같이 못 쓰고, 파일은 코드를 묻기 전에 읽는다. 파일 이름이 이 코드의 `<id>.json` 이 아니면 "이 코드의 파일이 아니에요. 이 코드의 파일은 백업 레포의 keep/1a2b3c4d….json 이에요"(id 앞 8자)로 멈춘다 — 어느 파일인지 모르면 아무 파일로 한 번 돌려 찾는다. 지난 주 모습은 백업 레포 README "되살리는 법"(이름은 `<id>.json` 그대로).
+- `--which`(SPEC-012): 코드를 물어 서버 이름(`keepIdOf`) 앞 8자 한 줄만 찍는다(예 `aaa97843`). 보관 지켜보기 요약·기기 이름표(`devices.json`)에서 그 폰이 어느 기기인지 알 때 쓴다. 서버를 부르지 않고 파일도 만들지 않으며, 다른 옵션과 같이 못 쓴다. 형식이 틀린 코드는 다른 일과 같이 거절한다.
 - 코드는 인자(`node scripts/keep-rescue.mjs HK7M-…`)로도 되지만 셸 기록에 남으니 표준 입력을 쓴다. 출력에 코드는 찍히지 않는다.
 - 레포 밖 `~/Downloads`(없으면 홈)에 기록 파일을 만들고 꺼낸 사본·전체 경로·보관 시각·장부 이름·기록 건수를 찍는다. 이름은 최신본 `우리장부-기록-YYYY-MM-DD-최신.txt`(보관한 날, 한국 시간 — 같은 날 `--day` 파일과 겹치지 않게, #186), `--day` 는 `우리장부-기록-YYYY-MM-DD.txt`, `--month` 는 `우리장부-기록-YYYY-MM.txt`, `--file` 은 `우리장부-기록-YYYY-MM-DD-주간사본.txt`. 다른 폴더는 `RESCUE_DIR=… ` 로. 같은 이름 파일이 있으면 덮어쓰지 않고 멈춘다.
 - 파일에는 그 사람 장부 전체와 복구 코드가 평문으로 들어 있다. 레포는 공개라 레포 안에 두지 않는다(`.gitignore` 에 `우리장부-기록-*.txt` 를 넣어 두었지만 안전망일 뿐).
@@ -174,10 +171,10 @@ node scripts/keep-rescue.mjs --file ../dongari-keep-backup/keep/<id>.json       
 |---|---|
 | 매주 일요일 23:00 UTC(월요일 08:00 KST), 또는 백업 레포 Actions → "주간 보관본" → Run workflow | `GET $KEEP_URL/v1/export` → `keep/<id>.json`(겉봉투 그대로)·`index.json`(id·savedAt·bytes), 목록에 없는 id 파일은 지움(한 번에 1개까지), 바뀐 게 있으면 "주간 보관본 YYYY-MM-DD" 커밋(그 레포 `GITHUB_TOKEN`) |
 
-- **파일 원본은 이 레포 `ops/keep-backup/`**(`.github/workflows/backup.yml`·`README.md`·`scripts/backup.mjs`·`scripts/backupPlan.ts`). 고칠 때는 여기서 PR 로 리뷰·테스트(`scripts/keepBackupPlan.test.ts`, 루트 `npm test`)하고, 머지 뒤 백업 레포에 손으로 옮긴다(같은 경로로 복사해 커밋·push).
-- 백업 레포 값: Secrets `EXPORT_TOKEN`(이 레포 `KEEP_EXPORT_TOKEN` 과 같은 값, 위 "내보내기 토큰"), Variables `KEEP_URL`(이 레포와 같은 값).
+- **파일 원본은 이 레포 `ops/keep-backup/`**(`.github/workflows/backup.yml`·`README.md`·`scripts/backup.mjs`·`scripts/backupPlan.ts`, 그리고 위 "보관 지켜보기"의 `keep-watch.yml`·`keep-watch.mjs`·`keepWatch.ts`). 고칠 때는 여기서 PR 로 리뷰·테스트(`scripts/keepBackupPlan.test.ts`·`scripts/keepWatch.test.ts`, 루트 `npm test`)하고, 머지 뒤 백업 레포에 손으로 옮긴다(같은 경로로 복사해 커밋·push). 백업 레포에만 있는 `devices.json`·`keep/`·`index.json` 은 덮지 않는다.
+- 백업 레포 값: Secrets `EXPORT_TOKEN`(이 레포 `KEEP_EXPORT_TOKEN` 과 같은 값, 위 "내보내기 토큰")·`REPORT_TOKEN`(이 레포 `KEEP_REPORT_TOKEN` 과 같은 값, 위 "요약 토큰", 보관 지켜보기용), Variables `KEEP_URL`(이 레포와 같은 값).
 - 실패하면(토큰 401·예전 서버 404·서버 오류·응답 모양 틀림·id 모양 틀림) 아무것도 쓰지 않고 GitHub 실패 메일. **서버가 0개를 줬는데 레포에 파일이 있거나, 지울 파일이 2개 이상이면 지우지 않고 실패**한다(서버 KV 를 잃은 뒤 폰 몇 대만 다시 보관했을 수 있음, #194 리뷰) — 정말 지울 일이면 백업 레포 README "지우지 않고 멈췄을 때"(문구에 나온 id 파일을 손으로 `git rm`·push 뒤 다시 실행).
-- 알림의 나눔: 서버가 답을 줄 때 `export:last` 를 쓰므로, 워크플로가 **서버를 부르지 못하면**(예약 실행 멈춤·꺼짐, 토큰 401, 서버 오류) 보관 지켜보기가 8일 뒤 실패로 알리고, **답을 받은 뒤 실패하면**(모양 거절·지우기 멈춤·커밋·push 실패) 백업 레포 실패 메일만 온다.
+- 알림의 나눔: 서버가 답을 줄 때 `export:last` 를 쓰므로, 워크플로가 **서버를 부르지 못하면**(예약 실행 멈춤·꺼짐, 토큰 401, 서버 오류) 보관 지켜보기가 8일 뒤 실패로 알리고(지켜보기 KST 07:17 이 주간 실행 08:00 보다 앞이라, 월요일 실행이 빠지면 수요일 아침에 "8일째"), **답을 받은 뒤 실패하면**(모양 거절·지우기 멈춤·커밋·push 실패) 백업 레포 실패 메일만 온다.
 - 되살리기: 위 "보관본 꺼내기" `--file`. 지워 달라는 요청(커밋 이력까지)은 백업 레포 README "지워 달라는 요청을 받았을 때"(`git filter-repo` 로 그 id 파일을 이력에서 지우고 force push).
 - 로컬에서 변환만 확인: `wrangler dev --local`(가짜 `--var EXPORT_TOKEN:…`) 에 보관본을 올리고, 스크래치 폴더에 `ops/keep-backup` 을 복사해 `KEEP_URL=http://localhost:8787 EXPORT_TOKEN=… node scripts/backup.mjs`. 실제 서버·토큰은 쓰지 않는다.
 
@@ -199,7 +196,7 @@ src/
 ├── devtools/    개발 확인 화면 `/#/dev/env` (개발 모드·미리보기 빌드 전용, 본 주소 번들 제외, SPEC-009 #141)
 └── test/        Vitest 설정, 여러 테스트가 같이 쓰는 장부 기록(ledgerFixtures: v1 예시 1년치, 장부·저장 데이터 만들기, v4 회비 칸이 든 장부 duesBook·그 저장 데이터 duesData, 저장 전 가드(#172)에 걸리는 낸 분 PAYERS_OFF_AMOUNT(합 ≠ 금액)·PAYERS_OFF_ROSTER(명단에 없는 번호)·두 경우 목록 BROKEN_PAYERS), 지어낸 엑셀 표(excelFixtures: 입출금내역·회비내역 시트 모양 — 회비내역은 이모 엑셀 모양과 앱이 내보낸 9절 모양, 실제 엑셀은 넣지 않음)
 public/icons/  앱 아이콘 (scripts/make-icons.mjs 가 토큰 색으로 만든다)
-scripts/       아이콘·글꼴 만들기, 보관 지켜보기(keep-watch.mjs + 판정 keepWatch.ts, 워크플로 keep-watch.yml 이 돌린다), 보관본 꺼내기(keep-rescue.mjs + 풀기 keepRescue.ts, 개발자가 손으로), 엑셀 조각 검사(check-excel-bundle.mjs + 판정 excelBundle.ts, npm run build 끝에서 돈다)
+scripts/       아이콘·글꼴 만들기, 보관본 꺼내기(keep-rescue.mjs + 풀기 keepRescue.ts, 개발자가 손으로, --which 는 기기 앞 8자), 엑셀 조각 검사(check-excel-bundle.mjs + 판정 excelBundle.ts, npm run build 끝에서 돈다), ops/keep-backup 스크립트 테스트(keepBackupPlan.test.ts·keepWatch.test.ts)
 worker/        자동 보관 서버 (Cloudflare Worker + KV, 따로 있는 패키지). src/index.ts 진입점(기본 내보내기만), src/keep.ts 요청 처리, wrangler.toml
-ops/keep-backup/  비공개 백업 레포(crowwan/dongari-keep-backup)에 올리는 파일 원본: 주간 워크플로·README·받기 backup.mjs + 변환 규칙 backupPlan.ts (테스트는 scripts/keepBackupPlan.test.ts, SPEC-011 #186)
+ops/keep-backup/  비공개 백업 레포(crowwan/dongari-keep-backup)에 올리는 파일 원본: 주간 워크플로·README·받기 backup.mjs + 변환 규칙 backupPlan.ts (테스트는 scripts/keepBackupPlan.test.ts, SPEC-011 #186), 보관 지켜보기 워크플로 keep-watch.yml·keep-watch.mjs + 판정 keepWatch.ts (기기 이름표 devices.json 은 백업 레포에만, 테스트는 scripts/keepWatch.test.ts, SPEC-012 #201)
 ```

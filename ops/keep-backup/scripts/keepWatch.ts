@@ -2,6 +2,9 @@
 //
 // 서버 요약(`GET /v1/report`) 응답을 받아 실패·경고 문구와 실행 요약 표를 만든다. 입출력 없는 순수 함수만 둔다.
 // SPEC-011(#186): 요약에 실린 마지막 서버 밖 사본 내보내기(export)도 판정한다.
+// SPEC-012(#201): 비공개 백업 레포(crowwan/dongari-keep-backup)에서 돈다. 레포 맨 위 devices.json(기기 이름표)으로
+// 기기를 `엄마 폰 (aaa97843)` 처럼 보이고, 이름 없는 기기·요약에 없는 이름표 기기는 경고, 이름표 모양이 틀리면 실패.
+// 원본은 dongari 레포 ops/keep-backup/ — 시험은 dongari scripts/keepWatch.test.ts.
 // 워크플로는 scripts/keep-watch.mjs 가 이 파일을 그대로 불러 쓴다(Node 24 가 타입만 지우고 실행, 빌드 없음).
 // 그래서 타입 지우기로 없어지는 문법만 쓴다(enum·namespace 없음, tsconfig erasableSyntaxOnly).
 
@@ -15,10 +18,24 @@ export const EXPORT_LIMIT_MS = 8 * DAY_MS
 const KST_OFFSET_MS = 9 * HOUR_MS
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
 
+// 기기 이름표 키: 서버 요약의 기기 id(64자 해시 앞 8자, 소문자 16진수). keep-rescue --which 가 찍는 그대로
+const NAME_KEY = /^[0-9a-f]{8}$/
+const HANGUL_FIRST = 0xac00
+const HANGUL_LAST = 0xd7a3
+const HANGUL_FINALS = 28
+
 export const SERVER_DOWN = '보관 서버가 응답하지 않아요'
-export const TOKEN_REJECTED = '보관 서버가 요약 토큰을 받지 않아요 (401). 레포 Secrets `KEEP_REPORT_TOKEN` 과 Worker 비밀값 `REPORT_TOKEN` 이 같은 값인지 확인하세요'
+export const TOKEN_REJECTED =
+  '보관 서버가 요약 토큰을 받지 않아요 (401). 이 레포 Secrets `REPORT_TOKEN` 과 dongari 레포 Secrets `KEEP_REPORT_TOKEN` 이 같은 값인지 보고, ' +
+  'dongari Actions "보관 서버" 를 다시 실행(Run workflow)해 Worker 비밀값 `REPORT_TOKEN` 에 넣으세요'
 export const NO_SIGNAL = '아직 상태 신호가 없어요'
 export const NO_EXPORT = '아직 서버 밖 사본이 없어요'
+export const DEVICES_FILE = 'devices.json'
+export const NAMES_BROKEN =
+  '기기 이름 파일(`devices.json`) 모양이 틀려요. `{ "aaa97843": "엄마 폰" }` 처럼 기기 앞 8자(소문자 16진수)에 이름 글자를 적어요'
+
+// devices.json 을 읽은 결과 (SPEC-012): 기기 앞 8자 → 이름, 또는 모양이 틀림
+export type DeviceNames = { ok: true; names: ReadonlyMap<string, string> } | { ok: false }
 
 // 서버를 부른 결과: 연결 자체가 안 됐거나(시간 초과 포함), 상태 코드와 JSON 본문(못 읽었으면 undefined)
 export type ReportResponse =
@@ -33,6 +50,8 @@ export interface DeviceReport {
   lastKeptAt?: string
   tooLarge: boolean
   appVersion: string
+  // 이름표(devices.json)에서 붙인 이름. 서버 답에는 없다
+  name?: string
 }
 
 // 마지막 서버 밖 사본 내보내기 (SPEC-011 2절): 때와 내보낸 보관본 개수
@@ -100,25 +119,75 @@ export function parseReport(body: unknown): Report | null {
   return { now: body.now, devices, export: lastExport }
 }
 
+// devices.json 글자 → 이름표 (SPEC-012). 파일이 없으면(undefined) 빈 이름표라 모든 기기가 "이름 없는 기기" 경고다.
+// 모양: `{ "앞 8자": "이름" }` — 키는 소문자 16진수 8자, 값은 빈칸 아닌 글자(앞뒤 빈칸은 지움). 하나라도 틀리면 모양이 틀림
+export function parseDeviceNames(text: string | undefined): DeviceNames {
+  if (text === undefined) return { ok: true, names: new Map() }
+  let raw: unknown
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    return { ok: false }
+  }
+  if (!isRecord(raw)) return { ok: false }
+  const names = new Map<string, string>()
+  for (const [id, name] of Object.entries(raw)) {
+    if (!NAME_KEY.test(id) || typeof name !== 'string' || name.trim() === '') return { ok: false }
+    names.set(id, name.trim())
+  }
+  return { ok: true, names }
+}
+
 // 사람이 읽는 시각: 한국 시간 `2026-10-12 09:30`
 export function formatKst(iso: string): string {
   const shifted = new Date(Date.parse(iso) + KST_OFFSET_MS).toISOString()
   return `${shifted.slice(0, 10)} ${shifted.slice(11, 16)}`
 }
 
+// 표의 기기 칸: 이름이 있으면 `엄마 폰 (aaa97843)`, 없으면 `aaa97843`
+function deviceLabel(id: string, name: string | undefined): string {
+  return name === undefined ? `\`${id}\`` : `\`${name} (${id})\``
+}
+
+// 문구 속 기기: 이름이 있으면 `엄마 폰 (aaa97843)`, 없으면 예전처럼 기기 `aaa97843`
+function deviceText(id: string, name: string | undefined): string {
+  return name === undefined ? `기기 ${deviceLabel(id, name)}` : deviceLabel(id, name)
+}
+
+// 문구 속 기기 + 주격 조사: 이름 끝 글자가 받침 있는 한글이면 '이'(엄마 폰 이), 아니면 '가'(이모 가).
+// 이름이 없으면 예전 문구 그대로 '가'
+function deviceSubject(id: string, name: string | undefined): string {
+  const code = name === undefined ? 0 : name.charCodeAt(name.length - 1)
+  const hasFinal = code >= HANGUL_FIRST && code <= HANGUL_LAST && (code - HANGUL_FIRST) % HANGUL_FINALS !== 0
+  return `${deviceText(id, name)} ${hasFinal ? '이' : '가'}`
+}
+
 function judgeDevice(device: DeviceReport, now: number): { failures: string[]; warnings: string[] } {
-  const name = `기기 \`${device.id}\``
+  const who = deviceText(device.id, device.name)
+  const subject = deviceSubject(device.id, device.name)
   const failures: string[] = []
   const warnings: string[] = []
 
   // 밀린 시간은 신호를 받은 때 기준이다. 앱을 안 열면 그 뒤 보관됐는지 알 수 없으니 (그때는 30일 경고로만 안다)
   if (device.pendingSince !== undefined && Date.parse(device.seenAt) - Date.parse(device.pendingSince) > PENDING_LIMIT_MS) {
-    failures.push(`${name} 가 3일 넘게 보관하지 못했어요 (밀린 때 ${formatKst(device.pendingSince)} KST)`)
+    failures.push(`${subject} 3일 넘게 보관하지 못했어요 (밀린 때 ${formatKst(device.pendingSince)} KST)`)
   }
-  if (device.tooLarge) failures.push(`${name} 의 기록이 1MB 를 넘어 보관하지 못했어요`)
-  if (!device.enabled) warnings.push(`${name} 가 자동 보관을 껐어요`)
-  if (now - Date.parse(device.seenAt) > SILENT_LIMIT_MS) warnings.push(`${name} 가 30일 넘게 앱을 열지 않았어요`)
+  if (device.tooLarge) failures.push(`${who} 의 기록이 1MB 를 넘어 보관하지 못했어요`)
+  if (!device.enabled) warnings.push(`${subject} 자동 보관을 껐어요`)
+  if (now - Date.parse(device.seenAt) > SILENT_LIMIT_MS) warnings.push(`${subject} 30일 넘게 앱을 열지 않았어요`)
   return { failures, warnings }
+}
+
+// 이름표 경고 (SPEC-012): 요약에 있는데 이름이 없는 기기, 이름표에 있는데 요약에 없는 기기
+function judgeNames(devices: readonly DeviceReport[], names: ReadonlyMap<string, string>): string[] {
+  const unnamed = devices
+    .filter((device) => device.name === undefined)
+    .map((device) => `이름 없는 기기 \`${device.id}\` 가 있어요. \`${DEVICES_FILE}\` 에 이름을 붙여 주세요`)
+  const reported = new Set(devices.map((device) => device.id))
+  const absent = [...names]
+    .filter(([id]) => !reported.has(id))
+    .map(([id, name]) => `이름표의 ${deviceSubject(id, name)} 요약에 없어요 (보관을 지웠거나 복구 코드가 바뀜)`)
+  return [...unnamed, ...absent]
 }
 
 // 서버 밖 사본 (SPEC-011): 한 번도 없으면 경고(첫 주), 마지막 내보내기가 8일 넘었으면 실패
@@ -133,14 +202,15 @@ function judgeExport(lastExport: ExportReport | null, now: number): { failures: 
   }
 }
 
-// 응답 하나를 판정한다. 시각 비교는 서버 요약의 now 로 한다 (실행기 시계와 무관)
-export function judgeReport(response: ReportResponse): Verdict {
+// 서버 답을 판정한다 (SPEC-007·011). 기기에는 이름표의 이름을 붙여 둔다
+function judgeResponse(response: ReportResponse, names: ReadonlyMap<string, string>): Verdict {
   if (response.kind === 'unreachable') return { failures: [`${SERVER_DOWN} (연결 실패)`], warnings: [] }
   if (response.status === 401) return { failures: [TOKEN_REJECTED], warnings: [] }
   if (response.status !== 200) return { failures: [`${SERVER_DOWN} (HTTP ${response.status})`], warnings: [] }
 
-  const report = parseReport(response.body)
-  if (!report) return { failures: [`${SERVER_DOWN} (요약 형식이 틀림)`], warnings: [] }
+  const parsed = parseReport(response.body)
+  if (!parsed) return { failures: [`${SERVER_DOWN} (요약 형식이 틀림)`], warnings: [] }
+  const report = { ...parsed, devices: parsed.devices.map((device) => ({ ...device, name: names.get(device.id) })) }
 
   const now = Date.parse(report.now)
   const judged = [...report.devices.map((device) => judgeDevice(device, now)), judgeExport(report.export, now)]
@@ -152,9 +222,21 @@ export function judgeReport(response: ReportResponse): Verdict {
   }
 }
 
+// 응답 하나를 이름표(devices.json, SPEC-012)와 함께 판정한다. 시각 비교는 서버 요약의 now 로 한다 (실행기 시계와 무관).
+// 이름표 모양이 틀리면 서버 판정은 그대로 하고(기기는 앞 8자로) 실패를 하나 더한다. 이름 경고는 요약을 받았을 때만
+export function judgeReport(response: ReportResponse, deviceNames: DeviceNames): Verdict {
+  if (!deviceNames.ok) {
+    const verdict = judgeResponse(response, new Map())
+    return { ...verdict, failures: [...verdict.failures, NAMES_BROKEN] }
+  }
+  const verdict = judgeResponse(response, deviceNames.names)
+  if (verdict.report === undefined) return verdict
+  return { ...verdict, warnings: [...verdict.warnings, ...judgeNames(verdict.report.devices, deviceNames.names)] }
+}
+
 function deviceRow(device: DeviceReport): string {
   const cells = [
-    `\`${device.id}\``,
+    deviceLabel(device.id, device.name),
     formatKst(device.seenAt),
     device.enabled ? '켜짐' : '꺼짐',
     device.pendingSince === undefined ? '-' : formatKst(device.pendingSince),

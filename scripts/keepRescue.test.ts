@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { describe, expect, it, vi } from 'vitest'
+import { parseDeviceNames } from '../ops/keep-backup/scripts/keepWatch.ts'
 import { keepIdOf as appKeepIdOf, sealKeep } from '../src/features/keep/keepCrypto'
 import { normalizeRecoveryCode as appNormalize } from '../src/features/keep/recoveryCode'
 import { createBackup, readBackup } from '../src/storage/backup'
@@ -26,6 +28,7 @@ import {
   rescueFileName,
   rescueKeep,
   SERVER_DOWN,
+  whichKeep,
   WRONG_CODE,
 } from './keepRescue.ts'
 import type { FetchFn } from './keepRescue.ts'
@@ -455,5 +458,90 @@ describe('SPEC-011 꺼내기 스크립트 날짜 고르기', () => {
       expect(text).toContain('우리장부-기록-2026-10-19-주간사본.txt')
       expect(text).not.toMatch(/HK7M|29QF|MX4P|8R2D/)
     })
+  })
+})
+
+describe('SPEC-012 AC-3 꺼내기 스크립트 --which (기기 이름표의 앞 8자)', () => {
+  // 명령줄을 그대로 돌린다(레포 맨 위에서, 다른 테스트의 파일 읽기와 같이). KEEP_URL 은 넘기지 않는다(서버를 부르지 않으니 필요 없어야 한다)
+  function runRescue(args: string[], input: string) {
+    return spawnSync(process.execPath, ['scripts/keep-rescue.mjs', ...args], {
+      input,
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH },
+    })
+  }
+
+  it('--which 는 앞 8자 보기를 고르고, 복구 코드는 다른 일처럼 인자로도 받는다', () => {
+    expect(parseRescueArgs(['--which'])).toEqual({ ok: true, command: { action: 'which' } })
+    expect(parseRescueArgs([CODE, '--which'])).toEqual({ ok: true, command: { action: 'which', code: CODE } })
+    expect(RESCUE_USAGE).toContain('--which')
+  })
+
+  it('--which 를 다른 옵션과 같이 쓰면 쓰는 법을 안내한다', () => {
+    const badArgs = [
+      ['--which', '--list'],
+      ['--day', '2026-11-21', '--which'],
+      ['--which', '--month', '2026-10'],
+      ['--file', 'keep/abc.json', '--which'],
+      ['--which', '--which'],
+    ]
+    for (const args of badArgs) {
+      const parsed = parseRescueArgs(args)
+      expect(parsed).toEqual({ ok: false, message: expect.stringContaining(RESCUE_USAGE) })
+      expect(parsed).toEqual({ ok: false, message: expect.stringContaining('--which 은 하나만 써요') })
+    }
+  })
+
+  it('복구 코드에서 앱과 같은 서버 이름을 만들어 앞 8자만 돌려주고, 서버는 부르지 않는다', async () => {
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    try {
+      const result = await whichKeep('hk7m 29qf mx4p 8r2d')
+
+      expect(result).toEqual({ ok: true, prefix: (await appKeepIdOf(CODE)).slice(0, 8) })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('찍는 앞 8자는 그대로 devices.json 의 키로 쓸 수 있다', async () => {
+    const result = await whichKeep(CODE)
+    if (!result.ok) throw new Error(result.message)
+
+    expect(parseDeviceNames(JSON.stringify({ [result.prefix]: '엄마 폰' }))).toEqual({
+      ok: true,
+      names: new Map([[result.prefix, '엄마 폰']]),
+    })
+  })
+
+  it('형식이 틀린 코드는 거절한다', async () => {
+    expect(await whichKeep('HK7M-29QF')).toEqual({ ok: false, message: INVALID_CODE })
+    expect(await whichKeep('HK7M-29QF-MX4P-8R2O')).toEqual({ ok: false, message: INVALID_CODE })
+  })
+
+  it('명령줄: 표준 입력으로 받은 코드의 앞 8자 한 줄만 찍고, KEEP_URL 없이 돌며 코드는 어디에도 찍지 않는다', { timeout: 30_000 }, async () => {
+    const run = runRescue(['--which'], `${CODE}\n`)
+
+    expect(run.status).toBe(0)
+    expect(run.stdout).toBe(`${(await appKeepIdOf(CODE)).slice(0, 8)}\n`)
+    expect(`${run.stdout}${run.stderr}`).not.toMatch(/HK7M|29QF|MX4P|8R2D/)
+  })
+
+  it('명령줄: 형식이 틀린 코드는 형식 안내와 함께 실패(종료 코드 1)한다', { timeout: 30_000 }, () => {
+    const run = runRescue(['--which'], 'HK7M-29QF\n')
+
+    expect(run.status).toBe(1)
+    expect(run.stdout).toBe('')
+    expect(run.stderr).toContain(INVALID_CODE)
+  })
+
+  it('명령줄: 다른 옵션과 같이 쓰면 코드를 묻기 전에 쓰는 법을 찍고 멈춘다', { timeout: 30_000 }, () => {
+    const run = runRescue(['--which', '--list'], `${CODE}\n`)
+
+    expect(run.status).toBe(1)
+    expect(run.stdout).toBe('')
+    expect(run.stderr).toContain('--which 은 하나만 써요')
+    expect(run.stderr).toContain(RESCUE_USAGE)
   })
 })
