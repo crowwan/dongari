@@ -30,7 +30,7 @@ const HANGUL_FINALS = 28
 const NAME_UNSAFE = /[\p{Cc}|`]/u
 const UTF8_BOM = '\uFEFF'
 
-// 앱 화면 이름(dongari src/features/useScreenHistory.ts 의 Screen name) → 사람 말. 모르는 이름(앱이 모르면 unknown)은 그대로 보인다
+// 앱 화면 이름(dongari src/features/useScreenHistory.ts 의 Screen name, AppRoot 의 RootScreenName) → 사람 말. 모르는 이름(앱이 모르면 unknown)은 그대로 보인다
 const SCREEN_NAMES: ReadonlyMap<string, string> = new Map([
   ['ledger', '장부'],
   ['settings', '설정'],
@@ -42,6 +42,10 @@ const SCREEN_NAMES: ReadonlyMap<string, string> = new Map([
   ['keep-restore', '복구 코드로 불러오기'],
   ['dues', '회비 표'],
   ['excel-import', '엑셀 불러오기'],
+  // 진짜 App 밖 화면 (dongari src/features/practice/AppRoot.tsx 의 RootScreenName, #203)
+  ['first-run', '첫 실행 물음'],
+  ['practice', '연습 장부'],
+  ['in-app', '카톡 안 안내'],
 ])
 
 export const SERVER_DOWN = '보관 서버가 응답하지 않아요'

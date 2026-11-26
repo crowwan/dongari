@@ -211,6 +211,9 @@ export default function App({
   const currentMonth = isThisYear ? today.getMonth() + 1 : undefined
   const currentDay = isThisYear ? today.getDate() : undefined
   const { screen } = navigation
+  // 그리려는 화면 이름을 오류 기록기에 먼저 알린다 (SPEC-012): 새 화면이 처음 그릴 때 던지면 그 그리기는 끝나지 않아
+  // 그린 뒤(useEffect) 알리면 직전 화면 이름이 남는다. 같은 이름을 여러 번 알려도 된다
+  appErrors?.setScreen(screen.name)
   const lastChainSaved = chainSaved.at(-1)
 
   // 연달아 적은 뒤 장부로 돌아왔으면 마지막에 저장한 달을 보여 주고 "N건을 저장했어요" 를 알린다 (AC-21).
@@ -370,10 +373,6 @@ export default function App({
   useEffect(() => {
     if (saveFailureBand !== undefined) appErrors?.recordSave(saveFailureBand)
   }, [appErrors, saveFailureBand])
-  // 지금 화면 이름 (오류가 난 화면). 그리기 오류는 오류 경계가 이 마지막 이름을 쓴다
-  useEffect(() => {
-    appErrors?.setScreen(screen.name)
-  }, [appErrors, screen.name])
   const notices = storageNoticeList.map(({ message, action }) => (
     <NoticeBar key={message} message={message} action={action && noticeActions[action]} />
   ))

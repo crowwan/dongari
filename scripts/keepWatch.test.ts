@@ -15,6 +15,7 @@ import {
   TOKEN_REJECTED,
 } from '../ops/keep-backup/scripts/keepWatch.ts'
 import type { AppErrorReport, DeviceReport, ExportReport, ReportResponse } from '../ops/keep-backup/scripts/keepWatch.ts'
+import type { RootScreenName } from '../src/features/practice/AppRoot'
 import type { Screen } from '../src/features/useScreenHistory'
 
 // 보관 지켜보기는 비공개 백업 레포(crowwan/dongari-keep-backup)에서 돈다 (SPEC-012).
@@ -458,6 +459,13 @@ const APP_SCREENS = {
   'excel-import': '엑셀 불러오기',
 } satisfies Record<Screen['name'], string>
 
+// 진짜 App 밖 화면 이름(src/features/practice/AppRoot.tsx 의 RootScreenName, #203). 늘면 여기서 타입 오류가 난다
+const ROOT_SCREENS = {
+  'first-run': '첫 실행 물음',
+  practice: '연습 장부',
+  'in-app': '카톡 안 안내',
+} satisfies Record<RootScreenName, string>
+
 describe('SPEC-012 AC-10 앱 오류 판정', () => {
   describe('36시간 안 오류는 실패', () => {
     it('스펙 예시 모양 문구로 실패한다: 기기·화면·종류·이름 "글"·횟수·마지막 때(KST)', () => {
@@ -519,7 +527,7 @@ describe('SPEC-012 AC-10 앱 오류 판정', () => {
       expect(verdict.failures).toEqual([expect.stringContaining('앱 오류가 났어요: `unknown` · render ·')])
     })
 
-    it.each(Object.entries(APP_SCREENS))('앱 화면 %s 는 "%s" 로 보인다', (screen, label) => {
+    it.each([...Object.entries(APP_SCREENS), ...Object.entries(ROOT_SCREENS)])('앱 화면 %s 는 "%s" 로 보인다', (screen, label) => {
       const verdict = judgeReport(ok([device({ errors: [appError({ screen })] })]), MOM)
       expect(verdict.failures).toEqual([expect.stringContaining(`앱 오류가 났어요: ${label}(\`${screen}\`) · render ·`)])
     })

@@ -37,6 +37,18 @@ type Mode =
 // 앱을 열고 뒤로 버튼을 다룰 때까지 기다리는 방문 기록 일: steps 만큼 되돌린 뒤 then
 type HistoryTask = { steps: number; then?: () => void }
 
+// 진짜 App 밖 화면 이름 (SPEC-012 앱 오류 기록): 카톡 안 안내·첫 실행 물음·연습(연습 장부·끝 화면·홈 화면에 추가 묻기).
+// 진짜 App 을 그릴 때는 App 이 그 안 화면 이름(useScreenHistory)을 알린다. 지켜보기 판정이 사람 말로 바꾼다(keepWatch SCREEN_NAMES)
+export type RootScreenName = 'in-app' | 'first-run' | 'practice'
+
+const ROOT_SCREENS: Record<Exclude<Mode['name'], 'app'>, RootScreenName> = {
+  'in-app': 'in-app',
+  ask: 'first-run',
+  practice: 'practice',
+  end: 'practice',
+  install: 'practice',
+}
+
 // 앱 맨 바깥 (SPEC-008): 첫 실행 물음 → 진짜 App / 연습 장부 → 끝 화면을 갈아 끼운다.
 // 연습은 진짜 App 을 내리고 메모리 저장소의 App 을 그린다. 연습이 끝나면 진짜 App 을 처음부터 다시 그린다
 // (설정에서 열었으면 연습 직전의 진짜 장부 데이터로).
@@ -45,7 +57,7 @@ type HistoryTask = { steps: number; then?: () => void }
 // - 첫 실행 새 장부 만들기에서 뒤로 버튼으로 이 칸이 빠지면 물음으로 돌아온다 (물음에서 뒤로 버튼은 앱을 닫는다)
 // - 연습이 끝나면 연습이 쌓은 칸을 표시 칸까지 되돌린다(첫 실행은 그 칸이 새 장부 만들기 칸, 설정에서 열었으면 그 칸도 뺀다)
 export function AppRoot({ practiceMarkStore, fromKakao = false, ...props }: AppRootProps) {
-  const { loaded, options, saver, installOfferStore, install = browserInstallEnvironment(), inApp, keep } = props
+  const { loaded, options, saver, installOfferStore, install = browserInstallEnvironment(), inApp, keep, appErrors } = props
   const rootMark = useId()
   // 첫 실행 연습을 마쳤는데 아직 장부가 없으면 물음 없이 새 장부 만들기로 연다 (SPEC-009 B, 설치 확인에서 아이콘으로 먼저 연 경우)
   const [startsAtNewBook] = useState(() => loaded.data.books.length === 0 && (practiceMarkStore?.load() ?? false))
@@ -55,6 +67,8 @@ export function AppRoot({ practiceMarkStore, fromKakao = false, ...props }: AppR
     if (inApp && !inApp.store.stays()) return { name: 'in-app', kind: inApp.kind }
     return startsAtNewBook ? { name: 'app', loaded } : { name: 'ask' }
   })
+  // 그리려는 화면 이름을 오류 기록기에 먼저 알린다 (SPEC-012, 그 화면이 처음 그릴 때 던져도 그 이름으로). 연습 App 은 알리지 않는다
+  if (mode.name !== 'app') appErrors?.setScreen(ROOT_SCREENS[mode.name])
   // 진짜 App 이 장부 없는 첫 실행 화면인지 (App 이 알린다)
   const firstRunApp = useRef(loaded.data.books.length === 0)
   // 화면을 갈아 끼운 뒤 할 방문 기록 일, 그 되돌리기가 끝나면(popstate) 할 일

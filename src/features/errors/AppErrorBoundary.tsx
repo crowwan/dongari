@@ -14,7 +14,7 @@ type AppErrorBoundaryState = { failed: boolean }
 const reloadPage = () => window.location.reload()
 
 // 오류 경계 (SPEC-012 2절): 진입점(main.tsx)이 앱 전체를 감싼다. 화면을 그리다 오류가 나면 흰 화면 대신 "다시 열기" 화면.
-// 화면 이름은 오류 기록기가 App 에게서 받아 둔 마지막 이름을 쓴다(onError 쪽). 이 부품은 앱 상태·저장소를 읽지 않는다
+// 화면 이름은 App·AppRoot 가 그리기 전에 오류 기록기에 알린 "그리려던 화면" 이름을 쓴다(onError 쪽). 이 부품은 앱 상태·저장소를 읽지 않는다
 export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
   state: AppErrorBoundaryState = { failed: false }
 

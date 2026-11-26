@@ -41,7 +41,8 @@ export class AppErrorRecorder implements AppErrorReporter {
   // 지금 둔 오류: 7일 안, 5줄까지, 마지막 때 순 (상태 신호에 싣는다)
   list = (): AppError[] => recentErrors(this.errors, this.now())
 
-  // 지금 화면 (useScreenHistory 의 screen.name). 그리기 오류는 마지막으로 알던 이름을 쓴다
+  // 지금 그리려는 화면 (App: useScreenHistory 의 screen.name, AppRoot: first-run·practice·in-app).
+  // App·AppRoot 가 그리기 전에 알려, 새 화면이 처음 그릴 때 던져도 그 화면 이름이 된다
   setScreen = (name: string): void => {
     this.screen = name
   }
