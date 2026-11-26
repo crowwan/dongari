@@ -42,7 +42,8 @@ import { payerAssign } from './features/dues/payerAssign'
 import { useBehindCount } from './features/dues/useBehindCount'
 import type { DuesSettings } from './features/settings/RosterPages'
 import { SettingsScreen } from './features/settings/SettingsScreen'
-import { storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
+import { shownSaveFailure, storageNotices, type StorageNoticeAction } from './features/storage/storageNotices'
+import type { AppErrorReporter } from './features/errors/AppErrorRecorder'
 import { useScreenHeading } from './features/useScreenHeading'
 import { useScreenHistory } from './features/useScreenHistory'
 import { totalEntryCount } from './domain/book'
@@ -85,6 +86,8 @@ type AppProps = {
   inApp?: InAppBrowser
   // 카톡에서 옮겨 와 첫 실행 물음의 [카톡에서 쓰던 장부 가져오기] 로 열었다 (SPEC-009 C ③): 복구 코드로 불러오기부터 (클립보드에서 읽은 코드)
   restoreFromKakao?: { code: string | undefined }
+  // 앱 오류 기록기 (SPEC-012 2절): 지금 화면 이름과 저장 실패 띠를 알린다. 없으면 알리지 않는다 (연습 장부·시험)
+  appErrors?: AppErrorReporter
 }
 
 // 장부 위 권하기 카드 [홈 화면에 추가] 의 방법 안내 선택 창 (설정 줄은 settings-install-guide)
@@ -145,6 +148,7 @@ export default function App({
   install = browserInstallEnvironment(),
   inApp,
   restoreFromKakao,
+  appErrors,
 }: AppProps) {
   const ledger = useLedger(repository, loaded, options)
   const bookName = ledger.book?.name ?? ''
@@ -207,6 +211,9 @@ export default function App({
   const currentMonth = isThisYear ? today.getMonth() + 1 : undefined
   const currentDay = isThisYear ? today.getDate() : undefined
   const { screen } = navigation
+  // 그리려는 화면 이름을 오류 기록기에 먼저 알린다 (SPEC-012): 새 화면이 처음 그릴 때 던지면 그 그리기는 끝나지 않아
+  // 그린 뒤(useEffect) 알리면 직전 화면 이름이 남는다. 같은 이름을 여러 번 알려도 된다
+  appErrors?.setScreen(screen.name)
   const lastChainSaved = chainSaved.at(-1)
 
   // 연달아 적은 뒤 장부로 돌아왔으면 마지막에 저장한 달을 보여 주고 "N건을 저장했어요" 를 알린다 (AC-21).
@@ -361,6 +368,11 @@ export default function App({
     'send-backup': { label: '기록 파일 보내기', icon: 'share', onClick: backup.send },
   }
   const storageNoticeList = storageNotices(ledger.startup, ledger.saveFailure)
+  // 앱 오류 기록 (SPEC-012 2절): 저장 실패 띠가 뜨면(이유가 바뀌면) save 로 한 번 센다. 띠가 떠 있는 동안 다시 실패해도 더 세지 않는다
+  const saveFailureBand = shownSaveFailure(ledger.startup, ledger.saveFailure)
+  useEffect(() => {
+    if (saveFailureBand !== undefined) appErrors?.recordSave(saveFailureBand)
+  }, [appErrors, saveFailureBand])
   const notices = storageNoticeList.map(({ message, action }) => (
     <NoticeBar key={message} message={message} action={action && noticeActions[action]} />
   ))

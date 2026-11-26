@@ -189,6 +189,27 @@ export function DevEnvScreen({ env }: { env: DevEnvironment }) {
         </div>
       </section>
 
+      <section className="dev-env__section" aria-labelledby="dev-env-errors">
+        <h2 id="dev-env-errors" className="dev-env__heading">
+          앱 오류
+        </h2>
+        <p className="dev-env__note">
+          SPEC-012 AC-11. 앱을 열어 장부 화면을 그린 뒤 일부러 화면 그리기 오류를 내요. "다시 열기" 화면이 보이면 서버 미리보기
+          자리(preview:status:)에 오류 목록이 남았는지 봐요. [다시 열기] 뒤에는 오류가 나지 않아요.
+        </p>
+        <div className="dev-env__actions">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              record('오류 내 보기', '누름')
+              env.crashApp()
+            }}
+          >
+            오류 내 보기
+          </Button>
+        </div>
+      </section>
+
       <section className="dev-env__section" aria-labelledby="dev-env-log">
         <h2 id="dev-env-log" className="dev-env__heading">
           결과 기록

@@ -39,6 +39,7 @@ function fakeEnvironment(overrides: Partial<DevEnvironment> = {}) {
     persisted: async () => false,
     log: sessionCheckLog(memoryStorage()),
     now: () => new Date(2026, 9, 16, 10, 0, 1),
+    crashApp: vi.fn(),
     ...overrides,
   }
   return { env, events, clipboard }
@@ -226,5 +227,18 @@ describe('SPEC-009 개발 확인 화면 (AC-36)', () => {
       expect(setItem.mock.contexts).not.toContain(localStorage)
       expect(localStorage.length).toBe(0)
     })
+  })
+})
+
+describe('SPEC-012 AC-11 개발 확인 화면 [오류 내 보기]', () => {
+  it('누르면 기록에 남기고, 앱을 열어 오류를 내러 간다', async () => {
+    const crashApp = vi.fn()
+    const { env } = fakeEnvironment({ crashApp })
+    render(<DevEnvScreen env={env} />)
+
+    await userEvent.click(screen.getByRole('button', { name: '오류 내 보기' }))
+
+    expect(crashApp).toHaveBeenCalledTimes(1)
+    expect(logLines()).toEqual([expect.stringContaining('오류 내 보기')])
   })
 })

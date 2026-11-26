@@ -1,5 +1,6 @@
 import { browserInstallPrompt, type InstallPromptStore } from '../features/install/installPrompt'
 import { browserAppVersion } from '../features/version/appVersion'
+import { askDevCrash } from './crashRequest'
 import { sessionCheckLog, type CheckLog } from './envChecks'
 
 // 화면이 보는 브라우저 상태. 테스트에서는 바꿔 넣는다
@@ -19,6 +20,8 @@ export type DevEnvironment = {
   persisted: (() => Promise<boolean>) | undefined
   log: CheckLog
   now: () => Date
+  // [오류 내 보기] (SPEC-012 AC-11): 다음에 열 앱에 오류를 내라고 적어 두고 앱 첫 화면으로 간다
+  crashApp: () => void
 }
 
 export function browserDevEnvironment(): DevEnvironment {
@@ -37,5 +40,10 @@ export function browserDevEnvironment(): DevEnvironment {
     persisted: nav.storage?.persisted ? () => nav.storage.persisted() : undefined,
     log: sessionCheckLog(window.sessionStorage),
     now: () => new Date(),
+    // 해시(#/dev/env)·검색어(?dev=env) 없는 앱 첫 주소로 새로 연다
+    crashApp: () => {
+      askDevCrash(window.sessionStorage)
+      window.location.assign(new URL(import.meta.env.BASE_URL, window.location.origin).href)
+    },
   }
 }
