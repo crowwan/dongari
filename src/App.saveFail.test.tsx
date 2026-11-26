@@ -3,6 +3,8 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import type { Ledger, StoredData } from './domain/types'
+import type { AppError } from './features/errors/appErrors'
+import { AppErrorRecorder } from './features/errors/AppErrorRecorder'
 import type { LedgerRepository, LoadResult, SaveFailureReason } from './storage/LedgerRepository'
 import { MemoryRepository } from './storage/MemoryRepository'
 import { duesData, PAYERS_OFF_ROSTER, storedWith } from './test/ledgerFixtures'
@@ -177,5 +179,82 @@ describe('SPEC-002 저장 전 v4 가드 (#172)', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('앱에 문제가 있어 방금 바꾼 것을 저장하지 않았어요. 그 전 기록은 그대로예요')
     expect(memory.load().data).toEqual(duesData(PAYERS_OFF_ROSTER))
+  })
+})
+
+describe('SPEC-012 AC-6 저장 실패 띠를 앱 오류 save 로 센다', () => {
+  function recorder() {
+    let saved: readonly AppError[] = []
+    return new AppErrorRecorder({
+      store: {
+        load: () => [...saved],
+        save: (errors) => {
+          saved = errors
+        },
+      },
+      origin: window.location.origin,
+      now: () => TODAY,
+    })
+  }
+
+  function renderWithErrors(repository: LedgerRepository, appErrors: AppErrorRecorder, loaded: LoadResult = repository.load()) {
+    let seq = 0
+    render(<App repository={repository} loaded={loaded} appErrors={appErrors} options={{ now: () => TODAY, createId: () => `id-${++seq}` }} />)
+  }
+
+  it('"저장하지 못했어요" 띠가 뜨면 실패 이유를 이름으로, 저장하던 화면 이름과 함께 센다', async () => {
+    const errors = recorder()
+    renderWithErrors(switchable(storedWith(LEDGER_2026)).repository, errors)
+
+    await addExpense('간식비', '5000')
+
+    expect(screen.getByRole('alert')).toHaveTextContent(SAVE_FAILED)
+    expect(errors.list()).toEqual([expect.objectContaining({ kind: 'save', name: 'quota-exceeded', message: '', screen: 'add-entry', count: 1 })])
+  })
+
+  it('띠가 떠 있는 동안 다시 실패해도 더 세지 않고, 저장에 성공해 띠가 사라진 뒤 다시 뜨면 한 번 더 센다', async () => {
+    const errors = recorder()
+    const { repository, state } = switchable(storedWith(LEDGER_2026))
+    renderWithErrors(repository, errors)
+
+    await addExpense('간식비', '5000')
+    await editAmount(/^대관료/, '45000')
+    expect(errors.list()).toEqual([expect.objectContaining({ count: 1 })])
+
+    state.failing = false
+    await addExpense('꽃값', '30000')
+    state.failing = true
+    await addExpense('장보기', '7000')
+    expect(errors.list()).toEqual([expect.objectContaining({ kind: 'save', name: 'quota-exceeded', screen: 'add-entry', count: 2 })])
+  })
+
+  it('가드에 어긋나 저장하지 않은 띠("앱에 문제가 있어")도 센다', async () => {
+    const errors = recorder()
+    renderWithErrors(switchable(storedWith(LEDGER_2026), 'invalid-data').repository, errors)
+
+    await addExpense('간식비', '5000')
+
+    expect(errors.list()).toEqual([expect.objectContaining({ kind: 'save', name: 'invalid-data' })])
+  })
+
+  it('읽기 전용으로 시작해 띠가 시작 안내 하나뿐이면 저장 실패를 세지 않는다', async () => {
+    const errors = recorder()
+    const { repository } = switchable(storedWith(LEDGER_2026), 'unreadable-original')
+    renderWithErrors(repository, errors, { status: 'read-only', reason: 'unreadable-original', data: storedWith(LEDGER_2026) })
+
+    await addExpense('간식비', '5000')
+
+    expect(errors.list()).toEqual([])
+  })
+
+  it('지금 화면 이름을 기록기에 알린다 (장부 → 설정)', async () => {
+    const errors = recorder()
+    renderWithErrors(new MemoryRepository(storedWith(LEDGER_2026)), errors)
+    errors.record('render', new Error('on ledger'))
+
+    await userEvent.click(screen.getByRole('button', { name: '설정' }))
+    errors.record('render', new Error('on settings'))
+
+    expect(errors.list().map((error) => error.screen)).toEqual(['ledger', 'settings'])
   })
 })

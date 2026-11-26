@@ -1,0 +1,25 @@
+/*
+ * "다시 열기" 화면 (SPEC-012 2절): 제목·본문 한 덩어리 → 묶음 간격 → 주 버튼 [다시 열기].
+ * 값은 tokens.css 변수만 쓴다. 화면 틀(.app·.app__main·.screen__title)은 screens.css 그대로
+ */
+@import '../../styles/tokens.css';
+
+.reopen {
+  gap: var(--group-gap);
+}
+
+.reopen__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-tight);
+}
+
+/* 본문: 큰 글씨에서도 낱말 가운데서 끊기지 않게 */
+.reopen__body {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--line-body);
+  word-break: keep-all;
+}
