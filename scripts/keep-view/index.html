@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>보관본 들여다보기</title>
 <!--
-  보관본 들여다보기 (SPEC-013, #205) — scripts/keep-view.mjs 가 127.0.0.1 에서 보내는 개발자용 페이지.
-  모양은 시안(SPEC-013 prototype)의 왼쪽 사본 목록 + 오른쪽 탭. 큰 글씨 규칙(docs/design.md)은 사용자 화면 기준이라 적용하지 않는다.
+  보관본 들여다보기 (SPEC-013, #205·#206) — scripts/keep-view.mjs 가 127.0.0.1 에서 보내는 개발자용 페이지.
+  모양은 시안(SPEC-013 prototype)의 왼쪽 사본 목록 + 오른쪽 탭(겉 정보·구조·표·비교). 큰 글씨 규칙(docs/design.md)은 사용자 화면 기준이라 적용하지 않는다.
   복구 코드는 이 탭 메모리(codes)에만 두고 페이지 안에서 푼다(keepRescue.ts 의 Web Crypto). 로컬 서버로 가는 주소에는 id 만 들어간다.
-  풀린 내용·코드는 localStorage·주소창·로그에 남기지 않는다. 구조·표·비교 탭은 #206.
+  풀린 내용·코드는 localStorage·주소창·로그에 남기지 않는다(풀린 사본은 이 탭 메모리 openedCopies 에만, [잠그기] 하면 지운다).
+  구조 나무·칸 채움·다섯 표·거르기·정렬·비교는 keepView.ts 의 순수 함수가 만들고, 여기서는 그리기만 한다.
 -->
 <style>
 :root{
@@ -112,6 +113,61 @@ pre{margin:0;font-family:var(--mono);font-size:12px;line-height:1.55;background:
 .locked{display:grid;gap:4px;justify-items:start;padding:16px 18px;border:1px dashed var(--line-strong);border-radius:10px;background:var(--sunk)}
 .locked b{color:var(--lock)}
 .opened{display:grid;gap:8px;padding:14px 16px;border:1px solid var(--line);border-left:3px solid var(--add);border-radius:10px}
+.mono{font-family:var(--mono)}
+
+/* 구조 */
+.tree{font-family:var(--mono);font-size:12.5px;line-height:1.7;min-width:0;overflow-x:auto}
+.tree details{margin-left:16px;border-left:1px solid var(--line);padding-left:10px}
+.tree > details{margin-left:0;border-left:0;padding-left:0}
+.tree summary{cursor:pointer;color:var(--ink)}
+.tree .leaf{margin-left:16px;padding-left:12px;border-left:1px solid var(--line)}
+.tree .ty{color:var(--accent-ink)}
+.tree .nt{color:var(--text)}
+.tree .sz{color:var(--muted);margin-left:8px}
+.tree .hid{color:var(--lock)}
+
+/* 표 */
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:460px}
+.tablewrap.free{max-height:none}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:5px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:top}
+th{position:sticky;top:0;background:var(--sunk);color:var(--muted);font-weight:600;font-size:12px;z-index:1}
+th button{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+th button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+td.n,th.n{text-align:right}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums}
+td.m{font-family:var(--mono);font-size:12px}
+td.wrap{white-space:normal;min-width:180px}
+td.nul{color:var(--muted);font-style:italic}
+table.rows tbody tr{cursor:pointer}
+table.rows tbody tr:hover{background:var(--sunk)}
+table.rows tbody tr[aria-selected="true"]{background:var(--accent-bg)}
+.tbar{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line-strong);border-radius:7px;overflow:hidden}
+.seg button{background:var(--panel);border:0;border-right:1px solid var(--line);padding:5px 11px;font-size:13px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.seg .k{font-family:var(--mono);font-size:11.5px;margin-left:4px}
+.tbar select,.tbar input{font-size:13px;padding:5px 8px;border:1px solid var(--line-strong);border-radius:6px;background:var(--panel)}
+.tbar select:disabled{opacity:.55}
+.tbar .count{margin-left:auto;font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+
+/* 비교 */
+.sum{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-size:13px;font-weight:600;border-radius:7px;padding:4px 10px;font-variant-numeric:tabular-nums}
+.pill.add{color:var(--add);background:var(--add-bg)}
+.pill.del{color:var(--del);background:var(--del-bg)}
+.pill.chg{color:var(--chg);background:var(--chg-bg)}
+.pill.same{color:var(--muted);background:var(--sunk);border:1px solid var(--line)}
+tr.added td:first-child{box-shadow:inset 3px 0 var(--add)}
+tr.removed td:first-child{box-shadow:inset 3px 0 var(--del)}
+tr.changed td:first-child{box-shadow:inset 3px 0 var(--chg)}
+.st-added{color:var(--add);font-weight:600}
+.st-removed{color:var(--del);font-weight:600}
+.st-changed{color:var(--chg);font-weight:600}
+del{color:var(--del);text-decoration-thickness:1px}
+ins{color:var(--add);text-decoration:none;font-weight:600}
+.members{font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px}
 </style>
 </head>
 <body>
@@ -133,13 +189,13 @@ pre{margin:0;font-family:var(--mono);font-size:12px;line-height:1.55;background:
   <section class="main" aria-labelledby="copyTitle">
     <div class="head" id="head"></div>
     <div class="lockbar" id="lockbar" data-testid="lockbar"></div>
-    <div class="tabs" role="tablist" aria-label="보기">
-      <button class="tab" type="button" role="tab" id="tab-outer" aria-selected="true" aria-controls="pane">겉 정보<span class="k">코드 없이</span></button>
-      <button class="tab" type="button" role="tab" aria-selected="false" disabled title="다음 단계(#206)">구조<span class="k">다음 단계</span></button>
-      <button class="tab" type="button" role="tab" aria-selected="false" disabled title="다음 단계(#206)">표<span class="k">다음 단계</span></button>
-      <button class="tab" type="button" role="tab" aria-selected="false" disabled title="다음 단계(#206)">비교<span class="k">다음 단계</span></button>
+    <div class="tabs" role="tablist" aria-label="보기" id="tabs">
+      <button class="tab" type="button" role="tab" id="tab-outer" data-tab="outer" aria-selected="true" aria-controls="pane">겉 정보<span class="k">코드 없이</span></button>
+      <button class="tab" type="button" role="tab" id="tab-tree" data-tab="tree" aria-selected="false" aria-controls="pane" tabindex="-1">구조</button>
+      <button class="tab" type="button" role="tab" id="tab-table" data-tab="table" aria-selected="false" aria-controls="pane" tabindex="-1">표</button>
+      <button class="tab" type="button" role="tab" id="tab-diff" data-tab="diff" aria-selected="false" aria-controls="pane" tabindex="-1">비교</button>
     </div>
-    <div class="pane" id="pane" role="tabpanel" aria-labelledby="tab-outer" data-testid="outer"></div>
+    <div class="pane" id="pane" role="tabpanel" aria-labelledby="tab-outer" data-testid="pane"></div>
   </section>
 </main>
 <script type="module">
@@ -147,6 +203,11 @@ import * as view from './keepView.ts'
 import { formatKst } from './keepRescue.ts'
 
 const $ = (id) => document.getElementById(id)
+
+// 자식 목록: 겹친 배열은 다 펴고, 없음·거짓 자식은 뺀다 (replaceChildren·append 는 그것을 글자로 바꿔 넣는다)
+function kids(children) {
+  return children.flat(Infinity).filter((child) => child !== undefined && child !== null && child !== false)
+}
 
 // el('p', { class: 'x', onclick }, '글', 자식…) — 글은 늘 글자로 넣는다(innerHTML 안 씀)
 function el(tag, attrs = {}, ...children) {
@@ -156,13 +217,13 @@ function el(tag, attrs = {}, ...children) {
     if (name.startsWith('on')) node.addEventListener(name.slice(2), value)
     else node.setAttribute(name, value === true ? '' : String(value))
   }
-  node.append(...children.flat().filter((child) => child !== undefined && child !== null && child !== false))
+  node.append(...kids(children))
   return node
 }
 
-// 자리 하나를 새로 채운다 (없음·거짓 자식은 뺀다 — replaceChildren 은 글자로 바꿔 넣는다)
+// 자리 하나를 새로 채운다
 function fill(id, ...children) {
-  $(id).replaceChildren(...children.flat().filter((child) => child !== undefined && child !== null && child !== false))
+  $(id).replaceChildren(...kids(children))
 }
 
 function infoList(rows, testid) {
@@ -173,6 +234,9 @@ const SERVER_GONE = '로컬 서버가 답하지 않아요. 터미널에서 도�
 
 // 기기 id → 정규화한 복구 코드. 이 탭 메모리에만 있고, [잠그기]나 탭을 닫으면 잊는다
 const codes = new Map()
+// 기기 id → (사본 자리 → 푼 결과 Promise). 비교 탭이 두 사본을 다시 받지 않게. 이 탭 메모리에만, [잠그기] 하면 그 기기 것을 지운다
+const openedCopies = new Map()
+const TABLE_START = { key: 'entries', book: '', year: '', search: '', sort: undefined, selected: undefined }
 const state = {
   loading: true,
   loadError: '',
@@ -182,9 +246,58 @@ const state = {
   copy: undefined, // undefined | { loading: true } | /api/copy 답
   opened: undefined, // 고른 사본을 푼 결과
   lockMessage: '',
+  tab: 'outer', // outer | tree | table | diff
+  table: { ...TABLE_START }, // 표 탭: 고른 표·장부·해·찾을 글·정렬·누른 줄
+  compare: undefined, // 비교 탭: { before, after, result } (사본을 새로 고르면 비운다)
 }
 // 사본을 빨리 바꿔 고를 때 늦게 온 답이 덮지 않게
 let pickToken = 0
+// 비교 앞·뒤를 빨리 바꿀 때 늦게 끝난 비교가 덮지 않게
+let compareToken = 0
+
+// 푼 저장 데이터 → 나무·칸 채움·다섯 표·고르기 칸 (한 사본에 한 번만 만든다)
+const derived = new WeakMap()
+function derivedOf(opened) {
+  if (!derived.has(opened.data)) {
+    derived.set(opened.data, {
+      tree: view.storedTree(opened.data),
+      fill: view.entryFill(opened.data),
+      tables: view.buildTables(opened.data),
+      choices: view.tableChoices(opened.data),
+    })
+  }
+  return derived.get(opened.data)
+}
+
+function copySpot(copy) {
+  return `${copy.kind}:${copy.key}`
+}
+
+// 그 기기 사본 하나를 받아 이 기기의 코드로 푼다. 잘 푼 것만 기억한다 (못 받은 것은 다음에 다시 받는다)
+function openedOf(device, copy) {
+  if (!openedCopies.has(device.id)) openedCopies.set(device.id, new Map())
+  const byCopy = openedCopies.get(device.id)
+  const spot = copySpot(copy)
+  if (!byCopy.has(spot)) {
+    const loading = (async () => {
+      const code = codes.get(device.id)
+      if (code === undefined) return { ok: false, message: '잠겨 있어요' }
+      const answer = await getLocal(view.copyPath(device.id, copy)).catch(() => ({ ok: false, message: SERVER_GONE }))
+      return answer.ok ? view.openCopy(code, answer.envelope) : answer
+    })()
+    byCopy.set(spot, loading)
+    loading.then((opened) => {
+      if (!opened.ok && byCopy.get(spot) === loading) byCopy.delete(spot)
+    })
+  }
+  return byCopy.get(spot)
+}
+
+function forgetOpened(deviceId) {
+  openedCopies.delete(deviceId)
+  compareToken++
+  if (state.compare) state.compare.result = undefined
+}
 
 // 로컬 서버 GET. 주소는 keepView 의 DEVICES_PATH·historyPath·copyPath 로만 만든다 (id 만, 코드 없음).
 // 상태와 형식을 먼저 본다: 200 이 아니면 서버가 준 { ok: false, message } 만, JSON 이 아니면 그 이유로 (keepView localAnswer)
@@ -208,15 +321,28 @@ async function openPicked(token) {
   const device = currentDevice()
   const code = device && codes.get(device.id)
   const opened = code && state.copy?.ok ? await view.openCopy(code, state.copy.envelope) : undefined
-  if (token === pickToken) state.opened = opened
+  if (token !== pickToken) return
+  state.opened = opened
+  // 비교 탭이 같은 사본을 다시 받지 않게
+  const copy = device?.copies[state.pick.index]
+  if (opened?.ok && copy) {
+    if (!openedCopies.has(device.id)) openedCopies.set(device.id, new Map())
+    openedCopies.get(device.id).set(copySpot(copy), Promise.resolve(opened))
+  }
 }
 
 async function pick(deviceId, index) {
   const token = ++pickToken
+  // 다른 기기로 가면 장부 id 가 달라지니 표 고르기를 처음으로
+  if (state.pick?.deviceId !== deviceId) state.table = { ...TABLE_START, key: state.table.key }
   state.pick = { deviceId, index }
   state.copy = { loading: true }
   state.opened = undefined
   state.lockMessage = ''
+  state.table.selected = undefined
+  // 비교 앞·뒤는 새로 고른 사본에서 다시 정한다 (끝나지 않은 비교는 버린다)
+  state.compare = undefined
+  compareToken++
   render()
   const device = currentDevice()
   const copy = device?.copies[index]
@@ -244,12 +370,16 @@ async function unlock(event) {
   }
   codes.set(device.id, result.normalized)
   state.lockMessage = ''
+  // 풀리면 바로 구조를 본다 (시안과 같게)
+  if (state.tab === 'outer') state.tab = 'tree'
   await openPicked(pickToken)
   render()
 }
 
 function relock() {
-  codes.delete(currentDevice().id)
+  const device = currentDevice()
+  codes.delete(device.id)
+  forgetOpened(device.id)
   state.opened = undefined
   render()
 }
@@ -271,6 +401,7 @@ async function openWithCode(event) {
   codes.set(device.id, result.normalized)
   message.className = 'msg'
   message.textContent = `${view.deviceName(device)} (${device.id.slice(0, 8)}) 을 열었어요`
+  if (state.tab === 'outer') state.tab = 'tree'
   await pick(device.id, 0)
 }
 
@@ -352,18 +483,343 @@ function renderLockbar() {
       state.lockMessage || '코드가 없으면 겉 정보만 보여요. 코드는 이 탭 안에서만 쓰고 로컬 서버로도 보내지 않아요.')))
 }
 
+function lockedBlock() {
+  return el('div', { class: 'locked', 'data-testid': 'locked' },
+    el('b', {}, '잠겨 있어요'),
+    el('p', {}, '이 기기의 복구 코드를 넣으면 저장 형식·장부·기록 수와 구조·표·비교가 보여요. 서버와 백업 레포에는 암호문만 있어요.'))
+}
+
 function openedBlock(device) {
-  if (!codes.has(device.id)) {
-    return el('div', { class: 'locked' },
-      el('b', {}, '잠겨 있어요'),
-      el('p', {}, '이 기기의 복구 코드를 넣으면 저장 형식·장부·기록 수가 보여요. 서버와 백업 레포에는 암호문만 있어요.'),
-      el('p', { class: 'cap' }, '구조·표·비교는 다음 단계(#206)예요.'))
-  }
+  if (!codes.has(device.id)) return lockedBlock()
   if (state.copy?.loading) return el('p', { class: 'cap', 'data-testid': 'opened-wait' }, '받으면 풀어요…')
   if (!state.copy?.ok) return el('div', { class: 'locked' }, el('p', {}, '사본을 받지 못해 풀 수 없어요.'))
   if (state.opened === undefined) return el('p', { class: 'cap' }, '푸는 중…')
   return el('div', { class: 'opened', 'data-testid': 'opened' }, el('h3', {}, '풀린 내용'), infoList(view.openedInfo(state.opened), 'opened-info'))
 }
+
+function outerPane(device, copy) {
+  const answer = state.copy
+  return [
+    infoList(view.outerInfo(device, copy, Date.now()), 'outer-info'),
+    answer?.loading && el('p', { class: 'cap' }, '겉봉투를 받는 중…'),
+    answer && !answer.loading && !answer.ok && el('p', { class: 'bad', 'data-testid': 'copy-problem' }, answer.message),
+    answer?.ok && el('div', { class: 'block' }, el('p', { class: 'cap' }, '겉봉투 (서버·백업 레포에 있는 그대로, data 는 앞부분만)'), el('pre', {}, view.envelopePreview(answer.envelope))),
+    openedBlock(device),
+  ]
+}
+
+// 구조·표 탭: 고른 사본이 풀렸을 때만. 아니면 그 까닭 한 줄
+function openedOrWhy() {
+  if (state.copy?.loading) return { why: el('p', { class: 'cap', 'data-testid': 'opened-wait' }, '받으면 풀어요…') }
+  if (!state.copy?.ok) return { why: el('p', { class: 'bad', 'data-testid': 'copy-problem' }, state.copy?.message ?? '사본을 받지 못했어요') }
+  if (state.opened === undefined) return { why: el('p', { class: 'cap' }, '푸는 중…') }
+  if (!state.opened.ok) return { why: el('p', { class: 'bad', 'data-testid': 'open-problem' }, state.opened.message) }
+  return { opened: state.opened }
+}
+
+function formatCap(opened, extra) {
+  return el('p', { class: 'cap' }, `저장 형식 ${view.schemaText(opened.schemaVersion)} · ${extra}`)
+}
+
+// ---------- 구조 ----------
+
+function treeLine(node) {
+  return [
+    el('span', {}, node.label),
+    node.value !== undefined && [': ', el('span', { class: 'ty' }, node.value)],
+    node.masked && [': ', el('span', { class: 'hid' }, '(가림)')],
+    node.kind !== undefined && [' ', el('span', { class: 'ty' }, node.kind)],
+    node.note !== undefined && el('span', { class: 'nt' }, ` · ${node.note}`),
+    node.bytes !== undefined && el('span', { class: 'sz' }, view.sizeText(node.bytes)),
+  ]
+}
+
+// 맨 위 두 층(StoredData·books)은 펼쳐 두고, 장부부터는 접어 둔다
+function treeNode(node, depth) {
+  if (node.children.length === 0) return el('div', { class: 'leaf' }, treeLine(node))
+  return el('details', { open: depth < 2 }, el('summary', {}, treeLine(node)), node.children.map((child) => treeNode(child, depth + 1)))
+}
+
+function fillTable(fill) {
+  const heads = [['칸'], ['종류'], ['필수/선택'], ['채운 줄', 'n'], ['비율', 'n']]
+  return el('div', { class: 'block' },
+    el('h3', {}, '내역(Entry) 칸 채움 ', el('span', { class: 'cap' }, `· ${view.won(fill.total)}줄`)),
+    el('div', { class: 'tablewrap free' },
+      el('table', { 'data-testid': 'fill' },
+        el('thead', {}, el('tr', {}, heads.map(([label, cls]) => el('th', { class: cls }, label)))),
+        el('tbody', {}, fill.fields.map((field) => el('tr', {},
+          el('td', { class: 'm' }, field.field), el('td', { class: 'm' }, field.type), el('td', {}, field.need),
+          el('td', { class: 'n' }, view.won(field.filled)), el('td', { class: 'n' }, field.share)))))))
+}
+
+function treePane() {
+  const { opened, why } = openedOrWhy()
+  if (why) return why
+  const { tree, fill } = derivedOf(opened)
+  return [
+    formatCap(opened, '크기는 줄바꿈·들여쓰기 없이 잰 JSON 크기, 시각은 한국 시간'),
+    el('div', { class: 'tree', 'data-testid': 'tree' }, treeNode(tree, 0)),
+    fillTable(fill),
+  ]
+}
+
+// ---------- 표 ----------
+
+function currentTable(tables) {
+  return tables.find((table) => table.key === state.table.key) ?? tables[0]
+}
+
+function hasYear(table) {
+  return table.columns.some((column) => column.key === 'year')
+}
+
+function tableQuery(table) {
+  const { book, year, search, sort } = state.table
+  return { book, year: hasYear(table) ? year : '', search, sort }
+}
+
+function tableBar(tables, choices) {
+  const table = currentTable(tables)
+  const pickTable = (key) => {
+    state.table = { ...state.table, key, sort: undefined, selected: undefined }
+    renderPane()
+  }
+  const option = (value, label, chosen) => el('option', { value, selected: chosen }, label)
+  return el('div', { class: 'tbar', 'data-testid': 'table-bar' },
+    el('div', { class: 'seg', role: 'group', 'aria-label': '표' }, tables.map((item) =>
+      el('button', { type: 'button', 'aria-pressed': String(item.key === table.key), 'data-testid': `table-${item.key}`, onclick: () => pickTable(item.key) },
+        item.label, el('span', { class: 'k' }, view.won(item.rows.length))))),
+    el('select', { id: 'tableBook', 'aria-label': '장부', onchange: (event) => { state.table.book = event.target.value; state.table.selected = undefined; renderTableResult() } },
+      option('', '모든 장부', state.table.book === ''),
+      choices.books.map(({ id, name }) => option(id, name, state.table.book === id))),
+    el('select', { id: 'tableYear', 'aria-label': '해', disabled: !hasYear(table), title: hasYear(table) ? undefined : '이 표에는 해 칸이 없어요', onchange: (event) => { state.table.year = event.target.value; state.table.selected = undefined; renderTableResult() } },
+      option('', '모든 해', state.table.year === ''),
+      choices.years.map((year) => option(year, year, state.table.year === year))),
+    // 찾는 동안에는 결과만 다시 그린다 (입력칸은 그대로 두어 포커스·커서가 남게)
+    el('input', { id: 'tableSearch', type: 'search', 'aria-label': '찾기', placeholder: '찾기 (이름·금액·글)', value: state.table.search, autocomplete: 'off', spellcheck: 'false', oninput: (event) => { state.table.search = event.target.value; state.table.selected = undefined; renderTableResult() } }),
+    el('span', { class: 'count', id: 'tableCount', 'data-testid': 'table-count' }))
+}
+
+// 지금 그린 줄 → tr, 칸 이름 → 머리 단추 (줄을 고르거나 정렬해도 포커스·스크롤을 지키려고)
+let rowNodes = new Map()
+let headButtons = new Map()
+
+function sortBy(key) {
+  const { sort } = state.table
+  state.table.sort = sort?.column === key ? { column: key, descending: !sort.descending } : { column: key, descending: false }
+  renderTableResult()
+  headButtons.get(key)?.focus()
+}
+
+// 줄을 고르면 표는 다시 그리지 않고 고른 표시와 원본 JSON 만 바꾼다 (포커스·스크롤이 그대로)
+function showSelected() {
+  const raw = $('tableRaw')
+  if (!raw) return
+  const { selected } = state.table
+  for (const [row, tr] of rowNodes) tr.setAttribute('aria-selected', String(selected === row))
+  const picked = selected !== undefined && rowNodes.has(selected) ? selected : undefined
+  raw.replaceChildren(picked
+    ? el('div', { class: 'block' }, el('p', { class: 'cap' }, '고른 줄 원본 (JSON, 저장된 그대로 — 장부·해 줄은 안의 목록을 줄여 보여요)'), el('pre', { 'data-testid': 'raw' }, JSON.stringify(picked.raw, null, 2)))
+    : el('p', { class: 'cap' }, '줄을 누르면 저장된 원본 JSON 이 아래에 보여요.'))
+}
+
+function tableCell(column, value) {
+  const text = view.cellText(column, value)
+  const classes = [
+    (column.format === 'won' || column.format === 'number') && 'n',
+    column.format === 'long' && 'wrap',
+    text === undefined && 'nul',
+  ].filter(Boolean).join(' ')
+  return el('td', { class: classes || undefined }, text ?? '—')
+}
+
+function tableRow(table, row) {
+  const toggle = () => {
+    state.table.selected = state.table.selected === row ? undefined : row
+    showSelected()
+  }
+  const tr = el('tr', { tabindex: '0', onclick: toggle, onkeydown: (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    toggle()
+  } }, table.columns.map((column) => tableCell(column, row.cells[column.key])))
+  rowNodes.set(row, tr)
+  return tr
+}
+
+// 표를 다시 그린다 (표·장부·해·찾기·정렬이 바뀔 때). 거르기 칸과 찾기 입력칸은 그대로 둔다
+function renderTableResult() {
+  const { opened } = openedOrWhy()
+  const result = $('tableResult')
+  if (!opened || !result) return
+  const table = currentTable(derivedOf(opened).tables)
+  const shown = view.queryTable(table, tableQuery(table))
+  const { sort } = state.table
+  $('tableCount').textContent = shown.countText
+  rowNodes = new Map()
+  headButtons = new Map()
+  const head = table.columns.map((column) => {
+    const on = sort?.column === column.key
+    const mark = on ? (sort.descending ? ' ▼' : ' ▲') : ''
+    const button = el('button', { type: 'button', onclick: () => sortBy(column.key) }, column.label + mark)
+    headButtons.set(column.key, button)
+    return el('th', { class: column.format === 'won' || column.format === 'number' ? 'n' : undefined, 'aria-sort': on ? (sort.descending ? 'descending' : 'ascending') : 'none' }, button)
+  })
+  result.replaceChildren(
+    el('div', { class: 'tablewrap' },
+      el('table', { class: 'rows', 'data-testid': 'table-rows' },
+        el('thead', {}, el('tr', {}, head)),
+        el('tbody', {}, shown.rows.map((row) => tableRow(table, row))))),
+    el('div', { id: 'tableRaw' }))
+  showSelected()
+}
+
+function tablePane() {
+  const { opened, why } = openedOrWhy()
+  if (why) return why
+  const { tables, choices } = derivedOf(opened)
+  return [
+    formatCap(opened, `한 번에 ${view.won(view.TABLE_LIMIT)}줄까지 그려요 — 장부·해·찾기로 좁혀 보세요. 시각은 한국 시간`),
+    tableBar(tables, choices),
+    el('div', { class: 'block', id: 'tableResult' }),
+  ]
+}
+
+// ---------- 비교 ----------
+
+function copyOptionLabel(copy) {
+  return `${view.copyLabel(copy)} · ${formatKst(copy.at).slice(5)}${copy.problem ? ' (못 받음)' : ''}`
+}
+
+async function startCompare(device, pair) {
+  const token = ++compareToken
+  pair.result = { loading: true }
+  const [before, after] = await Promise.all([openedOf(device, device.copies[pair.before]), openedOf(device, device.copies[pair.after])])
+  // 그사이 앞·뒤나 사본·잠금이 바뀌었으면 버린다
+  if (token !== compareToken || state.compare !== pair) return
+  if (!before.ok) pair.result = { ok: false, message: `앞 사본: ${before.message}` }
+  else if (!after.ok) pair.result = { ok: false, message: `뒤 사본: ${after.message}` }
+  else pair.result = { ok: true, comparison: view.compareCopies(before.data, after.data) }
+  renderCompareResult()
+}
+
+function changeCell(change) {
+  if (change.changes.length === 0) return el('td', { class: 'm' })
+  return el('td', { class: 'm' }, change.changes.map((item, index) => [
+    index > 0 && el('br'), `${item.label}: `, el('del', {}, item.before), ' → ', el('ins', {}, item.after)]))
+}
+
+const STATUS_WORDS = { added: '더해짐', removed: '빠짐', changed: '바뀜' }
+
+function signed(value) {
+  return `${value > 0 ? '+' : ''}${view.won(value)}`
+}
+
+function renderCompareResult() {
+  const result = $('compareResult')
+  const pair = state.compare
+  if (!result || !pair) return
+  if (pair.result === undefined || pair.result.loading) {
+    result.replaceChildren(el('p', { class: 'cap', 'data-testid': 'compare-wait' }, '두 사본을 받아 푸는 중…'))
+    return
+  }
+  if (!pair.result.ok) {
+    result.replaceChildren(el('p', { class: 'bad', 'data-testid': 'compare-problem' }, pair.result.message))
+    return
+  }
+  const { comparison } = pair.result
+  const { membersAdded, membersRemoved, balances } = comparison
+  const more = view.compareMoreText(comparison)
+  const memberChanged = membersAdded.length + membersRemoved.length > 0
+  // fill 로 채운다: 없음·거짓 자식(회원 변화 없음, 자른 줄 없음)을 글자로 넣지 않게
+  fill('compareResult',
+    el('div', { class: 'sum', 'data-testid': 'compare-sum' },
+      el('span', { class: 'pill del' }, `빠진 내역 ${view.won(comparison.removed)}`),
+      el('span', { class: 'pill chg' }, `바뀐 내역 ${view.won(comparison.changed)}`),
+      el('span', { class: 'pill add' }, `더해진 내역 ${view.won(comparison.added)}`),
+      el('span', { class: memberChanged ? 'pill add' : 'pill same' }, `회원 +${membersAdded.length} / −${membersRemoved.length}`)),
+    memberChanged && el('p', { class: 'members', 'data-testid': 'compare-members' },
+      membersAdded.map((member) => el('ins', {}, `+ ${member.book} · ${member.name}${member.joined ? ` (들어온 달 ${member.joined})` : ''}`)),
+      membersRemoved.map((member) => el('del', {}, `− ${member.book} · ${member.name}`))),
+    comparison.total === 0
+      ? el('p', { class: 'cap' }, '두 사본의 내역이 같아요 (월·일·종류·이름·금액·낸 분·엑셀 글).')
+      : el('div', { class: 'tablewrap' },
+        el('table', { 'data-testid': 'compare-rows' },
+          el('thead', {}, el('tr', {}, ['상태', '장부', '해·월·일', '종류', '이름', '금액', '바뀐 칸 (앞 → 뒤)'].map((label) => el('th', { class: label === '금액' ? 'n' : undefined }, label)))),
+          el('tbody', {}, comparison.rows.map((change) => el('tr', { class: change.status },
+            el('td', {}, el('span', { class: `st-${change.status}` }, STATUS_WORDS[change.status])),
+            el('td', {}, change.book), el('td', { class: 'm' }, change.date), el('td', {}, change.type ?? '—'), el('td', {}, change.name ?? '—'),
+            el('td', { class: 'n' }, change.amount === undefined ? '—' : view.won(change.amount)), changeCell(change)))))),
+    more && el('p', { class: 'cap', 'data-testid': 'compare-more' }, more),
+    el('div', { class: 'block' },
+      el('h3', {}, '해별 남은 돈 ', el('span', { class: 'cap' }, '· 이월금 + 수입 − 지출, 달라진 해만')),
+      balances.length === 0
+        ? el('p', { class: 'cap' }, '해별 남은 돈은 같아요.')
+        : el('div', { class: 'tablewrap free' },
+          el('table', { 'data-testid': 'balances' },
+            el('thead', {}, el('tr', {}, el('th', {}, '장부 · 해'), el('th', { class: 'n' }, '앞'), el('th', { class: 'n' }, '뒤'), el('th', { class: 'n' }, '차이'))),
+            el('tbody', {}, balances.map((item) => el('tr', {},
+              el('td', {}, `${item.book} · ${item.year}`),
+              el('td', { class: 'n' }, item.before === undefined ? '—' : view.won(item.before)),
+              el('td', { class: 'n' }, item.after === undefined ? '—' : view.won(item.after)),
+              el('td', { class: 'n' }, item.diff === undefined ? '—' : signed(item.diff)))))))))
+}
+
+function diffPane(device) {
+  if (device.copies.length < 2) return el('p', { class: 'cap' }, '이 기기에는 사본이 하나뿐이라 비교할 것이 없어요.')
+  if (state.compare === undefined) {
+    const pair = view.defaultPair(device.copies, state.pick.index) ?? { before: 1, after: 0 }
+    state.compare = { ...pair, result: undefined }
+  }
+  const pair = state.compare
+  const choose = (side) => (event) => {
+    state.compare = { ...pair, [side]: Number(event.target.value), result: undefined }
+    compareToken++
+    renderPane()
+  }
+  const options = (chosen) => device.copies.map((copy, index) => el('option', { value: String(index), selected: index === chosen }, copyOptionLabel(copy)))
+  if (pair.result === undefined) startCompare(device, pair)
+  return [
+    el('p', { class: 'cap' }, '같은 기기의 두 사본을 같은 코드로 풀어 맞춰 봐요. 내역은 id 로, 회원은 장부 id + 회원 번호로 맞춰요.'),
+    el('div', { class: 'tbar' },
+      el('label', { for: 'compareBefore', class: 'cap' }, '앞'),
+      el('select', { id: 'compareBefore', 'data-testid': 'compare-before', onchange: choose('before') }, options(pair.before)),
+      el('span', { 'aria-hidden': 'true' }, '→'),
+      el('label', { for: 'compareAfter', class: 'cap' }, '뒤'),
+      el('select', { id: 'compareAfter', 'data-testid': 'compare-after', onchange: choose('after') }, options(pair.after))),
+    el('div', { class: 'block', id: 'compareResult' }),
+  ]
+}
+
+// ---------- 탭 ----------
+
+const TABS = ['outer', 'tree', 'table', 'diff']
+
+function renderTabs() {
+  for (const tab of TABS) {
+    const button = $(`tab-${tab}`)
+    button.setAttribute('aria-selected', String(state.tab === tab))
+    button.tabIndex = state.tab === tab ? 0 : -1
+  }
+  $('pane').setAttribute('aria-labelledby', `tab-${state.tab}`)
+}
+
+function showTab(tab, focus) {
+  state.tab = tab
+  renderTabs()
+  renderPane()
+  if (focus) $(`tab-${tab}`).focus()
+}
+
+$('tabs').addEventListener('click', (event) => {
+  const tab = event.target.closest('[data-tab]')?.dataset.tab
+  if (tab) showTab(tab, false)
+})
+$('tabs').addEventListener('keydown', (event) => {
+  if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+  const step = event.key === 'ArrowRight' ? 1 : TABS.length - 1
+  showTab(TABS[(TABS.indexOf(state.tab) + step) % TABS.length], true)
+})
 
 function renderPane() {
   const device = currentDevice()
@@ -372,13 +828,16 @@ function renderPane() {
     fill('pane', el('p', { class: 'cap' }, state.loading ? '' : '왼쪽에서 사본을 고르세요.'))
     return
   }
-  const answer = state.copy
-  fill('pane',
-    infoList(view.outerInfo(device, copy, Date.now()), 'outer-info'),
-    answer?.loading && el('p', { class: 'cap' }, '겉봉투를 받는 중…'),
-    answer && !answer.loading && !answer.ok && el('p', { class: 'bad', 'data-testid': 'copy-problem' }, answer.message),
-    answer?.ok && el('div', { class: 'block' }, el('p', { class: 'cap' }, '겉봉투 (서버·백업 레포에 있는 그대로, data 는 앞부분만)'), el('pre', {}, view.envelopePreview(answer.envelope))),
-    openedBlock(device))
+  if (state.tab === 'outer') fill('pane', outerPane(device, copy))
+  else if (!codes.has(device.id)) fill('pane', lockedBlock())
+  else if (state.tab === 'tree') fill('pane', treePane())
+  else if (state.tab === 'table') {
+    fill('pane', tablePane())
+    renderTableResult()
+  } else {
+    fill('pane', diffPane(device))
+    renderCompareResult()
+  }
 }
 
 function render() {
@@ -386,6 +845,7 @@ function render() {
   renderSide()
   renderHead()
   renderLockbar()
+  renderTabs()
   renderPane()
 }
 
