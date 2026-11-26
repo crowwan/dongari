@@ -45,10 +45,16 @@ function saveFailureNotice(reason: SaveFailureReason): StorageNotice {
   return { message: STORAGE_NOTICE.saveFailed, action: 'send-backup' }
 }
 
-// 화면 위에 띄울 안내, 위에서부터 순서대로.
-// 저장을 막아 둔 상태(read-only)의 저장 실패는 시작 안내가 이미 이유를 말하므로 따로 띄우지 않는다
+// 저장 실패 띠를 띄울 실패 이유. 없으면 띠가 없다.
+// 저장을 막아 둔 상태(read-only)의 저장 실패는 시작 안내가 이미 이유를 말하므로 따로 띄우지 않는다.
+// 띠가 뜨면 App 이 앱 오류 save 로 센다 (SPEC-012 2절, "저장하지 못했어요"·"앱에 문제가 있어" 띠 둘 다)
+export function shownSaveFailure(startup: StartupStatus, saveFailure: SaveFailureReason | undefined): SaveFailureReason | undefined {
+  return startup.status === 'read-only' ? undefined : saveFailure
+}
+
+// 화면 위에 띄울 안내, 위에서부터 순서대로
 export function storageNotices(startup: StartupStatus, saveFailure: SaveFailureReason | undefined): StorageNotice[] {
-  const notices = [startupNotice(startup)]
-  if (saveFailure && startup.status !== 'read-only') notices.push(saveFailureNotice(saveFailure))
+  const failure = shownSaveFailure(startup, saveFailure)
+  const notices = [startupNotice(startup), failure && saveFailureNotice(failure)]
   return notices.filter((notice) => notice !== undefined)
 }

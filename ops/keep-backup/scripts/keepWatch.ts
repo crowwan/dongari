@@ -30,7 +30,7 @@ const HANGUL_FINALS = 28
 const NAME_UNSAFE = /[\p{Cc}|`]/u
 const UTF8_BOM = '\uFEFF'
 
-// 앱 화면 이름(dongari src/features/useScreenHistory.ts 의 Screen name) → 사람 말. 모르는 이름(앱이 모르면 unknown)은 그대로 보인다
+// 앱 화면 이름(dongari src/features/useScreenHistory.ts 의 Screen name, AppRoot 의 RootScreenName) → 사람 말. 모르는 이름(앱이 모르면 unknown)은 그대로 보인다
 const SCREEN_NAMES: ReadonlyMap<string, string> = new Map([
   ['ledger', '장부'],
   ['settings', '설정'],
@@ -42,6 +42,10 @@ const SCREEN_NAMES: ReadonlyMap<string, string> = new Map([
   ['keep-restore', '복구 코드로 불러오기'],
   ['dues', '회비 표'],
   ['excel-import', '엑셀 불러오기'],
+  // 진짜 App 밖 화면 (dongari src/features/practice/AppRoot.tsx 의 RootScreenName, #203)
+  ['first-run', '첫 실행 물음'],
+  ['practice', '연습 장부'],
+  ['in-app', '카톡 안 안내'],
 ])
 
 export const SERVER_DOWN = '보관 서버가 응답하지 않아요'
@@ -56,8 +60,9 @@ export const NAMES_BROKEN =
   '이름에는 줄바꿈 같은 제어 문자, `|`, 백틱을 넣지 않아요'
 export const NO_APP_ERRORS = '앱 오류가 없어요'
 
-// devices.json 을 읽은 결과 (SPEC-012): 기기 앞 8자 → 이름, 또는 모양이 틀림
-export type DeviceNames = { ok: true; names: ReadonlyMap<string, string> } | { ok: false }
+// devices.json 을 읽은 결과 (SPEC-012): 기기 앞 8자 → 이름, 또는 모양이 틀림.
+// 읽다 실패했으면(폴더·권한) readError 를 두고, 알면 오류 코드(EISDIR·EACCES 등, 없으면 오류 이름)를 담는다 (#209 리뷰)
+export type DeviceNames = { ok: true; names: ReadonlyMap<string, string> } | { ok: false; readError?: { code?: string } }
 
 // 서버를 부른 결과: 연결 자체가 안 됐거나(시간 초과 포함), 상태 코드와 JSON 본문(못 읽었으면 undefined)
 export type ReportResponse =
@@ -200,14 +205,23 @@ export function parseDeviceNames(text: string | undefined): DeviceNames {
   return { ok: true, names }
 }
 
+// 읽기 실패의 오류 코드: Node fs 오류의 code(EISDIR·EACCES 등), 없으면 오류 이름. 둘 다 없으면 undefined
+function readErrorCode(error: unknown): string | undefined {
+  if (!isRecord(error)) return undefined
+  if (typeof error.code === 'string') return error.code
+  return typeof error.name === 'string' ? error.name : undefined
+}
+
 // 이름표 파일 읽기: read 는 파일 글자를, 파일이 없으면 undefined 를 돌려준다.
-// 읽다 실패하면(폴더이거나 권한이 없음) 모양이 틀림으로 본다 — 예외로 끝나지 않고 서버 판정·표는 그대로 남게 (#207 리뷰)
+// 읽다 실패하면(폴더이거나 권한이 없음) 모양이 틀림으로 본다 — 예외로 끝나지 않고 서버 판정·표는 그대로 남게 (#207 리뷰).
+// 그때 오류 코드를 문구에 붙인다 (#209 리뷰)
 export function readDeviceNames(read: () => string | undefined): DeviceNames {
   let text: string | undefined
   try {
     text = read()
-  } catch {
-    return { ok: false }
+  } catch (error) {
+    const code = readErrorCode(error)
+    return { ok: false, readError: code === undefined ? {} : { code } }
   }
   return parseDeviceNames(text)
 }
@@ -228,10 +242,20 @@ function deviceText(id: string, name: string | undefined): string {
   return name === undefined ? `기기 ${deviceLabel(id, name)}` : deviceLabel(id, name)
 }
 
-// 서버에서 온 글(앱 오류의 종류·이름·글·화면)을 표 칸과 문구 한 줄에 넣을 수 있게 다듬는다:
-// 제어 문자(줄바꿈 등)는 빈칸, | 는 ¦(표 칸이 나뉘지 않게), 백틱은 '(코드 표시가 섞이지 않게)
+// 서버에서 온 글(앱 오류의 종류·이름·글·화면·위치, 기기의 앱 버전)을 표 칸과 문구 한 줄에 넣을 수 있게 다듬는다:
+// 제어 문자(줄바꿈 등)는 빈칸, | 는 ¦(표 칸이 나뉘지 않게), 백틱은 '(코드 표시가 섞이지 않게),
+// < > 는 ‹ ›, [ ] 는 ［ ］(실행 요약 마크다운에서 HTML 태그·링크로 읽히지 않게, #209 리뷰)
+const PLAIN_SWAPS: ReadonlyMap<string, string> = new Map([
+  ['|', '¦'],
+  ['`', "'"],
+  ['<', '‹'],
+  ['>', '›'],
+  ['[', '［'],
+  [']', '］'],
+])
+
 function plainText(text: string): string {
-  return text.replace(/\p{Cc}+/gu, ' ').replace(/\|/g, '¦').replace(/`/g, "'")
+  return text.replace(/\p{Cc}+/gu, ' ').replace(/[|`<>[\]]/g, (char) => PLAIN_SWAPS.get(char) ?? char)
 }
 
 // 오류가 난 화면: 아는 이름이면 사람 말과 이름(회비 표(`dues`)), 모르면 이름만(`unknown`)
@@ -272,9 +296,10 @@ function judgeDevice(device: DeviceReport, now: number): { failures: string[]; w
     failures.push(`${subject} 3일 넘게 보관하지 못했어요 (밀린 때 ${formatKst(device.pendingSince)} KST)`)
   }
   if (device.tooLarge) failures.push(`${who} 의 기록이 1MB 를 넘어 보관하지 못했어요`)
-  // 앱 오류: 마지막 때(폰 시각)가 요약 now 기준 36시간 안이면 실패. 정확히 36시간은 문제 아님, now 보다 뒤(폰 시계가 앞섬)는 36시간 안
+  // 앱 오류: 마지막 때(폰 시각)가 요약 now 기준 앞뒤 36시간 안이면 실패. 정확히 36시간은 문제 아님.
+  // now 보다 뒤(폰 시계가 앞섬)도 36시간 안일 때만 — 폰 시계가 크게 틀리면 실패로 잡지 않고 표에만 남는다 (SPEC-012 "판정의 한계", #209 리뷰)
   for (const error of device.errors) {
-    if (now - Date.parse(error.lastAt) < APP_ERROR_LIMIT_MS) failures.push(appErrorFailure(who, error))
+    if (Math.abs(now - Date.parse(error.lastAt)) < APP_ERROR_LIMIT_MS) failures.push(appErrorFailure(who, error))
   }
   if (!device.enabled) warnings.push(`${subject} 자동 보관을 껐어요`)
   if (now - Date.parse(device.seenAt) > SILENT_LIMIT_MS) warnings.push(`${subject} 30일 넘게 앱을 열지 않았어요`)
@@ -325,12 +350,18 @@ function judgeResponse(response: ReportResponse, names: ReadonlyMap<string, stri
   }
 }
 
+// 이름표 모양 틀림 문구. 읽다 실패했으면 그렇다고, 오류 코드를 알면 코드까지 붙인다: … (읽지 못함: EISDIR)
+function namesBrokenText(readError: { code?: string } | undefined): string {
+  if (readError === undefined) return NAMES_BROKEN
+  return `${NAMES_BROKEN} (읽지 못함${readError.code === undefined ? '' : `: ${plainText(readError.code)}`})`
+}
+
 // 응답 하나를 이름표(devices.json, SPEC-012)와 함께 판정한다. 시각 비교는 서버 요약의 now 로 한다 (실행기 시계와 무관).
 // 이름표 모양이 틀리면 서버 판정은 그대로 하고(기기는 앞 8자로) 실패를 하나 더한다. 이름 경고는 요약을 받았을 때만
 export function judgeReport(response: ReportResponse, deviceNames: DeviceNames): Verdict {
   if (!deviceNames.ok) {
     const verdict = judgeResponse(response, new Map())
-    return { ...verdict, failures: [...verdict.failures, NAMES_BROKEN] }
+    return { ...verdict, failures: [...verdict.failures, namesBrokenText(deviceNames.readError)] }
   }
   const verdict = judgeResponse(response, deviceNames.names)
   if (verdict.report === undefined) return verdict
@@ -345,7 +376,7 @@ function deviceRow(device: DeviceReport): string {
     device.pendingSince === undefined ? '-' : formatKst(device.pendingSince),
     device.lastKeptAt === undefined ? '-' : formatKst(device.lastKeptAt),
     device.tooLarge ? '1MB 넘음' : '-',
-    device.appVersion,
+    plainText(device.appVersion),
   ]
   return `| ${cells.join(' | ')} |`
 }
@@ -360,16 +391,18 @@ function appErrorRow(device: DeviceReport, error: AppErrorReport): string {
     String(error.count),
     formatKst(error.firstAt),
     formatKst(error.lastAt),
+    error.where === undefined || error.where === '' ? '-' : plainText(error.where),
   ]
   return `| ${cells.join(' | ')} |`
 }
 
-// "앱 오류" 표 (SPEC-012 2절): 36시간이 지난 오류도 남긴다(폰이 7일 동안 보낸다)
+// "앱 오류" 표 (SPEC-012 2절): 36시간이 지난 오류도 남긴다(폰이 7일 동안 보낸다).
+// 마지막 칸 위치(번들 파일이름:줄:칸)는 같은 태그를 소스맵과 함께 다시 빌드해 찾을 때 쓴다 (#209 리뷰). 실패 문구에는 넣지 않는다
 function appErrorLines(devices: readonly DeviceReport[]): string[] {
   const rows = devices.flatMap((device) => device.errors.map((error) => appErrorRow(device, error)))
   const lines = ['### 앱 오류 (폰 시각, KST)', '']
   if (rows.length === 0) return [...lines, NO_APP_ERRORS, '']
-  return [...lines, '| 기기 | 화면 | 종류 | 이름 | 글 | 횟수 | 처음 | 마지막 |', '|---|---|---|---|---|---|---|---|', ...rows, '']
+  return [...lines, '| 기기 | 화면 | 종류 | 이름 | 글 | 횟수 | 처음 | 마지막 | 위치 |', '|---|---|---|---|---|---|---|---|---|', ...rows, '']
 }
 
 function messageList(title: string, messages: string[]): string[] {

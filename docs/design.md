@@ -1,6 +1,6 @@
 ---
 project: 우리 장부
-updated: 2026-11-24
+updated: 2026-11-26
 ---
 
 # 우리 장부 디자인
@@ -243,6 +243,7 @@ CONCEPT.md §6 규칙 요약 1~9 기준.
 | `SlideGuide` (`ui`, SPEC-009 #142) | 넘겨 보는 안내 틀: 그림 한 장 → 장 번호 알약("1 / 4", `--primary-soft` 면 Label Bold `--accent-ink`) + 큰 글씨 한 줄(18 SemiBold `--strong`, 두 줄 높이 잡아 둠, `aria-live` — 화면 읽기 "2 / 4, …") → [이전](`Button secondary`, 첫 장 비활성 — 첫 장으로 돌아오면 포커스는 [다음]) [다음](주, 1:2 폭) · 마지막 장은 [다음] 자리가 `finishLabel`. 손으로만 넘긴다(자동 넘김 없음). 장 번호는 부품 안 상태라 다시 그리면 1장부터. 쓰는 곳: 설치 방법 안내 창(`InstallGuide`) |
 | 연습 띠·첫 실행 물음·끝 화면 (`features/practice`, SPEC-008 #132) | 띠: 모든 연습 화면 맨 위 `position: sticky`, `--info-bg` 면 + `--info-ink` 글자, ⓘ + "연습 중이에요"(Bold)/"저장되지 않아요"(14), [그만하기](`--surface` 면 + `--strong` SemiBold, 56, 반경 12, 줄바꿈 없음). 말풍선이 떠 있으면 스크림(40) 위 41 로 올라 밝게 남고, 확인 창이 뜨면 내려가 같이 어두워진다. 첫 실행 물음·끝 화면은 버튼을 아래 고정 대신 화면 흐름 맨 아래(글자를 키워도 글을 가리지 않게), 번호·체크는 `--primary-soft` 면 + `--accent-ink`. 끝 화면은 "배운 것" 카드 바로 아래 Caption 글 "진짜 엑셀은 카톡으로 폰에 받아 두고 장부 이름 ⌄ › [엑셀 파일로 새 장부]"(`practice-screen__note`, SPEC-010 10절 #168). 연습 엑셀 화면 조각을 받지 못하면 말풍선 아래 줄 버튼이 [엑셀 연습 건너뛰기](`CoachMark` `action`, [다음에 할게요] 와 같은 짝). 연습 끝 "홈 화면에 추가하시겠어요?"·설치 확인(SPEC-009 B #143)도 같은 틀: 제목 → `HomeScreenPreview` → "추가하면 좋은 점" 카드("배운 것" 카드 모양, 두 줄로 접히는 줄은 체크를 첫 줄에 맞추고 Body 줄 간격) → [추가할게요](주, 휴대폰 아이콘)·[다음에 할게요](보조). 설치 확인은 위쪽 동그라미 안 휴대폰 아이콘 → 제목 → 글 → 그림 → [+ 새 장부 만들기]·(신호 없을 때) [다시 따라 하기]. 연습 결산 띠 "연습 · 진짜 결산이 아니에요"는 요약 카드 위 `--strong` 면 + `--surface` Bold(사진은 라이트 고정이라 검은 띠), 결산표는 인라인 양식색 |
 | `NoticeBar` | 노란 면(반경 16) + SemiBold 문장(`role="alert"`, 낱말 단위 줄바꿈 `keep-all`), 할 일이 있으면 아래 흰 면 버튼 하나(왼쪽 정렬, 아이콘 `action.icon` 가능 — [공유 기록 파일 보내기]) |
+| `ReopenScreen` · `ReopenPage` (`features/errors`, SPEC-012 2절 #203) | **쓰임**: 화면을 그리다 오류가 났을 때 흰 화면 대신 앱 전체를 바꿔 그리는 "다시 열기" 화면(오류 경계 `AppErrorBoundary` 가 그린다. 앱을 열며 화면을 고르다 던졌을 때도 `renderStartScreen` 이 같은 `ReopenPage` 를 그린다, #211 리뷰). 앱 상태·저장소에 기대지 않고 글과 버튼 하나만 그려, 이 화면이 다시 오류를 내지 않게 한다. **모양**: 앱 화면 틀(`.app`·`.app__main`) 안 위에서부터 제목 h1(Title 24 Bold) "화면에 문제가 생겼어요" → (`--stack-tight`) 본문(Body 16 `--ink`) "적어 둔 기록은 폰에 그대로 있어요." → (`--group-gap`) 주 `Button`(`refresh` 아이콘) [다시 열기] = `location.reload()`. 제목·본문은 낱말 단위 줄바꿈(`keep-all`, 큰 글씨에서 "문제 / 가" 로 끊기지 않게). [기록 파일 보내기]는 두지 않는다(SPEC-012 열린 질문 닫음). 값은 `reopen.css` 의 토큰만. **상태**: 하나(버튼 기본·눌림은 `Button` 그대로). 카탈로그 "다시 열기 화면" 은 `ReopenScreen` 만(포커스를 옮기지 않음). **접근성**: `ReopenPage` 가 뜰 때 제목(`tabIndex=-1`, 포커스 테두리 없음)에 포커스를 주고 브라우저 제목을 "화면에 문제가 생겼어요 · 우리 장부" 로 바꿔 TalkBack 이 제목부터 읽는다(`useScreenHeading` 과 같은 약속). 버튼 이름은 글자 "다시 열기" |
 | `BalanceCard` | 이름(Caption Medium) → 큰 숫자(Display 30, "원" 60%) → 보조 줄(있을 때만), 적자는 `−` |
 | `AmountText` | 수입 `+` 밝은 청록 / 지출 `−` 제목색. 크기는 놓인 자리를 따른다 |
 | `MonthStepper` | [‹] 달 [›] 화살표 아이콘 56px 흰 면, 끝 달에서 비활성. `onPickMonth` 를 주면 가운데 "10월 ▾" 가 버튼("10월 달 고르기", `aria-haspopup="dialog"`). 폭이 모자라면 가운데 칸이 줄어 [›] 가 밀리지 않고, 화살표 사이에 달이 안 들어가면 달이 위 줄 가운데로 (SPEC-001 v2.6) |
@@ -403,3 +404,4 @@ const history = useScreenHistory()           // 화면 컴포넌트는 SheetHist
 | 2026-11-24 | #183 리뷰 반영(SPEC-010 #168): `modalLayer` 가 포커스를 옮기기 전 자리를 기억(말풍선이 먼저 창 안으로 옮겨도 창을 닫으면 창을 연 버튼으로), 말풍선 위 확인 창 조건 주석, 연습 말풍선 아래 줄 버튼 [엑셀 연습 건너뛰기] | |
 | 2026-11-24 | 엑셀 다른 장부에 넣기(SPEC-010 8절, #169): 엑셀 읽은 내용 보조 [다른 장부에 넣기](`file-in`), 새 부품 `ExcelMergePage`·`MergeConfirmDialog`(카탈로그 "엑셀 불러오기"), `CheckList` 줄 `detail`(카탈로그 "CheckList"), `ConfirmDialog` 가 화면보다 길면 창 안에서 내려 보기(`max-height`·`overflow-y`). 선택 창과 뒤로 버튼(`'excel-merge'`·`'excel-merge-confirm'`). 새 토큰 없음 | |
 | 2026-11-24 | 다른 장부에 넣기 확인 창(SPEC-010 8절, #193): `MergeConfirmDialog` 사실 카드에 이어지지 않는 이월금 줄("2026년 이월금" ··· "앱 100,000원" / "엑셀 2025년 끝 잔액 1,250,000원과 달라요") + 카드 밑 고칠 곳 Caption(`.excel-merge__facts`·`.excel-merge__fix`), 기록 0건인 해를 넣으면 설명에 한 문장. `ExcelMergePage` 경고·[기록 파일 먼저 보내기]는 고른 해 중에 앱 기록이 있는 해가 있을 때만(#191 리뷰). 카탈로그 "엑셀 불러오기" 확인 창 견본 하나 더. 새 토큰·새 공용 부품 없음 | |
+| 2026-11-26 | 다시 열기 화면(SPEC-012 2절, #203): 새 부품 `ReopenScreen`·`ReopenPage`(`features/errors`, 카탈로그 "다시 열기 화면"), 토큰만 쓰는 `reopen.css`(제목·본문 `keep-all`, 사이 `--stack-tight`, 버튼 앞 `--group-gap`). 새 토큰·공용 부품 변경 없음 | |

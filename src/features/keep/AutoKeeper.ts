@@ -5,8 +5,10 @@
 // - 실패·인터넷 없음은 조용히 밀린 채로 두고 다음 저장·앱 열기·연결 회복(online) 때 다시
 // - 읽기 전용(SPEC-002)이면 저장이 실패해 알림이 오지 않고, 진입점도 앱을 열 때 올리지 않는다
 // - 앱을 열 때 올리기 시도가 끝나면 상태 신호를 한 번 보낸다 (SPEC-007, 꺼져 있어도. 복구 코드가 없으면 안 보낸다)
+// - 앱 오류가 생기면 상태 신호를 바로 한 번 더 보낸다 (SPEC-012 2절, 앱을 한 번 연 동안 3번까지). 신호에는 폰에 둔 오류 목록이 실린다
 import type { StoredData } from '../../domain/types'
 import { createBackup } from '../../storage/backup'
+import type { AppError } from '../errors/appErrors'
 import { keepIdOf, sealKeep } from './keepCrypto'
 import type { KeepServer, KeepStatus } from './keepServer'
 import { recoveryCodeOf } from './recoveryCode'
@@ -30,9 +32,13 @@ export interface AutoKeeperOptions {
   now?: () => Date
   delayMs?: number // 저장을 모으는 시간 (기본 10초)
   appVersion?: string // 상태 신호에 넣는 앱 버전 (기본 빌드 때 넣은 package.json version)
+  errors?: () => readonly AppError[] // 상태 신호에 싣는 앱 오류 목록 (SPEC-012, 기록기의 list). 없으면 싣지 않는다
 }
 
 const BATCH_DELAY_MS = 10_000
+// 앱을 한 번 연 동안 오류 때문에 보내는 상태 신호 (SPEC-012 2절, KV 쓰기 하루 1,000회와 거리가 멀게)
+export const MAX_ERROR_SIGNALS = 3
+const noErrors = (): readonly AppError[] => []
 
 export class AutoKeeper {
   private readonly server: KeepServer
@@ -40,6 +46,7 @@ export class AutoKeeper {
   private readonly now: () => Date
   private readonly delayMs: number
   private readonly appVersion: string
+  private readonly errors: () => readonly AppError[]
   private state: KeepState
   private readonly listeners = new Set<() => void>()
   // 올릴 기록 (마지막으로 저장한 것)
@@ -48,6 +55,10 @@ export class AutoKeeper {
   private uploading: Promise<void> | undefined
   // 올리는 동안 새로 저장한 때. 다 올린 뒤에도 그만큼은 밀린 채로 남는다
   private savedDuringUpload: string | undefined
+  // 상태 신호는 하나씩 차례로 보낸다 (나중에 닿는 신호가 늘 최신)
+  private statusQueue: Promise<void> = Promise.resolve()
+  // 이번에 연 동안 오류 때문에 보낸 상태 신호 수
+  private errorSignals = 0
 
   constructor({
     server,
@@ -55,12 +66,14 @@ export class AutoKeeper {
     now = () => new Date(),
     delayMs = BATCH_DELAY_MS,
     appVersion = __APP_VERSION__,
+    errors = noErrors,
   }: AutoKeeperOptions) {
     this.server = server
     this.store = store
     this.now = now
     this.delayMs = delayMs
     this.appVersion = appVersion
+    this.errors = errors
     this.state = store.load()
   }
 
@@ -130,6 +143,16 @@ export class AutoKeeper {
     }
   }
 
+  // 앱 오류가 생겼다 (SPEC-012 2절, 오류 기록기가 알린다): 지금 상태와 오류 목록으로 상태 신호를 바로 보낸다.
+  // 앱을 한 번 연 동안 3번까지. 앱을 열 때 신호를 보내지 않는 경우(읽기 전용이라 start 를 부르지 않음, 복구 코드 없음)는 보내지 않고 세지도 않는다.
+  // 못 보낸 오류는 폰에 7일 남아 다음 앱 열기 신호에 실린다
+  reportErrors(): Promise<void> {
+    const data = this.latest
+    if (data === undefined || recoveryCodeOf(data) === undefined || this.errorSignals >= MAX_ERROR_SIGNALS) return Promise.resolve()
+    this.errorSignals += 1
+    return this.reportStatus(data)
+  }
+
   // 서버 사본을 지운다 (끌 때 [지우기]). 지웠는지
   async forget(): Promise<boolean> {
     const code = this.latest && recoveryCodeOf(this.latest)
@@ -161,20 +184,31 @@ export class AutoKeeper {
     return this.state.pendingSince !== undefined || this.state.lastKeptAt === undefined
   }
 
-  // 상태 신호 (SPEC-007): 켜짐·밀린 때·마지막 보관·너무 큼·앱 버전만. 장부 내용·복구 코드는 넣지 않는다
-  private async reportStatus(data: StoredData): Promise<void> {
+  // 상태 신호를 차례에 넣는다. 앞 신호가 끝난 뒤 보내고, 실패는 삼킨다 (다음 앱 열기 때 다시 보낸다)
+  private reportStatus(data: StoredData): Promise<void> {
     const code = recoveryCodeOf(data)
-    if (code === undefined) return
+    if (code === undefined) return Promise.resolve()
+    const sending = this.statusQueue.then(() => this.sendStatus(code)).catch(() => {})
+    this.statusQueue = sending
+    return sending
+  }
+
+  // 상태 신호 v2 (SPEC-007·SPEC-012): 켜짐·밀린 때·마지막 보관·너무 큼·앱 버전, 오류가 있으면 오류 목록. 장부 내용·복구 코드는 넣지 않는다.
+  // 보낼 차례에 지금 상태로 만든다
+  private async sendStatus(code: string): Promise<void> {
+    const id = await keepIdOf(code)
     const { enabled, pendingSince, lastKeptAt, tooLarge = false } = this.state
+    const errors = this.errors()
     const status: KeepStatus = {
-      v: 1,
+      v: 2,
       enabled,
       ...(pendingSince !== undefined && { pendingSince }),
       ...(lastKeptAt !== undefined && { lastKeptAt }),
       tooLarge,
       appVersion: this.appVersion,
+      ...(errors.length > 0 && { errors }),
     }
-    await this.server.sendStatus(await keepIdOf(code), status)
+    await this.server.sendStatus(id, status)
   }
 
   private markPending() {

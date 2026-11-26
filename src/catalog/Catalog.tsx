@@ -17,6 +17,7 @@ import { ExcelMergePage, MergeConfirmDialog } from '../features/excel/ExcelMerge
 import { ExcelNote } from '../features/excel/ExcelParts'
 import { ExcelProblem, ExcelReading } from '../features/excel/ExcelStatus'
 import { mergePlan } from '../features/excel/mergeBook'
+import { ReopenScreen } from '../features/errors/ReopenScreen'
 import type { ExcelImportSummary, ImportedBook } from '../features/excel/readExcelBook'
 import { BrowserBar, BrowserMenu, BrowserPage, BrowserPicture } from '../features/install/BrowserPicture'
 import { HomeScreenPreview } from '../features/install/HomeScreenPreview'
@@ -1478,6 +1479,23 @@ export function Catalog() {
                 message="저장된 기록을 읽지 못했어요. 지금 적는 내용은 저장되지 않아요"
                 action={{ label: '기록 파일 불러오기', onClick: noop }}
               />
+            </div>
+          </State>
+        </Section>
+
+        <Section title="다시 열기 화면 (SPEC-012 ReopenScreen)">
+          <State label="화면을 그리다 오류가 났을 때 (앱 전체를 바꿔 그린다, 제목에 포커스): 제목 · 본문 · 주 버튼 [다시 열기]">
+            <div className="catalog__frame catalog__frame--auto">
+              <div className="app__main">
+                <ReopenScreen onReopen={noop} />
+              </div>
+            </div>
+          </State>
+          <State label="버튼 눌림">
+            <div className="catalog__frame catalog__frame--auto" data-preview-pressed="">
+              <div className="app__main">
+                <ReopenScreen onReopen={noop} />
+              </div>
             </div>
           </State>
         </Section>

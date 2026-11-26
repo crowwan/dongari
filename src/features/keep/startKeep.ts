@@ -1,5 +1,6 @@
 // 앱 시작 때 자동 보관 준비 (SPEC-006). 진입점(main.tsx)이 저장소를 한 번 읽은 직후 부른다
 import type { LedgerRepository, LoadResult } from '../../storage/LedgerRepository'
+import type { AppError } from '../errors/appErrors'
 import { AutoKeeper } from './AutoKeeper'
 import { createKeepServer, type KeepServer } from './keepServer'
 import { localKeepStateStore } from './keepStateStore'
@@ -11,11 +12,12 @@ export interface Keep {
   server: KeepServer
 }
 
-// 서버 주소(빌드 환경변수 VITE_KEEP_URL)가 없으면 기능이 꺼진다 — 주소가 정해지기 전에도 앱은 그대로 동작
-export function createKeep(keepUrl: string | undefined): Keep | undefined {
+// 서버 주소(빌드 환경변수 VITE_KEEP_URL)가 없으면 기능이 꺼진다 — 주소가 정해지기 전에도 앱은 그대로 동작.
+// errors: 상태 신호에 싣는 앱 오류 목록 (SPEC-012, 오류 기록기의 list)
+export function createKeep(keepUrl: string | undefined, errors?: () => readonly AppError[]): Keep | undefined {
   if (!keepUrl) return undefined
   const server = createKeepServer(keepUrl)
-  return { keeper: new AutoKeeper({ server, store: localKeepStateStore() }), server }
+  return { keeper: new AutoKeeper({ server, store: localKeepStateStore(), errors }), server }
 }
 
 // 앱을 열 때 올리기·상태 신호 (SPEC-006·007). 읽기 전용이면 둘 다 하지 않는다

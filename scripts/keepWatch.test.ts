@@ -15,6 +15,7 @@ import {
   TOKEN_REJECTED,
 } from '../ops/keep-backup/scripts/keepWatch.ts'
 import type { AppErrorReport, DeviceReport, ExportReport, ReportResponse } from '../ops/keep-backup/scripts/keepWatch.ts'
+import type { RootScreenName } from '../src/features/practice/AppRoot'
 import type { Screen } from '../src/features/useScreenHistory'
 
 // 보관 지켜보기는 비공개 백업 레포(crowwan/dongari-keep-backup)에서 돈다 (SPEC-012).
@@ -378,13 +379,32 @@ describe('SPEC-012 지켜보기를 비공개 레포로', () => {
 
     it('파일이 폴더이거나 읽을 수 없으면 모양이 틀림으로 보고, 서버 판정과 표는 그대로 남긴다', () => {
       const unreadable = readDeviceNames(() => {
-        throw new Error('EISDIR: illegal operation on a directory, read')
+        throw Object.assign(new Error('EISDIR: illegal operation on a directory, read'), { code: 'EISDIR' })
       })
-      expect(unreadable).toEqual({ ok: false })
+      expect(unreadable).toEqual({ ok: false, readError: { code: 'EISDIR' } })
 
       const verdict = judgeReport(ok([device({ tooLarge: true })]), unreadable)
-      expect(verdict.failures).toEqual(['기기 `ab12cd34` 의 기록이 1MB 를 넘어 보관하지 못했어요', NAMES_BROKEN])
+      expect(verdict.failures).toEqual(['기기 `ab12cd34` 의 기록이 1MB 를 넘어 보관하지 못했어요', `${NAMES_BROKEN} (읽지 못함: EISDIR)`])
       expect(renderSummary(verdict)).toContain('| `ab12cd34` |')
+    })
+
+    it('읽기 실패 문구에 오류 코드를 붙인다 (권한 EACCES 등). 코드가 없으면 오류 이름, 그것도 없으면 붙이지 않는다', () => {
+      const failuresOf = (thrown: unknown) =>
+        judgeReport(
+          ok([device()]),
+          readDeviceNames(() => {
+            throw thrown
+          }),
+        ).failures
+      expect(failuresOf(Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }))).toEqual([`${NAMES_BROKEN} (읽지 못함: EACCES)`])
+      expect(failuresOf(new TypeError('bad'))).toEqual([`${NAMES_BROKEN} (읽지 못함: TypeError)`])
+      expect(failuresOf('뭔가')).toEqual([`${NAMES_BROKEN} (읽지 못함)`])
+      // 코드도 표·문구에 넣는 글이라 다듬는다
+      expect(failuresOf(Object.assign(new Error('x'), { code: 'E|`X\n' }))).toEqual([`${NAMES_BROKEN} (읽지 못함: E¦'X )`])
+    })
+
+    it('모양이 틀린 파일은 읽기 실패가 아니라 코드를 붙이지 않는다', () => {
+      expect(judgeReport(ok([device()]), readDeviceNames(() => '{ "ab12cd34": 1 }')).failures).toEqual([NAMES_BROKEN])
     })
 
     it('파일이 없으면(undefined) 빈 이름표, 있으면 그 글자를 읽는다', () => {
@@ -439,6 +459,13 @@ const APP_SCREENS = {
   'excel-import': '엑셀 불러오기',
 } satisfies Record<Screen['name'], string>
 
+// 진짜 App 밖 화면 이름(src/features/practice/AppRoot.tsx 의 RootScreenName, #203). 늘면 여기서 타입 오류가 난다
+const ROOT_SCREENS = {
+  'first-run': '첫 실행 물음',
+  practice: '연습 장부',
+  'in-app': '카톡 안 안내',
+} satisfies Record<RootScreenName, string>
+
 describe('SPEC-012 AC-10 앱 오류 판정', () => {
   describe('36시간 안 오류는 실패', () => {
     it('스펙 예시 모양 문구로 실패한다: 기기·화면·종류·이름 "글"·횟수·마지막 때(KST)', () => {
@@ -460,9 +487,18 @@ describe('SPEC-012 AC-10 앱 오류 판정', () => {
       expect(verdict.failures).toHaveLength(1)
     })
 
-    it('마지막 때가 요약 now 보다 뒤여도(폰 시계가 앞섬) 36시간 안으로 보고 실패한다', () => {
+    it('마지막 때가 요약 now 보다 뒤여도(폰 시계가 앞섬) 36시간 안이면 실패한다', () => {
       const verdict = judgeReport(ok([device({ errors: [appError({ lastAt: '2026-10-15T03:00:00.000Z' })] })]), MOM)
       expect(verdict.failures).toEqual([expect.stringContaining('마지막 2026-10-15 12:00 KST')])
+    })
+
+    it('미래 쪽도 36시간 안일 때만 실패다: 폰 시계가 36시간 넘게 앞서면 실패로 잡지 않고 표에만 남긴다', () => {
+      const almost = appError({ name: 'Almost', lastAt: '2026-10-16T11:59:59.000Z' })
+      const edge = appError({ name: 'Edge', lastAt: '2026-10-16T12:00:00.000Z' })
+      const far = appError({ name: 'Far', lastAt: '2026-10-20T00:00:00.000Z' })
+      const verdict = judgeReport(ok([device({ errors: [almost, edge, far] })]), MOM)
+      expect(verdict.failures).toEqual([expect.stringContaining('Almost')])
+      expect(renderSummary(verdict)).toContain('| Far |')
     })
 
     it('오류 줄마다, 기기마다 실패를 모으고 기기의 다른 실패와 함께 둔다', () => {
@@ -491,7 +527,7 @@ describe('SPEC-012 AC-10 앱 오류 판정', () => {
       expect(verdict.failures).toEqual([expect.stringContaining('앱 오류가 났어요: `unknown` · render ·')])
     })
 
-    it.each(Object.entries(APP_SCREENS))('앱 화면 %s 는 "%s" 로 보인다', (screen, label) => {
+    it.each([...Object.entries(APP_SCREENS), ...Object.entries(ROOT_SCREENS)])('앱 화면 %s 는 "%s" 로 보인다', (screen, label) => {
       const verdict = judgeReport(ok([device({ errors: [appError({ screen })] })]), MOM)
       expect(verdict.failures).toEqual([expect.stringContaining(`앱 오류가 났어요: ${label}(\`${screen}\`) · render ·`)])
     })
@@ -515,29 +551,35 @@ describe('SPEC-012 AC-10 앱 오류 판정', () => {
       const verdict = judgeReport(ok([device({ errors: [old] })]), MOM)
       expect(verdict).toMatchObject({ failures: [], warnings: [] })
       expect(renderSummary(verdict)).toContain(
-        "| `엄마 폰 (ab12cd34)` | 회비 표(`dues`) | render | TypeError | Cannot read properties of undefined (reading '…') | 3 | 2026-10-08 09:00 | 2026-10-10 09:00 |",
+        "| `엄마 폰 (ab12cd34)` | 회비 표(`dues`) | render | TypeError | Cannot read properties of undefined (reading '…') | 3 | 2026-10-08 09:00 | 2026-10-10 09:00 | index-abc123.js:1:23456 |",
       )
     })
   })
 
   describe('실행 요약 "앱 오류" 표', () => {
-    it('칸은 기기·화면·종류·이름·글·횟수·처음·마지막(KST)이고, 36시간 안 오류도 표에 있다', () => {
+    it('칸은 기기·화면·종류·이름·글·횟수·처음·마지막(KST)·위치이고, 36시간 안 오류도 표에 있다', () => {
       const summary = renderSummary(
         judgeReport(
           ok([
-            device({ errors: [appError(), appError({ kind: 'save', name: 'QuotaExceededError', message: '', screen: 'unknown', count: 1 })] }),
+            device({ errors: [appError(), appError({ kind: 'save', name: 'QuotaExceededError', message: '', screen: 'unknown', where: undefined, count: 1 })] }),
             device({ id: 'ef56ab78' }),
           ]),
           MOM_AND_AUNT,
         ),
       )
       expect(summary).toContain('### 앱 오류 (폰 시각, KST)')
-      expect(summary).toContain('| 기기 | 화면 | 종류 | 이름 | 글 | 횟수 | 처음 | 마지막 |\n|---|---|---|---|---|---|---|---|')
+      expect(summary).toContain('| 기기 | 화면 | 종류 | 이름 | 글 | 횟수 | 처음 | 마지막 | 위치 |\n|---|---|---|---|---|---|---|---|---|')
       expect(summary).toContain(
-        "| `엄마 폰 (ab12cd34)` | 회비 표(`dues`) | render | TypeError | Cannot read properties of undefined (reading '…') | 3 | 2026-10-14 14:00 | 2026-10-14 14:02 |",
+        "| `엄마 폰 (ab12cd34)` | 회비 표(`dues`) | render | TypeError | Cannot read properties of undefined (reading '…') | 3 | 2026-10-14 14:00 | 2026-10-14 14:02 | index-abc123.js:1:23456 |",
       )
-      expect(summary).toContain('| `엄마 폰 (ab12cd34)` | `unknown` | save | QuotaExceededError | - | 1 | 2026-10-14 14:00 | 2026-10-14 14:02 |')
+      // 위치가 없는 줄(저장 실패 등)은 -
+      expect(summary).toContain('| `엄마 폰 (ab12cd34)` | `unknown` | save | QuotaExceededError | - | 1 | 2026-10-14 14:00 | 2026-10-14 14:02 | - |')
       expect(summary).not.toContain('| `이모 (ef56ab78)` | `')
+    })
+
+    it('위치는 실패 문구에는 넣지 않는다 (표에만, 소스맵으로 찾을 때 쓴다)', () => {
+      const [failure] = judgeReport(ok([device({ errors: [appError()] })]), MOM).failures
+      expect(failure).not.toContain('index-abc123.js')
     })
 
     it('기기별 상태 표 뒤, 서버 밖 사본 앞에 둔다', () => {
@@ -567,12 +609,32 @@ describe('SPEC-012 AC-10 앱 오류 판정', () => {
       name: 'Type|Error',
       message: 'a || b `x`\n## 제목\r\n\tend',
       screen: 'du`es|',
+      where: 'a|b`.js:1:2\n',
     })
 
     it("표의 칸 수가 그대로이고 한 줄이다 (| 는 ¦, 백틱은 ', 줄바꿈·제어 문자는 빈칸)", () => {
       const summary = renderSummary(judgeReport(ok([device({ errors: [messy] })]), MOM))
       const row = summary.split('\n').find((line) => line.startsWith("| `엄마 폰 (ab12cd34)` | `du'"))
-      expect(row).toBe("| `엄마 폰 (ab12cd34)` | `du'es¦` | render | Type¦Error | a ¦¦ b 'x' ## 제목 end | 3 | 2026-10-14 14:00 | 2026-10-14 14:02 |")
+      expect(row).toBe(
+        "| `엄마 폰 (ab12cd34)` | `du'es¦` | render | Type¦Error | a ¦¦ b 'x' ## 제목 end | 3 | 2026-10-14 14:00 | 2026-10-14 14:02 | a¦b'.js:1:2  |",
+      )
+    })
+
+    it('<·>·[·] 도 다듬는다 (요약 마크다운에서 HTML·링크로 읽히지 않게)', () => {
+      const tricky = appError({ name: '<img src=x>', message: '[click](https://evil.example) <b>x</b>', screen: '[dues]', where: '<a>.js:1:2' })
+      const summary = renderSummary(judgeReport(ok([device({ errors: [tricky] })]), MOM))
+      const row = summary.split('\n').find((line) => line.startsWith('| `엄마 폰 (ab12cd34)` | `［'))
+      expect(row).toBe(
+        "| `엄마 폰 (ab12cd34)` | `［dues］` | render | ‹img src=x› | ［click］(https://evil.example) ‹b›x‹/b› | 3 | 2026-10-14 14:00 | 2026-10-14 14:02 | ‹a›.js:1:2 |",
+      )
+      expect(judgeReport(ok([device({ errors: [tricky] })]), MOM).failures[0]).toBe(
+        '`엄마 폰 (ab12cd34)` 에서 앱 오류가 났어요: `［dues］` · render · ‹img src=x› "［click］(https://evil.example) ‹b›x‹/b›" · 3번 · 마지막 2026-10-14 14:02 KST',
+      )
+    })
+
+    it('기기별 표의 앱 버전도 다듬는다', () => {
+      const summary = renderSummary(judgeReport(ok([device({ appVersion: '2.9.0|<b>`x`\n' })]), MOM))
+      expect(summary).toContain("| `엄마 폰 (ab12cd34)` | 2026-10-14 09:00 | 켜짐 | - | 2026-10-14 09:00 | - | 2.9.0¦‹b›'x'  |")
     })
 
     it('실패 문구도 한 줄이고 백틱은 기기·화면 표시만 감싼다', () => {
