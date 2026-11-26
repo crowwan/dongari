@@ -338,7 +338,7 @@ describe('SPEC-007 자동 보관 지켜보기 서버 (Worker)', () => {
       const badBodies = [
         'not json',
         '[]',
-        statusBody({ v: 2 }),
+        statusBody({ v: 3 }),
         statusBody({ enabled: 'yes' }),
         statusBody({ enabled: undefined }),
         statusBody({ tooLarge: 0 }),
@@ -438,6 +438,7 @@ describe('SPEC-007 자동 보관 지켜보기 서버 (Worker)', () => {
             lastKeptAt: '2026-10-13T09:00:00.000Z',
             tooLarge: false,
             appVersion: '2.6.0',
+            errors: [],
           },
           {
             id: '01234567',
@@ -445,6 +446,7 @@ describe('SPEC-007 자동 보관 지켜보기 서버 (Worker)', () => {
             enabled: false,
             tooLarge: true,
             appVersion: '2.6.0',
+            errors: [],
           },
         ]),
       })
@@ -644,6 +646,194 @@ describe('SPEC-006·SPEC-007 미리보기 주소는 저장 자리를 나눈다 (
       expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
     }
     expect(store.values.size).toBe(0)
+  })
+})
+
+// 앱 오류 한 줄 (SPEC-012 2절 "서버에 평문으로 남는 것")
+function appError(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    kind: 'render',
+    name: 'TypeError',
+    message: "Cannot read properties of undefined (reading '…')",
+    screen: 'dues',
+    where: 'index-abc123.js:1:23456',
+    count: 3,
+    firstAt: '2026-10-14T05:00:00.000Z',
+    lastAt: '2026-10-14T05:02:00.000Z',
+    ...overrides,
+  }
+}
+
+function statusBodyV2(overrides: Record<string, unknown> = {}): string {
+  return statusBody({ v: 2, errors: [appError()], ...overrides })
+}
+
+describe('SPEC-012 AC-9 상태 신호 v2 의 앱 오류 목록 (Worker)', () => {
+  let store: FakeKeepStore
+  const send = (req: Request, reportToken?: string) =>
+    worker.fetch(req, { KEEP: store, REPORT_TOKEN: reportToken })
+  const putStatus = (body: string, url = STATUS_URL, origin?: string) =>
+    send(request('PUT', { url, body, origin }))
+  const getReport = () =>
+    send(request('GET', { url: REPORT_URL, origin: null, authorization: `Bearer ${TOKEN}` }), TOKEN)
+  const storedStatus = (key = `status:${ID}`): unknown => JSON.parse(store.values.get(key) ?? 'null')
+
+  beforeEach(() => {
+    store = new FakeKeepStore()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(NOW))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  describe('받기', () => {
+    it('v2 신호를 받으면 204 를 주고 오류 목록을 받은 그대로 저장한다', async () => {
+      const second = appError({ kind: 'save', name: 'QuotaExceededError', message: '', screen: 'ledger', where: undefined, count: 1 })
+
+      const res = await putStatus(statusBodyV2({ errors: [appError(), second] }))
+
+      expect(res.status).toBe(204)
+      expect(storedStatus()).toEqual({
+        v: 2,
+        enabled: true,
+        pendingSince: '2026-10-14T03:00:00.000Z',
+        lastKeptAt: '2026-10-13T09:00:00.000Z',
+        tooLarge: false,
+        appVersion: '2.6.0',
+        errors: [
+          appError(),
+          {
+            kind: 'save',
+            name: 'QuotaExceededError',
+            message: '',
+            screen: 'ledger',
+            count: 1,
+            firstAt: '2026-10-14T05:00:00.000Z',
+            lastAt: '2026-10-14T05:02:00.000Z',
+          },
+        ],
+        seenAt: NOW,
+      })
+    })
+
+    it('v2 에 오류 칸이 없거나 빈 목록이어도 받는다', async () => {
+      expect((await putStatus(statusBodyV2({ errors: undefined }))).status).toBe(204)
+      expect(storedStatus()).not.toHaveProperty('errors')
+
+      expect((await putStatus(statusBodyV2({ errors: [] }))).status).toBe(204)
+      expect(storedStatus()).toHaveProperty('errors', [])
+    })
+
+    it('네 종류(render·uncaught·rejection·save)를 모두 받는다', async () => {
+      for (const kind of ['render', 'uncaught', 'rejection', 'save']) {
+        expect((await putStatus(statusBodyV2({ errors: [appError({ kind })] }))).status).toBe(204)
+      }
+    })
+
+    it('v1 신호는 지금처럼 받는다 (오류 칸 없음)', async () => {
+      expect((await putStatus(statusBody())).status).toBe(204)
+      expect(storedStatus()).toEqual(expect.objectContaining({ v: 1, appVersion: '2.6.0', seenAt: NOW }))
+      expect(storedStatus()).not.toHaveProperty('errors')
+    })
+
+    it('오류는 5줄까지 받고 6줄이면 400 이다', async () => {
+      const lines = (count: number) => Array.from({ length: count }, (_, i) => appError({ name: `Error${i}` }))
+
+      expect((await putStatus(statusBodyV2({ errors: lines(5) }))).status).toBe(204)
+      store.values.clear()
+      expect((await putStatus(statusBodyV2({ errors: lines(6) }))).status).toBe(400)
+      expect(store.values.size).toBe(0)
+    })
+
+    it('칸 길이는 상한까지 받는다 (이름 40자·글 120자·화면 32자·위치 80자, 글·위치는 빈 글자도)', async () => {
+      const longest = appError({ name: 'N'.repeat(40), message: 'm'.repeat(120), screen: 's'.repeat(32), where: 'w'.repeat(80) })
+      const shortest = appError({ name: 'E', message: '', screen: 's', where: '', count: 1 })
+
+      for (const error of [longest, shortest]) {
+        expect((await putStatus(statusBodyV2({ errors: [error] }))).status).toBe(204)
+      }
+    })
+
+    it('5줄 모두 칸 상한까지 채워도 4KB 안이라 받는다', async () => {
+      const longest = appError({ kind: 'rejection', name: 'N'.repeat(40), message: '…'.repeat(120), screen: 's'.repeat(32), where: 'w'.repeat(80), count: 999_999 })
+      const body = statusBodyV2({ appVersion: 'x'.repeat(32), errors: Array.from({ length: 5 }, () => longest) })
+
+      expect(new TextEncoder().encode(body).byteLength).toBeLessThan(MAX_STATUS_BYTES)
+      expect((await putStatus(body)).status).toBe(204)
+    })
+  })
+
+  describe('400 으로 거부한다', () => {
+    it.each([
+      ['v1 에 오류 칸', statusBody({ errors: [appError()] })],
+      ['v1 에 빈 오류 목록', statusBody({ errors: [] })],
+      ['모르는 버전 3', statusBodyV2({ v: 3 })],
+      ['v2 에 정한 칸 밖', statusBodyV2({ ledger: '장부 내용' })],
+      ['v2 의 v1 칸이 틀림', statusBodyV2({ enabled: 'yes' })],
+      ['오류 목록이 null', statusBodyV2({ errors: null })],
+      ['오류 목록이 배열이 아님', statusBodyV2({ errors: appError() })],
+      ['오류 줄이 객체가 아님', statusBodyV2({ errors: ['TypeError'] })],
+      ['오류 줄에 정한 칸 밖(stack)', statusBodyV2({ errors: [appError({ stack: 'at Dues (index.js:1:2)' })] })],
+      ['오류 줄에 정한 칸 밖(url)', statusBodyV2({ errors: [appError({ url: 'https://crowwan.github.io/dongari/' })] })],
+      ['모르는 종류', statusBodyV2({ errors: [appError({ kind: 'crash' })] })],
+      ['종류가 없음', statusBodyV2({ errors: [appError({ kind: undefined })] })],
+      ['이름이 빈 글자', statusBodyV2({ errors: [appError({ name: '' })] })],
+      ['이름이 41자', statusBodyV2({ errors: [appError({ name: 'N'.repeat(41) })] })],
+      ['이름이 글자가 아님', statusBodyV2({ errors: [appError({ name: 1 })] })],
+      ['글이 121자', statusBodyV2({ errors: [appError({ message: 'm'.repeat(121) })] })],
+      ['글이 없음', statusBodyV2({ errors: [appError({ message: undefined })] })],
+      ['화면이 빈 글자', statusBodyV2({ errors: [appError({ screen: '' })] })],
+      ['화면이 33자', statusBodyV2({ errors: [appError({ screen: 's'.repeat(33) })] })],
+      ['위치가 81자', statusBodyV2({ errors: [appError({ where: 'w'.repeat(81) })] })],
+      ['위치가 null', statusBodyV2({ errors: [appError({ where: null })] })],
+      ['횟수가 0', statusBodyV2({ errors: [appError({ count: 0 })] })],
+      ['횟수가 정수가 아님', statusBodyV2({ errors: [appError({ count: 1.5 })] })],
+      ['횟수가 글자', statusBodyV2({ errors: [appError({ count: '3' })] })],
+      ['처음 때가 시각이 아님', statusBodyV2({ errors: [appError({ firstAt: '어제' })] })],
+      ['마지막 때가 없음', statusBodyV2({ errors: [appError({ lastAt: undefined })] })],
+    ])('%s', async (_case, body) => {
+      expect((await putStatus(body)).status).toBe(400)
+      expect(store.values.size).toBe(0)
+    })
+  })
+
+  describe('요약(/v1/report)', () => {
+    it('기기마다 오류 목록을 싣고, v1 기기와 오류 칸 없는 v2 기기는 빈 목록이다', async () => {
+      const V1_ID = 'b'.repeat(64)
+      const QUIET_ID = 'c'.repeat(64)
+      await putStatus(statusBodyV2())
+      await putStatus(statusBody(), `https://keep.example.workers.dev/v1/status/${V1_ID}`)
+      await putStatus(statusBodyV2({ errors: undefined }), `https://keep.example.workers.dev/v1/status/${QUIET_ID}`)
+
+      const res = await getReport()
+
+      expect(res.status).toBe(200)
+      const report: unknown = await res.json()
+      expect(report).toHaveProperty('devices', [
+        expect.objectContaining({ id: 'aaaaaaaa', appVersion: '2.6.0', errors: [appError()] }),
+        expect.objectContaining({ id: 'bbbbbbbb', errors: [] }),
+        expect.objectContaining({ id: 'cccccccc', errors: [] }),
+      ])
+      expect(report).not.toHaveProperty('devices.0.v')
+    })
+
+    it('예전에 저장한 v1 신호(이 기능 전)도 빈 오류 목록으로 싣는다', async () => {
+      store.values.set(`status:${ID}`, JSON.stringify({ ...JSON.parse(statusBody()), seenAt: NOW }))
+
+      const res = await getReport()
+
+      expect(await res.json()).toHaveProperty('devices', [expect.objectContaining({ id: 'aaaaaaaa', errors: [] })])
+    })
+
+    it('미리보기에서 보낸 v2 오류는 preview:status:<id> 에 남고 요약에는 실리지 않는다', async () => {
+      const res = await putStatus(statusBodyV2(), STATUS_URL, PREVIEW_ORIGIN)
+
+      expect(res.status).toBe(204)
+      expect(storedStatus(`preview:status:${ID}`)).toHaveProperty('errors', [appError()])
+      expect(await (await getReport()).json()).toHaveProperty('devices', [])
+    })
   })
 })
 

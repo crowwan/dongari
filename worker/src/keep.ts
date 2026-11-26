@@ -5,6 +5,7 @@
 // #128(ADR 008): 본 주소와 미리보기 주소를 받고, 미리보기 요청은 KV 의 다른 자리(preview:)에 둔다.
 // SPEC-011(ADR 010): 날(한국 시간)·달이 바뀐 뒤 첫 보관 때 있던 최신본을 날짜별·달별 사본으로 남기고, 개발자가 골라 받게 한다.
 // 서버 밖 주간 사본(비공개 백업 레포의 GitHub Actions)에는 내보내기 토큰으로 본 자리 최신본 전부를 준다.
+// SPEC-012(ADR 011): 상태 신호 v2 는 앱 오류 목록(정리한 글, 5줄까지)을 함께 싣고, 요약은 기기마다 그 목록을 준다.
 
 export const MAX_BODY_BYTES = 1_048_576
 export const MAX_STATUS_BYTES = 4096
@@ -135,33 +136,100 @@ function isKeepBody(text: string): boolean {
   return v === 1 && typeof savedAt === 'string' && isIsoDate(savedAt) && isBase64(iv) && isBase64(data)
 }
 
-// 상태 신호 (SPEC-007): 장부 내용·복구 코드는 없고 보관 상태만
+// 앱 오류 한 줄 (SPEC-012 2절 "서버에 평문으로 남는 것"): 폰이 같은 오류를 묶어 횟수와 처음·마지막 때(폰 시각)를 올린다
+const APP_ERROR_KINDS = ['render', 'uncaught', 'rejection', 'save'] as const
+type AppErrorKind = (typeof APP_ERROR_KINDS)[number]
+
+interface AppError {
+  kind: AppErrorKind
+  name: string
+  message: string
+  screen: string
+  where?: string
+  count: number
+  firstAt: string
+  lastAt: string
+}
+
+const APP_ERROR_KEYS = new Set(['kind', 'name', 'message', 'screen', 'where', 'count', 'firstAt', 'lastAt'])
+const MAX_APP_ERRORS = 5
+
+// 상태 신호 (SPEC-007): 장부 내용·복구 코드는 없고 보관 상태만.
+// v2(SPEC-012 2절)는 같은 칸에 앱 오류 목록(errors, 선택)을 더한다. 예전 앱이 보내는 v1 도 계속 받는다
 interface StatusSignal {
-  v: 1
+  v: 1 | 2
   enabled: boolean
   pendingSince?: string
   lastKeptAt?: string
   tooLarge: boolean
   appVersion: string
+  // v2 에만 있다. 칸이 없으면 undefined
+  errors?: AppError[]
 }
 
-const STATUS_KEYS = new Set(['v', 'enabled', 'pendingSince', 'lastKeptAt', 'tooLarge', 'appVersion'])
+const STATUS_V1_KEYS = new Set(['v', 'enabled', 'pendingSince', 'lastKeptAt', 'tooLarge', 'appVersion'])
+const STATUS_V2_KEYS = new Set([...STATUS_V1_KEYS, 'errors'])
+
+// 정한 칸 말고 다른 것이 섞여 있는가 (서버에 평문으로 남는 것을 정한 만큼으로)
+function hasOtherKeys(record: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
+  return Object.keys(record).some((key) => !allowed.has(key))
+}
+
+function isTextOfLength(value: unknown, min: number, max: number): value is string {
+  return typeof value === 'string' && value.length >= min && value.length <= max
+}
+
+function isIsoText(value: unknown): value is string {
+  return typeof value === 'string' && isIsoDate(value)
+}
+
+function isAppErrorKind(value: unknown): value is AppErrorKind {
+  return APP_ERROR_KINDS.some((kind) => kind === value)
+}
+
+// 칸 길이: 이름 1~40자, 글 0~120자(폰이 정리한 글), 화면 1~32자, 위치 0~80자(없으면 뺀다)
+function toAppError(value: unknown): AppError | null {
+  if (!isRecord(value) || hasOtherKeys(value, APP_ERROR_KEYS)) return null
+  const { kind, name, message, screen, where, count, firstAt, lastAt } = value
+  if (!isAppErrorKind(kind)) return null
+  if (!isTextOfLength(name, 1, 40) || !isTextOfLength(message, 0, 120) || !isTextOfLength(screen, 1, 32)) return null
+  if (where !== undefined && !isTextOfLength(where, 0, 80)) return null
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 1) return null
+  if (!isIsoText(firstAt) || !isIsoText(lastAt)) return null
+  return { kind, name, message, screen, where, count, firstAt, lastAt }
+}
+
+// 오류 목록: 5줄까지, 한 줄이라도 틀리면 null
+function toAppErrors(value: unknown): AppError[] | null {
+  if (!Array.isArray(value) || value.length > MAX_APP_ERRORS) return null
+  const errors: AppError[] = []
+  for (const item of value) {
+    const error = toAppError(item)
+    if (!error) return null
+    errors.push(error)
+  }
+  return errors
+}
 
 function toStatusSignal(record: Record<string, unknown>): StatusSignal | null {
   const { v, enabled, pendingSince, lastKeptAt, tooLarge, appVersion } = record
-  if (v !== 1 || typeof enabled !== 'boolean' || typeof tooLarge !== 'boolean') return null
+  if ((v !== 1 && v !== 2) || typeof enabled !== 'boolean' || typeof tooLarge !== 'boolean') return null
   if (pendingSince !== undefined && (typeof pendingSince !== 'string' || !isIsoDate(pendingSince))) return null
   if (lastKeptAt !== undefined && (typeof lastKeptAt !== 'string' || !isIsoDate(lastKeptAt))) return null
   if (typeof appVersion !== 'string' || appVersion.length === 0) return null
   if (appVersion.length > MAX_APP_VERSION_LENGTH) return null
-  return { v, enabled, pendingSince, lastKeptAt, tooLarge, appVersion }
+  const signal: StatusSignal = { v, enabled, pendingSince, lastKeptAt, tooLarge, appVersion }
+  // v1 에 오류 칸이 오는 것은 받을 때 칸 검사(parseStatusBody)가 막는다
+  if (record.errors === undefined) return signal
+  const errors = toAppErrors(record.errors)
+  return errors === null ? null : { ...signal, errors }
 }
 
-// 정한 칸 말고 다른 것이 섞여 있으면 받지 않는다 (서버에 평문으로 남는 것을 정한 만큼으로)
+// 정한 칸 말고 다른 것이 섞여 있으면 받지 않는다. v1 에 오류 칸(errors)이 와도 400
 function parseStatusBody(text: string): StatusSignal | null {
   const parsed = parseJson(text)
   if (!isRecord(parsed)) return null
-  if (Object.keys(parsed).some((key) => !STATUS_KEYS.has(key))) return null
+  if (hasOtherKeys(parsed, parsed.v === 2 ? STATUS_V2_KEYS : STATUS_V1_KEYS)) return null
   return toStatusSignal(parsed)
 }
 
@@ -342,9 +410,11 @@ function isAuthorized(request: Request, token: string | undefined): boolean {
   return authorization.startsWith(prefix) && sameToken(authorization.slice(prefix.length), token)
 }
 
-interface DeviceSummary extends Omit<StatusSignal, 'v'> {
+interface DeviceSummary extends Omit<StatusSignal, 'v' | 'errors'> {
   id: string
   seenAt: string
+  // 앱 오류 목록 (SPEC-012 2절). v1 신호이거나 오류 칸이 없으면 빈 목록
+  errors: AppError[]
 }
 
 // 저장한 신호를 요약 한 줄로. 서버가 쓴 값이라 형식이 틀릴 일은 없지만, 틀리면 빼고 준다
@@ -354,7 +424,7 @@ function toDeviceSummary(key: string, stored: string | null): DeviceSummary | nu
   if (!isRecord(parsed) || typeof parsed.seenAt !== 'string') return null
   const signal = toStatusSignal(parsed)
   if (!signal) return null
-  const { enabled, pendingSince, lastKeptAt, tooLarge, appVersion } = signal
+  const { enabled, pendingSince, lastKeptAt, tooLarge, appVersion, errors } = signal
   return {
     // 기기는 이름(64자 해시)의 앞 8자로만 보여 준다
     id: key.slice(STATUS_PREFIX.length, STATUS_PREFIX.length + 8),
@@ -364,6 +434,7 @@ function toDeviceSummary(key: string, stored: string | null): DeviceSummary | nu
     lastKeptAt,
     tooLarge,
     appVersion,
+    errors: errors ?? [],
   }
 }
 
