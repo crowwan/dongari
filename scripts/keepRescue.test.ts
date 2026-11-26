@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import { parseDeviceNames } from '../ops/keep-backup/scripts/keepWatch.ts'
 import { keepIdOf as appKeepIdOf, sealKeep } from '../src/features/keep/keepCrypto'
@@ -462,9 +464,12 @@ describe('SPEC-011 꺼내기 스크립트 날짜 고르기', () => {
 })
 
 describe('SPEC-012 AC-3 꺼내기 스크립트 --which (기기 이름표의 앞 8자)', () => {
-  // 명령줄을 그대로 돌린다(레포 맨 위에서, 다른 테스트의 파일 읽기와 같이). KEEP_URL 은 넘기지 않는다(서버를 부르지 않으니 필요 없어야 한다)
+  // 명령줄을 그대로 돌린다. 스크립트 경로는 이 시험 파일 기준이라 vitest 를 어느 폴더에서 돌려도 같다 (#207 리뷰).
+  // new URL(상대 경로, import.meta.url) 은 jsdom 의 URL 이 http://localhost 주소로 바꿔 버려서 node:path 로 잇는다.
+  // KEEP_URL 은 넘기지 않는다(서버를 부르지 않으니 필요 없어야 한다)
+  const RESCUE_SCRIPT = join(dirname(fileURLToPath(import.meta.url)), 'keep-rescue.mjs')
   function runRescue(args: string[], input: string) {
-    return spawnSync(process.execPath, ['scripts/keep-rescue.mjs', ...args], {
+    return spawnSync(process.execPath, [RESCUE_SCRIPT, ...args], {
       input,
       encoding: 'utf8',
       env: { PATH: process.env.PATH },
