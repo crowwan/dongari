@@ -8,6 +8,8 @@
 //
 // scripts/keep-rescue.mjs 가 이 파일을 그대로 불러 쓴다(Node 24 가 타입만 지우고 실행, 빌드 없음).
 // 그래서 타입 지우기로 없어지는 문법만 쓰고(erasableSyntaxOnly), 다른 패키지·src 를 불러오지 않는다.
+// 보관본 들여다보기(SPEC-013, scripts/keepView.ts)는 이 파일을 타입만 지워 브라우저 페이지에도 보낸다 —
+// 그래서 Node 전용 API 없이 브라우저에도 있는 것(Web Crypto·TextEncoder·atob·fetch 모양)만 쓴다.
 // 암호 방식·코드 정규화는 src/features/keep/keepCrypto.ts·recoveryCode.ts 를 옮긴 것이다.
 // 어긋나면 scripts/keepRescue.test.ts(앱의 sealKeep·keepIdOf 로 만든 값을 여기서 푸는 테스트)가 깨진다.
 
@@ -189,11 +191,11 @@ export async function openKeep(normalized: string, envelope: KeepEnvelope): Prom
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function toEnvelope(value: unknown): KeepEnvelope | undefined {
+export function toEnvelope(value: unknown): KeepEnvelope | undefined {
   if (!isRecord(value) || value.v !== 1) return undefined
   const { savedAt, iv, data } = value
   if (typeof savedAt !== 'string' || typeof iv !== 'string' || typeof data !== 'string') return undefined
@@ -269,7 +271,7 @@ async function keepBaseOf(normalized: string, keepUrl: string): Promise<string> 
   return `${keepUrl.replace(/\/+$/, '')}/v1/keep/${await keepIdOf(normalized)}`
 }
 
-function copyUrl(base: string, target: RescueTarget): string {
+export function copyUrl(base: string, target: RescueTarget): string {
   if (target.kind === 'day') return `${base}?day=${target.date}`
   if (target.kind === 'month') return `${base}?month=${target.month}`
   return base
@@ -280,10 +282,11 @@ function copyNotFound(target: RescueTarget): string {
   return `${sourceName(target)}이 서버에 없어요 (404). --list 로 있는 날·달을 보세요`
 }
 
-type Fetched = { ok: true; body: unknown } | { ok: false; message: string }
+// bytes 는 받은 본문의 크기 (보관본 들여다보기가 사본 크기로 보인다, SPEC-013)
+export type Fetched = { ok: true; body: unknown; bytes: number } | { ok: false; message: string }
 
-// 본 주소 출처로 GET 하나. 닿지 못함 / 404 / 그 밖 오류를 나누고, 되면 JSON 본문(아니면 undefined)
-async function getJson(url: string, fetchFn: FetchFn, notFound: string): Promise<Fetched> {
+// 본 주소 출처로 GET 하나. 닿지 못함 / 404 / 그 밖 오류를 나누고, 되면 JSON 본문(아니면 undefined)과 크기
+export async function getJson(url: string, fetchFn: FetchFn, notFound: string): Promise<Fetched> {
   let response: Response
   try {
     response = await fetchFn(url, { method: 'GET', headers: { Origin: APP_ORIGIN } })
@@ -292,7 +295,8 @@ async function getJson(url: string, fetchFn: FetchFn, notFound: string): Promise
   }
   if (response.status === 404) return { ok: false, message: notFound }
   if (!response.ok) return { ok: false, message: `보관 서버가 오류로 답했어요 (HTTP ${response.status}). 잠시 뒤 다시 해 보세요` }
-  return { ok: true, body: await response.json().catch(() => undefined) }
+  const text = await response.text().catch(() => '')
+  return { ok: true, body: parseJson(text), bytes: new TextEncoder().encode(text).length }
 }
 
 // 겉봉투를 풀고 요약까지
@@ -326,7 +330,7 @@ export async function rescueKeep(code: string, keepUrl: string, fetchFn: FetchFn
   return openCopy(normalized, await keepBaseOf(normalized, keepUrl), target, fetchFn)
 }
 
-function parseJson(text: string): unknown {
+export function parseJson(text: string): unknown {
   try {
     return JSON.parse(text)
   } catch {
@@ -353,13 +357,13 @@ function isTimeText(value: unknown): value is string {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value))
 }
 
-interface CopyStamp {
+export interface CopyStamp {
   target: RescueTarget
   savedAt: string
 }
 
 // 서버 목록 답 { latest?: { savedAt }, days: [{ date, savedAt }], months: [{ month, savedAt }] } → 꺼낼 사본들 (서버가 준 순서, 최신 것부터)
-function toCopyStamps(value: unknown): CopyStamp[] | undefined {
+export function toCopyStamps(value: unknown): CopyStamp[] | undefined {
   if (!isRecord(value)) return undefined
   const { latest, days, months } = value
   if (!Array.isArray(days) || !Array.isArray(months)) return undefined
