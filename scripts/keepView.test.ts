@@ -5,13 +5,14 @@ import { networkInterfaces, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { keepIdOf as appKeepIdOf, sealKeep } from '../src/features/keep/keepCrypto'
-import { CURRENT_SCHEMA_VERSION as APP_SCHEMA_VERSION, type StoredData } from '../src/domain/types'
+import { CURRENT_SCHEMA_VERSION as APP_SCHEMA_VERSION, type Entry, type Ledger, type StoredData } from '../src/domain/types'
 import { createBackup } from '../src/storage/backup'
-import { book, ledger, storedWith } from '../src/test/ledgerFixtures'
+import { book, duesBook, ledger, storedWith } from '../src/test/ledgerFixtures'
 import {
   APP_ORIGIN,
   GONE_COPY,
   INVALID_CODE,
+  isRecord,
   NO_HISTORY_ROUTE,
   NOT_BACKUP,
   NOT_FOUND,
@@ -22,9 +23,15 @@ import {
 import {
   BAD_QUERY,
   BROKEN_DEVICE_NAMES,
+  buildTables,
+  compareCopies,
+  compareMoreText,
   copyPath,
   CURRENT_SCHEMA_VERSION,
   DEFAULT_PORT,
+  defaultPair,
+  ENTRY_FIELDS,
+  entryFill,
   envelopePreview,
   handleRequest,
   historyPath,
@@ -41,9 +48,12 @@ import {
   openedInfo,
   outerInfo,
   parseViewArgs,
+  queryTable,
   SERVER_ERROR,
   staleCloneNotice,
+  storedTree,
   strangeLocalAnswer,
+  tableChoices,
   unlockDevice,
   type CopyAnswer,
   type CopyItem,
@@ -52,8 +62,12 @@ import {
   type DeviceView,
   type GitFn,
   type HistoryAnswer,
+  type StoredView,
+  type TableKey,
+  type TableQuery,
   type ViewServer,
   type ViewSources,
+  type ViewTable,
 } from './keepView.ts'
 
 // 모두 지어낸 코드·장부다 (실제 기기·서버·백업 레포는 쓰지 않는다)
@@ -285,6 +299,117 @@ function copyOf(device: DeviceView, kind: CopyItem['kind'], key?: string): CopyI
   if (copy === undefined) throw new Error(`${kind} ${key ?? ''} 사본이 없다`)
   return copy
 }
+
+// ---------- 구조·표·비교 (#206): 지어낸 저장 데이터 ----------
+
+// 페이지가 푼 글자를 JSON.parse 한 것과 같은 모양 (StoredData 는 interface 라 Record 로 바로 넘기지 못한다)
+function viewOf(data: unknown): StoredView {
+  const parsed: unknown = JSON.parse(JSON.stringify(data))
+  if (!isRecord(parsed)) throw new Error('저장 데이터가 객체가 아니다')
+  return parsed
+}
+
+function sizeOf(value: unknown): number {
+  return bytesOf(JSON.stringify(value))
+}
+
+// 동아리(회비 칸이 든 duesBook 에 2025년 한 줄을 더함)와 가계부 하나, 복구 코드가 든 설정 — 내역 6줄
+function richData(): StoredData {
+  const club = duesBook({ id: 'club', name: '꽃동아리' })
+  club.ledgers['2025'] = {
+    year: 2025,
+    carryover: 50_000,
+    entries: [{ id: 'c25', month: 12, day: 20, type: 'expense', name: '송년회', amount: 30_000, createdAt: '2025-12-20T10:00:00.000Z', batchId: 'photo-1' }],
+  }
+  const home = book([ledger([[1, 'income', '용돈', 300_000], [1, 'expense', '장보기', 42_000], [2, 'expense', 'OTT 구독', 180_000]], { year: 2026, carryover: 0 })], {
+    id: 'home',
+    name: '우리집',
+    kind: 'household',
+    createdAt: '2026-01-03T00:00:00.000Z',
+  })
+  return { schemaVersion: APP_SCHEMA_VERSION, books: [club, home], settings: { recoveryCode: CODE_A, lastBookId: 'club', lastBackupAt: '2026-11-20T01:00:00.000Z' } }
+}
+
+function yearOf(data: StoredData, bookIndex: number, year: string): Ledger {
+  const found = data.books[bookIndex]?.ledgers[year]
+  if (found === undefined) throw new Error(`${bookIndex}번 장부에 ${year}년이 없다`)
+  return found
+}
+
+// richData 뒤의 모습: 지운 줄·고친 줄 둘·더한 줄 하나, 비교하지 않는 칸만 바뀐 줄 하나, 회원 하나 빠지고 둘 더해짐, 새 해 하나
+function laterData(): StoredData {
+  const data = richData()
+  const [club, home] = data.books
+  const homeYear = yearOf(data, 1, '2026')
+  homeYear.entries = homeYear.entries
+    .filter(({ id }) => id !== 'e2')
+    .map((entry): Entry => (entry.id === 'e3' ? { ...entry, month: 3, day: 10, type: 'income', name: 'OTT 환불' } : entry))
+    .concat({ id: 'new-1', month: 11, day: 25, type: 'expense', name: '꽃바구니', amount: 35_000, createdAt: '2026-11-25T01:00:00.000Z' })
+  const clubYear = yearOf(data, 0, '2026')
+  // 엑셀에서 온 회비: 금액을 고치고 낸 분을 붙이고 엑셀 글은 지움
+  clubYear.entries = clubYear.entries.map(
+    (entry): Entry =>
+      entry.id === 'dues-2'
+        ? { id: entry.id, month: entry.month, day: entry.day, type: entry.type, name: entry.name, amount: 20_000, createdAt: entry.createdAt, payers: [{ memberId: 'm1', amount: 20_000 }] }
+        : entry,
+  )
+  // 적은 때·사진 묶음은 비교하는 칸이 아니다
+  const old = yearOf(data, 0, '2025').entries[0]
+  old.createdAt = '2025-12-21T10:00:00.000Z'
+  old.batchId = 'photo-2'
+  club.members = [{ id: 'm1', name: '김도윤', joined: '2026-01', off: [] }, { id: 'm3', name: '이서준', joined: '2026-04', off: [] }]
+  // 다른 장부의 같은 회원 번호(m1)는 다른 회원이다 (장부 id + Member.id 로 맞춘다)
+  home.members = [{ id: 'm1', name: '김도윤', joined: '2026-11', off: [] }]
+  home.ledgers['2027'] = { year: 2027, carryover: 85_000, entries: [] }
+  return data
+}
+
+// 옛 저장 형식 v3 (회원·회비·낸 분·엑셀 글 칸이 없다)
+const V3_DATA = {
+  schemaVersion: 3,
+  books: [
+    {
+      id: 'old',
+      name: '옛 장부',
+      kind: 'club',
+      createdAt: '2025-10-08T00:00:00.000Z',
+      ledgers: { 2025: { year: 2025, carryover: 120_000, entries: [{ id: 'o1', month: 3, type: 'income', name: '회비', amount: 10_000, createdAt: '2025-03-01T00:00:00.000Z' }] } },
+    },
+  ],
+  settings: { recoveryCode: CODE_A },
+}
+
+// 내역 n 줄인 장부 하나 (7줄마다 수입 한 줄, 나머지는 지출)
+function manyEntries(count: number): StoredData {
+  const items = Array.from({ length: count }, (_, index): Entry => ({
+    id: `n${index}`,
+    month: (index % 12) + 1,
+    day: (index % 28) + 1,
+    type: index % 7 === 0 ? 'income' : 'expense',
+    name: index % 7 === 0 ? '회비' : '간식',
+    amount: 1_000 + index,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  }))
+  return { schemaVersion: APP_SCHEMA_VERSION, books: [book([{ year: 2026, carryover: 0, entries: items }], { id: 'big', name: '큰 장부' })], settings: {} }
+}
+
+function tableOf(data: StoredView, key: TableKey): ViewTable {
+  const found = buildTables(data).find((table) => table.key === key)
+  if (found === undefined) throw new Error(`${key} 표가 없다`)
+  return found
+}
+
+const ALL: TableQuery = { book: '', year: '', search: '' }
+
+// 표의 한 칸만 줄마다 (보이는 줄 순서)
+function columnOf(data: StoredView, key: TableKey, column: string, query: TableQuery = ALL): unknown[] {
+  return queryTable(tableOf(data, key), query).rows.map(({ cells }) => cells[column])
+}
+
+// Entry 칸 (src/domain/types.ts). Entry 에 칸이 생기거나 빠지면, 또는 필수·선택이 바뀌면 이 두 줄이 타입 검사에서 깨진다
+type OptionalKeys<T> = { [K in keyof T]-?: undefined extends T[K] ? K : never }[keyof T]
+const ENTRY_KEYS: Record<keyof Entry, true> = { id: true, month: true, day: true, type: true, name: true, amount: true, createdAt: true, batchId: true, payers: true, sourceText: true }
+const ENTRY_OPTIONAL: Record<OptionalKeys<Entry>, true> = { day: true, batchId: true, payers: true, sourceText: true }
 
 describe('SPEC-013 보관본 들여다보기', () => {
   describe('AC-1 로컬 서버는 127.0.0.1 에만 열고 Host 를 검사한다', () => {
@@ -574,8 +699,9 @@ describe('SPEC-013 보관본 들여다보기', () => {
       if (!unlocked.ok) throw new Error(unlocked.message)
 
       const { latestA, dayA, monthA, week1A, week2A } = world.envelopes
+      const { books } = viewOf(clubData(CODE_A, '꽃동아리'))
       for (const envelope of [latestA, dayA, monthA, week1A, week2A]) {
-        expect(await openCopy(unlocked.normalized, envelope)).toEqual({ ok: true, schemaVersion: 4, bookNames: ['꽃동아리'], entryCount: 2 })
+        expect(await openCopy(unlocked.normalized, envelope)).toMatchObject({ ok: true, schemaVersion: 4, bookNames: ['꽃동아리'], entryCount: 2, data: { books } })
       }
       expect(openedInfo(await openCopy(unlocked.normalized, latestA))).toEqual([
         { label: '저장 형식', value: 'v4' },
@@ -700,7 +826,8 @@ describe('SPEC-013 보관본 들여다보기', () => {
 
       const opened = await openCopy(CODE_A, envelope)
 
-      expect(opened).toEqual({ ok: true, schemaVersion: 3, bookNames: ['옛 장부'], entryCount: 1 })
+      // 구조·표·비교가 쓰는 저장 데이터도 옮기지 않은 그대로 준다 (#206)
+      expect(opened).toEqual({ ok: true, schemaVersion: 3, bookNames: ['옛 장부'], entryCount: 1, data: v3 })
       expect(openedInfo(opened)[0]).toEqual({ label: '저장 형식', value: 'v3 (옛 형식 — 옮기지 않고 그대로 보여요)' })
     })
 
@@ -729,6 +856,370 @@ describe('SPEC-013 보관본 들여다보기', () => {
 
     it('앱의 지금 저장 형식 번호와 같은 값을 기준으로 옛 형식을 가른다', () => {
       expect(CURRENT_SCHEMA_VERSION).toBe(APP_SCHEMA_VERSION)
+    })
+  })
+
+  describe('AC-7 구조: 나무와 내역 칸 채움', () => {
+    it('나무는 StoredData → books → 장부마다 ledgers(내역 수·이월금·월 회비)·members·dues → settings 이고, 마디마다 JSON 크기를 붙인다', () => {
+      const stored = richData()
+      const [club, home] = stored.books
+
+      expect(storedTree(viewOf(stored))).toEqual({
+        label: 'StoredData',
+        kind: '{ }',
+        bytes: sizeOf(stored),
+        children: [
+          { label: 'schemaVersion', value: '4', children: [] },
+          {
+            label: 'books',
+            kind: '[2]',
+            bytes: sizeOf(stored.books),
+            children: [
+              {
+                label: '꽃동아리',
+                kind: 'club',
+                note: '해 2 · 내역 3',
+                bytes: sizeOf(club),
+                children: [
+                  { label: 'id', value: 'club', children: [] },
+                  { label: 'createdAt', value: '2025-01-01 09:00', children: [] },
+                  {
+                    label: 'ledgers',
+                    kind: '{2}',
+                    bytes: sizeOf(club.ledgers),
+                    children: [
+                      { label: '2025', note: '내역 1 · 이월금 50,000', bytes: sizeOf(club.ledgers['2025']), children: [] },
+                      { label: '2026', note: '내역 2 · 이월금 0 · 월 회비 20,000', bytes: sizeOf(club.ledgers['2026']), children: [] },
+                    ],
+                  },
+                  { label: 'members', kind: '[2]', bytes: sizeOf(club.members), children: [] },
+                  { label: 'dues', kind: '{ }', note: 'startMonth: 2026-01', bytes: sizeOf(club.dues), children: [] },
+                ],
+              },
+              {
+                label: '우리집',
+                kind: 'household',
+                note: '해 1 · 내역 3',
+                bytes: sizeOf(home),
+                children: [
+                  { label: 'id', value: 'home', children: [] },
+                  { label: 'createdAt', value: '2026-01-03 09:00', children: [] },
+                  {
+                    label: 'ledgers',
+                    kind: '{1}',
+                    bytes: sizeOf(home.ledgers),
+                    children: [{ label: '2026', note: '내역 3 · 이월금 0', bytes: sizeOf(home.ledgers['2026']), children: [] }],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            label: 'settings',
+            kind: '{ }',
+            bytes: sizeOf(stored.settings),
+            children: [
+              { label: 'recoveryCode', masked: true, children: [] },
+              { label: 'lastBookId', value: 'club', children: [] },
+              { label: 'lastBackupAt', value: '2026-11-20 10:00', children: [] },
+            ],
+          },
+        ],
+      })
+    })
+
+    it('settings.recoveryCode 는 가리고, 나무 어디에도 복구 코드가 없다', () => {
+      const tree = JSON.stringify(storedTree(viewOf(richData())))
+
+      for (const part of CODE_A.split('-')) expect(tree).not.toContain(part)
+    })
+
+    it('내역 칸 채움 표는 Entry 칸마다 종류·필수/선택·채운 줄 수·비율을 보인다', () => {
+      const fill = entryFill(viewOf(richData()))
+
+      expect(fill.total).toBe(6)
+      expect(fill.fields.map(({ field, filled, share }) => [field, filled, share])).toEqual([
+        ['id', 6, '100.0%'],
+        ['month', 6, '100.0%'],
+        ['day', 3, '50.0%'],
+        ['type', 6, '100.0%'],
+        ['name', 6, '100.0%'],
+        ['amount', 6, '100.0%'],
+        ['createdAt', 6, '100.0%'],
+        ['batchId', 1, '16.7%'],
+        ['payers', 1, '16.7%'],
+        ['sourceText', 1, '16.7%'],
+      ])
+      expect(fill.fields.find(({ field }) => field === 'payers')).toMatchObject({ type: 'Payer[]', need: '선택 (낸 분, v4)' })
+      expect(fill.fields.find(({ field }) => field === 'id')).toMatchObject({ type: 'string', need: '필수' })
+    })
+
+    it('칸 채움 표의 칸·필수/선택은 앱의 Entry 칸과 같다', () => {
+      expect(ENTRY_FIELDS.map(({ field }) => field).sort()).toEqual(Object.keys(ENTRY_KEYS).sort())
+      expect(ENTRY_FIELDS.filter(({ required }) => !required).map(({ field }) => field).sort()).toEqual(Object.keys(ENTRY_OPTIONAL).sort())
+    })
+
+    it('내역이 없으면 채운 줄은 0 이고 비율은 비운다', () => {
+      const fill = entryFill(viewOf(manyEntries(0)))
+
+      expect(fill.total).toBe(0)
+      expect(new Set(fill.fields.map(({ filled, share }) => `${filled} ${share}`))).toEqual(new Set(['0 —']))
+    })
+
+    it('옛 저장 형식(v3)은 있는 칸만: 회원·회비 마디와 v4 칸(payers·sourceText) 줄이 없다', () => {
+      const data = viewOf(V3_DATA)
+      const tree = storedTree(data)
+      const oldBook = tree.children[1].children[0]
+
+      expect(tree.children[0]).toEqual({ label: 'schemaVersion', value: '3', children: [] })
+      expect(oldBook.children.map(({ label }) => label)).toEqual(['id', 'createdAt', 'ledgers'])
+      expect(oldBook.children[2].children).toEqual([{ label: '2025', note: '내역 1 · 이월금 120,000', bytes: sizeOf(V3_DATA.books[0].ledgers[2025]), children: [] }])
+      expect(entryFill(data).fields.map(({ field }) => field)).toEqual(['id', 'month', 'day', 'type', 'name', 'amount', 'createdAt', 'batchId'])
+    })
+  })
+
+  describe('AC-8 표: 다섯 표와 거르기·찾기·정렬·300줄', () => {
+    it('다섯 표의 칸은 스펙 표 그대로다', () => {
+      const tables = buildTables(viewOf(richData()))
+
+      expect(tables.map(({ label, columns }) => [label, columns.map((column) => column.label)])).toEqual([
+        ['장부', ['이름', '종류', '해 범위', '내역 수', '회원 수', '만든 때']],
+        ['해', ['장부', '해', '이월금', '월 회비', '내역 수', '수입', '지출', '남은 돈']],
+        ['내역', ['장부', '해', '월', '일', '종류', '이름', '금액', '낸 분', '엑셀 글', '적은 때']],
+        ['회원', ['장부', '이름', '들어온 달', '그만둔 달', '쉬는 달', '시작 남은 돈']],
+        ['낸 분', ['장부', '해', '월', '내역 이름', '회원', '몫']],
+      ])
+    })
+
+    it('다섯 표의 줄은 저장 데이터와 맞다 (시각은 한국 시간, 없는 칸은 비움)', () => {
+      const data = viewOf(richData())
+      const cells = (key: TableKey) => queryTable(tableOf(data, key), ALL).rows.map((row) => row.cells)
+
+      expect(cells('books')).toEqual([
+        { name: '꽃동아리', kind: '동아리', years: '2025~2026', entries: 3, members: 2, createdAt: '2025-01-01 09:00' },
+        { name: '우리집', kind: '가계부', years: '2026', entries: 3, members: undefined, createdAt: '2026-01-03 09:00' },
+      ])
+      expect(cells('ledgers')).toEqual([
+        { book: '꽃동아리', year: 2025, carryover: 50_000, monthlyFee: undefined, count: 1, income: 0, expense: 30_000, balance: 20_000 },
+        { book: '꽃동아리', year: 2026, carryover: 0, monthlyFee: 20_000, count: 2, income: 70_000, expense: 0, balance: 70_000 },
+        { book: '우리집', year: 2026, carryover: 0, monthlyFee: undefined, count: 3, income: 300_000, expense: 222_000, balance: 78_000 },
+      ])
+      expect(cells('entries')).toEqual([
+        { book: '꽃동아리', year: 2025, month: 12, day: 20, type: '지출', name: '송년회', amount: 30_000, payers: undefined, sourceText: undefined, createdAt: '2025-12-20 19:00' },
+        { book: '꽃동아리', year: 2026, month: 3, day: 5, type: '수입', name: '회비', amount: 40_000, payers: '김도윤, 강민지', sourceText: undefined, createdAt: '2026-03-05 09:00' },
+        { book: '꽃동아리', year: 2026, month: 4, day: 1, type: '수입', name: '회비', amount: 30_000, payers: undefined, sourceText: '4월 -2명: 김도윤(1만원),이서준', createdAt: '2026-04-01 09:00' },
+        { book: '우리집', year: 2026, month: 1, day: undefined, type: '수입', name: '용돈', amount: 300_000, payers: undefined, sourceText: undefined, createdAt: '2025-01-01 09:00' },
+        { book: '우리집', year: 2026, month: 1, day: undefined, type: '지출', name: '장보기', amount: 42_000, payers: undefined, sourceText: undefined, createdAt: '2025-01-01 09:00' },
+        { book: '우리집', year: 2026, month: 2, day: undefined, type: '지출', name: 'OTT 구독', amount: 180_000, payers: undefined, sourceText: undefined, createdAt: '2025-01-01 09:00' },
+      ])
+      expect(cells('members')).toEqual([
+        { book: '꽃동아리', name: '김도윤', joined: '2026-01', left: undefined, off: undefined, opening: undefined },
+        { book: '꽃동아리', name: '강민지', joined: '2025-07', left: '2026-12', off: '2026-02', opening: -30_000 },
+      ])
+      expect(cells('payers')).toEqual([
+        { book: '꽃동아리', year: 2026, month: 3, entry: '회비', member: '김도윤', amount: 20_000 },
+        { book: '꽃동아리', year: 2026, month: 3, entry: '회비', member: '강민지', amount: 20_000 },
+      ])
+    })
+
+    it('줄을 누르면 보일 원본 JSON 은 저장된 그 줄이고, 장부·해 줄은 안의 긴 목록을 줄여 보인다', () => {
+      const stored = richData()
+      const data = viewOf(stored)
+      const raw = (key: TableKey, index: number) => queryTable(tableOf(data, key), ALL).rows[index]?.raw
+
+      expect(raw('books', 0)).toEqual({
+        id: 'club',
+        name: '꽃동아리',
+        kind: 'club',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        dues: { startMonth: '2026-01' },
+        ledgers: '{… 2개 해}',
+        members: '[… 2명]',
+      })
+      expect(raw('books', 1)).toEqual({ id: 'home', name: '우리집', kind: 'household', createdAt: '2026-01-03T00:00:00.000Z', ledgers: '{… 1개 해}' })
+      expect(raw('ledgers', 1)).toEqual({ year: 2026, carryover: 0, monthlyFee: 20_000, entries: '[… 2줄]' })
+      expect(raw('entries', 1)).toEqual(yearOf(stored, 0, '2026').entries[0])
+      expect(raw('members', 1)).toEqual(stored.books[0].members?.[1])
+      expect(raw('payers', 1)).toEqual({ memberId: 'm2', amount: 20_000 })
+    })
+
+    it('장부·해로 거르면 그 장부·해 줄만 남고, 해 칸이 없는 표(장부·회원)는 해로 거르지 않는다', () => {
+      const data = viewOf(richData())
+
+      expect(tableChoices(data)).toEqual({ books: [{ id: 'club', name: '꽃동아리' }, { id: 'home', name: '우리집' }], years: ['2025', '2026'] })
+      expect(columnOf(data, 'entries', 'name', { ...ALL, book: 'home' })).toEqual(['용돈', '장보기', 'OTT 구독'])
+      expect(columnOf(data, 'entries', 'name', { ...ALL, year: '2025' })).toEqual(['송년회'])
+      expect(columnOf(data, 'ledgers', 'balance', { ...ALL, book: 'club', year: '2026' })).toEqual([70_000])
+      expect(columnOf(data, 'payers', 'member', { ...ALL, year: '2025' })).toEqual([])
+      expect(columnOf(data, 'books', 'name', { ...ALL, year: '2025' })).toEqual(['꽃동아리', '우리집'])
+      expect(columnOf(data, 'members', 'name', { ...ALL, book: 'home', year: '2025' })).toEqual([])
+    })
+
+    it('찾기는 보이는 글과 숫자(쉼표 있든 없든)에서 대소문자 없이 찾는다', () => {
+      const data = viewOf(richData())
+      const names = (search: string) => columnOf(data, 'entries', 'name', { ...ALL, search })
+
+      expect(names('42,000')).toEqual(['장보기'])
+      expect(names('42000')).toEqual(['장보기'])
+      expect(names('ott')).toEqual(['OTT 구독'])
+      // 낸 분 이름과 엑셀 글에서도 찾는다
+      expect(columnOf(data, 'entries', 'amount', { ...ALL, search: '김도윤' })).toEqual([40_000, 30_000])
+      expect(names('  지출  ')).toEqual(['송년회', '장보기', 'OTT 구독'])
+      expect(names('없는 글')).toEqual([])
+    })
+
+    it('칸 머리로 정렬하면 오름·내림차순이고, 빈 칸은 늘 뒤에 두고, 같은 값은 원래 순서를 지킨다', () => {
+      const data = viewOf(richData())
+      const sorted = (column: string, descending: boolean, show: string) => columnOf(data, 'entries', show, { ...ALL, sort: { column, descending } })
+
+      expect(sorted('day', false, 'day')).toEqual([1, 5, 20, undefined, undefined, undefined])
+      expect(sorted('day', true, 'day')).toEqual([20, 5, 1, undefined, undefined, undefined])
+      expect(sorted('day', false, 'name').slice(3)).toEqual(['용돈', '장보기', 'OTT 구독'])
+      expect(sorted('amount', true, 'name')).toEqual(['용돈', 'OTT 구독', '장보기', '회비', '송년회', '회비'])
+      expect(sorted('name', false, 'name')).toEqual(['OTT 구독', '송년회', '용돈', '장보기', '회비', '회비'])
+      // 숫자는 글자 순이 아니라 크기 순 (5 < 20 < 300,000)
+      expect(columnOf(data, 'ledgers', 'income', { ...ALL, sort: { column: 'income', descending: false } })).toEqual([0, 70_000, 300_000])
+    })
+
+    it('한 번에 300줄까지 그리고 "N / 모두 M줄"을 보인다', () => {
+      const big = tableOf(viewOf(manyEntries(350)), 'entries')
+      const all = queryTable(big, ALL)
+      const income = queryTable(big, { ...ALL, search: '수입' })
+
+      expect(all.rows).toHaveLength(300)
+      expect(all).toMatchObject({ matched: 350, total: 350, countText: '350 / 모두 350줄 · 앞 300줄만' })
+      expect(income.rows).toHaveLength(50)
+      expect(income.countText).toBe('50 / 모두 350줄')
+      expect(queryTable(tableOf(viewOf(manyEntries(300)), 'entries'), ALL).countText).toBe('300 / 모두 300줄')
+      expect(queryTable(tableOf(viewOf(manyEntries(1_200)), 'entries'), ALL).countText).toBe('1,200 / 모두 1,200줄 · 앞 300줄만')
+    })
+
+    it('옛 저장 형식(v3)은 회원·낸 분 표가 비고, 나머지 표는 있는 칸으로 채운다', () => {
+      const data = viewOf(V3_DATA)
+
+      expect(queryTable(tableOf(data, 'members'), ALL).total).toBe(0)
+      expect(queryTable(tableOf(data, 'payers'), ALL).total).toBe(0)
+      expect(columnOf(data, 'books', 'members')).toEqual([undefined])
+      expect(columnOf(data, 'entries', 'payers')).toEqual([undefined])
+      expect(columnOf(data, 'ledgers', 'balance')).toEqual([130_000])
+    })
+  })
+
+  describe('AC-9 비교: 두 사본의 내역·회원·해별 남은 돈', () => {
+    it('내역을 Entry.id 로 맞춰 빠진·바뀐·더해진 줄과 바뀐 칸(앞 → 뒤)을 보인다 — 비교하지 않는 칸만 바뀐 줄은 빼고', () => {
+      const comparison = compareCopies(viewOf(richData()), viewOf(laterData()))
+
+      expect(comparison).toMatchObject({ removed: 1, changed: 2, added: 1, total: 4 })
+      expect(comparison.rows).toEqual([
+        { status: 'removed', book: '우리집', date: '2026-01', type: '지출', name: '장보기', amount: 42_000, changes: [] },
+        {
+          status: 'changed',
+          book: '꽃동아리',
+          date: '2026-04-01',
+          type: '수입',
+          name: '회비',
+          amount: 20_000,
+          changes: [
+            { label: '금액', before: '30,000', after: '20,000' },
+            { label: '낸 분', before: '(없음)', after: '김도윤 20,000' },
+            { label: '엑셀 글', before: '4월 -2명: 김도윤(1만원),이서준', after: '(없음)' },
+          ],
+        },
+        {
+          status: 'changed',
+          book: '우리집',
+          date: '2026-03-10',
+          type: '수입',
+          name: 'OTT 환불',
+          amount: 180_000,
+          changes: [
+            { label: '월', before: '2', after: '3' },
+            { label: '일', before: '(없음)', after: '10' },
+            { label: '종류', before: '지출', after: '수입' },
+            { label: '이름', before: 'OTT 구독', after: 'OTT 환불' },
+          ],
+        },
+        { status: 'added', book: '우리집', date: '2026-11-25', type: '지출', name: '꽃바구니', amount: 35_000, changes: [] },
+      ])
+    })
+
+    it('회원은 장부 id + Member.id 로 맞춰 더해짐·빠짐을 보인다', () => {
+      const comparison = compareCopies(viewOf(richData()), viewOf(laterData()))
+
+      expect(comparison.membersAdded).toEqual([
+        { book: '꽃동아리', name: '이서준', joined: '2026-04' },
+        { book: '우리집', name: '김도윤', joined: '2026-11' },
+      ])
+      expect(comparison.membersRemoved).toEqual([{ book: '꽃동아리', name: '강민지', joined: '2025-07' }])
+    })
+
+    it('해별 남은 돈(이월금 + 수입 − 지출)이 달라진 해만 앞·뒤·차이로 보인다', () => {
+      const comparison = compareCopies(viewOf(richData()), viewOf(laterData()))
+
+      expect(comparison.balances).toEqual([
+        { book: '꽃동아리', year: '2026', before: 70_000, after: 60_000, diff: -10_000 },
+        { book: '우리집', year: '2026', before: 78_000, after: 445_000, diff: 367_000 },
+        { book: '우리집', year: '2027', before: undefined, after: 85_000, diff: undefined },
+      ])
+    })
+
+    it('같은 사본끼리는 바뀐 것이 없다', () => {
+      const data = viewOf(richData())
+
+      expect(compareCopies(data, data)).toEqual({ removed: 0, changed: 0, added: 0, total: 0, rows: [], membersAdded: [], membersRemoved: [], balances: [] })
+    })
+
+    it('바뀐 줄은 120줄까지 (빠짐 → 바뀜 → 더해짐, 그 안에서는 날짜가 늦은 것부터) 그리고 "모두 N줄"을 보인다', () => {
+      const empty = viewOf(manyEntries(0))
+      const later = manyEntries(130)
+      const many = compareCopies(empty, viewOf(later))
+      const exact = compareCopies(empty, viewOf(manyEntries(120)))
+      const pad = (value: number | undefined) => String(value).padStart(2, '0')
+      const allDates = yearOf(later, 0, '2026').entries.map(({ month, day }) => `2026-${pad(month)}-${pad(day)}`)
+
+      expect(many).toMatchObject({ added: 130, total: 130 })
+      expect(many.rows).toHaveLength(120)
+      expect(many.rows[0].date).toBe('2026-12-28')
+      // 줄을 다 줄 세운 뒤에 자른다: 날짜가 가장 이른 10줄이 빠진다
+      expect(many.rows.map(({ date }) => date)).toEqual(allDates.sort().reverse().slice(0, 120))
+      expect(compareMoreText(many)).toBe('앞 120줄만 보여요 (모두 130줄)')
+      expect(exact.rows).toHaveLength(120)
+      expect(compareMoreText(exact)).toBeUndefined()
+    })
+
+    it('같은 코드로 푼 두 사본(앱의 sealKeep 으로 만든 보관본)을 비교한다', async () => {
+      const [before, after] = await Promise.all([
+        openCopy(CODE_A, await seal(CODE_A, richData(), DAY_AT)),
+        openCopy(CODE_A, await seal(CODE_A, laterData(), LATEST_AT)),
+      ])
+      if (!before.ok || !after.ok) throw new Error('지어낸 보관본을 풀지 못했다')
+
+      expect(compareCopies(before.data, after.data)).toMatchObject({ removed: 1, changed: 2, added: 1 })
+      expect(JSON.stringify(storedTree(after.data))).not.toContain(CODE_A)
+    })
+
+    it('비교의 처음 앞·뒤: 뒤는 고른 사본, 앞은 그보다 먼저 받은 가장 가까운 사본 (받지 못한 사본은 빼고)', () => {
+      const copies: CopyItem[] = [
+        { kind: 'latest', key: '', at: LATEST_AT, bytes: 1 },
+        { kind: 'day', key: '2026-11-24', at: DAY_AT, bytes: 1 },
+        { kind: 'month', key: '2026-10', at: MONTH_AT, bytes: 1 },
+        { kind: 'week', key: 'a'.repeat(40), at: WEEK_2, bytes: 1 },
+        { kind: 'week', key: 'b'.repeat(40), at: WEEK_1, bytes: 1 },
+      ]
+
+      expect(defaultPair(copies, 0)).toEqual({ before: 1, after: 0 })
+      expect(defaultPair(copies, 1)).toEqual({ before: 3, after: 1 })
+      expect(defaultPair(copies, 4)).toEqual({ before: 2, after: 4 })
+      // 가장 오래된 사본을 고르면 그것을 앞에, 그다음에 받은 사본을 뒤에
+      expect(defaultPair(copies, 2)).toEqual({ before: 2, after: 4 })
+      const gone = copies.map((copy, index): CopyItem => (index === 1 ? { kind: copy.kind, key: copy.key, at: copy.at, problem: GONE_COPY } : copy))
+      expect(defaultPair(gone, 0)).toEqual({ before: 3, after: 0 })
+      expect(defaultPair(copies.slice(0, 1), 0)).toBeUndefined()
+      // 고른 사본과 같은 때 받은 사본은 같은 모습이라 앞으로 고르지 않는다
+      const same: CopyItem[] = [copies[0], { kind: 'week', key: 'c'.repeat(40), at: LATEST_AT, bytes: 1 }, copies[1]]
+      expect(defaultPair(same, 0)).toEqual({ before: 2, after: 0 })
+      const sameOldest: CopyItem[] = [copies[0], { kind: 'week', key: 'c'.repeat(40), at: MONTH_AT, bytes: 1 }, copies[2]]
+      expect(defaultPair(sameOldest, 2)).toEqual({ before: 2, after: 0 })
     })
   })
 

@@ -610,33 +610,758 @@ export function localAnswer(status: number, text: string): Record<string, unknow
   return { ok: false, message: strangeLocalAnswer(status) }
 }
 
+// 풀린 저장 데이터 (풀린 글자를 JSON.parse 한 객체 그대로 — 옛 형식도 옮기지 않는다). 구조·표·비교는 있는 칸만 읽는다
+export type StoredView = Record<string, unknown>
+
 export type OpenedCopy =
-  | { ok: true; schemaVersion?: number; bookNames: string[]; entryCount: number }
+  | { ok: true; schemaVersion?: number; bookNames: string[]; entryCount: number; data: StoredView }
   | { ok: false; message: string }
 
-// 풀어서 저장 형식·장부 이름·기록 건수까지. 옛 형식도 옮기지(migrate) 않고 그대로 센다
+// 풀어서 저장 형식·장부 이름·기록 건수와 저장 데이터까지. 옛 형식도 옮기지(migrate) 않고 그대로 센다
 export async function openCopy(normalized: string, envelope: KeepEnvelope): Promise<OpenedCopy> {
   const plainText = await openKeep(normalized, envelope)
   if (plainText === undefined) return { ok: false, message: WRONG_CODE }
   const summary = summarizeBackup(plainText)
-  if (summary === undefined) return { ok: false, message: NOT_BACKUP }
-  const raw = parseJson(plainText)
-  const schemaVersion = isRecord(raw) && typeof raw.schemaVersion === 'number' ? raw.schemaVersion : undefined
-  return { ok: true, schemaVersion, ...summary }
+  const data = parseJson(plainText)
+  if (summary === undefined || !isRecord(data)) return { ok: false, message: NOT_BACKUP }
+  const schemaVersion = typeof data.schemaVersion === 'number' ? data.schemaVersion : undefined
+  return { ok: true, schemaVersion, ...summary, data }
 }
 
-function versionText(version: number | undefined): string {
+// 저장 형식 번호. 옛 형식이면 그렇다고 적는다 (겉 정보의 풀린 내용·구조·표 머리)
+export function schemaText(version: number | undefined): string {
   if (version === undefined) return '모름 (schemaVersion 없음)'
   if (version < CURRENT_SCHEMA_VERSION) return `v${version} (옛 형식 — 옮기지 않고 그대로 보여요)`
   return `v${version}`
 }
 
-// 풀린 내용 줄 (구조·표·비교 탭은 SPEC-013 #206)
+// 풀린 내용 줄 (겉 정보 탭)
 export function openedInfo(opened: OpenedCopy): InfoRow[] {
   if (!opened.ok) return [{ label: '풀기', value: opened.message }]
   return [
-    { label: '저장 형식', value: versionText(opened.schemaVersion) },
+    { label: '저장 형식', value: schemaText(opened.schemaVersion) },
     { label: '장부', value: `${opened.bookNames.join(', ') || '(없음)'} — ${opened.bookNames.length}개` },
     { label: '기록', value: `${opened.entryCount}건` },
   ]
+}
+
+// ---------- 페이지: 풀린 저장 데이터 읽기 (구조·표·비교, SPEC-013 기본 흐름 6~8, #206) ----------
+//
+// 저장 데이터 모양은 앱의 src/domain/types.ts(StoredData v4: books·ledgers·entries·members·dues·settings·Payer)를 따르지만,
+// 옛 형식(v3 이하)이나 칸이 빠진 사본도 멈추지 않게 칸마다 모양을 보고 있는 칸만 읽는다 (src 는 불러오지 않는다)
+
+type RawRecord = Record<string, unknown>
+
+function recordsOf(value: unknown): RawRecord[] {
+  return Array.isArray(value) ? value.filter(isRecord) : []
+}
+
+function textOf(record: RawRecord, key: string): string | undefined {
+  const value = record[key]
+  return typeof value === 'string' ? value : undefined
+}
+
+function numberOf(record: RawRecord, key: string): number | undefined {
+  const value = record[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+// 세 자리마다 쉼표 (브라우저·Node 의 지역 설정과 상관없이 같게)
+export function won(value: number): string {
+  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+// 시각은 한국 시간 (시각 모양이 아니면 적힌 그대로)
+function timeText(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined
+  return Number.isNaN(Date.parse(value)) ? value : formatKst(value)
+}
+
+// 줄바꿈·들여쓰기 없이 잰 JSON 크기 (UTF-8 바이트)
+function jsonBytes(value: unknown): number {
+  return byteLength(JSON.stringify(value))
+}
+
+interface YearPart {
+  key: string // ledgers 의 키 ("2026")
+  year: number
+  raw: RawRecord
+  entries: RawRecord[]
+}
+
+interface BookPart {
+  id: string
+  name: string
+  raw: RawRecord
+  years: YearPart[] // 해 순 (해 키는 정수 모양이라 객체 키 순서가 곧 오름차순)
+  members?: RawRecord[] // members 칸이 없으면(옛 형식·가계부) 없음
+  memberNames: Map<string, string> // Member.id → 이름
+}
+
+function yearsOf(book: RawRecord): YearPart[] {
+  if (!isRecord(book.ledgers)) return []
+  return Object.entries(book.ledgers).flatMap(([key, raw]) => (isRecord(raw) ? [{ key, year: Number(key), raw, entries: recordsOf(raw.entries) }] : []))
+}
+
+function booksOf(data: StoredView): BookPart[] {
+  return recordsOf(data.books).map((raw, index) => {
+    const members = Array.isArray(raw.members) ? recordsOf(raw.members) : undefined
+    const memberNames = new Map(
+      (members ?? []).flatMap((member): [string, string][] => {
+        const id = textOf(member, 'id')
+        return id === undefined ? [] : [[id, textOf(member, 'name') ?? id]]
+      }),
+    )
+    return { id: textOf(raw, 'id') ?? `(id 없음 ${index + 1})`, name: textOf(raw, 'name') ?? '(이름 없음)', raw, years: yearsOf(raw), members, memberNames }
+  })
+}
+
+function entryCountOf(book: BookPart): number {
+  return book.years.reduce((sum, year) => sum + year.entries.length, 0)
+}
+
+// 그 해 수입·지출 합 (금액 칸이 숫자인 줄만)
+function sumsOf(year: YearPart): { income: number; expense: number } {
+  let income = 0
+  let expense = 0
+  for (const entry of year.entries) {
+    const amount = numberOf(entry, 'amount') ?? 0
+    if (entry.type === 'income') income += amount
+    else if (entry.type === 'expense') expense += amount
+  }
+  return { income, expense }
+}
+
+// 해별 남은 돈 = 이월금 + 수입 − 지출 (그 해 내역, SPEC-013 기술 메모 "비교 기준")
+function balanceOf(year: YearPart): number {
+  const { income, expense } = sumsOf(year)
+  return (numberOf(year.raw, 'carryover') ?? 0) + income - expense
+}
+
+function payerName(book: BookPart, payer: RawRecord): string {
+  const id = textOf(payer, 'memberId')
+  return id === undefined ? '(회원 번호 없음)' : (book.memberNames.get(id) ?? id)
+}
+
+// ---------- 구조 ----------
+
+// 구조 탭의 나무 마디 하나
+export interface TreeNode {
+  label: string // 칸 이름, 장부 이름, 해
+  value?: string // 값 하나 (schemaVersion: 4)
+  kind?: string // 모양({ }·[3]·{2}) 또는 장부 종류(club)
+  note?: string // 요약 (해 2 · 내역 112, 내역 52 · 이월금 410,000 · 월 회비 20,000)
+  bytes?: number // 그 마디의 JSON 크기
+  masked?: boolean // 값을 가림 (복구 코드)
+  children: TreeNode[]
+}
+
+// 나무에 값을 보이지 않는 설정 칸
+const MASKED_SETTINGS: ReadonlySet<string> = new Set(['recoveryCode'])
+
+function leaf(label: string, value: string): TreeNode {
+  return { label, value, children: [] }
+}
+
+// 값 하나를 글자로. ~At 칸의 시각은 한국 시간
+function valueText(key: string, value: unknown): string {
+  if (typeof value === 'string') return key.endsWith('At') ? (timeText(value) ?? value) : value
+  return JSON.stringify(value)
+}
+
+function ledgerNode(year: YearPart): TreeNode {
+  const parts = [`내역 ${won(year.entries.length)}`]
+  const carryover = numberOf(year.raw, 'carryover')
+  const fee = numberOf(year.raw, 'monthlyFee')
+  if (carryover !== undefined) parts.push(`이월금 ${won(carryover)}`)
+  if (fee !== undefined) parts.push(`월 회비 ${won(fee)}`)
+  return { label: year.key, note: parts.join(' · '), bytes: jsonBytes(year.raw), children: [] }
+}
+
+// 장부 하나: id·만든 때·ledgers{해}·members[]·dues (있는 칸만)
+function bookNode(book: BookPart): TreeNode {
+  const { raw } = book
+  const children = [leaf('id', book.id)]
+  const createdAt = textOf(raw, 'createdAt')
+  if (createdAt !== undefined) children.push(leaf('createdAt', valueText('createdAt', createdAt)))
+  if (isRecord(raw.ledgers)) {
+    children.push({ label: 'ledgers', kind: `{${book.years.length}}`, bytes: jsonBytes(raw.ledgers), children: book.years.map(ledgerNode) })
+  }
+  if (book.members !== undefined) children.push({ label: 'members', kind: `[${book.members.length}]`, bytes: jsonBytes(raw.members), children: [] })
+  if (isRecord(raw.dues)) {
+    const note = Object.entries(raw.dues)
+      .map(([key, value]) => `${key}: ${valueText(key, value)}`)
+      .join(' · ')
+    children.push({ label: 'dues', kind: '{ }', note, bytes: jsonBytes(raw.dues), children: [] })
+  }
+  return { label: book.name, kind: textOf(raw, 'kind'), note: `해 ${book.years.length} · 내역 ${won(entryCountOf(book))}`, bytes: jsonBytes(raw), children }
+}
+
+// 구조 나무: StoredData → schemaVersion · books[] → 장부마다 ledgers{해}·members[]·dues → settings (복구 코드는 가림)
+export function storedTree(data: StoredView): TreeNode {
+  const books = booksOf(data)
+  const children: TreeNode[] = []
+  if (data.schemaVersion !== undefined) children.push(leaf('schemaVersion', valueText('schemaVersion', data.schemaVersion)))
+  children.push({ label: 'books', kind: `[${books.length}]`, bytes: jsonBytes(data.books), children: books.map(bookNode) })
+  if (isRecord(data.settings)) {
+    const settings = Object.entries(data.settings).map(([key, value]): TreeNode =>
+      MASKED_SETTINGS.has(key) ? { label: key, masked: true, children: [] } : leaf(key, valueText(key, value)),
+    )
+    children.push({ label: 'settings', kind: '{ }', bytes: jsonBytes(data.settings), children: settings })
+  }
+  return { label: 'StoredData', kind: '{ }', bytes: jsonBytes(data), children }
+}
+
+export interface EntryField {
+  field: string
+  type: string
+  required: boolean
+  note?: string
+  // 그 칸이 생긴 저장 형식. 이보다 옛 형식 사본에는 그 줄을 보이지 않는다
+  since?: number
+}
+
+// 내역(Entry) 칸 — src/domain/types.ts Entry 와 같게 둔다 (scripts/keepView.test.ts 가 앱의 Entry 칸·필수/선택과 맞춰 본다)
+export const ENTRY_FIELDS: readonly EntryField[] = [
+  { field: 'id', type: 'string', required: true },
+  { field: 'month', type: 'number 1~12', required: true },
+  { field: 'day', type: 'number 1~31', required: false, note: 'v2.2 전 기록엔 없음' },
+  { field: 'type', type: "'income' | 'expense'", required: true },
+  { field: 'name', type: 'string', required: true },
+  { field: 'amount', type: 'number', required: true },
+  { field: 'createdAt', type: 'ISO 시각', required: true },
+  { field: 'batchId', type: 'string', required: false, note: '사진으로 함께 넣은 묶음' },
+  { field: 'payers', type: 'Payer[]', required: false, note: '낸 분, v4', since: 4 },
+  { field: 'sourceText', type: 'string', required: false, note: '엑셀 글, v4', since: 4 },
+]
+
+export interface FieldFill {
+  field: string
+  type: string
+  need: string // 필수 / 선택 (…)
+  filled: number // 그 칸이 있는 줄 수
+  share: string // 모든 내역 중 비율 (내역이 없으면 —)
+}
+
+export interface EntryFill {
+  total: number
+  fields: FieldFill[]
+}
+
+// 내역 칸 채움: 모든 장부·해의 내역에서 칸마다 몇 줄에 있는지 (옛 형식이면 그 형식에 없던 칸은 빼고)
+export function entryFill(data: StoredView): EntryFill {
+  const entries = booksOf(data).flatMap((book) => book.years.flatMap((year) => year.entries))
+  const version = typeof data.schemaVersion === 'number' ? data.schemaVersion : undefined
+  const fields = ENTRY_FIELDS.filter(({ since }) => version === undefined || since === undefined || since <= version).map(
+    ({ field, type, required, note }): FieldFill => {
+      const filled = entries.filter((entry) => Object.hasOwn(entry, field)).length
+      return {
+        field,
+        type,
+        need: required ? '필수' : note === undefined ? '선택' : `선택 (${note})`,
+        filled,
+        share: entries.length === 0 ? '—' : `${((filled / entries.length) * 100).toFixed(1)}%`,
+      }
+    },
+  )
+  return { total: entries.length, fields }
+}
+
+// ---------- 표 ----------
+
+export type TableKey = 'books' | 'ledgers' | 'entries' | 'members' | 'payers'
+export type CellValue = string | number | undefined
+// text: 글자 그대로, number: 숫자 그대로(해·월·개수), won: 세 자리 쉼표(돈), long: 긴 글(줄 바꿈 허용)
+export type CellFormat = 'text' | 'number' | 'won' | 'long'
+
+export interface TableColumn {
+  key: string
+  label: string
+  format: CellFormat
+}
+
+export interface TableRow {
+  bookId: string // 장부로 거르기
+  year?: number // 해로 거르기 (해 칸이 없는 표는 없음)
+  cells: Record<string, CellValue>
+  raw: unknown // 줄을 누르면 보일 원본 JSON
+}
+
+export interface ViewTable {
+  key: TableKey
+  label: string
+  columns: readonly TableColumn[]
+  rows: TableRow[]
+}
+
+function column(key: string, label: string, format: CellFormat = 'text'): TableColumn {
+  return { key, label, format }
+}
+
+// 다섯 표와 칸 (SPEC-013 기본 흐름 7 표)
+const TABLES: readonly { key: TableKey; label: string; columns: readonly TableColumn[] }[] = [
+  {
+    key: 'books',
+    label: '장부',
+    columns: [column('name', '이름'), column('kind', '종류'), column('years', '해 범위'), column('entries', '내역 수', 'number'), column('members', '회원 수', 'number'), column('createdAt', '만든 때')],
+  },
+  {
+    key: 'ledgers',
+    label: '해',
+    columns: [
+      column('book', '장부'),
+      column('year', '해', 'number'),
+      column('carryover', '이월금', 'won'),
+      column('monthlyFee', '월 회비', 'won'),
+      column('count', '내역 수', 'number'),
+      column('income', '수입', 'won'),
+      column('expense', '지출', 'won'),
+      column('balance', '남은 돈', 'won'),
+    ],
+  },
+  {
+    key: 'entries',
+    label: '내역',
+    columns: [
+      column('book', '장부'),
+      column('year', '해', 'number'),
+      column('month', '월', 'number'),
+      column('day', '일', 'number'),
+      column('type', '종류'),
+      column('name', '이름'),
+      column('amount', '금액', 'won'),
+      column('payers', '낸 분'),
+      column('sourceText', '엑셀 글', 'long'),
+      column('createdAt', '적은 때'),
+    ],
+  },
+  {
+    key: 'members',
+    label: '회원',
+    columns: [column('book', '장부'), column('name', '이름'), column('joined', '들어온 달'), column('left', '그만둔 달'), column('off', '쉬는 달'), column('opening', '시작 남은 돈', 'won')],
+  },
+  {
+    key: 'payers',
+    label: '낸 분',
+    columns: [column('book', '장부'), column('year', '해', 'number'), column('month', '월', 'number'), column('entry', '내역 이름'), column('member', '회원'), column('amount', '몫', 'won')],
+  },
+]
+
+const BOOK_KINDS: Readonly<Record<string, string>> = { club: '동아리', household: '가계부' }
+const ENTRY_TYPES: Readonly<Record<string, string>> = { income: '수입', expense: '지출' }
+
+// 아는 값은 화면 말로, 모르는 값은 적힌 그대로
+function wordOf(words: Readonly<Record<string, string>>, value: string | undefined): string | undefined {
+  if (value === undefined) return undefined
+  return Object.hasOwn(words, value) ? words[value] : value
+}
+
+function rangeText(keys: readonly string[]): string | undefined {
+  if (keys.length === 0) return undefined
+  return keys.length === 1 ? keys[0] : `${keys[0]}~${keys[keys.length - 1]}`
+}
+
+// 장부 줄의 원본: 안의 해·회원 목록은 줄여 보인다 (그 줄은 해·회원 표에서)
+function shortBook(book: BookPart): RawRecord {
+  const members = book.members === undefined ? {} : { members: `[… ${book.members.length}명]` }
+  return { ...book.raw, ledgers: `{… ${book.years.length}개 해}`, ...members }
+}
+
+// 다섯 표 (장부 순 → 해 순 → 저장된 내역 순). 옛 형식은 있는 칸만 채우고, 회원·낸 분 칸이 없으면 그 표는 빈다
+export function buildTables(data: StoredView): ViewTable[] {
+  const rows: Record<TableKey, TableRow[]> = { books: [], ledgers: [], entries: [], members: [], payers: [] }
+  for (const book of booksOf(data)) {
+    const bookId = book.id
+    rows.books.push({
+      bookId,
+      cells: {
+        name: book.name,
+        kind: wordOf(BOOK_KINDS, textOf(book.raw, 'kind')),
+        years: rangeText(book.years.map(({ key }) => key)),
+        entries: entryCountOf(book),
+        members: book.members?.length,
+        createdAt: timeText(textOf(book.raw, 'createdAt')),
+      },
+      raw: shortBook(book),
+    })
+    for (const part of book.years) {
+      const { year } = part
+      const { income, expense } = sumsOf(part)
+      rows.ledgers.push({
+        bookId,
+        year,
+        cells: {
+          book: book.name,
+          year,
+          carryover: numberOf(part.raw, 'carryover'),
+          monthlyFee: numberOf(part.raw, 'monthlyFee'),
+          count: part.entries.length,
+          income,
+          expense,
+          balance: balanceOf(part),
+        },
+        raw: { ...part.raw, entries: `[… ${part.entries.length}줄]` },
+      })
+      for (const entry of part.entries) {
+        const payers = recordsOf(entry.payers)
+        const month = numberOf(entry, 'month')
+        const name = textOf(entry, 'name')
+        rows.entries.push({
+          bookId,
+          year,
+          cells: {
+            book: book.name,
+            year,
+            month,
+            day: numberOf(entry, 'day'),
+            type: wordOf(ENTRY_TYPES, textOf(entry, 'type')),
+            name,
+            amount: numberOf(entry, 'amount'),
+            payers: Array.isArray(entry.payers) ? payers.map((payer) => payerName(book, payer)).join(', ') : undefined,
+            sourceText: textOf(entry, 'sourceText'),
+            createdAt: timeText(textOf(entry, 'createdAt')),
+          },
+          raw: entry,
+        })
+        for (const payer of payers) {
+          rows.payers.push({
+            bookId,
+            year,
+            cells: { book: book.name, year, month, entry: name, member: payerName(book, payer), amount: numberOf(payer, 'amount') },
+            raw: payer,
+          })
+        }
+      }
+    }
+    for (const member of book.members ?? []) {
+      const off = Array.isArray(member.off) && member.off.length > 0 ? member.off.map(String).join(', ') : undefined
+      rows.members.push({
+        bookId,
+        cells: {
+          book: book.name,
+          name: textOf(member, 'name'),
+          joined: textOf(member, 'joined'),
+          left: textOf(member, 'left'),
+          off,
+          opening: numberOf(member, 'opening'),
+        },
+        raw: member,
+      })
+    }
+  }
+  return TABLES.map(({ key, label, columns }) => ({ key, label, columns, rows: rows[key] }))
+}
+
+// 장부·해 고르기 칸에 넣을 것
+export function tableChoices(data: StoredView): { books: { id: string; name: string }[]; years: string[] } {
+  const books = booksOf(data)
+  const years = new Set(books.flatMap((book) => book.years.map(({ key }) => key)))
+  return { books: books.map(({ id, name }) => ({ id, name })), years: [...years].sort() }
+}
+
+// 한 번에 그리는 줄 수 (SPEC-013 기본 흐름 7)
+export const TABLE_LIMIT = 300
+
+export interface TableSort {
+  column: string
+  descending: boolean
+}
+
+export interface TableQuery {
+  book: string // 장부 id ('' = 모든 장부)
+  year: string // 해 ('' = 모든 해, 해 칸이 없는 표는 거르지 않는다)
+  search: string // 찾을 글 (앞뒤 빈칸은 빼고, 대소문자 없이)
+  sort?: TableSort
+}
+
+export interface TableView {
+  rows: TableRow[] // 앞 TABLE_LIMIT 줄
+  matched: number
+  total: number
+  countText: string // "N / 모두 M줄"
+}
+
+// 칸에 보일 글자. 빈 칸은 undefined (페이지가 —)
+export function cellText(column: TableColumn, value: CellValue): string | undefined {
+  if (value === undefined || typeof value === 'string') return value
+  return column.format === 'won' ? won(value) : String(value)
+}
+
+// 찾기: 칸마다 보이는 글자와 숫자 그대로(쉼표 없이) 둘 다에서
+function rowMatches(table: ViewTable, row: TableRow, search: string): boolean {
+  return table.columns.some((item) => {
+    const value = row.cells[item.key]
+    return value !== undefined && `${value}\n${cellText(item, value)}`.toLowerCase().includes(search)
+  })
+}
+
+// 숫자는 크기 순, 글자는 글자 순(유니코드, 한글은 가나다 순)
+function compareCells(left: string | number, right: string | number): number {
+  if (typeof left === 'number' && typeof right === 'number') return left - right
+  const [a, b] = [String(left), String(right)]
+  if (a === b) return 0
+  return a < b ? -1 : 1
+}
+
+function sortRows(rows: TableRow[], sort: TableSort): TableRow[] {
+  return rows.sort((first, second) => {
+    const [a, b] = [first.cells[sort.column], second.cells[sort.column]]
+    // 빈 칸은 오름·내림 어느 쪽이든 뒤에
+    if (a === undefined || b === undefined) return a === b ? 0 : a === undefined ? 1 : -1
+    return sort.descending ? compareCells(b, a) : compareCells(a, b)
+  })
+}
+
+// 표 하나를 거르고(장부·해·찾기) 정렬해 앞 300줄과 줄 수 글자를 만든다. 정렬은 같은 값끼리 원래 순서를 지킨다
+export function queryTable(table: ViewTable, query: TableQuery): TableView {
+  const search = query.search.trim().toLowerCase()
+  const matched = table.rows.filter(
+    (row) =>
+      (query.book === '' || row.bookId === query.book) &&
+      (query.year === '' || row.year === undefined || String(row.year) === query.year) &&
+      (search === '' || rowMatches(table, row, search)),
+  )
+  const { sort } = query
+  const ordered = sort !== undefined && table.columns.some(({ key }) => key === sort.column) ? sortRows(matched, sort) : matched
+  const more = ordered.length > TABLE_LIMIT ? ` · 앞 ${won(TABLE_LIMIT)}줄만` : ''
+  return {
+    rows: ordered.slice(0, TABLE_LIMIT),
+    matched: ordered.length,
+    total: table.rows.length,
+    countText: `${won(ordered.length)} / 모두 ${won(table.rows.length)}줄${more}`,
+  }
+}
+
+// ---------- 비교 ----------
+
+// 한 번에 그리는 바뀐 줄 수 (SPEC-013 기본 흐름 8)
+export const COMPARE_LIMIT = 120
+
+// 바뀐 칸으로 보는 것 (SPEC-013 기술 메모 "비교 기준"). 적은 때·사진 묶음은 보지 않는다
+const COMPARED_FIELDS: readonly { field: string; label: string }[] = [
+  { field: 'month', label: '월' },
+  { field: 'day', label: '일' },
+  { field: 'type', label: '종류' },
+  { field: 'name', label: '이름' },
+  { field: 'amount', label: '금액' },
+  { field: 'payers', label: '낸 분' },
+  { field: 'sourceText', label: '엑셀 글' },
+]
+
+export type ChangeStatus = 'removed' | 'changed' | 'added'
+
+export interface FieldChange {
+  label: string
+  before: string
+  after: string
+}
+
+export interface EntryChange {
+  status: ChangeStatus
+  book: string // 장부 이름
+  date: string // 해-월-일 (일이 없으면 해-월)
+  type?: string
+  name?: string
+  amount?: number
+  changes: FieldChange[] // 바뀐 줄의 바뀐 칸 (앞 → 뒤)
+}
+
+export interface MemberChange {
+  book: string
+  name: string
+  joined?: string
+}
+
+export interface BalanceChange {
+  book: string
+  year: string
+  before?: number // 앞 사본에 그 해가 없으면 없음
+  after?: number
+  diff?: number // 뒤 − 앞 (한쪽에 없으면 없음)
+}
+
+export interface Comparison {
+  removed: number
+  changed: number
+  added: number
+  total: number
+  rows: EntryChange[] // 앞 COMPARE_LIMIT 줄: 빠짐 → 바뀜 → 더해짐, 그 안에서는 날짜가 늦은 것부터
+  membersAdded: MemberChange[]
+  membersRemoved: MemberChange[]
+  balances: BalanceChange[] // 남은 돈이 달라진 해만
+}
+
+interface EntrySpot {
+  book: BookPart
+  year: YearPart
+  entry: RawRecord
+}
+
+// 내역은 Entry.id 로 맞춘다 (id 가 없는 줄은 맞출 수 없어 뺀다)
+function entriesById(data: StoredView): Map<string, EntrySpot> {
+  const found = new Map<string, EntrySpot>()
+  for (const book of booksOf(data)) {
+    for (const year of book.years) {
+      for (const entry of year.entries) {
+        const id = textOf(entry, 'id')
+        if (id !== undefined) found.set(id, { book, year, entry })
+      }
+    }
+  }
+  return found
+}
+
+function payersText(book: BookPart, payers: readonly RawRecord[]): string {
+  if (payers.length === 0) return '(빈 목록)'
+  return payers
+    .map((payer) => {
+      const amount = numberOf(payer, 'amount')
+      return amount === undefined ? payerName(book, payer) : `${payerName(book, payer)} ${won(amount)}`
+    })
+    .join(', ')
+}
+
+// 바뀐 칸의 앞·뒤 글자. 낸 분은 그 사본의 회원 이름으로
+function fieldText(field: string, spot: EntrySpot): string {
+  const value = spot.entry[field]
+  if (value === undefined) return '(없음)'
+  if (field === 'amount' && typeof value === 'number') return won(value)
+  if (field === 'type' && typeof value === 'string') return wordOf(ENTRY_TYPES, value) ?? value
+  if (field === 'payers' && Array.isArray(value)) return payersText(spot.book, recordsOf(value))
+  return typeof value === 'string' ? value : JSON.stringify(value)
+}
+
+function fieldChanges(before: EntrySpot, after: EntrySpot): FieldChange[] {
+  return COMPARED_FIELDS.flatMap(({ field, label }) =>
+    JSON.stringify(before.entry[field]) === JSON.stringify(after.entry[field]) ? [] : [{ label, before: fieldText(field, before), after: fieldText(field, after) }],
+  )
+}
+
+function twoDigits(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+function dateOf({ year, entry }: EntrySpot): string {
+  const month = numberOf(entry, 'month')
+  const day = numberOf(entry, 'day')
+  if (month === undefined) return year.key
+  return day === undefined ? `${year.key}-${twoDigits(month)}` : `${year.key}-${twoDigits(month)}-${twoDigits(day)}`
+}
+
+// 날짜 순서를 재는 값 (해·월·일, 없는 칸은 0)
+function dayOrder({ year, entry }: EntrySpot): number {
+  return year.year * 10_000 + (numberOf(entry, 'month') ?? 0) * 100 + (numberOf(entry, 'day') ?? 0)
+}
+
+const STATUS_ORDER: Readonly<Record<ChangeStatus, number>> = { removed: 0, changed: 1, added: 2 }
+
+function changeRow(status: ChangeStatus, spot: EntrySpot, changes: FieldChange[]): EntryChange {
+  const { entry } = spot
+  return {
+    status,
+    book: spot.book.name,
+    date: dateOf(spot),
+    type: wordOf(ENTRY_TYPES, textOf(entry, 'type')),
+    name: textOf(entry, 'name'),
+    amount: numberOf(entry, 'amount'),
+    changes,
+  }
+}
+
+// 회원은 장부 id + Member.id 로 맞춘다
+function membersByKey(data: StoredView): Map<string, MemberChange> {
+  const found = new Map<string, MemberChange>()
+  for (const book of booksOf(data)) {
+    for (const member of book.members ?? []) {
+      const id = textOf(member, 'id')
+      if (id !== undefined) found.set(JSON.stringify([book.id, id]), { book: book.name, name: textOf(member, 'name') ?? id, joined: textOf(member, 'joined') })
+    }
+  }
+  return found
+}
+
+function onlyIn(first: ReadonlyMap<string, MemberChange>, second: ReadonlyMap<string, MemberChange>): MemberChange[] {
+  return [...first].flatMap(([key, member]) => (second.has(key) ? [] : [member]))
+}
+
+interface YearBalance {
+  book: string
+  year: string
+  balance: number
+}
+
+// 해별 남은 돈 (장부 id + 해로 맞춘다)
+function balancesOf(data: StoredView): Map<string, YearBalance> {
+  const found = new Map<string, YearBalance>()
+  for (const book of booksOf(data)) {
+    for (const year of book.years) found.set(JSON.stringify([book.id, year.key]), { book: book.name, year: year.key, balance: balanceOf(year) })
+  }
+  return found
+}
+
+function balanceChanges(before: StoredView, after: StoredView): BalanceChange[] {
+  const [first, second] = [balancesOf(before), balancesOf(after)]
+  const keys = new Set([...first.keys(), ...second.keys()])
+  return [...keys].flatMap((key): BalanceChange[] => {
+    const [a, b] = [first.get(key), second.get(key)]
+    const named = b ?? a
+    if (named === undefined || a?.balance === b?.balance) return []
+    const diff = a === undefined || b === undefined ? undefined : b.balance - a.balance
+    return [{ book: named.book, year: named.year, before: a?.balance, after: b?.balance, diff }]
+  })
+}
+
+// 같은 기기의 두 사본(앞·뒤) 비교: 내역은 Entry.id, 회원은 장부 id + Member.id 로 맞추고, 해별 남은 돈이 달라진 해를 모은다
+export function compareCopies(before: StoredView, after: StoredView): Comparison {
+  const [first, second] = [entriesById(before), entriesById(after)]
+  const found: { status: ChangeStatus; spot: EntrySpot; changes: FieldChange[] }[] = []
+  for (const [id, spot] of first) if (!second.has(id)) found.push({ status: 'removed', spot, changes: [] })
+  for (const [id, spot] of second) {
+    const old = first.get(id)
+    if (old === undefined) found.push({ status: 'added', spot, changes: [] })
+    else {
+      const changes = fieldChanges(old, spot)
+      if (changes.length > 0) found.push({ status: 'changed', spot, changes })
+    }
+  }
+  found.sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || dayOrder(b.spot) - dayOrder(a.spot))
+  const count = (status: ChangeStatus) => found.filter((item) => item.status === status).length
+  const [membersBefore, membersAfter] = [membersByKey(before), membersByKey(after)]
+  return {
+    removed: count('removed'),
+    changed: count('changed'),
+    added: count('added'),
+    total: found.length,
+    rows: found.slice(0, COMPARE_LIMIT).map(({ status, spot, changes }) => changeRow(status, spot, changes)),
+    membersAdded: onlyIn(membersAfter, membersBefore),
+    membersRemoved: onlyIn(membersBefore, membersAfter),
+    balances: balanceChanges(before, after),
+  }
+}
+
+// 바뀐 줄이 많아 잘랐을 때 한 줄
+export function compareMoreText(comparison: Comparison): string | undefined {
+  return comparison.total > comparison.rows.length ? `앞 ${won(COMPARE_LIMIT)}줄만 보여요 (모두 ${won(comparison.total)}줄)` : undefined
+}
+
+export interface CopyPair {
+  before: number // 그 기기 사본 목록의 자리
+  after: number
+}
+
+// 비교 탭의 처음 앞·뒤. 뒤는 고른 사본, 앞은 그보다 먼저 받은 사본 중 가장 가까운 것(받지 못한 사본은 빼고).
+// 고른 사본이 가장 먼저 받은 것이면 고른 사본을 앞에, 그다음에 받은 사본을 뒤에. 같은 때 받은 사본은 같은 모습이라 고르지 않는다.
+// 비교할 사본이 없으면 undefined (페이지는 목록의 첫 두 사본으로)
+export function defaultPair(copies: readonly CopyItem[], picked: number): CopyPair | undefined {
+  const chosen = copies.at(picked)
+  const at = chosen === undefined ? Number.NaN : Date.parse(chosen.at)
+  if (Number.isNaN(at)) return undefined
+  const others = copies.flatMap((copy, index) => {
+    const time = Date.parse(copy.at)
+    return index === picked || copy.problem !== undefined || Number.isNaN(time) ? [] : [{ index, time }]
+  })
+  const closest = others.filter(({ time }) => time < at).sort((a, b) => b.time - a.time).at(0)
+  if (closest !== undefined) return { before: closest.index, after: picked }
+  const next = others.filter(({ time }) => time > at).sort((a, b) => a.time - b.time).at(0)
+  return next === undefined ? undefined : { before: picked, after: next.index }
 }
