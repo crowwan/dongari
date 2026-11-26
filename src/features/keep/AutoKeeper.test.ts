@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CURRENT_SCHEMA_VERSION, type StoredData } from '../../domain/types'
 import { book, duesBook, ledger } from '../../test/ledgerFixtures'
+import type { AppError } from '../errors/appErrors'
+import { AppErrorRecorder } from '../errors/AppErrorRecorder'
+import type { AppErrorStore } from '../errors/appErrorStore'
 import { AutoKeeper, type KeepState, type KeepStateStore } from './AutoKeeper'
 import { keepIdOf, openKeep, type KeepEnvelope } from './keepCrypto'
 import type { KeepPutResult, KeepServer, KeepStatus } from './keepServer'
@@ -327,7 +330,7 @@ describe('SPEC-007 앱을 열 때 보관 상태 신호', () => {
     expect(calls).toEqual(['put', 'status'])
     expect(statuses[0]?.id).toBe(await keepIdOf(CODE))
     // 올린 결과(밀린 것 없음, 마지막 보관 시각)가 담긴다
-    expect(statuses[0]?.status).toEqual({ v: 1, enabled: true, lastKeptAt: NOW.toISOString(), tooLarge: false, appVersion: '2.6.0' })
+    expect(statuses[0]?.status).toEqual({ v: 2, enabled: true, lastKeptAt: NOW.toISOString(), tooLarge: false, appVersion: '2.6.0' })
   })
 
   it('AC-1 올릴 것이 없어도 신호는 한 번 보낸다', async () => {
@@ -336,7 +339,7 @@ describe('SPEC-007 앱을 열 때 보관 상태 신호', () => {
 
     expect(calls).toEqual(['status'])
     expect(statuses[0]?.status).toEqual({
-      v: 1,
+      v: 2,
       enabled: true,
       lastKeptAt: '2026-10-14T00:00:00.000Z',
       tooLarge: false,
@@ -375,7 +378,7 @@ describe('SPEC-007 앱을 열 때 보관 상태 신호', () => {
 
     expect(calls).toEqual(['status'])
     expect(statuses[0]?.status).toEqual({
-      v: 1,
+      v: 2,
       enabled: false,
       lastKeptAt: '2026-10-01T00:00:00.000Z',
       tooLarge: false,
@@ -415,7 +418,7 @@ describe('SPEC-007 앱을 열 때 보관 상태 신호', () => {
     await keeper.start(stored())
 
     const body = JSON.stringify(statuses[0]?.status)
-    expect(body).toBe('{"v":1,"enabled":false,"tooLarge":false,"appVersion":"2.6.0"}')
+    expect(body).toBe('{"v":2,"enabled":false,"tooLarge":false,"appVersion":"2.6.0"}')
     expectServerShape(body)
   })
 
@@ -504,5 +507,168 @@ describe('SPEC-010 자동으로 지키기 보관본 v4', () => {
     const kept = await uploaded(fake.puts[0]?.envelope)
     expect(kept.schemaVersion).toBe(4)
     expect(kept.books).toEqual(data.books)
+  })
+})
+
+describe('SPEC-012 AC-8 오류가 생기면 상태 신호를 바로 보낸다', () => {
+  const NOW = new Date('2026-11-26T05:00:00.000Z')
+  const ORIGIN = 'https://uri-jangbu-preview.pages.dev'
+
+  // 폰에 둔 오류 목록 (앱을 다시 열어도 같은 곳을 읽는다)
+  function errorStore(): AppErrorStore & { saved: AppError[] } {
+    const store: AppErrorStore & { saved: AppError[] } = {
+      saved: [],
+      load: () => store.saved,
+      save: (errors: readonly AppError[]) => {
+        store.saved = [...errors]
+      },
+    }
+    return store
+  }
+
+  // 앱 한 번 열기: 진입점(main.tsx)처럼 기록기와 보관기를 잇는다
+  function openApp(store: AppErrorStore, state: KeepState = { enabled: true, lastKeptAt: '2026-11-25T00:00:00.000Z' }) {
+    const fake = fakeServer()
+    const errors = new AppErrorRecorder({ store, origin: ORIGIN, now: () => NOW })
+    const keeper = new AutoKeeper({ server: fake.server, store: memoryStore(state), now: () => NOW, appVersion: '2.9.0', errors: errors.list })
+    return { ...fake, errors, keeper }
+  }
+
+  function crash(message: string): Error {
+    const error = new TypeError(message)
+    error.stack = `TypeError: ${message}\n    at DuesScreen (${ORIGIN}/assets/index-abc123.js:1:23456)`
+    return error
+  }
+
+  it('앱 열기 신호는 v2 이고, 오류가 없으면 errors 칸이 없다', async () => {
+    const app = openApp(errorStore())
+    await app.keeper.start(stored())
+    expect(app.statuses).toHaveLength(1)
+    expect(app.statuses[0]?.status).toEqual({ v: 2, enabled: true, lastKeptAt: '2026-11-25T00:00:00.000Z', tooLarge: false, appVersion: '2.9.0' })
+  })
+
+  it('오류가 생기면 지금 상태와 오류 목록으로 신호를 한 번 더 보낸다', async () => {
+    const app = openApp(errorStore())
+    await app.keeper.start(stored())
+    app.errors.setScreen('dues')
+    app.errors.record('render', crash('boom'))
+    await app.keeper.reportErrors()
+
+    expect(app.calls).toEqual(['status', 'status'])
+    expect(app.statuses[1]?.id).toBe(await keepIdOf(CODE))
+    expect(app.statuses[1]?.status).toEqual({
+      v: 2,
+      enabled: true,
+      lastKeptAt: '2026-11-25T00:00:00.000Z',
+      tooLarge: false,
+      appVersion: '2.9.0',
+      errors: [
+        {
+          kind: 'render',
+          name: 'TypeError',
+          message: 'boom',
+          screen: 'dues',
+          where: 'index-abc123.js:1:23456',
+          count: 1,
+          firstAt: NOW.toISOString(),
+          lastAt: NOW.toISOString(),
+        },
+      ],
+    })
+  })
+
+  it('앱을 한 번 연 동안 오류 때문에 보내는 신호는 3번까지다', async () => {
+    const app = openApp(errorStore())
+    await app.keeper.start(stored())
+    for (const message of ['one', 'two', 'three', 'four', 'five']) {
+      app.errors.record('rejection', crash(message))
+      await app.keeper.reportErrors()
+    }
+    // 앱 열기 1번 + 오류 3번
+    expect(app.statuses).toHaveLength(4)
+    expect(app.statuses[3]?.status.errors?.map((error) => error.message)).toEqual(['one', 'two', 'three'])
+  })
+
+  it('못 보낸 오류는 다음 앱 열기 신호에 실린다 (폰이 7일 동안 갖고 있다)', async () => {
+    const store = errorStore()
+    const first = openApp(store)
+    await first.keeper.start(stored())
+    // 3번을 다 쓴 뒤의 오류는 이번에 보내지 못한다
+    for (const message of ['one', 'two', 'three']) {
+      first.errors.record('rejection', crash(message))
+      await first.keeper.reportErrors()
+    }
+    first.errors.record('render', crash('late'))
+    await first.keeper.reportErrors()
+    expect(first.statuses.at(-1)?.status.errors?.map((error) => error.message)).toEqual(['one', 'two', 'three'])
+
+    const next = openApp(store)
+    await next.keeper.start(stored())
+    expect(next.statuses).toHaveLength(1)
+    expect(next.statuses[0]?.status.errors?.map((error) => error.message)).toEqual(['one', 'two', 'three', 'late'])
+  })
+
+  it('읽기 전용(앱을 열 때 신호를 보내지 않음)·복구 코드 없음이면 오류가 나도 보내지 않는다', async () => {
+    const readOnly = openApp(errorStore())
+    readOnly.errors.record('render', crash('boom'))
+    await readOnly.keeper.reportErrors()
+    expect(readOnly.calls).toEqual([])
+
+    const noCode = openApp(errorStore())
+    await noCode.keeper.start({ ...stored(), settings: {} })
+    noCode.errors.record('render', crash('boom'))
+    await noCode.keeper.reportErrors()
+    expect(noCode.calls).not.toContain('status')
+  })
+
+  it('보내지 않은 경우는 3번에 세지 않는다 (첫 장부로 복구 코드가 생긴 뒤부터 보낸다)', async () => {
+    const app = openApp(errorStore())
+    await app.keeper.start({ ...stored(), settings: {} })
+    for (const message of ['one', 'two', 'three']) {
+      app.errors.record('rejection', crash(message))
+      await app.keeper.reportErrors()
+    }
+    app.keeper.setEnabled(false)
+    app.keeper.saved(stored())
+    await app.keeper.reportErrors()
+    expect(app.calls).toEqual(['status'])
+  })
+
+  it('신호는 하나씩 차례로 보내고, 보낼 차례에 지금 상태로 만든다 (나중에 닿는 신호가 최신)', async () => {
+    const fake = fakeServer()
+    const sent: string[] = []
+    // 첫 신호는 서버가 답하기 전에 멈춰 둔다
+    let firstStarted: () => void = () => {}
+    const started = new Promise<void>((resolve) => {
+      firstStarted = resolve
+    })
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const server: KeepServer = {
+      ...fake.server,
+      sendStatus: async (_id, status) => {
+        sent.push(`시작 ${status.errors?.length ?? 0}`)
+        if (sent.length === 1) {
+          firstStarted()
+          await gate
+        }
+        sent.push(`끝 ${status.errors?.length ?? 0}`)
+      },
+    }
+    const errors = new AppErrorRecorder({ store: errorStore(), origin: ORIGIN, now: () => NOW })
+    const keeper = new AutoKeeper({ server, store: memoryStore({ enabled: true, lastKeptAt: '2026-11-25T00:00:00.000Z' }), now: () => NOW, errors: errors.list })
+
+    const opening = keeper.start(stored())
+    await started
+    errors.record('render', crash('boom'))
+    const reporting = keeper.reportErrors()
+    errors.record('render', crash('again'))
+    release()
+    await Promise.all([opening, reporting])
+
+    // 첫 신호가 끝난 뒤에 둘째 신호를 시작하고, 둘째는 그때 둔 오류 둘을 싣는다
+    expect(sent).toEqual(['시작 0', '끝 0', '시작 2', '끝 2'])
   })
 })

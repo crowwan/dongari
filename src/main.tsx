@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { isCatalogRoute } from './catalog/route'
 import { isDevEnvRoute } from './devtools/route'
+import { AppErrorBoundary } from './features/errors/AppErrorBoundary'
+import { AppErrorRecorder } from './features/errors/AppErrorRecorder'
+import { localAppErrorStore } from './features/errors/appErrorStore'
 import { AppRoot } from './features/practice/AppRoot'
 import { localGuideStore, settleExistingPhone } from './features/guide/guideStore'
 import { inAppKind, localInAppStore, readFromKakao } from './features/install/inAppBrowser'
@@ -12,6 +15,11 @@ import { localPracticeMarkStore } from './features/practice/practiceMark'
 import { LocalStorageRepository } from './storage/LocalStorageRepository'
 import { NotifyingRepository } from './storage/NotifyingRepository'
 import { requestPersistentStorage } from './storage/persist'
+
+// 앱 오류 기록 (SPEC-012 2절): 화면을 고르기 전부터 잡히지 않은 오류·Promise 거절을 듣는다 (앱을 여는 동안 난 오류도 센다).
+// 오류 경계(그리기 오류)·App(화면 이름·저장 실패 띠)·자동 보관기(바로 보내기)가 이 기록기 하나를 쓴다. 폰 기록은 dongari:errors
+const appErrors = new AppErrorRecorder({ store: localAppErrorStore(), origin: window.location.origin })
+appErrors.listen(window)
 
 // 개발 모드에서 #/dev/catalog 면 디자인 카탈로그를 연다.
 // import.meta.env.DEV 가 프로덕션 빌드에서 false 로 바뀌어 아래 동적 import 는 번들에서 빠진다.
@@ -29,6 +37,25 @@ async function pickScreen(): Promise<ReactNode> {
     ])
     return <DevEnvScreen env={browserDevEnvironment()} />
   }
+  const app = openApp()
+  // 개발 확인 화면 [오류 내 보기] 로 왔으면 앱을 그린 뒤 일부러 그리기 오류를 낸다 (SPEC-012 AC-11 수동 QA).
+  // 개발 모드·미리보기 빌드에서만. 본 주소 빌드는 false 라 아래 동적 import 가 번들에서 빠진다
+  if (import.meta.env.DEV || __PREVIEW_BUILD__) {
+    const [{ takeDevCrash }, { DevCrash }] = await Promise.all([import('./devtools/crashRequest'), import('./devtools/DevCrash')])
+    if (takeDevCrash(window.sessionStorage)) {
+      return (
+        <>
+          {app}
+          <DevCrash />
+        </>
+      )
+    }
+  }
+  return app
+}
+
+// 진짜 앱: 저장소를 읽고 자동 보관을 시작한다
+function openApp(): ReactNode {
   // 저장소는 앱 시작 때 여기서 한 번만 읽는다. 읽기에는 깨진 원본을 옮겨 두는 부작용이 있어 렌더 중에 하지 않는다
   const storage = new LocalStorageRepository()
   // 이 버전을 처음 연 폰이면 복구 코드를 만들어 둔다 (SPEC-006 AC-1)
@@ -49,16 +76,18 @@ async function pickScreen(): Promise<ReactNode> {
   const inApp = kind && { kind, store: localInAppStore() }
   const from = readFromKakao(window.location.href)
   if (from.cleanHref) window.history.replaceState(window.history.state, '', from.cleanHref)
-  const stores = { guideStore, installOfferStore, practiceMarkStore, inApp, fromKakao: from.fromKakao }
+  const stores = { guideStore, installOfferStore, practiceMarkStore, inApp, fromKakao: from.fromKakao, appErrors }
 
   // 복구 코드 자동 보관 (SPEC-006): 서버 주소(VITE_KEEP_URL)가 있는 빌드에서만. 저장에 성공할 때마다 보관기에 알린다.
-  // 앱을 열 때 올리고 상태 신호를 보낸다 (SPEC-007, 읽기 전용이면 둘 다 안 한다)
+  // 앱을 열 때 올리고 상태 신호(오류 목록 포함, SPEC-012)를 보낸다 (SPEC-007, 읽기 전용이면 둘 다 안 한다)
   // 장부가 없으면 첫 실행 물음부터, 연습 장부는 메모리에만 (SPEC-008, AppRoot)
-  const keep = createKeep(import.meta.env.VITE_KEEP_URL)
+  const keep = createKeep(import.meta.env.VITE_KEEP_URL, appErrors.list)
   if (!keep) return <AppRoot repository={storage} loaded={loaded} {...stores} />
   const repository = new NotifyingRepository(storage, (data) => keep.keeper.saved(data))
   void startKeep(keep.keeper, loaded)
   keep.keeper.listen(window, document, () => document.visibilityState)
+  // 앱 오류가 기록되면 상태 신호를 바로 보낸다 (SPEC-012, 앱을 한 번 연 동안 3번까지는 보관기가 센다)
+  appErrors.subscribe(() => void keep.keeper.reportErrors())
   return <AppRoot repository={repository} loaded={loaded} keep={keep} {...stores} />
 }
 
@@ -69,6 +98,11 @@ if (import.meta.env.DEV || __PREVIEW_BUILD__) {
 
 const root = createRoot(document.getElementById('root')!)
 
+// 화면을 그리다 오류가 나면 흰 화면 대신 "다시 열기" 화면 (SPEC-012 2절). 그 오류는 render 로 센다
 pickScreen().then((screen) => {
-  root.render(<StrictMode>{screen}</StrictMode>)
+  root.render(
+    <StrictMode>
+      <AppErrorBoundary onError={(error) => appErrors.record('render', error)}>{screen}</AppErrorBoundary>
+    </StrictMode>,
+  )
 })
