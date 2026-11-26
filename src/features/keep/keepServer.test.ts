@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { handleKeepRequest, MAX_STATUS_BYTES, type KeepStore } from '../../../worker/src/keep'
 import type { AppError } from '../errors/appErrors'
 import type { KeepEnvelope } from './keepCrypto'
-import { createKeepServer, KEEP_SIZE_LIMIT, STATUS_SIZE_LIMIT, statusBody, type KeepStatus } from './keepServer'
+import { createKeepServer, KEEP_SIZE_LIMIT, STATUS_SIZE_LIMIT, STATUS_TIMEOUT_MS, statusBody, type KeepStatus } from './keepServer'
 
 const ID = 'a'.repeat(64)
 const ENVELOPE: KeepEnvelope = { v: 1, savedAt: '2026-10-12T06:20:00.000Z', iv: 'aXY=', data: 'ZGF0YQ==' }
@@ -146,6 +146,42 @@ describe('SPEC-012 상태 신호 v2 (앱 오류 목록)', () => {
   it('오류 줄을 다 빼도 넘으면 errors 없이 보낸다 (보관 상태는 꼭 닿게)', () => {
     const huge = appError(1, { message: 'x'.repeat(5000) })
     expect(statusBody({ ...BASE, errors: [huge] })).toBe(JSON.stringify(BASE))
+  })
+
+  it('상태 신호는 10초 안에 답이 없으면 끊는다 (차례로 보내는 다음 신호가 걸린 요청 뒤에서 계속 기다리지 않게)', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout')
+    const fetchFn = respond(204)
+    const server = createKeepServer('https://k.dev', fetchFn)
+    await server.sendStatus(ID, BASE)
+
+    expect(STATUS_TIMEOUT_MS).toBe(10_000)
+    expect(timeout).toHaveBeenCalledWith(STATUS_TIMEOUT_MS)
+    expect(fetchFn.mock.calls[0]?.[1]?.signal).toBe(timeout.mock.results[0]?.value)
+
+    // 보관본 올리기(최대 1MB)는 약한 망에서 10초를 넘을 수 있어 끊지 않는다
+    await server.put(ID, ENVELOPE)
+    expect(fetchFn.mock.calls[1]?.[1]?.signal).toBeUndefined()
+    timeout.mockRestore()
+  })
+
+  it('AbortSignal.timeout 이 없는 예전 브라우저도 시간 제한 없이 신호를 보낸다', async () => {
+    const original = AbortSignal.timeout
+    Reflect.deleteProperty(AbortSignal, 'timeout')
+    try {
+      const fetchFn = respond(204)
+      await createKeepServer('https://k.dev', fetchFn).sendStatus(ID, BASE)
+      expect(fetchFn).toHaveBeenCalledTimes(1)
+      expect(fetchFn.mock.calls[0]?.[1]?.signal).toBeUndefined()
+    } finally {
+      Object.defineProperty(AbortSignal, 'timeout', { value: original, configurable: true, writable: true })
+    }
+  })
+
+  it('시간이 다 되어 끊기면(TimeoutError) 예외 없이 끝난다', async () => {
+    const timedOut = vi.fn<typeof fetch>(async () => {
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError')
+    })
+    await expect(createKeepServer('https://k.dev', timedOut).sendStatus(ID, BASE)).resolves.toBeUndefined()
   })
 
   it('sendStatus 는 그렇게 줄인 본문을 보낸다', async () => {

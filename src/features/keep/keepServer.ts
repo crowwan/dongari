@@ -11,6 +11,9 @@ export const KEEP_SIZE_LIMIT = 1024 * 1024
 // 상태 신호 크기 상한 4KB (서버 MAX_STATUS_BYTES, worker/src/keep.ts). JSON 으로 바꾼 뒤의 UTF-8 바이트로 잰다.
 // 넘으면 서버가 413 으로 보관 상태까지 통째로 버린다
 export const STATUS_SIZE_LIMIT = 4096
+// 상태 신호 하나를 기다리는 시간. 신호는 차례로 보내므로(AutoKeeper) 걸린 요청이 뒤 신호를 붙잡지 않게 끊는다.
+// 보관본 올리기(최대 1MB)는 약한 망에서 이보다 오래 걸릴 수 있어 끊지 않는다 (상태 신호 차례와 따로 간다)
+export const STATUS_TIMEOUT_MS = 10_000
 
 export type KeepPutResult = 'ok' | 'too-large' | 'failed'
 
@@ -64,6 +67,11 @@ const JSON_HEADERS = { 'content-type': 'application/json' }
 
 const utf8Bytes = (text: string) => new TextEncoder().encode(text).byteLength
 
+// ms 뒤 끊는 신호. AbortSignal.timeout 이 없는 예전 브라우저(크롬 103·삼성 인터넷 20 전)는 끊지 않고 그대로 보낸다
+function timeoutSignal(ms: number): AbortSignal | undefined {
+  return typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(ms) : undefined
+}
+
 // 마지막 때가 가장 오래된 줄 하나를 뺀다 (나머지는 순서 그대로)
 function withoutOldest(errors: readonly AppError[]): AppError[] {
   const oldest = errors.reduce((found, error) => (Date.parse(error.lastAt) < Date.parse(found.lastAt) ? error : found))
@@ -112,7 +120,12 @@ export function createKeepServer(baseUrl: string, fetchFn: typeof fetch = (...ar
     },
     remove: async (id) => (await request(keepPath(id), { method: 'DELETE' }))?.ok ?? false,
     sendStatus: async (id, status) => {
-      await request(`/v1/status/${id}`, { method: 'PUT', headers: JSON_HEADERS, body: statusBody(status) })
+      await request(`/v1/status/${id}`, {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: statusBody(status),
+        signal: timeoutSignal(STATUS_TIMEOUT_MS),
+      })
     },
   }
 }

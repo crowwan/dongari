@@ -58,6 +58,11 @@ describe('SPEC-012 AC-7 오류 글 정리', () => {
     expect(cleanText('Load failed https://example.com/ ok', 120)).toBe('Load failed … ok')
   })
 
+  it('끝에 :줄:칸 이 붙은 주소(스택 모양)도 파일 이름만 남긴다', () => {
+    expect(cleanText(`boom at ${ORIGIN}/assets/index-Bx.js:1:234 end`, 120)).toBe('boom at index-Bx.js end')
+    expect(cleanText(`boom at ${ORIGIN}/assets/index-Bx.js:17`, 120)).toBe('boom at index-Bx.js')
+  })
+
   it('복구 코드 모양(4자 × 4 묶음)은 … 로 바꾼다', () => {
     expect(cleanText('bad code HK7M-29QF-MX4P-8R2D given', 120)).toBe('bad code … given')
     expect(cleanText('bad code hk7m-29qf-mx4p-8r2d', 120)).toBe('bad code …')
@@ -154,7 +159,7 @@ describe('SPEC-012 AC-6 오류 하나 정리 (종류·이름·글·화면·위�
   })
 })
 
-describe('오류 값 읽기', () => {
+describe('SPEC-012 오류 값 읽기', () => {
   it('Error·DOMException 은 이름·글·스택을, 글자는 NonError 와 그 글을, 그 밖은 NonError 만', () => {
     const error = new TypeError('boom')
     expect(rawErrorOf(error)).toEqual({ name: 'TypeError', message: 'boom', stack: error.stack })
@@ -206,7 +211,7 @@ describe('SPEC-012 AC-6 같은 오류 묶기·7일·5줄', () => {
   })
 })
 
-describe('폰에 둔 오류 줄 모양 검사', () => {
+describe('SPEC-012 폰에 둔 오류 줄 모양 검사', () => {
   it('서버가 받는 모양(칸 길이·종류·횟수·때)이면 참', () => {
     expect(isAppError(line())).toBe(true)
     expect(isAppError(line({ where: 'index.js:1:2' }))).toBe(true)

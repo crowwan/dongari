@@ -1,11 +1,12 @@
-import { StrictMode, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { isCatalogRoute } from './catalog/route'
+import { takeDevCrash } from './devtools/crashRequest'
 import { isDevEnvRoute } from './devtools/route'
-import { AppErrorBoundary } from './features/errors/AppErrorBoundary'
 import { AppErrorRecorder } from './features/errors/AppErrorRecorder'
 import { localAppErrorStore } from './features/errors/appErrorStore'
+import { renderStartScreen } from './features/errors/startScreen'
 import { AppRoot } from './features/practice/AppRoot'
 import { localGuideStore, settleExistingPhone } from './features/guide/guideStore'
 import { inAppKind, localInAppStore, readFromKakao } from './features/install/inAppBrowser'
@@ -39,17 +40,16 @@ async function pickScreen(): Promise<ReactNode> {
   }
   const app = openApp()
   // 개발 확인 화면 [오류 내 보기] 로 왔으면 앱을 그린 뒤 일부러 그리기 오류를 낸다 (SPEC-012 AC-11 수동 QA).
-  // 개발 모드·미리보기 빌드에서만. 본 주소 빌드는 false 라 아래 동적 import 가 번들에서 빠진다
-  if (import.meta.env.DEV || __PREVIEW_BUILD__) {
-    const [{ takeDevCrash }, { DevCrash }] = await Promise.all([import('./devtools/crashRequest'), import('./devtools/DevCrash')])
-    if (takeDevCrash(window.sessionStorage)) {
-      return (
-        <>
-          {app}
-          <DevCrash />
-        </>
-      )
-    }
+  // 개발 모드·미리보기 빌드에서만, 표시(sessionStorage dongari-dev:crash)가 있을 때만 그 조각을 받는다.
+  // 본 주소 빌드는 조건이 false 라 표시 읽기와 아래 동적 import 가 번들에서 빠진다
+  if ((import.meta.env.DEV || __PREVIEW_BUILD__) && takeDevCrash(window.sessionStorage)) {
+    const { DevCrash } = await import('./devtools/DevCrash')
+    return (
+      <>
+        {app}
+        <DevCrash />
+      </>
+    )
   }
   return app
 }
@@ -98,11 +98,5 @@ if (import.meta.env.DEV || __PREVIEW_BUILD__) {
 
 const root = createRoot(document.getElementById('root')!)
 
-// 화면을 그리다 오류가 나면 흰 화면 대신 "다시 열기" 화면 (SPEC-012 2절). 그 오류는 render 로 센다
-pickScreen().then((screen) => {
-  root.render(
-    <StrictMode>
-      <AppErrorBoundary onError={(error) => appErrors.record('render', error)}>{screen}</AppErrorBoundary>
-    </StrictMode>,
-  )
-})
+// 화면을 그리다(또는 고르다) 오류가 나면 흰 화면 대신 "다시 열기" 화면 (SPEC-012 2절). 그 오류는 render 로 센다
+void renderStartScreen(root, pickScreen, appErrors)

@@ -52,8 +52,9 @@ const CROSS_ORIGIN_MESSAGE = 'Script error.'
 const ELLIPSIS = '…'
 
 const SPACES = /\s+/gu
-// 주소(https://… , chrome-extension://…): 파일 이름만 남긴다
+// 주소(https://… , chrome-extension://…): 파일 이름만 남긴다. 스택 모양으로 끝에 붙은 :줄:칸 은 떼고 본다
 const URL_TEXT = /\b[a-z][a-z\d+.-]*:\/\/[^\s'"()<>]+/giu
+const LINE_COLUMN_END = /:\d+(?::\d+)?$/u
 // 복구 코드 모양 (4자 × 4 묶음, SPEC-006)
 const CODE_TEXT = /\b[a-z\d]{4}(?:-[a-z\d]{4}){3}\b/giu
 // 영문·숫자·기호(ASCII 보이는 글자)가 아닌 글자 덩어리. 그 사이 빈칸도 한 덩어리로 (낱말 수가 드러나지 않게)
@@ -86,7 +87,7 @@ export function cleanText(text: string, max: number): string {
   const cleaned = text
     .replace(SPACES, ' ')
     .trim()
-    .replace(URL_TEXT, (url) => fileNameOf(url) ?? ELLIPSIS)
+    .replace(URL_TEXT, (url) => fileNameOf(url.replace(LINE_COLUMN_END, '')) ?? ELLIPSIS)
     .replace(CODE_TEXT, ELLIPSIS)
     .replace(OUTSIDE_RUN, ELLIPSIS)
     .replace(DIGIT_RUN, '#')
