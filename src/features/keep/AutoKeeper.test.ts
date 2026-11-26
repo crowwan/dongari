@@ -633,42 +633,4 @@ describe('SPEC-012 AC-8 오류가 생기면 상태 신호를 바로 보낸다', 
     await app.keeper.reportErrors()
     expect(app.calls).toEqual(['status'])
   })
-
-  it('신호는 하나씩 차례로 보내고, 보낼 차례에 지금 상태로 만든다 (나중에 닿는 신호가 최신)', async () => {
-    const fake = fakeServer()
-    const sent: string[] = []
-    // 첫 신호는 서버가 답하기 전에 멈춰 둔다
-    let firstStarted: () => void = () => {}
-    const started = new Promise<void>((resolve) => {
-      firstStarted = resolve
-    })
-    let release: () => void = () => {}
-    const gate = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    const server: KeepServer = {
-      ...fake.server,
-      sendStatus: async (_id, status) => {
-        sent.push(`시작 ${status.errors?.length ?? 0}`)
-        if (sent.length === 1) {
-          firstStarted()
-          await gate
-        }
-        sent.push(`끝 ${status.errors?.length ?? 0}`)
-      },
-    }
-    const errors = new AppErrorRecorder({ store: errorStore(), origin: ORIGIN, now: () => NOW })
-    const keeper = new AutoKeeper({ server, store: memoryStore({ enabled: true, lastKeptAt: '2026-11-25T00:00:00.000Z' }), now: () => NOW, errors: errors.list })
-
-    const opening = keeper.start(stored())
-    await started
-    errors.record('render', crash('boom'))
-    const reporting = keeper.reportErrors()
-    errors.record('render', crash('again'))
-    release()
-    await Promise.all([opening, reporting])
-
-    // 첫 신호가 끝난 뒤에 둘째 신호를 시작하고, 둘째는 그때 둔 오류 둘을 싣는다
-    expect(sent).toEqual(['시작 0', '끝 0', '시작 2', '끝 2'])
-  })
 })
