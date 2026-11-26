@@ -8,18 +8,18 @@
   gap: var(--group-gap);
 }
 
+/* 제목·본문: 큰 글씨에서도 낱말 가운데서 끊기지 않게 ("화면에 문제 / 가 생겼어요" 가 되지 않게) */
 .reopen__text {
   display: flex;
   flex-direction: column;
   gap: var(--stack-tight);
+  word-break: keep-all;
 }
 
-/* 본문: 큰 글씨에서도 낱말 가운데서 끊기지 않게 */
 .reopen__body {
   margin: 0;
   color: var(--ink);
   font-size: var(--text-body-size);
   font-weight: var(--text-body-weight);
   line-height: var(--line-body);
-  word-break: keep-all;
 }
