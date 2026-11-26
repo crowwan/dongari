@@ -1,5 +1,5 @@
 import { execFile, execFileSync, spawn, type ChildProcess } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer, request as httpRequest, type Server } from 'node:http'
 import { networkInterfaces, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -30,6 +30,8 @@ import {
   historyPath,
   isAllowedHost,
   listDevices,
+  localAnswer,
+  mergeDevices,
   NO_DEVICE_NAMES,
   NO_KEEP_URL,
   noCloneNotice,
@@ -39,7 +41,9 @@ import {
   openedInfo,
   outerInfo,
   parseViewArgs,
+  SERVER_ERROR,
   staleCloneNotice,
+  strangeLocalAnswer,
   unlockDevice,
   type CopyAnswer,
   type CopyItem,
@@ -242,8 +246,18 @@ afterAll(() => {
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true })
 })
 
+// 받아 온 때(FETCH_HEAD)는 기본으로 모른다 → 마지막 커밋 시각이 기준 (시험마다 정해 준다)
+const neverFetched = () => Promise.resolve(undefined)
+
 function sourcesWith(overrides: Partial<ViewSources> = {}): ViewSources {
-  return { keepUrl: KEEP_URL, backupDir: world.repo.dir, fetchFn: fakeKeep(world.routes).fetchFn, git: gitRunner(world.repo.dir).git, ...overrides }
+  return {
+    keepUrl: KEEP_URL,
+    backupDir: world.repo.dir,
+    fetchFn: fakeKeep(world.routes).fetchFn,
+    git: gitRunner(world.repo.dir).git,
+    fetchedAt: neverFetched,
+    ...overrides,
+  }
 }
 
 const PAGE = new Map([['/', { type: 'text/html; charset=utf-8', body: '<p>페이지</p>' }]])
@@ -277,7 +291,10 @@ describe('SPEC-013 보관본 들여다보기', () => {
     it('기본 포트는 7788 이고 --port 로 바꾼다', () => {
       expect(parseViewArgs([])).toEqual({ ok: true, port: 7788 })
       expect(parseViewArgs(['--port', '7799'])).toEqual({ ok: true, port: 7799 })
-      for (const args of [['--port', 'x'], ['--port', '70000'], ['--port'], ['--verbose']]) {
+      expect(parseViewArgs(['--port', '1024'])).toEqual({ ok: true, port: 1024 })
+      // 80 이면 브라우저가 Host 에서 포트를 빼서 모든 요청이 Host 검사에 걸린다. 1023 아래는 받지 않는다 (0 은 빈 포트, 시험용)
+      expect(parseViewArgs(['--port', '0'])).toEqual({ ok: true, port: 0 })
+      for (const args of [['--port', 'x'], ['--port', '70000'], ['--port', '80'], ['--port', '1023'], ['--port'], ['--verbose']]) {
         expect(parseViewArgs(args).ok).toBe(false)
       }
     })
@@ -422,16 +439,32 @@ describe('SPEC-013 보관본 들여다보기', () => {
       expect(opened.device.copies.map(({ kind }) => kind)).toEqual(['latest', 'day', 'month'])
     })
 
-    it('클론 마지막 커밋이 8일 넘었으면 git pull 안내를 보이고, 8일 안이면 보이지 않는다', async () => {
-      const lastCommit = Date.parse(WEEK_2)
+    it('클론을 마지막으로 받아 온 때(FETCH_HEAD)가 8일 넘었으면 git pull 안내를 보이고, 8일 안이면 보이지 않는다', async () => {
       const minute = 60 * 1000
+      const fetchedAt = (at: number) => () => Promise.resolve(new Date(at).toISOString())
 
-      const stale = await listDevices(sourcesWith(), lastCommit + 8 * DAY_MS + minute)
-      const fresh = await listDevices(sourcesWith(), lastCommit + 8 * DAY_MS - minute)
+      const stale = await listDevices(sourcesWith({ fetchedAt: fetchedAt(NOW - 8 * DAY_MS - minute) }), NOW)
+      const fresh = await listDevices(sourcesWith({ fetchedAt: fetchedAt(NOW - 8 * DAY_MS + minute) }), NOW)
 
       expect(stale.notices).toEqual([staleCloneNotice(8)])
       expect(stale.devices).toHaveLength(2)
       expect(fresh.notices).toEqual([])
+    })
+
+    it('바뀐 게 없어 주간 커밋이 오래돼도 막 받아 왔으면 안내하지 않는다', async () => {
+      // 마지막 커밋은 20일 전, git pull 은 어제
+      const now = Date.parse(WEEK_2) + 20 * DAY_MS
+      const answer = await listDevices(sourcesWith({ fetchedAt: () => Promise.resolve(new Date(now - DAY_MS).toISOString()) }), now)
+
+      expect(answer.notices).toEqual([])
+    })
+
+    it('받아 온 적 없는 클론(FETCH_HEAD 없음)은 마지막 커밋 시각으로 본다', async () => {
+      const lastCommit = Date.parse(WEEK_2)
+      const minute = 60 * 1000
+
+      expect((await listDevices(sourcesWith(), lastCommit + 8 * DAY_MS + minute)).notices).toEqual([staleCloneNotice(8)])
+      expect((await listDevices(sourcesWith(), lastCommit + 8 * DAY_MS - minute)).notices).toEqual([])
     })
 
     it('devices.json 이 없거나 모양이 틀리면 이름 없이 보이고 안내한다', async () => {
@@ -615,6 +648,49 @@ describe('SPEC-013 보관본 들여다보기', () => {
       const sources = sourcesWith()
       expect(await openByCode(CODE_D, [], (path) => getJsonFrom<HistoryAnswer>(path, sources))).toEqual({ ok: false, message: NOT_FOUND })
     })
+
+    it('목록에 있어도 사본이 하나도 없으면 열었다고 하지 않고 그 기기의 서버 문구(없으면 없음 문구)를 보인다', async () => {
+      const noCopies: DeviceView = { id: world.idA, name: '예시 폰 A', copies: [] }
+      const ask = () => Promise.reject(new Error('부르지 않아야 한다'))
+
+      expect(await openByCode(CODE_A, [noCopies], ask)).toEqual({ ok: false, message: NOT_FOUND })
+      expect(await openByCode(CODE_A, [{ ...noCopies, serverProblem: SERVER_DOWN }], ask)).toEqual({ ok: false, message: SERVER_DOWN })
+    })
+
+    it('처음 목록을 받는 동안 코드로 먼저 연 기기는 받은 목록이 지우지 않는다', () => {
+      const deviceA: DeviceView = { id: world.idA, name: '예시 폰 A', copies: [] }
+      const deviceB: DeviceView = { id: world.idB, copies: [] }
+      const openedC: DeviceView = { id: world.idC, copies: [{ kind: 'latest', key: '', at: LATEST_AT }] }
+      const openedA: DeviceView = { id: world.idA, copies: [] }
+
+      // 받은 목록 뒤에 남기고, 받은 목록에도 있는 기기는 받은 것으로
+      expect(mergeDevices([deviceA, deviceB], [openedC, openedA])).toEqual([deviceA, deviceB, openedC])
+      expect(mergeDevices([], [openedC])).toEqual([openedC])
+      expect(mergeDevices([deviceA], [])).toEqual([deviceA])
+    })
+  })
+
+  describe('로컬 서버 오류도 같은 모양으로', () => {
+    it('요청을 처리하다 오류가 나면 다른 답과 같은 헤더를 붙인 500 JSON { ok: false, message } 로 답한다', async () => {
+      const broken: GitFn = () => Promise.reject(new Error('git 이 이상하다'))
+      const answer = await get('/api/devices', sourcesWith({ git: broken }))
+      const page = await get('/', sourcesWith())
+
+      expect(answer.status).toBe(500)
+      expect(JSON.parse(answer.body)).toEqual({ ok: false, message: SERVER_ERROR })
+      expect(answer.headers).toEqual({ ...page.headers, 'Content-Type': 'application/json; charset=utf-8' })
+      expect(answer.headers['Content-Security-Policy']).toContain("connect-src 'self'")
+    })
+
+    it('페이지는 로컬 서버 답의 상태와 형식을 먼저 보고, JSON 이 아니면 이유를 적은 { ok: false, message } 로 바꾼다', () => {
+      expect(localAnswer(200, JSON.stringify({ notices: [], devices: [] }))).toEqual({ notices: [], devices: [] })
+      expect(localAnswer(500, JSON.stringify({ ok: false, message: SERVER_ERROR }))).toEqual({ ok: false, message: SERVER_ERROR })
+      expect(localAnswer(400, JSON.stringify({ ok: false, message: BAD_QUERY }))).toEqual({ ok: false, message: BAD_QUERY })
+      expect(localAnswer(500, '도구 안에서 오류가 났어요')).toEqual({ ok: false, message: strangeLocalAnswer(500) })
+      expect(localAnswer(403, '이 도구는 http://127.0.0.1:7788/ 로만 열어요')).toEqual({ ok: false, message: strangeLocalAnswer(403) })
+      expect(localAnswer(502, JSON.stringify({ devices: [] }))).toEqual({ ok: false, message: strangeLocalAnswer(502) })
+      expect(localAnswer(200, '[1, 2]')).toEqual({ ok: false, message: strangeLocalAnswer(200) })
+    })
   })
 
   describe('AC-10 이상한 사본에서도 멈추지 않는다', () => {
@@ -694,6 +770,9 @@ describe('SPEC-013 보관본 들여다보기', () => {
       const keepAddress = keepServer.address()
       if (keepAddress === null || typeof keepAddress === 'string') throw new Error('가짜 보관 서버 주소를 모른다')
 
+      // 막 git pull 한 클론처럼 FETCH_HEAD 를 지금 시각으로 둔다 — 실제 시계로 도는 도구가 커밋 날짜(11월)만 보고 오래됐다고 하지 않게
+      writeFileSync(join(world.repo.dir, '.git', 'FETCH_HEAD'), '')
+
       // vitest 는 레포 맨 위에서 돈다 (다른 테스트처럼 레포 기준 경로)
       child = spawn(process.execPath, ['scripts/keep-view.mjs', '--port', '0'], {
         env: { ...process.env, KEEP_URL: `http://127.0.0.1:${keepAddress.port}`, KEEP_BACKUP_DIR: world.repo.dir },
@@ -766,6 +845,20 @@ describe('SPEC-013 보관본 들여다보기', () => {
 
       const week: CopyAnswer = JSON.parse((await request('127.0.0.1', copyPath(world.idB, listed.devices[1].copies[0]))).body)
       expect(week).toEqual({ ok: true, envelope: world.envelopes.weekB, bytes: bytesOf(fileText(world.envelopes.weekB)) })
+    })
+
+    it('클론을 마지막으로 받아 온 때는 FETCH_HEAD 수정 시각으로 본다', async () => {
+      const fetchHead = join(world.repo.dir, '.git', 'FETCH_HEAD')
+      // 20일 하고 한 시간 전에 받아 온 클론 (도구는 실제 시계로 잰다)
+      const old = new Date(Date.now() - 20 * DAY_MS - 60 * 60 * 1000)
+      utimesSync(fetchHead, old, old)
+      try {
+        const listed: DevicesAnswer = JSON.parse((await request('127.0.0.1', '/api/devices')).body)
+        expect(listed.notices).toEqual([staleCloneNotice(20)])
+      } finally {
+        const now = new Date()
+        utimesSync(fetchHead, now, now)
+      }
     })
   })
 })

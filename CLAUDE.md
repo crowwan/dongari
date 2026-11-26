@@ -184,21 +184,21 @@ node scripts/keep-rescue.mjs --which                                            
 
 ```bash
 KEEP_URL=$(gh variable get KEEP_URL) node scripts/keep-view.mjs   # http://127.0.0.1:7788/ 를 브라우저로 연다
-node scripts/keep-view.mjs --port 7799                             # 다른 포트 (3000 은 쓰지 않는다)
+node scripts/keep-view.mjs --port 7799                             # 다른 포트 (1024~65535, 3000 은 쓰지 않는다)
 KEEP_BACKUP_DIR=~/keep-backup node scripts/keep-view.mjs           # 백업 레포 클론이 ../dongari-keep-backup 이 아닐 때
 ```
 
 - 켤 때 `ExperimentalWarning: stripTypeScriptTypes is an experimental feature` 가 한 번 찍힌다 — 정상이다(아래 "페이지에 TS 보내기"). 그 아래 주소·출처 줄이 나오면 켜진 것. 끄기는 Ctrl+C.
 - **출처** (못 쓰는 출처는 빼고 페이지 위에 안내 한 줄씩)
   - 보관 서버 `KEEP_URL`(셸 변수): 기기마다 `GET /v1/keep/<id>/history` 로 최신본·날짜별·달별 목록을 받고, 사본마다 GET 하나로 크기를 잰다(꺼내기 `--list` 와 같은 방식). 고른 사본은 `?day=`·`?month=` 로 다시 받는다. 없으면 "KEEP_URL 이 없어…" 안내와 함께 백업 레포만 본다. 연결 실패·예전 서버(목록 404)·목록을 받은 사이 사라진 사본(404)은 꺼내기 스크립트와 같은 문구(`keepRescue.ts`).
-  - 백업 레포 클론 `KEEP_BACKUP_DIR`(기본 `../dongari-keep-backup`, 지금 폴더 기준): 기기 목록은 커밋된 `index.json`(`git show HEAD:index.json`), 주간 사본은 `git log --format=%H%x09%cI --diff-filter=AM -- keep/<id>.json`(파일이 생기거나 바뀐 커밋, 지운 커밋은 뺌), 크기는 `git cat-file --batch-check` 한 번, 본문은 `git show <커밋>:keep/<id>.json`. 클론이 없으면 기기 목록 없이 [코드로 열기]로만 연다. **클론 마지막 커밋이 8일 넘었으면 "백업 레포를 먼저 받아 오세요(`git pull`)"** — 도구는 pull 하지 않는다.
+  - 백업 레포 클론 `KEEP_BACKUP_DIR`(기본 `../dongari-keep-backup`, 지금 폴더 기준): 기기 목록은 커밋된 `index.json`(`git show HEAD:index.json`), 주간 사본은 `git log --format=%H%x09%cI --diff-filter=AM -- keep/<id>.json`(파일이 생기거나 바뀐 커밋, 지운 커밋은 뺌), 크기는 `git cat-file --batch-check` 한 번, 본문은 `git show <커밋>:keep/<id>.json`. 클론이 없으면 기기 목록 없이 [코드로 열기]로만 연다. **클론을 마지막으로 받아 온 때가 8일 넘었으면 "백업 레포를 먼저 받아 오세요(`git pull`)"** — 도구는 pull 하지 않는다. 받아 온 때는 `.git/FETCH_HEAD` 수정 시각(`git fetch`·`pull` 마다 바뀜), 받아 온 적 없는 새 클론이면 마지막 커밋 시각. 주간 워크플로는 바뀐 게 없으면 커밋하지 않아서 커밋 시각으로는 재지 않는다.
   - 기기 이름표 `devices.json`(백업 레포 맨 위, 커밋된 것, 위 "보관 지켜보기"와 같은 파일·모양): 있으면 이름, 없으면 "이름 없음"과 id 앞 8자. 없거나 모양이 틀리면 안내 한 줄.
 - **화면**: 왼쪽 기기별 사본 목록(최신본·날짜별 31일·달별 400일·주간, 시각은 한국 시간, 크기), 오른쪽 겉 정보 탭(기기·보관 자리 id·사본·있는 곳 KV 키 `snap:<id>:<날>` 또는 `<커밋>:keep/<id>.json`·받은 때·크기와 1MB 한도의 %·남는 기간·이 기기 사본 개수·겉봉투(`data` 는 앞부분만)). 날짜별 남는 기간은 "그 날 다음 날 0시 + 31일"(달별은 "다음 달 1일 0시 + 400일")까지는 적어도 남는다고 적는다 — 사본은 그 뒤 첫 보관 때 만들어지기 때문이다.
 - **풀기**: 오른쪽 [복구 코드] 칸에 넣으면 페이지가 코드에서 id 를 계산해 그 기기의 코드일 때만 이 기기의 사본이 모두 풀린다. 다른 기기 코드면 "이 기기의 코드가 아니에요 (이 코드의 id 는 1a2b3c4d…)". 목록에 없는 기기(지난 주간 사본 뒤 처음 보관한 기기, 클론이 없을 때)는 위 [코드로 열기]로 연다 — 페이지가 id 를 계산해 로컬 서버에 그 id 의 사본 목록만 묻는다. 옛 저장 형식(v3)은 옮기지 않고 형식 번호와 함께, 풀었지만 장부가 아니면 "풀었지만 기록 파일 형식이 아니에요".
 - **읽기만**: 보관 서버에는 본 주소 출처(`Origin: https://crowwan.github.io`)를 붙인 GET 만 보낸다(본 자리만, 미리보기 `preview:` 는 보지 않는다). 쓰기·지우기·되살리기·기록 파일 만들기는 없다 — 되살리기는 위 "보관본 꺼내기". 백업 레포는 git 읽기만.
 - **안전 규칙**
   - `127.0.0.1` 에만 연다(같은 와이파이의 다른 기기는 못 들어옴). `Host` 가 `127.0.0.1:<포트>`·`localhost:<포트>` 가 아니면 403(DNS rebinding 막기). GET 만 받는다.
-  - 모든 응답에 `Cache-Control: no-store`, 그리고 페이지가 이 맥 밖으로 아무것도 보내지 못하게 CSP(`connect-src 'self'`, `form-action 'none'`, 외부 글꼴·스크립트 없음)·`Referrer-Policy: no-referrer`.
+  - 모든 응답(처리 중 오류의 500 `{ ok: false, message }` JSON 도)에 `Cache-Control: no-store`, 그리고 페이지가 이 맥 밖으로 아무것도 보내지 못하게 CSP(`connect-src 'self'`, `form-action 'none'`, 외부 글꼴·스크립트 없음)·`Referrer-Policy: no-referrer`.
   - 복구 코드는 그 탭 메모리에만 둔다. 로컬 서버로 가는 주소(`/api/devices`·`/api/history?id=`·`/api/copy?id=&kind=&key=`)에는 id·사본 자리만 들어간다. [잠그기]나 탭을 닫으면 잊는다. 풀린 내용·코드는 파일·로그·주소창·localStorage 에 남기지 않고, 서버는 요청을 찍지 않는다.
   - id(64자 16진수)·날(YYYY-MM-DD)·달(YYYY-MM)·커밋(40자 16진수)은 형식을 본 뒤에만 git 인자·서버 주소에 쓴다(아니면 400). git 은 `GIT_CEILING_DIRECTORIES` 로 클론 자리 밖(위 폴더의 dongari 등)을 읽지 않는다.
   - **받은 코드로 화면을 캡처하거나 화면 공유하지 않는다**(코드 칸은 가려 보이지만 풀린 이름은 보인다). 시험·캡처는 지어낸 데이터(가짜 보관 서버·임시 git 레포·앱의 `sealKeep` 으로 만든 보관본)로.

@@ -13,7 +13,7 @@
 //
 // 풀린 내용과 복구 코드는 파일·로그 어디에도 남기지 않는다. 요청을 찍지 않는다.
 import { execFile } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { stripTypeScriptTypes } from 'node:module'
 import { dirname, resolve } from 'node:path'
@@ -68,13 +68,26 @@ function git(args, input) {
 // 보관 서버에는 keepRescue getJson 이 본 주소 출처를 붙인 GET 만 보낸다
 const fetchFn = (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) })
 
-const sources = { keepUrl, backupDir, fetchFn, git }
+// 클론을 마지막으로 받아 온 때: git fetch·pull 이 받을 때마다 다시 쓰는 FETCH_HEAD 의 수정 시각.
+// 받아 온 적 없는 새 클론에는 없다 → undefined (그때는 keepView.ts 가 마지막 커밋 시각을 쓴다)
+async function fetchedAt() {
+  const path = (await git(['rev-parse', '--git-path', 'FETCH_HEAD']))?.trim()
+  if (!path) return undefined
+  try {
+    return statSync(resolve(backupDir, path)).mtime.toISOString()
+  } catch {
+    return undefined
+  }
+}
+
+const sources = { keepUrl, backupDir, fetchFn, git, fetchedAt }
 let port = parsed.port
 
+// handleRequest 는 던지지 않는다 (처리 중 오류도 공용 헤더를 붙인 500 JSON 으로 돌려준다)
 const server = createServer((request, response) => {
-  handleRequest({ method: request.method ?? '', url: request.url ?? '/', host: request.headers.host }, { port, files, sources }, Date.now())
-    .catch(() => ({ status: 500, headers: { 'Cache-Control': 'no-store', 'Content-Type': 'text/plain; charset=utf-8' }, body: '도구 안에서 오류가 났어요' }))
-    .then(({ status, headers, body }) => response.writeHead(status, headers).end(body))
+  handleRequest({ method: request.method ?? '', url: request.url ?? '/', host: request.headers.host }, { port, files, sources }, Date.now()).then(
+    ({ status, headers, body }) => response.writeHead(status, headers).end(body),
+  )
 })
 
 server.on('error', (error) => {

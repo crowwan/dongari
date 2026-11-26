@@ -63,7 +63,15 @@ export function noCloneNotice(backupDir: string): string {
 }
 
 export function staleCloneNotice(days: number): string {
-  return `백업 레포를 먼저 받아 오세요 (git pull) — 클론의 마지막 커밋이 ${days}일 전이에요`
+  return `백업 레포를 먼저 받아 오세요 (git pull) — 클론을 받아 온 지 ${days}일 지났어요`
+}
+
+// 도구 안에서 생각 못 한 오류 (요청 처리 중 던진 것)
+export const SERVER_ERROR = '보관본 들여다보기 안에서 오류가 났어요. 터미널에서 도구를 다시 켜 보세요'
+
+// 로컬 서버 답이 JSON 이 아닐 때 (도구가 아닌 다른 것이 그 포트에서 답했거나 도구가 망가짐)
+export function strangeLocalAnswer(status: number): string {
+  return `로컬 서버가 알 수 없는 답을 줬어요 (HTTP ${status}). 터미널에서 도구가 켜져 있는지 보세요`
 }
 
 // ---------- 형식 ----------
@@ -126,15 +134,17 @@ export function copyPath(id: string, copy: CopyRef): string {
 
 export type ViewArgs = { ok: true; port: number } | { ok: false; message: string }
 
-// --port 만 받는다. 0 이면 빈 포트를 고른다(시험용)
+// --port 만 받는다. 0 이면 빈 포트를 고른다(시험용).
+// 1~1023 은 받지 않는다: 80 이면 브라우저가 Host 에서 포트를 빼서(127.0.0.1) 모든 요청이 Host 검사에 걸리고, 나머지는 관리자 권한이 필요하다
 export function parseViewArgs(args: readonly string[]): ViewArgs {
   let port = DEFAULT_PORT
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]
     if (arg !== '--port') return { ok: false, message: `모르는 인자예요: ${arg}\n${VIEW_USAGE}` }
     const value = args[++index] ?? ''
-    if (!/^\d{1,5}$/.test(value) || Number(value) > 65_535) {
-      return { ok: false, message: `--port 뒤에는 포트 번호(0~65535)를 적어요: "${value}"\n${VIEW_USAGE}` }
+    const number = Number(value)
+    if (!/^\d{1,5}$/.test(value) || number > 65_535 || (number > 0 && number < 1024)) {
+      return { ok: false, message: `--port 뒤에는 1024~65535 포트 번호를 적어요: "${value}"\n${VIEW_USAGE}` }
     }
     port = Number(value)
   }
@@ -233,6 +243,8 @@ export interface ViewSources {
   backupDir: string
   fetchFn: FetchFn
   git: GitFn
+  // 클론을 마지막으로 받아 온 때(ISO, git fetch·pull 이 쓰는 FETCH_HEAD 의 수정 시각). 모르면 undefined
+  fetchedAt: () => Promise<string | undefined>
 }
 
 function keepBase(keepUrl: string, id: string): string {
@@ -294,16 +306,24 @@ async function loadDevice(id: string, names: ReadonlyMap<string, string>, source
 
 interface CloneFiles {
   lastCommitAt: string
+  fetchedAt?: string
   indexText?: string
   namesText?: string
 }
 
-// 클론의 마지막 커밋 시각과 index.json·devices.json (커밋된 것). 클론이 없으면 undefined. pull 하지 않는다
-async function readClone(git: GitFn): Promise<CloneFiles | undefined> {
+// 클론의 마지막 커밋 시각·마지막으로 받아 온 때와 index.json·devices.json (커밋된 것). 클론이 없으면 undefined. pull 하지 않는다
+async function readClone({ git, fetchedAt }: ViewSources): Promise<CloneFiles | undefined> {
   const last = (await git(['log', '-1', '--format=%cI']))?.trim() ?? ''
   if (Number.isNaN(Date.parse(last))) return undefined
-  const [indexText, namesText] = await Promise.all([git(['show', 'HEAD:index.json']), git(['show', 'HEAD:devices.json'])])
-  return { lastCommitAt: last, indexText, namesText }
+  const [indexText, namesText, fetched] = await Promise.all([git(['show', 'HEAD:index.json']), git(['show', 'HEAD:devices.json']), fetchedAt()])
+  return { lastCommitAt: last, fetchedAt: fetched, indexText, namesText }
+}
+
+// 클론이 얼마나 오래됐는지의 기준: 마지막으로 받아 온 때, 모르면(받아 온 적 없는 새 클론) 마지막 커밋.
+// 주간 워크플로는 바뀐 게 없으면 커밋하지 않아서, 커밋 시각만 보면 막 git pull 한 클론도 오래돼 보인다
+function cloneTime(clone: CloneFiles): number {
+  const fetched = clone.fetchedAt === undefined ? Number.NaN : Date.parse(clone.fetchedAt)
+  return Number.isNaN(fetched) ? Date.parse(clone.lastCommitAt) : fetched
 }
 
 // /api/devices: 기기 목록은 백업 레포 index.json 에서, 사본은 서버 목록과 커밋 이력에서.
@@ -311,12 +331,12 @@ async function readClone(git: GitFn): Promise<CloneFiles | undefined> {
 export async function listDevices(sources: ViewSources, now: number): Promise<DevicesAnswer> {
   const notices: string[] = []
   if (sources.keepUrl === '') notices.push(NO_KEEP_URL)
-  const clone = await readClone(sources.git)
+  const clone = await readClone(sources)
   if (clone === undefined) {
     notices.push(noCloneNotice(sources.backupDir))
     return { notices, devices: [] }
   }
-  const age = now - Date.parse(clone.lastCommitAt)
+  const age = now - cloneTime(clone)
   if (age > STALE_CLONE_DAYS * DAY_MS) notices.push(staleCloneNotice(Math.floor(age / DAY_MS)))
 
   const ids = clone.indexText === undefined ? undefined : parseBackupIndex(clone.indexText)
@@ -402,8 +422,17 @@ function plain(status: number, text: string): ViewResponse {
   return respond(status, 'text/plain; charset=utf-8', text)
 }
 
-// 로컬 서버 요청 하나. Host 검사 → GET 만 → 페이지·모듈 → API. id·날·달·커밋은 형식을 본 뒤에만 git·서버에 쓴다
+// 로컬 서버 요청 하나. Host 검사 → GET 만 → 페이지·모듈 → API. id·날·달·커밋은 형식을 본 뒤에만 git·서버에 쓴다.
+// 던지지 않는다: 처리 중 오류는 다른 답과 같은 헤더를 붙인 500 JSON { ok: false, message } 로
 export async function handleRequest(request: ViewRequest, server: ViewServer, now: number): Promise<ViewResponse> {
+  try {
+    return await answerRequest(request, server, now)
+  } catch {
+    return json(500, { ok: false, message: SERVER_ERROR })
+  }
+}
+
+async function answerRequest(request: ViewRequest, server: ViewServer, now: number): Promise<ViewResponse> {
   if (!isAllowedHost(request.host, server.port)) return plain(403, `이 도구는 http://127.0.0.1:${server.port}/ 로만 열어요`)
   if (request.method !== 'GET') return plain(405, 'GET 만 받아요 (읽기만 하는 도구)')
   const url = new URL(request.url, 'http://127.0.0.1')
@@ -556,12 +585,29 @@ export async function openByCode(
   const normalized = normalizeRecoveryCode(code)
   if (normalized === undefined) return { ok: false, message: INVALID_CODE }
   const id = await keepIdOf(normalized)
-  const listed = devices.find((device) => device.id === id)
-  if (listed !== undefined) return { ok: true, device: listed, normalized }
-  const answer = await getLocal(historyPath(id))
-  if (!answer.ok) return answer
-  if (answer.device.copies.length === 0) return { ok: false, message: answer.device.serverProblem ?? NOT_FOUND }
-  return { ok: true, device: answer.device, normalized }
+  let device = devices.find((item) => item.id === id)
+  if (device === undefined) {
+    const answer = await getLocal(historyPath(id))
+    if (!answer.ok) return answer
+    device = answer.device
+  }
+  // 목록에 있든 없든 열 사본이 없으면 열었다고 하지 않는다
+  if (device.copies.length === 0) return { ok: false, message: device.serverProblem ?? NOT_FOUND }
+  return { ok: true, device, normalized }
+}
+
+// 처음 목록을 받는 동안 [코드로 열기]로 먼저 연 기기는, 받은 목록에 없으면 뒤에 남긴다 (받은 목록이 덮어 지우지 않게)
+export function mergeDevices(loaded: readonly DeviceView[], opened: readonly DeviceView[]): DeviceView[] {
+  const loadedIds = new Set(loaded.map(({ id }) => id))
+  return [...loaded, ...opened.filter(({ id }) => !loadedIds.has(id))]
+}
+
+// 페이지가 받은 로컬 서버 답(상태·글자) → JSON 객체. 200 이 아니면 서버가 준 { ok: false, message } 만 그대로 쓰고,
+// JSON 객체가 아니면(다른 프로그램이 답함 등) { ok: false, message } 로 바꾼다
+export function localAnswer(status: number, text: string): Record<string, unknown> {
+  const body = parseJson(text)
+  if (isRecord(body) && (status === 200 || (body.ok === false && typeof body.message === 'string'))) return body
+  return { ok: false, message: strangeLocalAnswer(status) }
 }
 
 export type OpenedCopy =

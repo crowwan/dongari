@@ -186,10 +186,11 @@ const state = {
 // 사본을 빨리 바꿔 고를 때 늦게 온 답이 덮지 않게
 let pickToken = 0
 
-// 로컬 서버 GET. 주소는 keepView 의 DEVICES_PATH·historyPath·copyPath 로만 만든다 (id 만, 코드 없음)
+// 로컬 서버 GET. 주소는 keepView 의 DEVICES_PATH·historyPath·copyPath 로만 만든다 (id 만, 코드 없음).
+// 상태와 형식을 먼저 본다: 200 이 아니면 서버가 준 { ok: false, message } 만, JSON 이 아니면 그 이유로 (keepView localAnswer)
 async function getLocal(path) {
   const response = await fetch(path, { cache: 'no-store' })
-  return response.json()
+  return view.localAnswer(response.status, await response.text())
 }
 
 function currentDevice() {
@@ -323,8 +324,14 @@ function renderHead() {
       copy.bytes !== undefined && el('span', {}, view.sizeText(copy.bytes))))
 }
 
+// 잠금 막대는 기기·잠금 모드·문구가 바뀔 때만 다시 그린다 — 뒤에서 받던 것이 끝나 render() 가 돌아도 치던 코드와 포커스를 지우지 않게
+let lockbarShown
+
 function renderLockbar() {
   const device = currentDevice()
+  const shown = device === undefined ? '' : `${device.id}|${codes.has(device.id)}|${state.lockMessage}`
+  if (shown === lockbarShown) return
+  lockbarShown = shown
   if (device === undefined) {
     fill('lockbar')
     return
@@ -352,6 +359,7 @@ function openedBlock(device) {
       el('p', {}, '이 기기의 복구 코드를 넣으면 저장 형식·장부·기록 수가 보여요. 서버와 백업 레포에는 암호문만 있어요.'),
       el('p', { class: 'cap' }, '구조·표·비교는 다음 단계(#206)예요.'))
   }
+  if (state.copy?.loading) return el('p', { class: 'cap', 'data-testid': 'opened-wait' }, '받으면 풀어요…')
   if (!state.copy?.ok) return el('div', { class: 'locked' }, el('p', {}, '사본을 받지 못해 풀 수 없어요.'))
   if (state.opened === undefined) return el('p', { class: 'cap' }, '푸는 중…')
   return el('div', { class: 'opened', 'data-testid': 'opened' }, el('h3', {}, '풀린 내용'), infoList(view.openedInfo(state.opened), 'opened-info'))
@@ -384,15 +392,16 @@ function render() {
 $('addr').textContent = `${location.host} · 읽기만`
 $('byCodeForm').addEventListener('submit', openWithCode)
 
-const loaded = await getLocal(view.DEVICES_PATH).catch(() => undefined)
+const loaded = await getLocal(view.DEVICES_PATH).catch(() => ({ ok: false, message: SERVER_GONE }))
 state.loading = false
-if (loaded === undefined) state.loadError = SERVER_GONE
-else {
-  state.devices = loaded.devices
+if (Array.isArray(loaded.devices)) {
+  // 받는 동안 [코드로 열기]로 연 기기는 남긴다
+  state.devices = view.mergeDevices(loaded.devices, state.devices)
   state.notices = loaded.notices
-}
+} else state.loadError = loaded.message ?? SERVER_GONE
+// 받는 동안 이미 고른 것이 있으면(코드로 열기) 그대로 둔다
 const first = state.devices.find((device) => device.copies.length > 0)
-if (first) await pick(first.id, 0)
+if (state.pick === undefined && first) await pick(first.id, 0)
 else render()
 </script>
 </body>
