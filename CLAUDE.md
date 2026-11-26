@@ -186,9 +186,9 @@ node scripts/keep-rescue.mjs --which                                            
 - 되살리기: 위 "보관본 꺼내기" `--file`. 지워 달라는 요청(커밋 이력까지)은 백업 레포 README "지워 달라는 요청을 받았을 때"(`git filter-repo` 로 그 id 파일을 이력에서 지우고 force push).
 - 로컬에서 변환만 확인: `wrangler dev --local`(가짜 `--var EXPORT_TOKEN:…`) 에 보관본을 올리고, 스크래치 폴더에 `ops/keep-backup` 을 복사해 `KEEP_URL=http://localhost:8787 EXPORT_TOKEN=… node scripts/backup.mjs`. 실제 서버·토큰은 쓰지 않는다.
 
-### 보관본 들여다보기 (개발자용, `scripts/keep-view.mjs`, SPEC-013, #205)
+### 보관본 들여다보기 (개발자용, `scripts/keep-view.mjs`, SPEC-013, #205·#206)
 
-기기별 보관본 사본(서버 최신본·날짜별·달별, 백업 레포 주간 사본)을 내 맥에서 DB 보듯 보는 읽기 전용 도구. 사용자 화면·앱 릴리스와 상관없다. 복구 코드 없이는 겉 정보(시각·크기·있는 곳·남는 기간·겉봉투)만, 코드가 있으면 그 기기의 사본을 페이지 안에서 풀어 본다(지금은 저장 형식·장부 이름·기록 수, 구조·표·비교 탭은 #206).
+기기별 보관본 사본(서버 최신본·날짜별·달별, 백업 레포 주간 사본)을 내 맥에서 DB 보듯 보는 읽기 전용 도구. 사용자 화면·앱 릴리스와 상관없다. 복구 코드 없이는 겉 정보(시각·크기·있는 곳·남는 기간·겉봉투)만, 코드가 있으면 그 기기의 사본을 페이지 안에서 풀어 구조·표·비교까지 본다.
 
 ```bash
 KEEP_URL=$(gh variable get KEEP_URL) node scripts/keep-view.mjs   # http://127.0.0.1:7788/ 를 브라우저로 연다
@@ -202,16 +202,20 @@ KEEP_BACKUP_DIR=~/keep-backup node scripts/keep-view.mjs           # 백업 레�
   - 백업 레포 클론 `KEEP_BACKUP_DIR`(기본 `../dongari-keep-backup`, 지금 폴더 기준): 기기 목록은 커밋된 `index.json`(`git show HEAD:index.json`), 주간 사본은 `git log --format=%H%x09%cI --diff-filter=AM -- keep/<id>.json`(파일이 생기거나 바뀐 커밋, 지운 커밋은 뺌), 크기는 `git cat-file --batch-check` 한 번, 본문은 `git show <커밋>:keep/<id>.json`. 클론이 없으면 기기 목록 없이 [코드로 열기]로만 연다. **클론을 마지막으로 받아 온 때가 8일 넘었으면 "백업 레포를 먼저 받아 오세요(`git pull`)"** — 도구는 pull 하지 않는다. 받아 온 때는 `.git/FETCH_HEAD` 수정 시각(`git fetch`·`pull` 마다 바뀜), 받아 온 적 없는 새 클론이면 마지막 커밋 시각. 주간 워크플로는 바뀐 게 없으면 커밋하지 않아서 커밋 시각으로는 재지 않는다.
   - 기기 이름표 `devices.json`(백업 레포 맨 위, 커밋된 것, 위 "보관 지켜보기"와 같은 파일·모양): 있으면 이름, 없으면 "이름 없음"과 id 앞 8자. 없거나 모양이 틀리면 안내 한 줄.
 - **화면**: 왼쪽 기기별 사본 목록(최신본·날짜별 31일·달별 400일·주간, 시각은 한국 시간, 크기), 오른쪽 겉 정보 탭(기기·보관 자리 id·사본·있는 곳 KV 키 `snap:<id>:<날>` 또는 `<커밋>:keep/<id>.json`·받은 때·크기와 1MB 한도의 %·남는 기간·이 기기 사본 개수·겉봉투(`data` 는 앞부분만)). 날짜별 남는 기간은 "그 날 다음 날 0시 + 31일"(달별은 "다음 달 1일 0시 + 400일")까지는 적어도 남는다고 적는다 — 사본은 그 뒤 첫 보관 때 만들어지기 때문이다.
-- **풀기**: 오른쪽 [복구 코드] 칸에 넣으면 페이지가 코드에서 id 를 계산해 그 기기의 코드일 때만 이 기기의 사본이 모두 풀린다. 다른 기기 코드면 "이 기기의 코드가 아니에요 (이 코드의 id 는 1a2b3c4d…)". 목록에 없는 기기(지난 주간 사본 뒤 처음 보관한 기기, 클론이 없을 때)는 위 [코드로 열기]로 연다 — 페이지가 id 를 계산해 로컬 서버에 그 id 의 사본 목록만 묻는다. 옛 저장 형식(v3)은 옮기지 않고 형식 번호와 함께, 풀었지만 장부가 아니면 "풀었지만 기록 파일 형식이 아니에요".
+- **풀기**: 오른쪽 [복구 코드] 칸에 넣으면 페이지가 코드에서 id 를 계산해 그 기기의 코드일 때만 이 기기의 사본이 모두 풀린다. 다른 기기 코드면 "이 기기의 코드가 아니에요 (이 코드의 id 는 1a2b3c4d…)". 목록에 없는 기기(지난 주간 사본 뒤 처음 보관한 기기, 클론이 없을 때)는 위 [코드로 열기]로 연다 — 페이지가 id 를 계산해 로컬 서버에 그 id 의 사본 목록만 묻는다. 옛 저장 형식(v3)은 옮기지 않고 형식 번호와 함께, 풀었지만 장부가 아니면 "풀었지만 기록 파일 형식이 아니에요". 풀리면 구조 탭으로 넘어간다.
+- **구조·표·비교** (#206, 풀린 기기만. 잠긴 기기는 "잠겨 있어요". 저장 데이터는 옮기지 않고 칸마다 모양을 봐서 있는 칸만 읽는다 — 옛 형식(v3)은 회원·회비 마디와 회원·낸 분 표가 빈다)
+  - 구조: 나무 `StoredData → schemaVersion · books[] → 장부마다 id·createdAt·ledgers{해}(내역 수·이월금·월 회비)·members[]·dues → settings`, 마디마다 JSON 크기(줄바꿈·들여쓰기 없이 잰 UTF-8 바이트), `settings.recoveryCode` 는 "(가림)". 아래 "내역(Entry) 칸 채움" 표(칸·종류·필수/선택·채운 줄·비율, 옛 형식이면 그 형식에 없던 `payers`·`sourceText` 줄은 뺌). 칸 목록은 `keepView.ts` 의 `ENTRY_FIELDS` — 앱의 `Entry` 칸이나 필수/선택을 바꾸면 `scripts/keepView.test.ts` 타입 검사가 깨지니 같이 고친다.
+  - 표: 장부·해·내역·회원·낸 분 다섯 표(칸은 SPEC-013 기본 흐름 7 표). 장부·해로 거르기(해는 `ledgers` 키 글자로, 해 칸이 없는 장부·회원 표는 해로 거르지 않고 해 고르기가 꺼짐, 같은 기기의 다른 사본으로 바꾸면 그 사본에 없는 장부·해는 "모든 …"으로 — `fitTableFilter`), 찾기(보이는 글과 쉼표 없는 숫자, 대소문자 없이), 칸 머리로 정렬(숫자는 크기 순, 빈 칸은 늘 뒤, 같은 값은 원래 순서), 줄을 누르면(또는 Enter) 그 줄 원본 JSON(장부·해 줄은 안의 해·회원·내역 목록을 줄여 보임). 300줄까지 그리고 "N / 모두 M줄 · 앞 300줄만".
+  - 비교: 같은 기기의 두 사본을 같은 코드로 풀어 내역은 `Entry.id`, 회원은 장부 id + `Member.id` 로 맞춘다. 빠진·바뀐·더해진 줄(이 순서, 그 안에서는 날짜가 늦은 것부터, 120줄까지와 "모두 N줄"), 바뀐 칸 `앞 → 뒤`(다른 장부·해로 옮겨 갔으면 장부·해, 그리고 월·일·종류·이름·금액·낸 분·엑셀 글 — 적은 때·사진 묶음은 보지 않음), 회원 더해짐·빠짐, 해별 남은 돈(이월금 + 수입 − 지출)이 달라진 해. 처음 앞·뒤는 "고른 사본보다 먼저 받은 가장 가까운 사본(못 받은 사본·같은 때 받은 사본은 빼고) → 고른 사본", 고른 사본이 가장 먼저면 "고른 사본 → 그다음 사본", 그럴 사본이 없으면 견주지 않고 "이 사본과 견줄 다른 사본이 없어요"(앞·뒤는 직접 고를 수 있고, 같은 사본끼리는 견주지 않음).
 - **읽기만**: 보관 서버에는 본 주소 출처(`Origin: https://crowwan.github.io`)를 붙인 GET 만 보낸다(본 자리만, 미리보기 `preview:` 는 보지 않는다). 쓰기·지우기·되살리기·기록 파일 만들기는 없다 — 되살리기는 위 "보관본 꺼내기". 백업 레포는 git 읽기만.
 - **안전 규칙**
   - `127.0.0.1` 에만 연다(같은 와이파이의 다른 기기는 못 들어옴). `Host` 가 `127.0.0.1:<포트>`·`localhost:<포트>` 가 아니면 403(DNS rebinding 막기). GET 만 받는다.
   - 모든 응답(처리 중 오류의 500 `{ ok: false, message }` JSON 도)에 `Cache-Control: no-store`, 그리고 페이지가 이 맥 밖으로 아무것도 보내지 못하게 CSP(`connect-src 'self'`, `form-action 'none'`, 외부 글꼴·스크립트 없음)·`Referrer-Policy: no-referrer`.
-  - 복구 코드는 그 탭 메모리에만 둔다. 로컬 서버로 가는 주소(`/api/devices`·`/api/history?id=`·`/api/copy?id=&kind=&key=`)에는 id·사본 자리만 들어간다. [잠그기]나 탭을 닫으면 잊는다. 풀린 내용·코드는 파일·로그·주소창·localStorage 에 남기지 않고, 서버는 요청을 찍지 않는다.
+  - 복구 코드는 그 탭 메모리에만 둔다. 로컬 서버로 가는 주소(`/api/devices`·`/api/history?id=`·`/api/copy?id=&kind=&key=`)에는 id·사본 자리만 들어간다. [잠그기]나 탭을 닫으면 잊는다. 풀린 사본(비교가 다시 풀지 않게 기억하는 것)도 그 탭 메모리에만 두고, [잠그기] 하면 그 기기의 풀린 사본·고른 줄·그린 표·비교를 모두 지운다. 받거나 푸는 사이에 잠갔으면 풀기가 끝나도 그 결과를 버린다(PR #210 에서 헤드리스 크롬 힙 스냅숏으로 확인). 풀린 내용·코드는 파일·로그·주소창·localStorage 에 남기지 않고, 서버는 요청을 찍지 않는다.
   - id(64자 16진수)·날(YYYY-MM-DD)·달(YYYY-MM)·커밋(40자 16진수)은 형식을 본 뒤에만 git 인자·서버 주소에 쓴다(아니면 400). git 은 `GIT_CEILING_DIRECTORIES` 로 클론 자리 밖(위 폴더의 dongari 등)을 읽지 않는다.
   - **받은 코드로 화면을 캡처하거나 화면 공유하지 않는다**(코드 칸은 가려 보이지만 풀린 이름은 보인다). 시험·캡처는 지어낸 데이터(가짜 보관 서버·임시 git 레포·앱의 `sealKeep` 으로 만든 보관본)로.
 - **페이지에 TS 보내기** (SPEC-013 기술 확인): 로컬 서버가 켤 때 `scripts/keepView.ts`·`scripts/keepRescue.ts` 를 `node:module` 의 `stripTypeScriptTypes` 로 타입만 지워 `text/javascript` 로 보내고(요청마다 지우지 않으니 고쳤으면 다시 켠다), 페이지(`scripts/keep-view/index.html`)가 ES 모듈로 불러 `normalizeRecoveryCode`·`keepIdOf`·`openKeep`(Web Crypto, 앱과 같은 방식)으로 푼다. 빌드 없음. 그래서 두 파일은 `keepRescue.ts` 의 제약(타입 지우기 문법만, 다른 패키지·src 불러오기 없음)에 더해 브라우저에도 있는 API 만 쓴다. Node 24 에서 이 함수는 실험 기능이라 켤 때 경고가 한 번 나고, 숨기지 않는다(숨기려면 프로세스 경고 처리를 건드려 다른 경고까지 가릴 수 있음).
-- 순수 함수(목록 합치기·겉 정보·남는 기간·Host·입력 형식 검사·풀기·코드로 열기·요청 처리 `handleRequest`)는 `scripts/keepView.ts`, 시험은 `scripts/keepView.test.ts`(가짜 보관 서버·임시 git 레포·앱의 `sealKeep` 으로 만든 값, 그리고 `keep-view.mjs` 를 `--port 0` 으로 실제로 켜 보는 묶음). `keep-view.mjs` 는 `node:http`·`node:child_process`(git)·`fetch` 로 그 함수를 잇기만 한다.
+- 순수 함수(목록 합치기·겉 정보·남는 기간·Host·입력 형식 검사·풀기·코드로 열기·요청 처리 `handleRequest`, #206 의 구조 나무 `storedTree`·칸 채움 `entryFill`·다섯 표 `buildTables`·거르기·찾기·정렬 `queryTable`·거르기 되돌리기 `fitTableFilter`·비교 `compareCopies`·처음 앞뒤 `defaultPair`)는 `scripts/keepView.ts`, 시험은 `scripts/keepView.test.ts`(가짜 보관 서버·임시 git 레포·앱의 `sealKeep` 으로 만든 값과 `src/test/ledgerFixtures` 의 지어낸 장부, 그리고 `keep-view.mjs` 를 `--port 0` 으로 실제로 켜 보는 묶음). `keep-view.mjs` 는 `node:http`·`node:child_process`(git)·`fetch` 로 그 함수를 잇기만 하고, 페이지는 그 함수가 만든 것을 그리기만 한다(탭 전환·늦게 온 답 버리기 같은 페이지 동작은 레포 시험이 아니라 PR 의 헤드리스 크롬 장면으로 본다).
 
 ## 폴더 구조
 
@@ -231,7 +235,7 @@ src/
 ├── devtools/    개발 확인 화면 `/#/dev/env` (개발 모드·미리보기 빌드 전용, 본 주소 번들 제외, SPEC-009 #141), [오류 내 보기] 표시 crashRequest·일부러 그리기 오류 DevCrash (SPEC-012 AC-11 #203)
 └── test/        Vitest 설정, 여러 테스트가 같이 쓰는 장부 기록(ledgerFixtures: v1 예시 1년치, 장부·저장 데이터 만들기, v4 회비 칸이 든 장부 duesBook·그 저장 데이터 duesData, 저장 전 가드(#172)에 걸리는 낸 분 PAYERS_OFF_AMOUNT(합 ≠ 금액)·PAYERS_OFF_ROSTER(명단에 없는 번호)·두 경우 목록 BROKEN_PAYERS), 지어낸 엑셀 표(excelFixtures: 입출금내역·회비내역 시트 모양 — 회비내역은 이모 엑셀 모양과 앱이 내보낸 9절 모양, 실제 엑셀은 넣지 않음)
 public/icons/  앱 아이콘 (scripts/make-icons.mjs 가 토큰 색으로 만든다)
-scripts/       아이콘·글꼴 만들기, 보관본 꺼내기(keep-rescue.mjs + 풀기 keepRescue.ts, 개발자가 손으로, --which 는 기기 앞 8자), 보관본 들여다보기(keep-view.mjs 로컬 서버 127.0.0.1:7788 + 순수 함수 keepView.ts + 페이지 keep-view/index.html, 페이지는 keepView.ts·keepRescue.ts 를 타입만 지워 받아 브라우저에서 푼다, SPEC-013), 엑셀 조각 검사(check-excel-bundle.mjs + 판정 excelBundle.ts, npm run build 끝에서 돈다), ops/keep-backup 스크립트 테스트(keepBackupPlan.test.ts·keepWatch.test.ts)
+scripts/       아이콘·글꼴 만들기, 보관본 꺼내기(keep-rescue.mjs + 풀기 keepRescue.ts, 개발자가 손으로, --which 는 기기 앞 8자), 보관본 들여다보기(keep-view.mjs 로컬 서버 127.0.0.1:7788 + 순수 함수 keepView.ts(목록·겉 정보·풀기, 구조·표·비교) + 페이지 keep-view/index.html, 페이지는 keepView.ts·keepRescue.ts 를 타입만 지워 받아 브라우저에서 푼다, SPEC-013), 엑셀 조각 검사(check-excel-bundle.mjs + 판정 excelBundle.ts, npm run build 끝에서 돈다), ops/keep-backup 스크립트 테스트(keepBackupPlan.test.ts·keepWatch.test.ts)
 worker/        자동 보관 서버 (Cloudflare Worker + KV, 따로 있는 패키지). src/index.ts 진입점(기본 내보내기만), src/keep.ts 요청 처리, wrangler.toml
 ops/keep-backup/  비공개 백업 레포(crowwan/dongari-keep-backup)에 올리는 파일 원본: 주간 워크플로·README·받기 backup.mjs + 변환 규칙 backupPlan.ts (테스트는 scripts/keepBackupPlan.test.ts, SPEC-011 #186), 보관 지켜보기 워크플로 keep-watch.yml·keep-watch.mjs + 판정 keepWatch.ts (기기 이름표 devices.json 은 백업 레포에만, 테스트는 scripts/keepWatch.test.ts, SPEC-012 #201)
 ```
