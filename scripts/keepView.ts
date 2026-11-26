@@ -666,9 +666,11 @@ function numberOf(record: RawRecord, key: string): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
-// 세 자리마다 쉼표 (브라우저·Node 의 지역 설정과 상관없이 같게)
+// 정수 부분에만 세 자리마다 쉼표 (브라우저·Node 의 지역 설정과 상관없이 같게)
 export function won(value: number): string {
-  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const [whole, fraction] = String(value).split('.')
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return fraction === undefined ? grouped : `${grouped}.${fraction}`
 }
 
 // 시각은 한국 시간 (시각 모양이 아니면 적힌 그대로)
@@ -683,10 +685,15 @@ function jsonBytes(value: unknown): number {
 }
 
 interface YearPart {
-  key: string // ledgers 의 키 ("2026")
-  year: number
+  key: string // ledgers 의 키 ("2026"). 거르기는 이 글자로 맞춘다
+  year: number // 키를 숫자로 (숫자가 아닌 키면 NaN — yearCell·dayOrder 가 다룬다)
   raw: RawRecord
   entries: RawRecord[]
+}
+
+// 표의 해 칸: 숫자 키는 숫자, 숫자가 아닌 키는 키 글자 그대로 (정렬하면 숫자 해 뒤에)
+function yearCell(part: YearPart): string | number {
+  return Number.isFinite(part.year) ? part.year : part.key
 }
 
 interface BookPart {
@@ -882,7 +889,7 @@ export interface TableColumn {
 
 export interface TableRow {
   bookId: string // 장부로 거르기
-  year?: number // 해로 거르기 (해 칸이 없는 표는 없음)
+  year?: string // 해로 거르기: ledgers 키 글자 (해 칸이 없는 표는 없음)
   cells: Record<string, CellValue>
   raw: unknown // 줄을 누르면 보일 원본 JSON
 }
@@ -961,10 +968,11 @@ function rangeText(keys: readonly string[]): string | undefined {
   return keys.length === 1 ? keys[0] : `${keys[0]}~${keys[keys.length - 1]}`
 }
 
-// 장부 줄의 원본: 안의 해·회원 목록은 줄여 보인다 (그 줄은 해·회원 표에서)
+// 장부 줄의 원본: 안의 해·회원 목록은 줄여 보인다 (그 줄은 해·회원 표에서). 없는 칸은 지어 넣지 않는다
 function shortBook(book: BookPart): RawRecord {
+  const ledgers = isRecord(book.raw.ledgers) ? { ledgers: `{… ${book.years.length}개 해}` } : {}
   const members = book.members === undefined ? {} : { members: `[… ${book.members.length}명]` }
-  return { ...book.raw, ledgers: `{… ${book.years.length}개 해}`, ...members }
+  return { ...book.raw, ...ledgers, ...members }
 }
 
 // 다섯 표 (장부 순 → 해 순 → 저장된 내역 순). 옛 형식은 있는 칸만 채우고, 회원·낸 분 칸이 없으면 그 표는 빈다
@@ -985,14 +993,16 @@ export function buildTables(data: StoredView): ViewTable[] {
       raw: shortBook(book),
     })
     for (const part of book.years) {
-      const { year } = part
+      // 거르기는 해 키 글자로, 칸에는 숫자 해(숫자가 아닌 키는 그 글자)
+      const { key: year } = part
+      const yearShown = yearCell(part)
       const { income, expense } = sumsOf(part)
       rows.ledgers.push({
         bookId,
         year,
         cells: {
           book: book.name,
-          year,
+          year: yearShown,
           carryover: numberOf(part.raw, 'carryover'),
           monthlyFee: numberOf(part.raw, 'monthlyFee'),
           count: part.entries.length,
@@ -1011,7 +1021,7 @@ export function buildTables(data: StoredView): ViewTable[] {
           year,
           cells: {
             book: book.name,
-            year,
+            year: yearShown,
             month,
             day: numberOf(entry, 'day'),
             type: wordOf(ENTRY_TYPES, textOf(entry, 'type')),
@@ -1027,7 +1037,7 @@ export function buildTables(data: StoredView): ViewTable[] {
           rows.payers.push({
             bookId,
             year,
-            cells: { book: book.name, year, month, entry: name, member: payerName(book, payer), amount: numberOf(payer, 'amount') },
+            cells: { book: book.name, year: yearShown, month, entry: name, member: payerName(book, payer), amount: numberOf(payer, 'amount') },
             raw: payer,
           })
         }
@@ -1052,11 +1062,30 @@ export function buildTables(data: StoredView): ViewTable[] {
   return TABLES.map(({ key, label, columns }) => ({ key, label, columns, rows: rows[key] }))
 }
 
+export interface TableChoices {
+  books: { id: string; name: string }[]
+  years: string[] // ledgers 키 글자
+}
+
 // 장부·해 고르기 칸에 넣을 것
-export function tableChoices(data: StoredView): { books: { id: string; name: string }[]; years: string[] } {
+export function tableChoices(data: StoredView): TableChoices {
   const books = booksOf(data)
   const years = new Set(books.flatMap((book) => book.years.map(({ key }) => key)))
   return { books: books.map(({ id, name }) => ({ id, name })), years: [...years].sort() }
+}
+
+export interface TableFilter {
+  book: string
+  year: string
+}
+
+// 같은 기기의 다른 사본으로 바꿨을 때, 그 사본에 없는 장부·해는 ''(모든 장부·모든 해)로 되돌린다.
+// 그대로 두면 고르기 칸은 "모든 …"으로 보이는데 표는 옛 값으로 걸러 0줄이 된다
+export function fitTableFilter(filter: TableFilter, choices: TableChoices): TableFilter {
+  return {
+    book: choices.books.some(({ id }) => id === filter.book) ? filter.book : '',
+    year: choices.years.includes(filter.year) ? filter.year : '',
+  }
 }
 
 // 한 번에 그리는 줄 수 (SPEC-013 기본 흐름 7)
@@ -1118,7 +1147,7 @@ export function queryTable(table: ViewTable, query: TableQuery): TableView {
   const matched = table.rows.filter(
     (row) =>
       (query.book === '' || row.bookId === query.book) &&
-      (query.year === '' || row.year === undefined || String(row.year) === query.year) &&
+      (query.year === '' || row.year === undefined || row.year === query.year) &&
       (search === '' || rowMatches(table, row, search)),
   )
   const { sort } = query
@@ -1137,7 +1166,7 @@ export function queryTable(table: ViewTable, query: TableQuery): TableView {
 // 한 번에 그리는 바뀐 줄 수 (SPEC-013 기본 흐름 8)
 export const COMPARE_LIMIT = 120
 
-// 바뀐 칸으로 보는 것 (SPEC-013 기술 메모 "비교 기준"). 적은 때·사진 묶음은 보지 않는다
+// 바뀐 칸으로 보는 내역 칸 (SPEC-013 기술 메모 "비교 기준"). 적은 때·사진 묶음은 보지 않는다. 옮겨 간 장부·해는 placeChanges 가 본다
 const COMPARED_FIELDS: readonly { field: string; label: string }[] = [
   { field: 'month', label: '월' },
   { field: 'day', label: '일' },
@@ -1231,10 +1260,21 @@ function fieldText(field: string, spot: EntrySpot): string {
   return typeof value === 'string' ? value : JSON.stringify(value)
 }
 
+// 같은 id 의 줄이 다른 장부·해로 옮겨 갔으면 그것도 바뀐 칸이다 (장부는 id 로 맞추고 이름으로 보인다)
+function placeChanges(before: EntrySpot, after: EntrySpot): FieldChange[] {
+  const changes: FieldChange[] = []
+  if (before.book.id !== after.book.id) changes.push({ label: '장부', before: before.book.name, after: after.book.name })
+  if (before.year.key !== after.year.key) changes.push({ label: '해', before: before.year.key, after: after.year.key })
+  return changes
+}
+
 function fieldChanges(before: EntrySpot, after: EntrySpot): FieldChange[] {
-  return COMPARED_FIELDS.flatMap(({ field, label }) =>
-    JSON.stringify(before.entry[field]) === JSON.stringify(after.entry[field]) ? [] : [{ label, before: fieldText(field, before), after: fieldText(field, after) }],
-  )
+  return [
+    ...placeChanges(before, after),
+    ...COMPARED_FIELDS.flatMap(({ field, label }) =>
+      JSON.stringify(before.entry[field]) === JSON.stringify(after.entry[field]) ? [] : [{ label, before: fieldText(field, before), after: fieldText(field, after) }],
+    ),
+  ]
 }
 
 function twoDigits(value: number): string {
@@ -1249,7 +1289,9 @@ function dateOf({ year, entry }: EntrySpot): string {
 }
 
 // 날짜 순서를 재는 값 (해·월·일, 없는 칸은 0)
+// 숫자가 아닌 해 키의 줄은 가장 이른 것으로 쳐서, 날짜가 늦은 것부터 줄 세우면 맨 뒤에 온다
 function dayOrder({ year, entry }: EntrySpot): number {
+  if (!Number.isFinite(year.year)) return Number.MIN_SAFE_INTEGER
   return year.year * 10_000 + (numberOf(entry, 'month') ?? 0) * 100 + (numberOf(entry, 'day') ?? 0)
 }
 

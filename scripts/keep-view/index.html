@@ -273,30 +273,58 @@ function copySpot(copy) {
   return `${copy.kind}:${copy.key}`
 }
 
-// 그 기기 사본 하나를 받아 이 기기의 코드로 푼다. 잘 푼 것만 기억한다 (못 받은 것은 다음에 다시 받는다)
-function openedOf(device, copy) {
-  if (!openedCopies.has(device.id)) openedCopies.set(device.id, new Map())
-  const byCopy = openedCopies.get(device.id)
-  const spot = copySpot(copy)
-  if (!byCopy.has(spot)) {
-    const loading = (async () => {
-      const code = codes.get(device.id)
-      if (code === undefined) return { ok: false, message: '잠겨 있어요' }
-      const answer = await getLocal(view.copyPath(device.id, copy)).catch(() => ({ ok: false, message: SERVER_GONE }))
-      return answer.ok ? view.openCopy(code, answer.envelope) : answer
-    })()
-    byCopy.set(spot, loading)
-    loading.then((opened) => {
-      if (!opened.ok && byCopy.get(spot) === loading) byCopy.delete(spot)
-    })
+const LOCKED = '잠겨 있어요'
+
+// 기기 id|사본 자리 → 받는 중인 /api/copy 답. 사본을 고르는 쪽과 비교가 같은 사본을 동시에 받으면 한 번만 받는다.
+// 다 받으면 지운다 (겉봉투는 고를 때마다 새로 받는다 — 그사이 서버 최신본이 바뀌었을 수 있다)
+const copyAnswers = new Map()
+function answerOf(device, copy) {
+  const key = `${device.id}|${copySpot(copy)}`
+  if (!copyAnswers.has(key)) {
+    const loading = getLocal(view.copyPath(device.id, copy)).catch(() => ({ ok: false, message: SERVER_GONE }))
+    copyAnswers.set(key, loading)
+    loading.then(() => copyAnswers.delete(key))
   }
-  return byCopy.get(spot)
+  return copyAnswers.get(key)
 }
 
+// 기억해 둔 풀린 사본 하나 (그 기기가 잠겨 있지 않을 때만)
+function rememberOpened(device, copy, opened) {
+  if (!codes.has(device.id)) return
+  if (!openedCopies.has(device.id)) openedCopies.set(device.id, new Map())
+  openedCopies.get(device.id).set(copySpot(copy), opened)
+}
+
+// 그 기기 사본 하나를 받아 이 기기의 코드로 푼다. 잘 푼 것만 기억한다 (못 받은 것은 다음에 다시 받는다).
+// 받거나 푸는 사이에 [잠그기] 했으면 풀린 것을 버리고 잠김으로 돌려준다
+function openedOf(device, copy) {
+  const spot = copySpot(copy)
+  const known = openedCopies.get(device.id)?.get(spot)
+  if (known) return known
+  const code = codes.get(device.id)
+  if (code === undefined) return Promise.resolve({ ok: false, message: LOCKED })
+  const loading = (async () => {
+    const answer = await answerOf(device, copy)
+    if (!answer.ok) return answer
+    const opened = await view.openCopy(code, answer.envelope)
+    return codes.get(device.id) === code ? opened : { ok: false, message: LOCKED }
+  })()
+  rememberOpened(device, copy, loading)
+  loading.then((opened) => {
+    if (!opened.ok && openedCopies.get(device.id)?.get(spot) === loading) openedCopies.get(device.id).delete(spot)
+  })
+  return loading
+}
+
+// [잠그기]: 그 기기의 풀린 사본·고른 줄·그린 표·비교를 모두 잊는다 (탭 메모리에서도 지운다)
 function forgetOpened(deviceId) {
   openedCopies.delete(deviceId)
   compareToken++
-  if (state.compare) state.compare.result = undefined
+  state.compare = undefined
+  state.opened = undefined
+  state.table.selected = undefined
+  rowNodes = new Map()
+  headButtons = new Map()
 }
 
 // 로컬 서버 GET. 주소는 keepView 의 DEVICES_PATH·historyPath·copyPath 로만 만든다 (id 만, 코드 없음).
@@ -321,14 +349,12 @@ async function openPicked(token) {
   const device = currentDevice()
   const code = device && codes.get(device.id)
   const opened = code && state.copy?.ok ? await view.openCopy(code, state.copy.envelope) : undefined
-  if (token !== pickToken) return
+  // 푸는 사이에 다른 사본을 골랐거나 [잠그기] 했으면 풀린 것을 버린다 (잠근 기기에 풀린 장부가 다시 들어가지 않게)
+  if (token !== pickToken || (code !== undefined && codes.get(device.id) !== code)) return
   state.opened = opened
   // 비교 탭이 같은 사본을 다시 받지 않게
   const copy = device?.copies[state.pick.index]
-  if (opened?.ok && copy) {
-    if (!openedCopies.has(device.id)) openedCopies.set(device.id, new Map())
-    openedCopies.get(device.id).set(copySpot(copy), Promise.resolve(opened))
-  }
+  if (opened?.ok && copy) rememberOpened(device, copy, Promise.resolve(opened))
 }
 
 async function pick(deviceId, index) {
@@ -346,9 +372,8 @@ async function pick(deviceId, index) {
   render()
   const device = currentDevice()
   const copy = device?.copies[index]
-  let answer
-  if (copy === undefined) answer = undefined
-  else answer = await getLocal(view.copyPath(device.id, copy)).catch(() => ({ ok: false, message: SERVER_GONE }))
+  // 비교가 같은 사본을 받는 중이면 그 답을 같이 쓴다
+  const answer = copy === undefined ? undefined : await answerOf(device, copy)
   if (token !== pickToken) return
   state.copy = answer
   await openPicked(token)
@@ -380,7 +405,6 @@ function relock() {
   const device = currentDevice()
   codes.delete(device.id)
   forgetOpened(device.id)
-  state.opened = undefined
   render()
 }
 
@@ -678,6 +702,8 @@ function tablePane() {
   const { opened, why } = openedOrWhy()
   if (why) return why
   const { tables, choices } = derivedOf(opened)
+  // 같은 기기의 다른 사본으로 왔을 때 그 사본에 없는 장부·해는 "모든 …"으로 (고르기 칸과 거르기가 어긋나지 않게)
+  Object.assign(state.table, view.fitTableFilter(state.table, choices))
   return [
     formatCap(opened, `한 번에 ${view.won(view.TABLE_LIMIT)}줄까지 그려요 — 장부·해·찾기로 좁혀 보세요. 시각은 한국 시간`),
     tableBar(tables, choices),
@@ -719,6 +745,10 @@ function renderCompareResult() {
   const result = $('compareResult')
   const pair = state.compare
   if (!result || !pair) return
+  if (pair.before === pair.after) {
+    fill('compareResult', !pair.noPair && el('p', { class: 'cap', 'data-testid': 'compare-same' }, '앞과 뒤가 같은 사본이에요. 다른 사본을 골라 주세요.'))
+    return
+  }
   if (pair.result === undefined || pair.result.loading) {
     result.replaceChildren(el('p', { class: 'cap', 'data-testid': 'compare-wait' }, '두 사본을 받아 푸는 중…'))
     return
@@ -768,19 +798,22 @@ function renderCompareResult() {
 function diffPane(device) {
   if (device.copies.length < 2) return el('p', { class: 'cap' }, '이 기기에는 사본이 하나뿐이라 비교할 것이 없어요.')
   if (state.compare === undefined) {
-    const pair = view.defaultPair(device.copies, state.pick.index) ?? { before: 1, after: 0 }
-    state.compare = { ...pair, result: undefined }
+    // 처음 앞 사본을 정할 수 없으면(다른 사본을 못 받았거나 같은 때 받은 것뿐) 앞·뒤 모두 고른 사본으로 두고 견주지 않는다
+    const pair = view.defaultPair(device.copies, state.pick.index)
+    state.compare = pair === undefined ? { before: state.pick.index, after: state.pick.index, result: undefined, noPair: true } : { ...pair, result: undefined }
   }
   const pair = state.compare
+  const same = pair.before === pair.after
   const choose = (side) => (event) => {
-    state.compare = { ...pair, [side]: Number(event.target.value), result: undefined }
+    state.compare = { before: pair.before, after: pair.after, [side]: Number(event.target.value), result: undefined }
     compareToken++
     renderPane()
   }
   const options = (chosen) => device.copies.map((copy, index) => el('option', { value: String(index), selected: index === chosen }, copyOptionLabel(copy)))
-  if (pair.result === undefined) startCompare(device, pair)
+  if (pair.result === undefined && !same) startCompare(device, pair)
   return [
     el('p', { class: 'cap' }, '같은 기기의 두 사본을 같은 코드로 풀어 맞춰 봐요. 내역은 id 로, 회원은 장부 id + 회원 번호로 맞춰요.'),
+    pair.noPair && same && el('p', { class: 'bad', 'data-testid': 'compare-none' }, '이 사본과 견줄 다른 사본이 없어요 — 다른 사본을 받지 못했거나 같은 때 받은 사본뿐이에요. 앞·뒤를 직접 골라 볼 수는 있어요.'),
     el('div', { class: 'tbar' },
       el('label', { for: 'compareBefore', class: 'cap' }, '앞'),
       el('select', { id: 'compareBefore', 'data-testid': 'compare-before', onchange: choose('before') }, options(pair.before)),

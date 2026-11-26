@@ -33,6 +33,7 @@ import {
   ENTRY_FIELDS,
   entryFill,
   envelopePreview,
+  fitTableFilter,
   handleRequest,
   historyPath,
   isAllowedHost,
@@ -55,6 +56,7 @@ import {
   strangeLocalAnswer,
   tableChoices,
   unlockDevice,
+  won,
   type CopyAnswer,
   type CopyItem,
   type CopyRef,
@@ -1094,6 +1096,11 @@ describe('SPEC-013 보관본 들여다보기', () => {
       expect(queryTable(tableOf(viewOf(manyEntries(1_200)), 'entries'), ALL).countText).toBe('1,200 / 모두 1,200줄 · 앞 300줄만')
     })
 
+    it('돈은 정수 부분에만 세 자리 쉼표를 찍는다 (음수·소수도)', () => {
+      expect([won(0), won(999), won(1_000), won(-30_000), won(1_234_567)]).toEqual(['0', '999', '1,000', '-30,000', '1,234,567'])
+      expect([won(1234.5678), won(-1234.5)]).toEqual(['1,234.5678', '-1,234.5'])
+    })
+
     it('옛 저장 형식(v3)은 회원·낸 분 표가 비고, 나머지 표는 있는 칸으로 채운다', () => {
       const data = viewOf(V3_DATA)
 
@@ -1102,6 +1109,31 @@ describe('SPEC-013 보관본 들여다보기', () => {
       expect(columnOf(data, 'books', 'members')).toEqual([undefined])
       expect(columnOf(data, 'entries', 'payers')).toEqual([undefined])
       expect(columnOf(data, 'ledgers', 'balance')).toEqual([130_000])
+    })
+
+    it('다른 사본으로 바꿨을 때 그 사본에 없는 장부·해로는 거르지 않는다 (고르기 칸은 모든 장부·모든 해로)', () => {
+      const choices = tableChoices(viewOf(richData()))
+
+      expect(fitTableFilter({ book: 'home', year: '2025' }, choices)).toEqual({ book: 'home', year: '2025' })
+      expect(fitTableFilter({ book: 'gone-book', year: '2024' }, choices)).toEqual({ book: '', year: '' })
+      expect(fitTableFilter({ book: '', year: '' }, choices)).toEqual({ book: '', year: '' })
+    })
+
+    it('원본에 ledgers 가 없는 장부 줄은 ledgers 를 지어 넣지 않는다 (저장된 그대로)', () => {
+      const data = viewOf({ schemaVersion: 4, books: [{ id: 'bare', name: '칸 빠진 장부', kind: 'club' }], settings: {} })
+
+      expect(queryTable(tableOf(data, 'books'), ALL).rows[0].raw).toEqual({ id: 'bare', name: '칸 빠진 장부', kind: 'club' })
+    })
+
+    it('숫자가 아닌 해 키도 키 글자로 거르고, 정렬하면 숫자 해 뒤에 둔다', () => {
+      const odd = richData()
+      odd.books[1].ledgers.old = { year: 0, carryover: 0, entries: [{ id: 'odd-1', month: 1, type: 'income', name: '옛 키 줄', amount: 1_000, createdAt: '2026-01-01T00:00:00.000Z' }] }
+      const data = viewOf(odd)
+
+      expect(tableChoices(data).years).toEqual(['2025', '2026', 'old'])
+      expect(columnOf(data, 'entries', 'name', { ...ALL, year: 'old' })).toEqual(['옛 키 줄'])
+      expect(columnOf(data, 'entries', 'year', { ...ALL, book: 'home' })).toEqual([2026, 2026, 2026, 'old'])
+      expect(columnOf(data, 'ledgers', 'year', { ...ALL, sort: { column: 'year', descending: false } })).toEqual([2025, 2026, 2026, 'old'])
     })
   })
 
@@ -1160,6 +1192,39 @@ describe('SPEC-013 보관본 들여다보기', () => {
         { book: '꽃동아리', year: '2026', before: 70_000, after: 60_000, diff: -10_000 },
         { book: '우리집', year: '2026', before: 78_000, after: 445_000, diff: 367_000 },
         { book: '우리집', year: '2027', before: undefined, after: 85_000, diff: undefined },
+      ])
+    })
+
+    it('같은 id 의 내역이 다른 해나 다른 장부로 옮겨 가면 바뀐 줄이고, 장부·해도 앞 → 뒤로 보인다', () => {
+      const before = richData()
+      const after = richData()
+      // 우리집 2026 의 용돈(e1)을 2027 로, 꽃동아리 2025 의 송년회(c25)를 우리집 2025 로
+      const homeYear = yearOf(after, 1, '2026')
+      const [allowance] = homeYear.entries.splice(0, 1)
+      after.books[1].ledgers['2027'] = { year: 2027, carryover: 0, entries: [allowance] }
+      const party = yearOf(after, 0, '2025').entries.splice(0, 1)
+      after.books[1].ledgers['2025'] = { year: 2025, carryover: 0, entries: party }
+
+      const comparison = compareCopies(viewOf(before), viewOf(after))
+
+      expect(comparison).toMatchObject({ removed: 0, changed: 2, added: 0 })
+      expect(comparison.rows.map(({ name, date, changes }) => ({ name, date, changes }))).toEqual([
+        { name: '용돈', date: '2027-01', changes: [{ label: '해', before: '2026', after: '2027' }] },
+        { name: '송년회', date: '2025-12-20', changes: [{ label: '장부', before: '꽃동아리', after: '우리집' }] },
+      ])
+    })
+
+    it('숫자가 아닌 해 키의 줄은 같은 무리 안에서 맨 뒤에 둔다', () => {
+      const after = richData()
+      // 먼저 훑는 장부(꽃동아리)에 두어, 날짜를 못 재면 넣은 순서대로 앞에 남는다
+      after.books[0].ledgers.old = { year: 0, carryover: 0, entries: [{ id: 'odd-1', month: 12, day: 31, type: 'income', name: '옛 키 줄', amount: 1_000, createdAt: '2026-01-01T00:00:00.000Z' }] }
+      yearOf(after, 1, '2026').entries.push({ id: 'new-2', month: 1, day: 2, type: 'expense', name: '새 줄', amount: 2_000, createdAt: '2026-01-02T00:00:00.000Z' })
+
+      const comparison = compareCopies(viewOf(richData()), viewOf(after))
+
+      expect(comparison.rows.map(({ name, date }) => [name, date])).toEqual([
+        ['새 줄', '2026-01-02'],
+        ['옛 키 줄', 'old-12-31'],
       ])
     })
 
